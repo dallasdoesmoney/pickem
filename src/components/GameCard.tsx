@@ -26,7 +26,7 @@ function TeamHalf({
   return (
     <button
       onClick={onClick}
-      className="relative flex-1 h-28 active:scale-95 transition-transform duration-150"
+      className="relative flex-1 h-28 cursor-pointer active:scale-95 transition-transform duration-150"
       style={{ zIndex: isPicked ? 10 : 0 }}
     >
       <div
