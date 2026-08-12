@@ -38,7 +38,7 @@ export default function Home() {
               >
                 {group.label}
               </h2>
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-3 sm:gap-6">
                 {group.games.map((game) => (
                   <GameCard
                     key={game.id}

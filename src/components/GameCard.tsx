@@ -26,7 +26,7 @@ function TeamHalf({
   return (
     <button
       onClick={onClick}
-      className="relative flex-1 h-28 active:scale-95 transition-transform duration-150"
+      className="relative flex-1 h-20 sm:h-28 active:scale-95 transition-transform duration-150"
       style={{ zIndex: isPicked ? 10 : 0 }}
     >
       <div
@@ -43,7 +43,7 @@ function TeamHalf({
         <img
           src={team.logo}
           alt={team.name}
-          className="h-40 w-40 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+          className="h-28 w-28 sm:h-40 sm:w-40 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
         />
       </div>
       {isPicked && (
