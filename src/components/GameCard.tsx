@@ -47,12 +47,24 @@ function TeamHalf({
         />
       </div>
       {isPicked && (
-        <div
-          className={`pointer-events-none absolute inset-0 ${radius}`}
-          style={{
-            boxShadow: "0 0 16px 4px rgba(74,222,128,0.85)",
-          }}
-        />
+        <>
+          <div
+            className={`pointer-events-none absolute inset-0 ${radius}`}
+            style={{
+              boxShadow: "0 0 10px 3px rgba(74,222,128,0.75)",
+            }}
+          />
+          <span
+            className="pointer-events-none absolute inset-0 flex items-center justify-center text-3xl font-black"
+            style={{
+              color: "#4ade80",
+              textShadow:
+                "-1.5px -1.5px 0 #052e16, 1.5px -1.5px 0 #052e16, -1.5px 1.5px 0 #052e16, 1.5px 1.5px 0 #052e16, 0 2px 6px rgba(0,0,0,0.6)",
+            }}
+          >
+            W
+          </span>
+        </>
       )}
     </button>
   );
