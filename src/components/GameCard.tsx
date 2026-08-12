@@ -82,9 +82,10 @@ export function GameCard({
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
   const hasPick = !!picked;
+  const favoriteTeam = game.favorite ? TEAMS[game.favorite] : undefined;
 
   return (
-    <div className="flex items-center px-1">
+    <div className="relative flex items-center px-1">
       <TeamHalf
         team={away}
         side="left"
@@ -99,6 +100,18 @@ export function GameCard({
         isFaded={hasPick && picked !== home.abbr}
         onClick={() => onPick(home.abbr)}
       />
+      {favoriteTeam && game.spread !== undefined && (
+        <span
+          className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-bold"
+          style={{
+            backgroundColor: "#0e1b33",
+            borderColor: "#4ade80",
+            color: "#4ade80",
+          }}
+        >
+          {favoriteTeam.abbr} -{game.spread}
+        </span>
+      )}
     </div>
   );
 }
