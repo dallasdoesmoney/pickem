@@ -3,6 +3,9 @@
 import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 
+const BORDER_WIDTH = 4;
+const GLOW_WIDTH = 5;
+
 function TeamHalf({
   team,
   isPicked,
@@ -16,32 +19,39 @@ function TeamHalf({
   side: "left" | "right";
   onClick: () => void;
 }) {
-  const shapeClasses =
-    side === "left"
-      ? "rounded-l-full border-l-[3px] border-t-[3px] border-b-[3px]"
-      : "rounded-r-full border-r-[3px] border-t-[3px] border-b-[3px]";
+  const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
+  const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
 
   return (
     <button
       onClick={onClick}
-      className={[
-        "relative flex-1 flex items-center justify-center transition-all duration-150 border-white",
-        shapeClasses,
-        "h-28 active:scale-95",
-      ].join(" ")}
-      style={{
-        backgroundColor: team.color,
-        boxShadow: isPicked
-          ? "0 0 0 3px #4ade80, 0 0 22px 4px rgba(74,222,128,0.8)"
-          : undefined,
-        filter: isFaded ? "grayscale(0.85) brightness(0.5)" : undefined,
-      }}
+      className="relative flex-1 h-28 active:scale-95 transition-transform duration-150"
+      style={{ zIndex: isPicked ? 10 : 0 }}
     >
-      <img
-        src={team.logo}
-        alt={team.name}
-        className="h-24 w-24 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
-      />
+      <div
+        className={`absolute inset-0 ${radius} overflow-hidden flex items-center justify-center`}
+        style={{
+          backgroundColor: team.color,
+          borderTop: `${BORDER_WIDTH}px solid white`,
+          borderBottom: `${BORDER_WIDTH}px solid white`,
+          [outerBorderSide]: `${BORDER_WIDTH}px solid white`,
+          filter: isFaded ? "grayscale(0.85) brightness(0.5)" : undefined,
+        }}
+      >
+        <img
+          src={team.logo}
+          alt={team.name}
+          className="h-40 w-40 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+        />
+      </div>
+      {isPicked && (
+        <div
+          className={`pointer-events-none absolute inset-0 ${radius}`}
+          style={{
+            boxShadow: `0 0 0 ${GLOW_WIDTH}px #4ade80, 0 0 26px 6px rgba(74,222,128,0.85)`,
+          }}
+        />
+      )}
     </button>
   );
 }
