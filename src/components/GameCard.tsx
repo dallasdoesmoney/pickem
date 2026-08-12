@@ -3,7 +3,7 @@
 import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 
-const BORDER_WIDTH = 4;
+const BORDER_WIDTH = 3;
 
 function TeamHalf({
   team,
@@ -26,7 +26,7 @@ function TeamHalf({
   return (
     <button
       onClick={onClick}
-      className="relative flex-1 h-28 cursor-pointer active:scale-95 transition-transform duration-150"
+      className="relative flex-1 h-20 cursor-pointer active:scale-95 transition-transform duration-150"
       style={{ zIndex: isPicked ? 10 : 0 }}
     >
       <div
@@ -43,14 +43,14 @@ function TeamHalf({
         <img
           src={team.logo}
           alt={team.name}
-          className="h-40 w-40 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+          className="h-28 w-28 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
         />
       </div>
       {isPicked && (
         <div
           className={`pointer-events-none absolute inset-0 ${radius}`}
           style={{
-            boxShadow: "0 0 24px 6px rgba(74,222,128,0.85)",
+            boxShadow: "0 0 16px 4px rgba(74,222,128,0.85)",
           }}
         />
       )}

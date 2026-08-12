@@ -13,22 +13,22 @@ export default function Home() {
 
   return (
     <div className="flex flex-col flex-1">
-      <header className="px-4 pt-8 pb-4 text-center">
+      <header className="px-4 pt-6 pb-3 text-center">
         <h1
           className="text-3xl tracking-wide"
           style={{ fontFamily: "var(--font-display)" }}
         >
           NFL PICK&rsquo;EM
         </h1>
-        <p className="text-sm text-white/50 mt-3">
+        <p className="text-sm text-white/50 mt-2">
           Week {CURRENT_WEEK} &middot; {pickedCount} / {games.length} picked
         </p>
       </header>
 
-      <main className="flex-1 px-4 pb-10 flex flex-col gap-8 max-w-xl w-full mx-auto">
+      <main className="flex-1 px-4 pb-10 flex flex-col gap-5 max-w-4xl w-full mx-auto">
         {loaded &&
           groups.map((group) => (
-            <section key={group.label} className="flex flex-col gap-3">
+            <section key={group.label} className="flex flex-col gap-2">
               <h2
                 className="text-center whitespace-nowrap px-2"
                 style={{
@@ -38,7 +38,7 @@ export default function Home() {
               >
                 {group.label}
               </h2>
-              <div className="flex flex-col gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-4 gap-y-3">
                 {group.games.map((game) => (
                   <GameCard
                     key={game.id}
