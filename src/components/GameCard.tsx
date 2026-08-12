@@ -50,9 +50,15 @@ function TeamHalf({
       </div>
       {spreadLabel && (
         <span
-          className={`pointer-events-none absolute top-1.5 z-10 text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${
+          className={`pointer-events-none absolute bottom-1.5 z-10 text-sm font-bold text-white ${
             side === "left" ? "right-2" : "left-2"
           }`}
+          style={{
+            transform: side === "left" ? "rotate(-10deg)" : "rotate(10deg)",
+            filter: isFaded
+              ? "grayscale(0.85) brightness(0.5)"
+              : "drop-shadow(0 1px 2px rgba(0,0,0,0.8))",
+          }}
         >
           {spreadLabel}
         </span>
@@ -70,6 +76,7 @@ function TeamHalf({
             style={{
               color: "#4ade80",
               transform: "rotate(-12deg)",
+              WebkitTextStroke: "1px rgba(0,0,0,0.6)",
               filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
             }}
           >
