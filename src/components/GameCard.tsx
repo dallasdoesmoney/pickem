@@ -21,6 +21,7 @@ function TeamHalf({
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
+  const borderColor = isPicked ? "transparent" : "white";
 
   return (
     <button
@@ -32,9 +33,9 @@ function TeamHalf({
         className={`absolute inset-0 ${radius} overflow-hidden flex items-center justify-center`}
         style={{
           backgroundColor: team.color,
-          borderTop: `${BORDER_WIDTH}px solid white`,
-          borderBottom: `${BORDER_WIDTH}px solid white`,
-          [outerBorderSide]: `${BORDER_WIDTH}px solid white`,
+          borderTop: `${BORDER_WIDTH}px solid ${borderColor}`,
+          borderBottom: `${BORDER_WIDTH}px solid ${borderColor}`,
+          [outerBorderSide]: `${BORDER_WIDTH}px solid ${borderColor}`,
           filter: isFaded ? "grayscale(0.85) brightness(0.5)" : undefined,
         }}
       >
