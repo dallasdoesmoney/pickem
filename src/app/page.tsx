@@ -3,36 +3,49 @@
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard } from "@/components/GameCard";
 import { usePicks } from "@/hooks/usePicks";
+import { groupGamesByDay } from "@/lib/groupGames";
 
 export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
   const { picks, setPick, loaded } = usePicks(CURRENT_WEEK);
   const pickedCount = Object.keys(picks).length;
+  const groups = groupGamesByDay(games);
 
   return (
-    <div className="flex flex-col flex-1 bg-neutral-50">
-      <header className="sticky top-0 z-10 bg-neutral-50/90 backdrop-blur border-b border-black/10 px-4 pt-6 pb-4">
-        <h1 className="text-2xl font-bold">Week {CURRENT_WEEK}</h1>
-        <p className="text-sm text-black/60 mt-1">
-          {pickedCount} / {games.length} picked
+    <div className="flex flex-col flex-1">
+      <header className="px-4 pt-8 pb-4 text-center">
+        <h1
+          className="text-3xl tracking-wide"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          NFL PICK&rsquo;EM
+        </h1>
+        <p className="text-sm text-white/50 mt-3">
+          Week {CURRENT_WEEK} &middot; {pickedCount} / {games.length} picked
         </p>
-        <div className="mt-2 h-1.5 rounded-full bg-black/10 overflow-hidden">
-          <div
-            className="h-full bg-emerald-500 transition-all"
-            style={{ width: `${(pickedCount / games.length) * 100}%` }}
-          />
-        </div>
       </header>
 
-      <main className="flex-1 px-4 py-4 flex flex-col gap-3 max-w-xl w-full mx-auto">
+      <main className="flex-1 px-4 pb-10 flex flex-col gap-8 max-w-xl w-full mx-auto">
         {loaded &&
-          games.map((game) => (
-            <GameCard
-              key={game.id}
-              game={game}
-              picked={picks[game.id]}
-              onPick={(team) => setPick(game.id, team)}
-            />
+          groups.map((group) => (
+            <section key={group.label} className="flex flex-col gap-3">
+              <h2
+                className="text-center text-lg tracking-wide"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {group.label}
+              </h2>
+              <div className="flex flex-col gap-3">
+                {group.games.map((game) => (
+                  <GameCard
+                    key={game.id}
+                    game={game}
+                    picked={picks[game.id]}
+                    onPick={(team) => setPick(game.id, team)}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
       </main>
     </div>
