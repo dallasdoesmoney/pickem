@@ -16,11 +16,20 @@ function TeamHalf({
   side: "left" | "right";
   onClick: () => void;
 }) {
+  const outerRadius = side === "left" ? "rounded-l-full" : "rounded-r-full";
+  const innerRadius = isPicked
+    ? side === "left"
+      ? "rounded-r-full"
+      : "rounded-l-full"
+    : "rounded-none";
+
   return (
     <button
       onClick={onClick}
       className={[
-        "relative flex-1 flex items-center justify-center rounded-full transition-all duration-150",
+        "relative flex-1 flex items-center justify-center transition-all duration-150",
+        outerRadius,
+        innerRadius,
         "h-20 active:scale-95",
         isPicked ? "z-10 scale-105" : "z-0 scale-100",
       ].join(" ")}
@@ -30,8 +39,6 @@ function TeamHalf({
           ? "0 0 0 3px #4ade80, 0 0 18px 2px rgba(74,222,128,0.7)"
           : undefined,
         filter: isFaded ? "grayscale(0.85) brightness(0.55)" : undefined,
-        marginLeft: side === "right" ? -8 : 0,
-        marginRight: side === "left" ? -8 : 0,
       }}
     >
       <img
@@ -57,7 +64,7 @@ export function GameCard({
   const hasPick = !!picked;
 
   return (
-    <div className="flex items-center gap-2 px-1">
+    <div className="flex items-center px-1">
       <TeamHalf
         team={away}
         side="left"
