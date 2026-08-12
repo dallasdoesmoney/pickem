@@ -12,7 +12,9 @@ export type Team = {
 };
 
 function espnLogo(espnAbbr: string) {
-  return `https://a.espncdn.com/i/teamlogos/nfl/500/${espnAbbr}.png`;
+  // "500-dark" variant has outlined marks built for colored/dark backgrounds,
+  // so logos stay legible even when a team's own color is used behind them.
+  return `https://a.espncdn.com/i/teamlogos/nfl/500-dark/${espnAbbr}.png`;
 }
 
 export const TEAMS: Record<TeamAbbr, Team> = {

@@ -16,35 +16,31 @@ function TeamHalf({
   side: "left" | "right";
   onClick: () => void;
 }) {
-  const outerRadius = side === "left" ? "rounded-l-full" : "rounded-r-full";
-  const innerRadius = isPicked
-    ? side === "left"
-      ? "rounded-r-full"
-      : "rounded-l-full"
-    : "rounded-none";
+  const shapeClasses =
+    side === "left"
+      ? "rounded-l-full border-l-[3px] border-t-[3px] border-b-[3px]"
+      : "rounded-r-full border-r-[3px] border-t-[3px] border-b-[3px]";
 
   return (
     <button
       onClick={onClick}
       className={[
-        "relative flex-1 flex items-center justify-center transition-all duration-150",
-        outerRadius,
-        innerRadius,
-        "h-20 active:scale-95",
-        isPicked ? "z-10 scale-105" : "z-0 scale-100",
+        "relative flex-1 flex items-center justify-center transition-all duration-150 border-white",
+        shapeClasses,
+        "h-28 active:scale-95",
       ].join(" ")}
       style={{
         backgroundColor: team.color,
         boxShadow: isPicked
-          ? "0 0 0 3px #4ade80, 0 0 18px 2px rgba(74,222,128,0.7)"
+          ? "0 0 0 3px #4ade80, 0 0 22px 4px rgba(74,222,128,0.8)"
           : undefined,
-        filter: isFaded ? "grayscale(0.85) brightness(0.55)" : undefined,
+        filter: isFaded ? "grayscale(0.85) brightness(0.5)" : undefined,
       }}
     >
       <img
         src={team.logo}
         alt={team.name}
-        className="h-12 w-12 object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+        className="h-24 w-24 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
       />
     </button>
   );

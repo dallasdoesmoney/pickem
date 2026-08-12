@@ -28,6 +28,10 @@ export const WEEK_1_GAMES: Game[] = [
   { id: "2026-w1-den-kc", week: 1, away: "DEN", home: "KC", kickoff: "2026-09-14T20:15:00-04:00", network: "ESPN" },
 ];
 
+// To add a new week: copy the WEEK_1_GAMES array above, rename it
+// (e.g. WEEK_2_GAMES), fill in that week's real matchups, register it
+// below, and bump CURRENT_WEEK. Team colors/logos in teams.ts don't
+// need to change — every team abbreviation already resolves there.
 export const GAMES_BY_WEEK: Record<number, Game[]> = {
   1: WEEK_1_GAMES,
 };
