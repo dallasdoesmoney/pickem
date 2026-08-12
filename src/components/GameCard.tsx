@@ -50,11 +50,11 @@ function TeamHalf({
       </div>
       {spreadLabel && (
         <span
-          className={`pointer-events-none absolute bottom-1.5 z-10 text-sm font-bold text-white ${
+          className={`pointer-events-none absolute bottom-1.5 z-10 text-2xl text-white ${
             side === "left" ? "right-2" : "left-2"
           }`}
           style={{
-            transform: side === "left" ? "rotate(-10deg)" : "rotate(10deg)",
+            fontFamily: "var(--font-display)",
             filter: isFaded
               ? "grayscale(0.85) brightness(0.5)"
               : "drop-shadow(0 1px 2px rgba(0,0,0,0.8))",
