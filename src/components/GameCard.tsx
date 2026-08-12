@@ -10,12 +10,14 @@ function TeamHalf({
   isPicked,
   isFaded,
   side,
+  spreadLabel,
   onClick,
 }: {
   team: (typeof TEAMS)[TeamAbbr];
   isPicked: boolean;
   isFaded: boolean;
   side: "left" | "right";
+  spreadLabel?: string;
   onClick: () => void;
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
@@ -46,6 +48,15 @@ function TeamHalf({
           className="h-28 w-28 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
         />
       </div>
+      {spreadLabel && (
+        <span
+          className={`pointer-events-none absolute top-1.5 z-10 text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${
+            side === "left" ? "right-2" : "left-2"
+          }`}
+        >
+          {spreadLabel}
+        </span>
+      )}
       {isPicked && (
         <>
           <div
@@ -55,11 +66,11 @@ function TeamHalf({
             }}
           />
           <span
-            className="pointer-events-none absolute inset-0 flex items-center justify-center text-3xl font-black"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center text-5xl font-black"
             style={{
               color: "#4ade80",
-              textShadow:
-                "-1.5px -1.5px 0 #052e16, 1.5px -1.5px 0 #052e16, -1.5px 1.5px 0 #052e16, 1.5px 1.5px 0 #052e16, 0 2px 6px rgba(0,0,0,0.6)",
+              transform: "rotate(-12deg)",
+              filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
             }}
           >
             W
@@ -82,7 +93,19 @@ export function GameCard({
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
   const hasPick = !!picked;
-  const favoriteTeam = game.favorite ? TEAMS[game.favorite] : undefined;
+
+  const awaySpread =
+    game.favorite && game.spread !== undefined
+      ? game.favorite === game.away
+        ? `-${game.spread}`
+        : `+${game.spread}`
+      : undefined;
+  const homeSpread =
+    game.favorite && game.spread !== undefined
+      ? game.favorite === game.home
+        ? `-${game.spread}`
+        : `+${game.spread}`
+      : undefined;
 
   return (
     <div className="relative flex items-center px-1">
@@ -91,6 +114,7 @@ export function GameCard({
         side="left"
         isPicked={picked === away.abbr}
         isFaded={hasPick && picked !== away.abbr}
+        spreadLabel={awaySpread}
         onClick={() => onPick(away.abbr)}
       />
       <TeamHalf
@@ -98,20 +122,9 @@ export function GameCard({
         side="right"
         isPicked={picked === home.abbr}
         isFaded={hasPick && picked !== home.abbr}
+        spreadLabel={homeSpread}
         onClick={() => onPick(home.abbr)}
       />
-      {favoriteTeam && game.spread !== undefined && (
-        <span
-          className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-bold"
-          style={{
-            backgroundColor: "#0e1b33",
-            borderColor: "#4ade80",
-            color: "#4ade80",
-          }}
-        >
-          {favoriteTeam.abbr} -{game.spread}
-        </span>
-      )}
     </div>
   );
 }
