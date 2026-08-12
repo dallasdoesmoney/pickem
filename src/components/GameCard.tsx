@@ -4,7 +4,6 @@ import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 
 const BORDER_WIDTH = 4;
-const GLOW_WIDTH = 5;
 
 function TeamHalf({
   team,
@@ -21,7 +20,8 @@ function TeamHalf({
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
-  const borderColor = isPicked ? "transparent" : "white";
+  const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
+  const borderColor = isPicked ? "#4ade80" : "white";
 
   return (
     <button
@@ -36,6 +36,7 @@ function TeamHalf({
           borderTop: `${BORDER_WIDTH}px solid ${borderColor}`,
           borderBottom: `${BORDER_WIDTH}px solid ${borderColor}`,
           [outerBorderSide]: `${BORDER_WIDTH}px solid ${borderColor}`,
+          [innerBorderSide]: isPicked ? `${BORDER_WIDTH}px solid ${borderColor}` : undefined,
           filter: isFaded ? "grayscale(0.85) brightness(0.5)" : undefined,
         }}
       >
@@ -49,7 +50,7 @@ function TeamHalf({
         <div
           className={`pointer-events-none absolute inset-0 ${radius}`}
           style={{
-            boxShadow: `0 0 0 ${GLOW_WIDTH}px #4ade80, 0 0 26px 6px rgba(74,222,128,0.85)`,
+            boxShadow: "0 0 24px 6px rgba(74,222,128,0.85)",
           }}
         />
       )}
