@@ -49,8 +49,8 @@ function TeamHalf({
         />
         {spreadLabel && (
           <span
-            className={`pointer-events-none absolute top-1 z-10 text-3xl text-white ${
-              side === "left" ? "left-2" : "right-2"
+            className={`pointer-events-none absolute top-1.5 z-10 text-2xl text-white ${
+              side === "left" ? "left-3" : "right-3"
             }`}
             style={{
               fontFamily: "var(--font-display)",
