@@ -30,8 +30,11 @@ export default function Home() {
           groups.map((group) => (
             <section key={group.label} className="flex flex-col gap-3">
               <h2
-                className="text-center text-lg tracking-wide"
-                style={{ fontFamily: "var(--font-display)" }}
+                className="text-center whitespace-nowrap px-2"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "clamp(1.25rem, 7.5vw, 2.75rem)",
+                }}
               >
                 {group.label}
               </h2>

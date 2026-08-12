@@ -23,7 +23,14 @@ export function usePicks(week: number) {
   }, [picks, loaded, storageKey]);
 
   function setPick(gameId: string, team: TeamAbbr) {
-    setPicks((prev) => ({ ...prev, [gameId]: team }));
+    setPicks((prev) => {
+      if (prev[gameId] === team) {
+        const next = { ...prev };
+        delete next[gameId];
+        return next;
+      }
+      return { ...prev, [gameId]: team };
+    });
   }
 
   return { picks, setPick, loaded };
