@@ -47,22 +47,21 @@ function TeamHalf({
           alt={team.name}
           className="h-28 w-28 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
         />
+        {spreadLabel && (
+          <span
+            className={`pointer-events-none absolute top-1 z-10 text-3xl text-white ${
+              side === "left" ? "left-2" : "right-2"
+            }`}
+            style={{
+              fontFamily: "var(--font-display)",
+              transform: side === "left" ? "rotate(-45deg)" : "rotate(45deg)",
+              textShadow: "0 1px 2px rgba(0,0,0,0.8)",
+            }}
+          >
+            {spreadLabel}
+          </span>
+        )}
       </div>
-      {spreadLabel && (
-        <span
-          className={`pointer-events-none absolute bottom-1.5 z-10 text-2xl text-white ${
-            side === "left" ? "right-2" : "left-2"
-          }`}
-          style={{
-            fontFamily: "var(--font-display)",
-            filter: isFaded
-              ? "grayscale(0.85) brightness(0.5)"
-              : "drop-shadow(0 1px 2px rgba(0,0,0,0.8))",
-          }}
-        >
-          {spreadLabel}
-        </span>
-      )}
       {isPicked && (
         <>
           <div
@@ -76,8 +75,8 @@ function TeamHalf({
             style={{
               color: "#4ade80",
               transform: "rotate(-12deg)",
-              WebkitTextStroke: "1px rgba(0,0,0,0.6)",
-              filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.4))",
+              textShadow:
+                "-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 3px 5px rgba(0,0,0,0.5)",
             }}
           >
             W
