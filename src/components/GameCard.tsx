@@ -39,7 +39,7 @@ function TeamHalf({
   const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
   const borderColor = isPicked ? "#4ade80" : "white";
   const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
-  const fadedFilter = isFaded ? "grayscale(0.85) brightness(0.5)" : undefined;
+  const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
 
   return (
     <button
