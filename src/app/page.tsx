@@ -7,7 +7,8 @@ import { groupGamesByDay } from "@/lib/groupGames";
 
 type FlowItem =
   | { type: "header"; key: string; label: string }
-  | { type: "game"; key: string; game: Game };
+  | { type: "game"; key: string; game: Game }
+  | { type: "blank"; key: string };
 
 type DayGroup = { label: string; games: Game[] };
 
@@ -18,10 +19,11 @@ function flatten(groups: DayGroup[]): FlowItem[] {
   ]);
 }
 
-// Splits into two columns by game count (not raw CSS column-balance) so we
-// can guarantee column 2 always starts with a header row - inserting a
-// repeated day label if the split happens to fall mid-day - instead of a
-// bare game floating at the top with no section context.
+// Splits into two columns by game count, row-paired for a CSS grid so a
+// header on one side and a game on the other still force both cells in
+// that row to the same height (the grid's native "tallest cell wins" rule
+// keeps every subsequent row locked in alignment). Column 2 reserves a
+// blank cell instead of repeating a day label when the split falls mid-day.
 function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: FlowItem[] } {
   const totalGames = groups.reduce((sum, g) => sum + g.games.length, 0);
   const half = Math.ceil(totalGames / 2);
@@ -39,7 +41,7 @@ function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: FlowIte
         col1.push({ type: "game", key: game.id, game });
       } else {
         if (!col2Started) {
-          col2.push({ type: "header", key: `h2-${group.label}-start`, label: group.label });
+          col2.push({ type: "blank", key: `blank-${group.label}` });
           col2Started = true;
         } else if (isFirstOfGroup) {
           col2.push({ type: "header", key: `h2-${group.label}`, label: group.label });
@@ -61,8 +63,9 @@ export default function Home() {
 
   const items = flatten(groups);
   const { col1, col2 } = splitIntoColumns(groups);
+  const rowCount = Math.max(col1.length, col2.length);
 
-  const renderItem = (item: FlowItem, isFirst: boolean) =>
+  const renderMobileItem = (item: FlowItem, isFirst: boolean) =>
     item.type === "header" ? (
       <h2
         key={item.key}
@@ -73,7 +76,7 @@ export default function Home() {
       >
         {item.label}
       </h2>
-    ) : (
+    ) : item.type === "game" ? (
       <div key={item.key} className="mb-3">
         <GameCard
           game={item.game}
@@ -81,7 +84,33 @@ export default function Home() {
           onPick={(team) => setPick(item.game.id, team)}
         />
       </div>
+    ) : null;
+
+  const renderGridCell = (item: FlowItem | undefined) => {
+    if (!item || item.type === "blank") {
+      return <div key={item?.key ?? Math.random()} />;
+    }
+    if (item.type === "header") {
+      return (
+        <div key={item.key} className="h-full flex items-end justify-center pb-2">
+          <h2
+            className="text-center whitespace-nowrap px-2 text-4xl"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {item.label}
+          </h2>
+        </div>
+      );
+    }
+    return (
+      <GameCard
+        key={item.key}
+        game={item.game}
+        picked={picks[item.game.id]}
+        onPick={(team) => setPick(item.game.id, team)}
+      />
     );
+  };
 
   return (
     <div className="flex flex-col flex-1">
@@ -101,15 +130,13 @@ export default function Home() {
         {loaded && (
           <>
             <div className="flex flex-col lg:hidden">
-              {items.map((item, i) => renderItem(item, i === 0))}
+              {items.map((item, i) => renderMobileItem(item, i === 0))}
             </div>
-            <div className="hidden lg:flex lg:gap-x-8">
-              <div className="flex-1 flex flex-col">
-                {col1.map((item, i) => renderItem(item, i === 0))}
-              </div>
-              <div className="flex-1 flex flex-col">
-                {col2.map((item, i) => renderItem(item, i === 0))}
-              </div>
+            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-3 lg:items-stretch">
+              {Array.from({ length: rowCount }).flatMap((_, i) => [
+                renderGridCell(col1[i]),
+                renderGridCell(col2[i]),
+              ])}
             </div>
           </>
         )}

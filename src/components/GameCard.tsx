@@ -35,8 +35,9 @@ function TeamHalf({
       style={{ zIndex: isPicked ? 10 : 0 }}
     >
       <div
-        className={`absolute inset-0 ${radius} overflow-hidden flex flex-col`}
+        className={`absolute inset-0 ${radius} overflow-hidden`}
         style={{
+          backgroundColor: team.color,
           borderTop: `${BORDER_WIDTH}px solid ${borderColor}`,
           borderBottom: `${BORDER_WIDTH}px solid ${borderColor}`,
           [outerBorderSide]: `${BORDER_WIDTH}px solid ${borderColor}`,
@@ -44,35 +45,16 @@ function TeamHalf({
           filter: fadedFilter,
         }}
       >
-        <div
-          className="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden"
-          style={{ backgroundColor: team.color }}
-        >
+        <div className="absolute inset-0 flex items-center justify-center">
           <img
             src={team.logo}
             alt={team.name}
             className="h-28 w-28 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
           />
-          {isPicked && (
-            <span
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-5xl font-black"
-              style={{
-                color: "#4ade80",
-                transform: "rotate(-12deg)",
-                textShadow:
-                  "-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 3px 5px rgba(0,0,0,0.5)",
-              }}
-            >
-              W
-            </span>
-          )}
         </div>
         <div
-          className="h-8 shrink-0 flex items-center justify-center gap-1.5"
-          style={{
-            backgroundColor: team.color,
-            filter: isFaded ? undefined : "brightness(0.6)",
-          }}
+          className="absolute inset-x-0 bottom-0 h-8 flex items-center justify-center gap-1.5"
+          style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
         >
           {spreadLabel && (
             <span
@@ -84,6 +66,20 @@ function TeamHalf({
           )}
           <span className="text-[10px] text-white/70">{record}</span>
         </div>
+        {isPicked && (
+          <span
+            className="pointer-events-none absolute inset-0 flex items-center justify-center text-5xl"
+            style={{
+              fontFamily: "var(--font-display)",
+              color: "#4ade80",
+              transform: "rotate(-12deg)",
+              textShadow:
+                "-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 3px 5px rgba(0,0,0,0.5)",
+            }}
+          >
+            W
+          </span>
+        )}
       </div>
       {isPicked && (
         <div
