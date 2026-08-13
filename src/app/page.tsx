@@ -75,7 +75,7 @@ function computePickStats(games: Game[], picks: Record<string, TeamAbbr>) {
 
 export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
-  const { picks, setPick, loaded } = usePicks(CURRENT_WEEK);
+  const { picks, setPick, locks, toggleLock, loaded } = usePicks(CURRENT_WEEK);
   const pickedCount = Object.keys(picks).length;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
@@ -96,11 +96,13 @@ export default function Home() {
         {item.label}
       </h2>
     ) : item.type === "game" ? (
-      <div key={item.key} className="mb-3">
+      <div key={item.key} className="mb-4">
         <GameCard
           game={item.game}
           picked={picks[item.game.id]}
           onPick={(team) => setPick(item.game.id, team)}
+          isLocked={!!locks[item.game.id]}
+          onToggleLock={() => toggleLock(item.game.id)}
         />
       </div>
     ) : null;
@@ -127,6 +129,8 @@ export default function Home() {
         game={item.game}
         picked={picks[item.game.id]}
         onPick={(team) => setPick(item.game.id, team)}
+        isLocked={!!locks[item.game.id]}
+        onToggleLock={() => toggleLock(item.game.id)}
       />
     );
   };
@@ -191,7 +195,7 @@ export default function Home() {
             <div className="flex flex-col lg:hidden">
               {items.map((item, i) => renderMobileItem(item, i === 0))}
             </div>
-            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-3 lg:items-stretch">
+            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 lg:items-stretch">
               {Array.from({ length: rowCount }).flatMap((_, i) => [
                 renderGridCell(col1[i]),
                 renderGridCell(col2[i]),

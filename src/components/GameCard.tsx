@@ -118,14 +118,57 @@ function TeamHalf({
   );
 }
 
+function LockToggle({
+  isLocked,
+  disabled,
+  onClick,
+}: {
+  isLocked: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const color = disabled ? "#5b6472" : isLocked ? "#fbbf24" : "#e5e7eb";
+  return (
+    <button
+      aria-label={isLocked ? "Unlock this pick" : "Lock this pick for double points"}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="absolute left-1/2 -top-[13px] z-20 flex h-[26px] w-[26px] -translate-x-1/2 items-center justify-center rounded-full"
+      style={{
+        backgroundColor: "#0e1b33",
+        border: `2px solid ${color}`,
+        cursor: disabled ? "default" : "pointer",
+        boxShadow: isLocked ? "0 0 6px 1px rgba(251,191,36,0.7)" : undefined,
+      }}
+    >
+      <svg width="12" height="13" viewBox="0 0 12 13" fill="none">
+        <rect x="1.5" y="5.5" width="9" height="6.5" rx="1.5" fill={color} />
+        <path
+          d="M3.5 5.5V3.75a2.5 2.5 0 0 1 5 0V5.5"
+          stroke={color}
+          strokeWidth="1.4"
+          fill="none"
+        />
+      </svg>
+    </button>
+  );
+}
+
 export function GameCard({
   game,
   picked,
   onPick,
+  isLocked = false,
+  onToggleLock,
 }: {
   game: Game;
   picked?: TeamAbbr;
   onPick: (team: TeamAbbr) => void;
+  isLocked?: boolean;
+  onToggleLock?: () => void;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
@@ -167,6 +210,9 @@ export function GameCard({
         record={game.homeRecord ?? "0-0"}
         onClick={() => onPick(home.abbr)}
       />
+      {onToggleLock && (
+        <LockToggle isLocked={isLocked} disabled={!hasPick} onClick={onToggleLock} />
+      )}
     </div>
   );
 }
