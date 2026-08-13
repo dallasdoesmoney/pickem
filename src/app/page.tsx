@@ -132,28 +132,32 @@ function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: FlowIte
 // loading, closing the separate "still mid-fetch" race too).
 async function inlineImages(container: HTMLElement) {
   const imgs = Array.from(container.querySelectorAll("img"));
+  const failures: string[] = [];
   await Promise.all(
     imgs.map(async (img) => {
       if (img.src.startsWith("data:")) return;
+      const label = img.alt || img.src.split("/").pop() || img.src;
       try {
         const res = await fetch(img.src, { mode: "cors" });
+        if (!res.ok) throw new Error(`fetch ${res.status}`);
         const blob = await res.blob();
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(reader.error);
+          reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
           reader.readAsDataURL(blob);
         });
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
           img.addEventListener("load", () => resolve(), { once: true });
-          img.addEventListener("error", () => resolve(), { once: true });
+          img.addEventListener("error", () => reject(new Error("data: url failed to load")), { once: true });
           img.src = dataUrl;
         });
-      } catch {
-        // Leave the original src - toPng will still attempt to fetch it.
+      } catch (err) {
+        failures.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
       }
     })
   );
+  return { total: imgs.length, failed: failures };
 }
 
 function computePickStats(games: Game[], picks: Record<string, TeamAbbr>) {
@@ -184,40 +188,56 @@ export default function Home() {
   const stats = computePickStats(games, picks);
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
+  const [shareDebug, setShareDebug] = useState<string[] | null>(null);
 
   async function handleShare() {
     if (!shareCardRef.current || sharing) return;
     setSharing(true);
+    const log: string[] = [];
     try {
-      await inlineImages(shareCardRef.current);
+      log.push(`ua: ${navigator.userAgent}`);
+      const { total, failed } = await inlineImages(shareCardRef.current);
+      log.push(`logos: ${total - failed.length}/${total} inlined`);
+      failed.forEach((f) => log.push(`  FAILED ${f}`));
+
       const dataUrl = await toPng(shareCardRef.current, {
         pixelRatio: 2,
         cacheBust: true,
         backgroundColor: SHARE_BG,
       });
+      log.push(`capture: ${Math.round(dataUrl.length / 1024)}kb png`);
+
       const filename = `pickem-week-${CURRENT_WEEK}.png`;
       const res = await fetch(dataUrl);
       const blob = await res.blob();
       const file = new File([blob], filename, { type: "image/png" });
 
-      if (navigator.canShare?.({ files: [file] })) {
+      const canShareFiles = !!navigator.canShare?.({ files: [file] });
+      log.push(`canShare files: ${canShareFiles}`);
+
+      if (canShareFiles) {
         await navigator.share({
           files: [file],
           title: "NFL Pick'em",
           text: `My Week ${CURRENT_WEEK} picks`,
         });
+        log.push("share sheet: opened");
       } else {
         const link = document.createElement("a");
         link.href = dataUrl;
         link.download = filename;
         link.click();
+        log.push("download: triggered");
       }
     } catch (err) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        console.error("Share failed", err);
+      if (err instanceof Error && err.name === "AbortError") {
+        log.push("share sheet: cancelled by user");
+      } else {
+        log.push(`ERROR: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
       }
     } finally {
       setSharing(false);
+      setShareDebug(log);
     }
   }
 
@@ -363,6 +383,22 @@ export default function Home() {
               ])}
             </div>
           </div>
+        </div>
+      )}
+
+      {shareDebug && (
+        <div className="fixed inset-x-3 bottom-3 z-50 rounded-lg bg-black text-white text-[11px] leading-relaxed font-mono p-3 max-h-[50vh] overflow-y-auto shadow-lg border border-white/20">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-white/50">share debug</span>
+            <button onClick={() => setShareDebug(null)} className="text-white/70 underline">
+              dismiss
+            </button>
+          </div>
+          {shareDebug.map((line, i) => (
+            <div key={i} className="whitespace-pre-wrap break-all">
+              {line}
+            </div>
+          ))}
         </div>
       )}
     </div>
