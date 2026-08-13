@@ -2,20 +2,14 @@
 
 import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
-import { SpecialPick } from "@/hooks/usePicks";
+import { PickTag } from "@/lib/pickLayout";
 
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
-const SPECIAL_BORDER_WIDTH = 5;
 export const PILL_WIDTH = 343; // px - fixed size, every card locks to this regardless of viewport
 export const PILL_HEIGHT = 80; // px
 const FOOTER_HEIGHT = 26; // px
 const LOGO_AREA_HEIGHT = PILL_HEIGHT - FOOTER_HEIGHT; // logo centers in this region, not the full card
-
-const SPECIAL_STYLE: Record<SpecialPick, { color: string; glow: string; emoji: string }> = {
-  lock: { color: "#fbbf24", glow: "rgba(251,191,36,0.7)", emoji: "\u{1F512}" },
-  blowout: { color: "#f97316", glow: "rgba(249,115,22,0.7)", emoji: "\u{1F4A5}" },
-};
 
 function darkenColor(hex: string, factor: number, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -24,60 +18,23 @@ function darkenColor(hex: string, factor: number, alpha: number) {
   return `rgba(${Math.round(r * factor)},${Math.round(g * factor)},${Math.round(b * factor)},${alpha})`;
 }
 
-// Tap target that flags a picked team as Lock/Blowout. Shows a small
-// dashed-circle hint (matching the header's sign-in button) until tapped,
-// then grows into the full emoji badge - tapping again cycles onward.
-// This is a real click, not a long-press: press-and-hold on an <img>
-// triggers the browser's native save/view-image menu on mobile (especially
-// inside in-app browsers like TikTok's), which made long-press unreliable.
-function SpecialTrigger({
-  side,
-  special,
-  onClick,
-  canAdd,
-}: {
-  side: "left" | "right";
-  special?: SpecialPick;
-  onClick: () => void;
-  canAdd: boolean;
-}) {
-  if (!special && !canAdd) return null;
-
+// Auto-computed tags (underdog/boldest pick) - purely informational, no
+// interaction, so this is just a badge rather than a button.
+function TagBadge({ side, tag }: { side: "left" | "right"; tag: PickTag }) {
   const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
-
-  if (!special) {
-    return (
-      <button
-        aria-label="Mark this pick as a Lock or Blowout"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick();
-        }}
-        className="absolute -top-2.5 z-20 h-7 w-7 rounded-full border-2 border-dashed border-white/50 text-white/60 text-sm flex items-center justify-center"
-        style={{ ...positionStyle, backgroundColor: "#0e1b33" }}
-      >
-        +
-      </button>
-    );
-  }
-
-  const { color, emoji } = SPECIAL_STYLE[special];
   return (
-    <button
-      aria-label={`Special pick: ${special}. Tap to change.`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className="absolute -top-2.5 z-20 text-[42px] leading-none"
+    <span
+      role="img"
+      aria-label={tag.label}
+      className="absolute -top-2.5 z-20 text-[42px] leading-none pointer-events-none"
       style={{
         ...positionStyle,
         transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
-        filter: `drop-shadow(0 2px 3px rgba(0,0,0,0.6)) drop-shadow(0 0 3px ${color})`,
+        filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
       }}
     >
-      {emoji}
-    </button>
+      {tag.emoji}
+    </span>
   );
 }
 
@@ -85,30 +42,26 @@ function TeamHalf({
   team,
   isPicked,
   isFaded,
-  special,
+  tag,
   side,
   spreadLabel,
   record,
   onClick,
-  onCycleSpecial,
-  canAddSpecial,
 }: {
   team: (typeof TEAMS)[TeamAbbr];
   isPicked: boolean;
   isFaded: boolean;
-  special?: SpecialPick;
+  tag?: PickTag;
   side: "left" | "right";
   spreadLabel?: string;
   record: string;
   onClick: () => void;
-  onCycleSpecial?: () => void;
-  canAddSpecial: boolean;
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
   const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
-  const borderColor = special ? SPECIAL_STYLE[special].color : isPicked ? "#4ade80" : "white";
-  const borderWidth = special ? SPECIAL_BORDER_WIDTH : isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
+  const borderColor = isPicked ? "#4ade80" : "white";
+  const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
 
   return (
@@ -185,17 +138,11 @@ function TeamHalf({
       {isPicked && (
         <div
           className={`pointer-events-none absolute inset-0 ${radius}`}
-          style={{
-            boxShadow: `0 0 ${special ? "8px 2px" : "6px 1px"} ${
-              special ? SPECIAL_STYLE[special].glow : "rgba(74,222,128,0.6)"
-            }`,
-          }}
+          style={{ boxShadow: "0 0 6px 1px rgba(74,222,128,0.6)" }}
         />
       )}
       </button>
-      {isPicked && onCycleSpecial && (
-        <SpecialTrigger side={side} special={special} onClick={onCycleSpecial} canAdd={canAddSpecial} />
-      )}
+      {isPicked && tag && <TagBadge side={side} tag={tag} />}
     </div>
   );
 }
@@ -204,16 +151,12 @@ export function GameCard({
   game,
   picked,
   onPick,
-  special,
-  onCycleSpecial,
-  canAddSpecial = true,
+  tag,
 }: {
   game: Game;
   picked?: TeamAbbr;
   onPick: (team: TeamAbbr) => void;
-  special?: SpecialPick;
-  onCycleSpecial?: () => void;
-  canAddSpecial?: boolean;
+  tag?: PickTag;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
@@ -242,24 +185,20 @@ export function GameCard({
         side="left"
         isPicked={picked === away.abbr}
         isFaded={hasPick && picked !== away.abbr}
-        special={picked === away.abbr ? special : undefined}
+        tag={picked === away.abbr ? tag : undefined}
         spreadLabel={awaySpread}
         record={game.awayRecord ?? "0-0"}
         onClick={() => onPick(away.abbr)}
-        onCycleSpecial={picked === away.abbr ? onCycleSpecial : undefined}
-        canAddSpecial={canAddSpecial}
       />
       <TeamHalf
         team={home}
         side="right"
         isPicked={picked === home.abbr}
         isFaded={hasPick && picked !== home.abbr}
-        special={picked === home.abbr ? special : undefined}
+        tag={picked === home.abbr ? tag : undefined}
         spreadLabel={homeSpread}
         record={game.homeRecord ?? "0-0"}
         onClick={() => onPick(home.abbr)}
-        onCycleSpecial={picked === home.abbr ? onCycleSpecial : undefined}
-        canAddSpecial={canAddSpecial}
       />
     </div>
   );

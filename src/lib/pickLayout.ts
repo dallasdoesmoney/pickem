@@ -51,15 +51,25 @@ export function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: 
   return { col1, col2 };
 }
 
+// The single underdog pick with the largest spread against it - shared by
+// the stats row (as "Boldest Pick") and the auto-tag system (where it
+// overrides the plain underdog tag on that one game).
+function findBoldestPick(games: Game[], picks: Record<string, TeamAbbr>): Game | null {
+  const underdogGames = games.filter(
+    (g) => g.favorite && g.spread !== undefined && picks[g.id] && picks[g.id] !== g.favorite
+  );
+  return underdogGames.reduce<Game | null>(
+    (max, g) => (!max || (g.spread ?? 0) > (max.spread ?? 0) ? g : max),
+    null
+  );
+}
+
 export function computePickStats(games: Game[], picks: Record<string, TeamAbbr>) {
   const withSpread = games.filter((g) => g.favorite && g.spread !== undefined && picks[g.id]);
   const chalkGames = withSpread.filter((g) => picks[g.id] === g.favorite);
   const underdogGames = withSpread.filter((g) => picks[g.id] !== g.favorite);
   const chalkPct = withSpread.length > 0 ? Math.round((chalkGames.length / withSpread.length) * 100) : null;
-  const boldest = underdogGames.reduce<Game | null>(
-    (max, g) => (!max || (g.spread ?? 0) > (max.spread ?? 0) ? g : max),
-    null
-  );
+  const boldest = findBoldestPick(games, picks);
   return {
     underdogCount: underdogGames.length,
     chalkPct,
@@ -69,3 +79,20 @@ export function computePickStats(games: Game[], picks: Record<string, TeamAbbr>)
 }
 
 export type PickStats = ReturnType<typeof computePickStats>;
+
+export type PickTag = { emoji: string; label: string };
+
+// Every underdog pick (picked team isn't the spread favorite) gets a plain
+// underdog tag, EXCEPT the single boldest one (biggest spread against it),
+// which gets the boldest-pick tag instead - one tag per game, no stacking.
+export function computePickTags(games: Game[], picks: Record<string, TeamAbbr>): Record<string, PickTag> {
+  const boldest = findBoldestPick(games, picks);
+  const tags: Record<string, PickTag> = {};
+  for (const g of games) {
+    const pick = picks[g.id];
+    if (!pick || !g.favorite || g.spread === undefined || pick === g.favorite) continue;
+    tags[g.id] =
+      g.id === boldest?.id ? { emoji: "\u{1F48E}", label: "Boldest Pick" } : { emoji: "\u{1F436}", label: "Underdog" };
+  }
+  return tags;
+}

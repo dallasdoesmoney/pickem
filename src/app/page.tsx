@@ -3,20 +3,12 @@
 import { useState } from "react";
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard } from "@/components/GameCard";
-import { usePicks, MAX_LOCKS, MAX_BLOWOUTS } from "@/hooks/usePicks";
+import { usePicks } from "@/hooks/usePicks";
 import { groupGamesByDay } from "@/lib/groupGames";
-import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats } from "@/lib/pickLayout";
+import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
 
-function StatPills({
-  stats,
-  lockedCount,
-  blowoutCount,
-}: {
-  stats: PickStats;
-  lockedCount: number;
-  blowoutCount: number;
-}) {
+function StatPills({ stats }: { stats: PickStats }) {
   return (
     <div className="flex gap-2 mt-4 justify-center flex-wrap">
       <div className="shrink-0 min-w-[88px] rounded-full border-2 border-white text-center px-4 py-1.5">
@@ -46,37 +38,17 @@ function StatPills({
         </div>
         <div className="text-[9px] text-white/55">CHALK</div>
       </div>
-      <div
-        className="shrink-0 min-w-[88px] rounded-full border-2 text-center px-4 py-1.5"
-        style={{ borderColor: "#fbbf24" }}
-      >
-        <div className="text-base" style={{ fontFamily: "var(--font-display)", color: "#fbbf24" }}>
-          {lockedCount}/{MAX_LOCKS}
-        </div>
-        <div className="text-[9px] text-white/55">LOCKS</div>
-      </div>
-      <div
-        className="shrink-0 min-w-[88px] rounded-full border-2 text-center px-4 py-1.5"
-        style={{ borderColor: "#f97316" }}
-      >
-        <div className="text-base" style={{ fontFamily: "var(--font-display)", color: "#f97316" }}>
-          {blowoutCount}/{MAX_BLOWOUTS}
-        </div>
-        <div className="text-[9px] text-white/55">BLOWOUT</div>
-      </div>
     </div>
   );
 }
 
 export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
-  const { picks, setPick, specials, cycleSpecial, loaded } = usePicks(CURRENT_WEEK);
+  const { picks, setPick, loaded } = usePicks(CURRENT_WEEK);
   const pickedCount = Object.keys(picks).length;
-  const lockedCount = Object.values(specials).filter((s) => s === "lock").length;
-  const blowoutCount = Object.values(specials).filter((s) => s === "blowout").length;
-  const canAddSpecial = lockedCount < MAX_LOCKS || blowoutCount < MAX_BLOWOUTS;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
+  const tags = computePickTags(games, picks);
   const [sharing, setSharing] = useState(false);
   const [shareDebug, setShareDebug] = useState<string[] | null>(null);
 
@@ -86,7 +58,7 @@ export default function Home() {
     const log: string[] = [];
     try {
       log.push(`ua: ${navigator.userAgent}`);
-      const blob = await renderShareImage({ games, groups, picks, specials, week: CURRENT_WEEK });
+      const blob = await renderShareImage({ games, groups, picks, week: CURRENT_WEEK });
       log.push(`canvas render: ${Math.round(blob.size / 1024)}kb png`);
 
       const filename = `pickem-week-${CURRENT_WEEK}.png`;
@@ -156,9 +128,7 @@ export default function Home() {
           game={item.game}
           picked={picks[item.game.id]}
           onPick={(team) => setPick(item.game.id, team)}
-          special={specials[item.game.id]}
-          onCycleSpecial={() => cycleSpecial(item.game.id)}
-          canAddSpecial={canAddSpecial}
+          tag={tags[item.game.id]}
         />
       </div>
     ) : null;
@@ -185,9 +155,7 @@ export default function Home() {
         game={item.game}
         picked={picks[item.game.id]}
         onPick={(team) => setPick(item.game.id, team)}
-        special={specials[item.game.id]}
-        onCycleSpecial={() => cycleSpecial(item.game.id)}
-        canAddSpecial={canAddSpecial}
+        tag={tags[item.game.id]}
       />
     );
   };
@@ -215,7 +183,7 @@ export default function Home() {
           </button>
         </div>
 
-        <StatPills stats={stats} lockedCount={lockedCount} blowoutCount={blowoutCount} />
+        <StatPills stats={stats} />
       </header>
 
       <main className="flex-1 px-4 pb-10 max-w-4xl w-full mx-auto">

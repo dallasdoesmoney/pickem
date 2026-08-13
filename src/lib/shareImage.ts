@@ -1,7 +1,6 @@
 import { Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
-import { SpecialPick, MAX_LOCKS, MAX_BLOWOUTS } from "@/hooks/usePicks";
-import { DayGroup, FlowItem, PickStats, splitIntoColumns, computePickStats } from "@/lib/pickLayout";
+import { DayGroup, FlowItem, PickStats, PickTag, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 
 // Hand-drawn on a <canvas> instead of screenshotting the live DOM (via
 // html-to-image or similar). WebKit has long-standing bugs rendering
@@ -28,12 +27,6 @@ const BRAND_FOOTER_H = 280;
 
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
-const SPECIAL_BORDER_WIDTH = 5;
-
-const SPECIAL_STYLE: Record<SpecialPick, { color: string; glow: string; emoji: string }> = {
-  lock: { color: "#fbbf24", glow: "rgba(251,191,36,0.7)", emoji: "\u{1F512}" },
-  blowout: { color: "#f97316", glow: "rgba(249,115,22,0.7)", emoji: "\u{1F4A5}" },
-};
 
 function darken(hex: string, factor: number, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -142,19 +135,19 @@ function drawTeamHalf(
     team: (typeof TEAMS)[TeamAbbr];
     isPicked: boolean;
     isFaded: boolean;
-    special?: SpecialPick;
+    tag?: PickTag;
     spreadLabel?: string;
     record: string;
     logo: HTMLImageElement | null;
   }
 ) {
-  const { x, y, w, h, side, team, isPicked, isFaded, special, spreadLabel, record, logo } = opts;
+  const { x, y, w, h, side, team, isPicked, isFaded, tag, spreadLabel, record, logo } = opts;
   const radius = h / 2;
   const r: Radii =
     side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
 
-  const borderColor = special ? SPECIAL_STYLE[special].color : isPicked ? "#4ade80" : isFaded ? "rgba(255,255,255,0.35)" : "#ffffff";
-  const borderWidth = special ? SPECIAL_BORDER_WIDTH : isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
+  const borderColor = isPicked ? "#4ade80" : isFaded ? "rgba(255,255,255,0.35)" : "#ffffff";
+  const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
 
   ctx.save();
   roundRectPath(ctx, x, y, w, h, r);
@@ -233,14 +226,13 @@ function drawTeamHalf(
   ctx.lineWidth = borderWidth;
   ctx.strokeStyle = borderColor;
   if (isPicked) {
-    ctx.shadowColor = special ? SPECIAL_STYLE[special].glow : "rgba(74,222,128,0.6)";
-    ctx.shadowBlur = special ? 8 : 6;
+    ctx.shadowColor = "rgba(74,222,128,0.6)";
+    ctx.shadowBlur = 6;
   }
   ctx.stroke();
   ctx.shadowBlur = 0;
 
-  if (special) {
-    const emoji = SPECIAL_STYLE[special].emoji;
+  if (tag) {
     // CSS rotates the badge around its own center by default; rotating
     // around a corner (as this used to) swings it visibly off-target. Only
     // let it protrude ~12px past the pill edge - GAP_X between columns is
@@ -256,7 +248,7 @@ function drawTeamHalf(
     ctx.textBaseline = "middle";
     ctx.shadowColor = "rgba(0,0,0,0.6)";
     ctx.shadowBlur = 4;
-    ctx.fillText(emoji, 0, 0);
+    ctx.fillText(tag.emoji, 0, 0);
     ctx.restore();
   }
 }
@@ -265,16 +257,14 @@ export type ShareImageParams = {
   games: Game[];
   groups: DayGroup[];
   picks: Record<string, TeamAbbr>;
-  specials: Record<string, SpecialPick>;
   week: number;
 };
 
 export async function renderShareImage(params: ShareImageParams): Promise<Blob> {
-  const { games, groups, picks, specials, week } = params;
+  const { games, groups, picks, week } = params;
   const pickedCount = Object.keys(picks).length;
-  const lockedCount = Object.values(specials).filter((s) => s === "lock").length;
-  const blowoutCount = Object.values(specials).filter((s) => s === "blowout").length;
   const stats: PickStats = computePickStats(games, picks);
+  const tags = computePickTags(games, picks);
   const { col1, col2 } = splitIntoColumns(groups);
   const rowCount = Math.max(col1.length, col2.length);
 
@@ -342,8 +332,6 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       logo: stats.boldestTeam ? logos.get(stats.boldestTeam.logo) : undefined,
     },
     { w: 88, borderColor: "#ffffff", valueColor: "#ffffff", value: stats.chalkPct !== null ? `${stats.chalkPct}%` : "-", label: "CHALK" },
-    { w: 88, borderColor: "#fbbf24", valueColor: "#fbbf24", value: `${lockedCount}/${MAX_LOCKS}`, label: "LOCKS" },
-    { w: 88, borderColor: "#f97316", valueColor: "#f97316", value: `${blowoutCount}/${MAX_BLOWOUTS}`, label: "BLOWOUT" },
   ];
   const pillGap = 8;
   const pillH = 44;
@@ -374,7 +362,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       const home = TEAMS[game.home];
       const picked = picks[game.id];
       const hasPick = !!picked;
-      const special = specials[game.id];
+      const tag = tags[game.id];
       const halfW = PILL_W / 2;
 
       const awaySpread =
@@ -399,7 +387,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         team: away,
         isPicked: picked === away.abbr,
         isFaded: hasPick && picked !== away.abbr,
-        special: picked === away.abbr ? special : undefined,
+        tag: picked === away.abbr ? tag : undefined,
         spreadLabel: awaySpread,
         record: game.awayRecord ?? "0-0",
         logo: logos.get(away.logo) ?? null,
@@ -413,7 +401,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         team: home,
         isPicked: picked === home.abbr,
         isFaded: hasPick && picked !== home.abbr,
-        special: picked === home.abbr ? special : undefined,
+        tag: picked === home.abbr ? tag : undefined,
         spreadLabel: homeSpread,
         record: game.homeRecord ?? "0-0",
         logo: logos.get(home.logo) ?? null,
