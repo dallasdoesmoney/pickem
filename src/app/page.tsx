@@ -123,6 +123,23 @@ function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: FlowIte
   return { col1, col2 };
 }
 
+// The off-screen share card's <img> tags can still be mid-fetch when the
+// user taps Share (they're not on-screen, so nothing forced them to load
+// yet) - capturing before they resolve bakes blank rectangles into the PNG
+// where every team logo should be.
+function waitForImages(container: HTMLElement) {
+  const imgs = Array.from(container.querySelectorAll("img"));
+  return Promise.all(
+    imgs.map((img) => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        img.addEventListener("load", () => resolve(), { once: true });
+        img.addEventListener("error", () => resolve(), { once: true });
+      });
+    })
+  );
+}
+
 function computePickStats(games: Game[], picks: Record<string, TeamAbbr>) {
   const withSpread = games.filter((g) => g.favorite && g.spread !== undefined && picks[g.id]);
   const chalkGames = withSpread.filter((g) => picks[g.id] === g.favorite);
@@ -156,6 +173,7 @@ export default function Home() {
     if (!shareCardRef.current || sharing) return;
     setSharing(true);
     try {
+      await waitForImages(shareCardRef.current);
       const dataUrl = await toPng(shareCardRef.current, {
         pixelRatio: 2,
         cacheBust: true,
