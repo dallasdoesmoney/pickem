@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${bungee.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-50">
+        <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-30">
           <pattern
             id="press-backdrop"
             width="380"
