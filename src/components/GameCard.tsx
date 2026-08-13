@@ -4,6 +4,7 @@ import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 
 const BORDER_WIDTH = 3;
+const PICKED_BORDER_WIDTH = 5;
 export const PILL_WIDTH = 343; // px - fixed size, every card locks to this regardless of viewport
 export const PILL_HEIGHT = 80; // px
 const FOOTER_HEIGHT = 26; // px
@@ -37,6 +38,7 @@ function TeamHalf({
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
   const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
   const borderColor = isPicked ? "#4ade80" : "white";
+  const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
   const fadedFilter = isFaded ? "grayscale(0.85) brightness(0.5)" : undefined;
 
   return (
@@ -49,10 +51,10 @@ function TeamHalf({
         className={`absolute inset-0 ${radius} overflow-hidden`}
         style={{
           backgroundColor: team.color,
-          borderTop: `${BORDER_WIDTH}px solid ${borderColor}`,
-          borderBottom: `${BORDER_WIDTH}px solid ${borderColor}`,
-          [outerBorderSide]: `${BORDER_WIDTH}px solid ${borderColor}`,
-          [innerBorderSide]: isPicked ? `${BORDER_WIDTH}px solid ${borderColor}` : undefined,
+          borderTop: `${borderWidth}px solid ${borderColor}`,
+          borderBottom: `${borderWidth}px solid ${borderColor}`,
+          [outerBorderSide]: `${borderWidth}px solid ${borderColor}`,
+          [innerBorderSide]: isPicked ? `${borderWidth}px solid ${borderColor}` : undefined,
           filter: fadedFilter,
         }}
       >
@@ -84,14 +86,20 @@ function TeamHalf({
           <span className="text-[10px] text-white/70">{record}</span>
         </div>
         {isPicked && (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ backgroundColor: "rgba(74,222,128,0.16)" }}
+          />
+        )}
+        {isPicked && (
           <span
-            className="pointer-events-none absolute inset-0 flex items-center justify-center text-5xl"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl"
             style={{
               fontFamily: "var(--font-display)",
               color: "#4ade80",
               transform: "rotate(-12deg)",
               textShadow:
-                "-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 3px 5px rgba(0,0,0,0.5)",
+                "-1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff, 0 3px 5px rgba(0,0,0,0.4)",
             }}
           >
             W
@@ -102,7 +110,7 @@ function TeamHalf({
         <div
           className={`pointer-events-none absolute inset-0 ${radius}`}
           style={{
-            boxShadow: "0 0 10px 3px rgba(74,222,128,0.75)",
+            boxShadow: "0 0 6px 1px rgba(74,222,128,0.6)",
           }}
         />
       )}
