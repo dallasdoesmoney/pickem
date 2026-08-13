@@ -31,6 +31,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-30">
+          {/*
+            Brick-style stagger: each pattern tile holds two logos, one at
+            the normal spot and one offset by half a tile in both axes, so
+            adjacent columns (post-rotation, adjacent diagonals) fall
+            out of phase with each other and only every OTHER column
+            lines up. The three extra copies of the offset logo are
+            wraparound duplicates - <pattern> clips to its own tile, so
+            without them the offset logo would be cut off at the tile
+            edges instead of continuing seamlessly into the next tile.
+          */}
           <pattern
             id="press-backdrop"
             width="380"
@@ -38,7 +48,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             patternUnits="userSpaceOnUse"
             patternTransform="rotate(-45)"
           >
-            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="60" y="60" width="260" height="260" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="60" y="60" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="250" y="250" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="-130" y="250" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="250" y="-130" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="-130" y="-130" width="220" height="220" />
           </pattern>
           <rect width="100%" height="100%" fill="url(#press-backdrop)" />
         </svg>
