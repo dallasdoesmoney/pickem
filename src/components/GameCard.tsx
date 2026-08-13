@@ -65,7 +65,7 @@ function TeamHalf({
           <img
             src={team.logo}
             alt={team.name}
-            className="h-[90px] w-auto max-w-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+            className="h-[117px] w-auto max-w-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
           />
         </div>
         <div
