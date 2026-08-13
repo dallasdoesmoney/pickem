@@ -79,6 +79,7 @@ export default function Home() {
   const pickedCount = Object.keys(picks).length;
   const lockedCount = Object.values(specials).filter((s) => s === "lock").length;
   const blowoutCount = Object.values(specials).filter((s) => s === "blowout").length;
+  const canAddSpecial = lockedCount < MAX_LOCKS || blowoutCount < MAX_BLOWOUTS;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
 
@@ -105,6 +106,7 @@ export default function Home() {
           onPick={(team) => setPick(item.game.id, team)}
           special={specials[item.game.id]}
           onCycleSpecial={() => cycleSpecial(item.game.id)}
+          canAddSpecial={canAddSpecial}
         />
       </div>
     ) : null;
@@ -133,6 +135,7 @@ export default function Home() {
         onPick={(team) => setPick(item.game.id, team)}
         special={specials[item.game.id]}
         onCycleSpecial={() => cycleSpecial(item.game.id)}
+        canAddSpecial={canAddSpecial}
       />
     );
   };

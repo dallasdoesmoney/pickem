@@ -34,11 +34,15 @@ function SpecialTrigger({
   side,
   special,
   onClick,
+  canAdd,
 }: {
   side: "left" | "right";
   special?: SpecialPick;
   onClick: () => void;
+  canAdd: boolean;
 }) {
+  if (!special && !canAdd) return null;
+
   const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
 
   if (!special) {
@@ -87,6 +91,7 @@ function TeamHalf({
   record,
   onClick,
   onCycleSpecial,
+  canAddSpecial,
 }: {
   team: (typeof TEAMS)[TeamAbbr];
   isPicked: boolean;
@@ -97,6 +102,7 @@ function TeamHalf({
   record: string;
   onClick: () => void;
   onCycleSpecial?: () => void;
+  canAddSpecial: boolean;
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
@@ -187,7 +193,7 @@ function TeamHalf({
       )}
       </button>
       {isPicked && onCycleSpecial && (
-        <SpecialTrigger side={side} special={special} onClick={onCycleSpecial} />
+        <SpecialTrigger side={side} special={special} onClick={onCycleSpecial} canAdd={canAddSpecial} />
       )}
     </div>
   );
@@ -199,12 +205,14 @@ export function GameCard({
   onPick,
   special,
   onCycleSpecial,
+  canAddSpecial = true,
 }: {
   game: Game;
   picked?: TeamAbbr;
   onPick: (team: TeamAbbr) => void;
   special?: SpecialPick;
   onCycleSpecial?: () => void;
+  canAddSpecial?: boolean;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
@@ -238,6 +246,7 @@ export function GameCard({
         record={game.awayRecord ?? "0-0"}
         onClick={() => onPick(away.abbr)}
         onCycleSpecial={picked === away.abbr ? onCycleSpecial : undefined}
+        canAddSpecial={canAddSpecial}
       />
       <TeamHalf
         team={home}
@@ -249,6 +258,7 @@ export function GameCard({
         record={game.homeRecord ?? "0-0"}
         onClick={() => onPick(home.abbr)}
         onCycleSpecial={picked === home.abbr ? onCycleSpecial : undefined}
+        canAddSpecial={canAddSpecial}
       />
     </div>
   );
