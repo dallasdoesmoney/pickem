@@ -4,6 +4,7 @@ import { CURRENT_WEEK, GAMES_BY_WEEK, Game } from "@/data/games";
 import { GameCard } from "@/components/GameCard";
 import { usePicks } from "@/hooks/usePicks";
 import { groupGamesByDay } from "@/lib/groupGames";
+import { TEAMS, TeamAbbr } from "@/data/teams";
 
 type FlowItem =
   | { type: "header"; key: string; label: string }
@@ -55,11 +56,29 @@ function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: FlowIte
   return { col1, col2 };
 }
 
+function computePickStats(games: Game[], picks: Record<string, TeamAbbr>) {
+  const withSpread = games.filter((g) => g.favorite && g.spread !== undefined && picks[g.id]);
+  const chalkGames = withSpread.filter((g) => picks[g.id] === g.favorite);
+  const underdogGames = withSpread.filter((g) => picks[g.id] !== g.favorite);
+  const chalkPct = withSpread.length > 0 ? Math.round((chalkGames.length / withSpread.length) * 100) : null;
+  const boldest = underdogGames.reduce<Game | null>(
+    (max, g) => (!max || (g.spread ?? 0) > (max.spread ?? 0) ? g : max),
+    null
+  );
+  return {
+    underdogCount: underdogGames.length,
+    chalkPct,
+    boldestTeam: boldest ? TEAMS[picks[boldest.id]] : null,
+    boldestSpread: boldest?.spread,
+  };
+}
+
 export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
   const { picks, setPick, loaded } = usePicks(CURRENT_WEEK);
   const pickedCount = Object.keys(picks).length;
   const groups = groupGamesByDay(games);
+  const stats = computePickStats(games, picks);
 
   const items = flatten(groups);
   const { col1, col2 } = splitIntoColumns(groups);
@@ -114,16 +133,56 @@ export default function Home() {
 
   return (
     <div className="flex flex-col flex-1">
-      <header className="px-4 pt-6 pb-3 text-center">
-        <h1
-          className="text-3xl tracking-wide"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          NFL PICK&rsquo;EM
-        </h1>
-        <p className="text-sm text-white/50 mt-2">
-          Week {CURRENT_WEEK} &middot; {pickedCount} / {games.length} picked
-        </p>
+      <header className="px-4 pt-6 pb-3 max-w-4xl w-full mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1
+              className="text-3xl tracking-wide"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              NFL PICK&rsquo;EM
+            </h1>
+            <p className="text-sm text-white/50 mt-1">
+              Week {CURRENT_WEEK} &middot; {pickedCount} / {games.length} picked
+            </p>
+          </div>
+          <button
+            aria-label="Sign in"
+            className="h-9 w-9 shrink-0 rounded-full border-2 border-dashed border-white/40 text-white/50 text-lg flex items-center justify-center"
+          >
+            +
+          </button>
+        </div>
+
+        <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
+          <div className="shrink-0 min-w-[88px] rounded-full border-2 border-white text-center px-4 py-1.5">
+            <div className="text-base" style={{ fontFamily: "var(--font-display)" }}>
+              {stats.underdogCount}
+            </div>
+            <div className="text-[9px] text-white/55">UNDERDOGS</div>
+          </div>
+          <div className="shrink-0 min-w-[110px] rounded-full border-2 border-emerald-400 text-center px-4 py-1.5">
+            <div
+              className="text-base flex items-center justify-center gap-1"
+              style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}
+            >
+              {stats.boldestTeam ? (
+                <>
+                  <img src={stats.boldestTeam.logo} alt="" className="h-[34px] w-auto" />+{stats.boldestSpread}
+                </>
+              ) : (
+                "-"
+              )}
+            </div>
+            <div className="text-[9px] text-white/55">BOLDEST PICK</div>
+          </div>
+          <div className="shrink-0 min-w-[88px] rounded-full border-2 border-white text-center px-4 py-1.5">
+            <div className="text-base" style={{ fontFamily: "var(--font-display)" }}>
+              {stats.chalkPct !== null ? `${stats.chalkPct}%` : "-"}
+            </div>
+            <div className="text-[9px] text-white/55">CHALK</div>
+          </div>
+        </div>
       </header>
 
       <main className="flex-1 px-4 pb-10 max-w-4xl w-full mx-auto">
