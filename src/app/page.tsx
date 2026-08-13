@@ -133,9 +133,9 @@ export default function Home() {
 
   return (
     <div className="flex flex-col flex-1">
-      <header className="px-4 pt-6 pb-3 max-w-4xl w-full mx-auto">
-        <div className="flex items-center justify-between">
-          <div>
+      <header className="px-4 pt-6 pb-3 max-w-4xl w-full mx-auto lg:relative">
+        <div className="flex items-center justify-between lg:flex-col lg:items-center">
+          <div className="lg:text-center">
             <h1
               className="text-3xl tracking-wide"
               style={{ fontFamily: "var(--font-display)" }}
@@ -148,13 +148,13 @@ export default function Home() {
           </div>
           <button
             aria-label="Sign in"
-            className="h-9 w-9 shrink-0 rounded-full border-2 border-dashed border-white/40 text-white/50 text-lg flex items-center justify-center"
+            className="h-9 w-9 shrink-0 rounded-full border-2 border-dashed border-white/40 text-white/50 text-lg flex items-center justify-center lg:absolute lg:top-6 lg:right-4"
           >
             +
           </button>
         </div>
 
-        <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
+        <div className="flex gap-2 mt-4 overflow-x-auto pb-1 lg:justify-center lg:overflow-visible">
           <div className="shrink-0 min-w-[88px] rounded-full border-2 border-white text-center px-4 py-1.5">
             <div className="text-base" style={{ fontFamily: "var(--font-display)" }}>
               {stats.underdogCount}
