@@ -23,19 +23,14 @@ function darkenColor(hex: string, factor: number, alpha: number) {
 function LockBadge({ side }: { side: "left" | "right" }) {
   return (
     <div
-      className={`pointer-events-none absolute top-1.5 z-20 flex h-9 w-9 items-center justify-center rounded-full ${
-        side === "left" ? "left-1.5" : "right-1.5"
-      }`}
+      className="pointer-events-none absolute -top-2.5 z-20 text-[42px] leading-none"
       style={{
-        backgroundColor: "#0e1b33",
-        border: "2px solid #fbbf24",
-        boxShadow: "0 0 8px 2px rgba(251,191,36,0.75)",
+        [side === "left" ? "left" : "right"]: "-10px",
+        transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
+        filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
       }}
     >
-      <svg width="16" height="18" viewBox="0 0 12 13" fill="none">
-        <rect x="1.5" y="5.5" width="9" height="6.5" rx="1.5" fill="#fbbf24" />
-        <path d="M3.5 5.5V3.75a2.5 2.5 0 0 1 5 0V5.5" stroke="#fbbf24" strokeWidth="1.4" fill="none" />
-      </svg>
+      &#128274;
     </div>
   );
 }
