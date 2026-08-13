@@ -123,19 +123,35 @@ function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: FlowIte
   return { col1, col2 };
 }
 
-// The off-screen share card's <img> tags can still be mid-fetch when the
-// user taps Share (they're not on-screen, so nothing forced them to load
-// yet) - capturing before they resolve bakes blank rectangles into the PNG
-// where every team logo should be.
-function waitForImages(container: HTMLElement) {
+// Safari's canvas/SVG pipeline has long-standing bugs rendering
+// cross-origin <img> elements inside html-to-image's foreignObject step,
+// even when the source sends correct CORS headers - the failure shows up
+// as blank team logos in the exported PNG. Pre-converting every logo to a
+// same-origin data: URL before capture sidesteps that class of bug
+// entirely (and as a side effect guarantees the image has finished
+// loading, closing the separate "still mid-fetch" race too).
+async function inlineImages(container: HTMLElement) {
   const imgs = Array.from(container.querySelectorAll("img"));
-  return Promise.all(
-    imgs.map((img) => {
-      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        img.addEventListener("load", () => resolve(), { once: true });
-        img.addEventListener("error", () => resolve(), { once: true });
-      });
+  await Promise.all(
+    imgs.map(async (img) => {
+      if (img.src.startsWith("data:")) return;
+      try {
+        const res = await fetch(img.src, { mode: "cors" });
+        const blob = await res.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+        await new Promise<void>((resolve) => {
+          img.addEventListener("load", () => resolve(), { once: true });
+          img.addEventListener("error", () => resolve(), { once: true });
+          img.src = dataUrl;
+        });
+      } catch {
+        // Leave the original src - toPng will still attempt to fetch it.
+      }
     })
   );
 }
@@ -173,7 +189,7 @@ export default function Home() {
     if (!shareCardRef.current || sharing) return;
     setSharing(true);
     try {
-      await waitForImages(shareCardRef.current);
+      await inlineImages(shareCardRef.current);
       const dataUrl = await toPng(shareCardRef.current, {
         pixelRatio: 2,
         cacheBust: true,
