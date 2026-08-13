@@ -9,6 +9,8 @@ export type Game = {
   network: string;
   favorite?: TeamAbbr; // point-spread favorite, if known
   spread?: number; // points favored by, always positive
+  awayRecord?: string; // e.g. "3-1" - defaults to "0-0" when unset
+  homeRecord?: string;
 };
 
 // Spread/favorite values below are placeholder examples to demo the UI -
