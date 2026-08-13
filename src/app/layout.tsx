@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${bungee.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-30">
+        <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-20">
           {/*
             Brick-style stagger: each pattern tile holds two logos, one at
             the normal spot and one offset by half a tile in both axes, so
@@ -43,16 +43,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           */}
           <pattern
             id="press-backdrop"
-            width="380"
-            height="380"
+            width="500"
+            height="500"
             patternUnits="userSpaceOnUse"
             patternTransform="rotate(-45)"
           >
-            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="60" y="60" width="220" height="220" />
-            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="250" y="250" width="220" height="220" />
-            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="-130" y="250" width="220" height="220" />
-            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="250" y="-130" width="220" height="220" />
-            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="-130" y="-130" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="140" y="140" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="390" y="390" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="-110" y="390" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="390" y="-110" width="220" height="220" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="-110" y="-110" width="220" height="220" />
           </pattern>
           <rect width="100%" height="100%" fill="url(#press-backdrop)" />
         </svg>
