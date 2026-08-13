@@ -24,7 +24,7 @@ const GAP_Y = 16;
 const HEADER_ROW_H = 56;
 const BG = "#0e1b33";
 const BRAND_LOGO_SRC = "/press-logo.png";
-const BRAND_FOOTER_H = 150;
+const BRAND_FOOTER_H = 280;
 
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
@@ -153,7 +153,7 @@ function drawTeamHalf(
   const r: Radii =
     side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
 
-  const borderColor = special ? SPECIAL_STYLE[special].color : isPicked ? "#4ade80" : "#ffffff";
+  const borderColor = special ? SPECIAL_STYLE[special].color : isPicked ? "#4ade80" : isFaded ? "rgba(255,255,255,0.35)" : "#ffffff";
   const borderWidth = special ? SPECIAL_BORDER_WIDTH : isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
 
   ctx.save();
@@ -428,18 +428,18 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   ctx.font = "12px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.45)";
   ctx.fillText("P O W E R E D   B Y", WIDTH / 2, cursorY + 12);
-  cursorY += 12 + 10;
+  cursorY += 12 + 14;
 
   if (brandLogo) {
-    const logoH = 60;
+    const logoH = 170;
     const logoW = (brandLogo.naturalWidth / brandLogo.naturalHeight) * logoH;
     ctx.drawImage(brandLogo, WIDTH / 2 - logoW / 2, cursorY, logoW, logoH);
-    cursorY += logoH + 10;
+    cursorY += logoH + 26;
   }
 
-  ctx.font = `20px ${displayFont}`;
-  ctx.fillStyle = "#4ade80";
-  ctx.fillText("sidelinebrew.com", WIDTH / 2, cursorY + 18);
+  ctx.font = `22px ${displayFont}`;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("sidelinebrew.com", WIDTH / 2, cursorY + 20);
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("canvas.toBlob returned null"))), "image/png");
