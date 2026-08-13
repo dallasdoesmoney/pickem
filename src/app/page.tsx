@@ -2,7 +2,7 @@
 
 import { CURRENT_WEEK, GAMES_BY_WEEK, Game } from "@/data/games";
 import { GameCard } from "@/components/GameCard";
-import { usePicks, MAX_LOCKS } from "@/hooks/usePicks";
+import { usePicks, MAX_LOCKS, MAX_BLOWOUTS } from "@/hooks/usePicks";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 
@@ -75,9 +75,10 @@ function computePickStats(games: Game[], picks: Record<string, TeamAbbr>) {
 
 export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
-  const { picks, setPick, locks, toggleLock, loaded } = usePicks(CURRENT_WEEK);
+  const { picks, setPick, specials, cycleSpecial, loaded } = usePicks(CURRENT_WEEK);
   const pickedCount = Object.keys(picks).length;
-  const lockedCount = Object.values(locks).filter(Boolean).length;
+  const lockedCount = Object.values(specials).filter((s) => s === "lock").length;
+  const blowoutCount = Object.values(specials).filter((s) => s === "blowout").length;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
 
@@ -102,9 +103,8 @@ export default function Home() {
           game={item.game}
           picked={picks[item.game.id]}
           onPick={(team) => setPick(item.game.id, team)}
-          isLocked={!!locks[item.game.id]}
-          onToggleLock={() => toggleLock(item.game.id)}
-          locksAvailable={lockedCount < MAX_LOCKS}
+          special={specials[item.game.id]}
+          onCycleSpecial={() => cycleSpecial(item.game.id)}
         />
       </div>
     ) : null;
@@ -131,9 +131,8 @@ export default function Home() {
         game={item.game}
         picked={picks[item.game.id]}
         onPick={(team) => setPick(item.game.id, team)}
-        isLocked={!!locks[item.game.id]}
-        onToggleLock={() => toggleLock(item.game.id)}
-        locksAvailable={lockedCount < MAX_LOCKS}
+        special={specials[item.game.id]}
+        onCycleSpecial={() => cycleSpecial(item.game.id)}
       />
     );
   };
@@ -197,6 +196,15 @@ export default function Home() {
               {lockedCount}/{MAX_LOCKS}
             </div>
             <div className="text-[9px] text-white/55">LOCKS</div>
+          </div>
+          <div
+            className="shrink-0 min-w-[88px] rounded-full border-2 text-center px-4 py-1.5"
+            style={{ borderColor: "#f97316" }}
+          >
+            <div className="text-base" style={{ fontFamily: "var(--font-display)", color: "#f97316" }}>
+              {blowoutCount}/{MAX_BLOWOUTS}
+            </div>
+            <div className="text-[9px] text-white/55">BLOWOUT</div>
           </div>
         </div>
       </header>

@@ -3,15 +3,21 @@
 import { useRef } from "react";
 import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
+import { SpecialPick } from "@/hooks/usePicks";
 
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
-const LOCK_BORDER_WIDTH = 5;
+const SPECIAL_BORDER_WIDTH = 5;
 const LONG_PRESS_MS = 450;
 export const PILL_WIDTH = 343; // px - fixed size, every card locks to this regardless of viewport
 export const PILL_HEIGHT = 80; // px
 const FOOTER_HEIGHT = 26; // px
 const LOGO_AREA_HEIGHT = PILL_HEIGHT - FOOTER_HEIGHT; // logo centers in this region, not the full card
+
+const SPECIAL_STYLE: Record<SpecialPick, { color: string; glow: string; emoji: string }> = {
+  lock: { color: "#fbbf24", glow: "rgba(251,191,36,0.7)", emoji: "\u{1F512}" },
+  blowout: { color: "#f97316", glow: "rgba(249,115,22,0.7)", emoji: "\u{1F4A5}" },
+};
 
 function darkenColor(hex: string, factor: number, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -20,17 +26,18 @@ function darkenColor(hex: string, factor: number, alpha: number) {
   return `rgba(${Math.round(r * factor)},${Math.round(g * factor)},${Math.round(b * factor)},${alpha})`;
 }
 
-function LockBadge({ side }: { side: "left" | "right" }) {
+function SpecialBadge({ side, special }: { side: "left" | "right"; special: SpecialPick }) {
+  const { color, emoji } = SPECIAL_STYLE[special];
   return (
     <div
       className="pointer-events-none absolute -top-2.5 z-20 text-[42px] leading-none"
       style={{
         [side === "left" ? "left" : "right"]: "-10px",
         transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
-        filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
+        filter: `drop-shadow(0 2px 3px rgba(0,0,0,0.6)) drop-shadow(0 0 3px ${color})`,
       }}
     >
-      &#128274;
+      {emoji}
     </div>
   );
 }
@@ -39,7 +46,7 @@ function TeamHalf({
   team,
   isPicked,
   isFaded,
-  isLocked,
+  special,
   side,
   spreadLabel,
   record,
@@ -49,7 +56,7 @@ function TeamHalf({
   team: (typeof TEAMS)[TeamAbbr];
   isPicked: boolean;
   isFaded: boolean;
-  isLocked: boolean;
+  special?: SpecialPick;
   side: "left" | "right";
   spreadLabel?: string;
   record: string;
@@ -59,8 +66,8 @@ function TeamHalf({
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
   const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
-  const borderColor = isLocked ? "#fbbf24" : isPicked ? "#4ade80" : "white";
-  const borderWidth = isLocked ? LOCK_BORDER_WIDTH : isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
+  const borderColor = special ? SPECIAL_STYLE[special].color : isPicked ? "#4ade80" : "white";
+  const borderWidth = special ? SPECIAL_BORDER_WIDTH : isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
 
   const pressTimer = useRef<number | null>(null);
@@ -161,13 +168,13 @@ function TeamHalf({
         <div
           className={`pointer-events-none absolute inset-0 ${radius}`}
           style={{
-            boxShadow: isLocked
-              ? "0 0 8px 2px rgba(251,191,36,0.7)"
-              : "0 0 6px 1px rgba(74,222,128,0.6)",
+            boxShadow: `0 0 ${special ? "8px 2px" : "6px 1px"} ${
+              special ? SPECIAL_STYLE[special].glow : "rgba(74,222,128,0.6)"
+            }`,
           }}
         />
       )}
-      {isPicked && isLocked && <LockBadge side={side} />}
+      {isPicked && special && <SpecialBadge side={side} special={special} />}
     </button>
   );
 }
@@ -176,21 +183,18 @@ export function GameCard({
   game,
   picked,
   onPick,
-  isLocked = false,
-  onToggleLock,
-  locksAvailable = true,
+  special,
+  onCycleSpecial,
 }: {
   game: Game;
   picked?: TeamAbbr;
   onPick: (team: TeamAbbr) => void;
-  isLocked?: boolean;
-  onToggleLock?: () => void;
-  locksAvailable?: boolean;
+  special?: SpecialPick;
+  onCycleSpecial?: () => void;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
   const hasPick = !!picked;
-  const canLongPress = onToggleLock && (isLocked || locksAvailable);
 
   const awaySpread =
     game.favorite && game.spread !== undefined
@@ -215,22 +219,22 @@ export function GameCard({
         side="left"
         isPicked={picked === away.abbr}
         isFaded={hasPick && picked !== away.abbr}
-        isLocked={isLocked && picked === away.abbr}
+        special={picked === away.abbr ? special : undefined}
         spreadLabel={awaySpread}
         record={game.awayRecord ?? "0-0"}
         onClick={() => onPick(away.abbr)}
-        onLongPress={canLongPress ? onToggleLock : undefined}
+        onLongPress={onCycleSpecial}
       />
       <TeamHalf
         team={home}
         side="right"
         isPicked={picked === home.abbr}
         isFaded={hasPick && picked !== home.abbr}
-        isLocked={isLocked && picked === home.abbr}
+        special={picked === home.abbr ? special : undefined}
         spreadLabel={homeSpread}
         record={game.homeRecord ?? "0-0"}
         onClick={() => onPick(home.abbr)}
-        onLongPress={canLongPress ? onToggleLock : undefined}
+        onLongPress={onCycleSpecial}
       />
     </div>
   );
