@@ -4,6 +4,8 @@ import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 
 const BORDER_WIDTH = 3;
+export const PILL_WIDTH = 343; // px - fixed size, every card locks to this regardless of viewport
+export const PILL_HEIGHT = 112; // px (h-28)
 
 function TeamHalf({
   team,
@@ -54,7 +56,7 @@ function TeamHalf({
         </div>
         <div
           className="absolute inset-x-0 bottom-0 h-8 flex items-center justify-center gap-1.5"
-          style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+          style={{ backgroundColor: "rgba(0,0,0,0.72)" }}
         >
           {spreadLabel && (
             <span
@@ -120,7 +122,10 @@ export function GameCard({
       : undefined;
 
   return (
-    <div className="relative flex items-center px-1">
+    <div
+      className="relative flex items-center mx-auto shrink-0"
+      style={{ width: PILL_WIDTH }}
+    >
       <TeamHalf
         team={away}
         side="left"
