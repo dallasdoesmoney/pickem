@@ -3,7 +3,7 @@
 import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 
-const BORDER_WIDTH = 3;
+const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
 export const PILL_WIDTH = 343; // px - fixed size, every card locks to this regardless of viewport
 export const PILL_HEIGHT = 80; // px
