@@ -139,6 +139,7 @@ function TeamHalf({
             src={team.logo}
             alt={team.name}
             draggable={false}
+            crossOrigin="anonymous"
             className="h-[117px] w-auto max-w-none select-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
             style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
           />
