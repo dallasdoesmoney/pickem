@@ -158,7 +158,12 @@ function drawTeamHalf(
   roundRectPath(ctx, x, y, w, h, r);
   ctx.clip();
 
-  ctx.filter = isFaded ? "grayscale(0.5) brightness(0.55)" : "none";
+  // `ctx.filter` (grayscale/brightness) isn't reliable across every canvas
+  // implementation - confirmed it silently no-ops on at least one real
+  // device this shipped to. A plain translucent-black overlay drawn last,
+  // using nothing but fillRect+rgba, dims and mutes the whole half
+  // (background, logo, footer, text alike) with zero dependency on filter
+  // support.
   ctx.fillStyle = team.color;
   ctx.fillRect(x, y, w, h);
 
@@ -168,8 +173,7 @@ function drawTeamHalf(
     ctx.drawImage(logo, x + w / 2 - logoW / 2, y + LOGO_AREA_H / 2 - logoH / 2, logoW, logoH);
   }
 
-  ctx.filter = "none";
-  ctx.fillStyle = isFaded ? team.color : darken(team.color, 0.6, 0.93);
+  ctx.fillStyle = darken(team.color, 0.6, 0.93);
   ctx.fillRect(x, y + LOGO_AREA_H, w, FOOTER_H);
 
   const footerMidY = y + LOGO_AREA_H + FOOTER_H / 2;
@@ -216,6 +220,11 @@ function drawTeamHalf(
     ctx.restore();
   }
 
+  if (isFaded) {
+    ctx.fillStyle = "rgba(6,10,20,0.6)";
+    ctx.fillRect(x, y, w, h);
+  }
+
   ctx.restore();
 
   roundRectPath(ctx, x, y, w, h, r);
@@ -230,14 +239,19 @@ function drawTeamHalf(
 
   if (special) {
     const emoji = SPECIAL_STYLE[special].emoji;
-    const badgeX = side === "left" ? x - 4 : x + w + 4;
-    const badgeY = y - 2;
+    // CSS rotates the badge around its own center by default; rotating
+    // around a corner (as this used to) swings it visibly off-target. Only
+    // let it protrude ~12px past the pill edge - GAP_X between columns is
+    // 32px, and a wider protrusion bleeds into the neighboring pill.
+    const protrusion = 12;
+    const centerX = side === "left" ? x - protrusion + 19 : x + w + protrusion - 19;
+    const centerY = y - 8 + 19;
     ctx.save();
-    ctx.translate(badgeX, badgeY);
+    ctx.translate(centerX, centerY);
     ctx.rotate(((side === "left" ? -22 : 22) * Math.PI) / 180);
-    ctx.font = "42px system-ui, sans-serif";
-    ctx.textAlign = side === "left" ? "right" : "left";
-    ctx.textBaseline = "top";
+    ctx.font = "38px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.shadowColor = "rgba(0,0,0,0.6)";
     ctx.shadowBlur = 4;
     ctx.fillText(emoji, 0, 0);
