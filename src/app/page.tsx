@@ -207,30 +207,12 @@ export default function Home() {
               Week {CURRENT_WEEK} &middot; {pickedCount} / {games.length} picked
             </p>
           </div>
-          <div className="absolute top-6 right-4 flex items-center gap-2">
-            <button
-              aria-label="Share your picks"
-              onClick={handleShare}
-              disabled={sharing}
-              className="h-9 w-9 shrink-0 rounded-full border-2 border-white/40 text-white/70 flex items-center justify-center disabled:opacity-50"
-            >
-              {sharing ? (
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white/80 animate-spin" />
-              ) : (
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v12" />
-                  <path d="M7 8l5-5 5 5" />
-                  <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
-                </svg>
-              )}
-            </button>
-            <button
-              aria-label="Sign in"
-              className="h-9 w-9 shrink-0 rounded-full border-2 border-dashed border-white/40 text-white/50 text-lg flex items-center justify-center"
-            >
-              +
-            </button>
-          </div>
+          <button
+            aria-label="Sign in"
+            className="h-9 w-9 shrink-0 rounded-full border-2 border-dashed border-white/40 text-white/50 text-lg flex items-center justify-center absolute top-6 right-4"
+          >
+            +
+          </button>
         </div>
 
         <StatPills stats={stats} lockedCount={lockedCount} blowoutCount={blowoutCount} />
@@ -247,6 +229,36 @@ export default function Home() {
                 renderGridCell(col1[i]),
                 renderGridCell(col2[i]),
               ])}
+            </div>
+
+            <div className="flex justify-center mt-8">
+              <button
+                aria-label="Share your picks"
+                onClick={handleShare}
+                disabled={sharing}
+                className="flex items-center gap-2 rounded-full px-7 py-3.5 text-lg shadow-[0_4px_20px_rgba(74,222,128,0.35)] active:scale-95 transition-transform duration-150 disabled:opacity-60"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  background: "linear-gradient(135deg, #4ade80, #22c55e)",
+                  color: "#0e1b33",
+                }}
+              >
+                {sharing ? (
+                  <>
+                    <span className="h-4 w-4 rounded-full border-2 border-[#0e1b33]/40 border-t-[#0e1b33] animate-spin" />
+                    SHARING&hellip;
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3v12" />
+                      <path d="M7 8l5-5 5 5" />
+                      <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                    </svg>
+                    SHARE MY PICKS 🏈
+                  </>
+                )}
+              </button>
             </div>
           </>
         )}

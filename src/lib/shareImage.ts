@@ -23,6 +23,8 @@ const GAP_X = 32;
 const GAP_Y = 16;
 const HEADER_ROW_H = 56;
 const BG = "#0e1b33";
+const BRAND_LOGO_SRC = "/press-logo.png";
+const BRAND_FOOTER_H = 150;
 
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
@@ -292,9 +294,10 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     logoUrls.add(TEAMS[g.home].logo);
   });
   if (stats.boldestTeam) logoUrls.add(stats.boldestTeam.logo);
-  const logoEntries = await Promise.all(
-    Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)
-  );
+  const [logoEntries, brandLogo] = await Promise.all([
+    Promise.all(Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)),
+    loadImage(BRAND_LOGO_SRC),
+  ]);
   const logos = new Map(logoEntries);
 
   let bodyHeight = 0;
@@ -304,7 +307,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   }
 
   const headerHeight = 64 + 8 + 44;
-  const totalHeight = PAD_TOP + headerHeight + 24 + bodyHeight + PAD_BOTTOM;
+  const totalHeight = PAD_TOP + headerHeight + 24 + bodyHeight + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const pixelRatio = 2;
   const canvas = document.createElement("canvas");
@@ -418,6 +421,25 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     });
     cursorY += h + GAP_Y;
   }
+
+  cursorY += 20;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.fillText("P O W E R E D   B Y", WIDTH / 2, cursorY + 12);
+  cursorY += 12 + 10;
+
+  if (brandLogo) {
+    const logoH = 60;
+    const logoW = (brandLogo.naturalWidth / brandLogo.naturalHeight) * logoH;
+    ctx.drawImage(brandLogo, WIDTH / 2 - logoW / 2, cursorY, logoW, logoH);
+    cursorY += logoH + 10;
+  }
+
+  ctx.font = `20px ${displayFont}`;
+  ctx.fillStyle = "#4ade80";
+  ctx.fillText("sidelinebrew.com", WIDTH / 2, cursorY + 18);
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("canvas.toBlob returned null"))), "image/png");
