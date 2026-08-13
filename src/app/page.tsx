@@ -1,17 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { toPng } from "html-to-image";
-import { CURRENT_WEEK, GAMES_BY_WEEK, Game } from "@/data/games";
+import { useState } from "react";
+import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard } from "@/components/GameCard";
 import { usePicks, MAX_LOCKS, MAX_BLOWOUTS } from "@/hooks/usePicks";
 import { groupGamesByDay } from "@/lib/groupGames";
-import { TEAMS, TeamAbbr } from "@/data/teams";
-
-const SHARE_CARD_WIDTH = 840;
-const SHARE_BG = "#0e1b33";
-
-type PickStats = ReturnType<typeof computePickStats>;
+import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats } from "@/lib/pickLayout";
+import { renderShareImage } from "@/lib/shareImage";
 
 function StatPills({
   stats,
@@ -73,110 +68,6 @@ function StatPills({
   );
 }
 
-type FlowItem =
-  | { type: "header"; key: string; label: string }
-  | { type: "game"; key: string; game: Game }
-  | { type: "blank"; key: string };
-
-type DayGroup = { label: string; games: Game[] };
-
-function flatten(groups: DayGroup[]): FlowItem[] {
-  return groups.flatMap((group) => [
-    { type: "header" as const, key: `h-${group.label}`, label: group.label },
-    ...group.games.map((game) => ({ type: "game" as const, key: game.id, game })),
-  ]);
-}
-
-// Splits into two columns by game count, row-paired for a CSS grid so a
-// header on one side and a game on the other still force both cells in
-// that row to the same height (the grid's native "tallest cell wins" rule
-// keeps every subsequent row locked in alignment). Column 2 reserves a
-// blank cell instead of repeating a day label when the split falls mid-day.
-function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: FlowItem[] } {
-  const totalGames = groups.reduce((sum, g) => sum + g.games.length, 0);
-  const half = Math.ceil(totalGames / 2);
-
-  const col1: FlowItem[] = [];
-  const col2: FlowItem[] = [];
-  let count = 0;
-  let col2Started = false;
-
-  for (const group of groups) {
-    group.games.forEach((game, i) => {
-      const isFirstOfGroup = i === 0;
-      if (count < half) {
-        if (isFirstOfGroup) col1.push({ type: "header", key: `h1-${group.label}`, label: group.label });
-        col1.push({ type: "game", key: game.id, game });
-      } else {
-        if (!col2Started) {
-          col2.push({ type: "blank", key: `blank-${group.label}` });
-          col2Started = true;
-        } else if (isFirstOfGroup) {
-          col2.push({ type: "header", key: `h2-${group.label}`, label: group.label });
-        }
-        col2.push({ type: "game", key: game.id, game });
-      }
-      count++;
-    });
-  }
-
-  return { col1, col2 };
-}
-
-// Safari's canvas/SVG pipeline has long-standing bugs rendering
-// cross-origin <img> elements inside html-to-image's foreignObject step,
-// even when the source sends correct CORS headers - the failure shows up
-// as blank team logos in the exported PNG. Pre-converting every logo to a
-// same-origin data: URL before capture sidesteps that class of bug
-// entirely (and as a side effect guarantees the image has finished
-// loading, closing the separate "still mid-fetch" race too).
-async function inlineImages(container: HTMLElement) {
-  const imgs = Array.from(container.querySelectorAll("img"));
-  const failures: string[] = [];
-  await Promise.all(
-    imgs.map(async (img) => {
-      if (img.src.startsWith("data:")) return;
-      const label = img.alt || img.src.split("/").pop() || img.src;
-      try {
-        const res = await fetch(img.src, { mode: "cors" });
-        if (!res.ok) throw new Error(`fetch ${res.status}`);
-        const blob = await res.blob();
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
-          reader.readAsDataURL(blob);
-        });
-        await new Promise<void>((resolve, reject) => {
-          img.addEventListener("load", () => resolve(), { once: true });
-          img.addEventListener("error", () => reject(new Error("data: url failed to load")), { once: true });
-          img.src = dataUrl;
-        });
-      } catch (err) {
-        failures.push(`${label}: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    })
-  );
-  return { total: imgs.length, failed: failures };
-}
-
-function computePickStats(games: Game[], picks: Record<string, TeamAbbr>) {
-  const withSpread = games.filter((g) => g.favorite && g.spread !== undefined && picks[g.id]);
-  const chalkGames = withSpread.filter((g) => picks[g.id] === g.favorite);
-  const underdogGames = withSpread.filter((g) => picks[g.id] !== g.favorite);
-  const chalkPct = withSpread.length > 0 ? Math.round((chalkGames.length / withSpread.length) * 100) : null;
-  const boldest = underdogGames.reduce<Game | null>(
-    (max, g) => (!max || (g.spread ?? 0) > (max.spread ?? 0) ? g : max),
-    null
-  );
-  return {
-    underdogCount: underdogGames.length,
-    chalkPct,
-    boldestTeam: boldest ? TEAMS[picks[boldest.id]] : null,
-    boldestSpread: boldest?.spread,
-  };
-}
-
 export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
   const { picks, setPick, specials, cycleSpecial, loaded } = usePicks(CURRENT_WEEK);
@@ -186,30 +77,19 @@ export default function Home() {
   const canAddSpecial = lockedCount < MAX_LOCKS || blowoutCount < MAX_BLOWOUTS;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
-  const shareCardRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
   const [shareDebug, setShareDebug] = useState<string[] | null>(null);
 
   async function handleShare() {
-    if (!shareCardRef.current || sharing) return;
+    if (sharing) return;
     setSharing(true);
     const log: string[] = [];
     try {
       log.push(`ua: ${navigator.userAgent}`);
-      const { total, failed } = await inlineImages(shareCardRef.current);
-      log.push(`logos: ${total - failed.length}/${total} inlined`);
-      failed.forEach((f) => log.push(`  FAILED ${f}`));
-
-      const dataUrl = await toPng(shareCardRef.current, {
-        pixelRatio: 2,
-        cacheBust: true,
-        backgroundColor: SHARE_BG,
-      });
-      log.push(`capture: ${Math.round(dataUrl.length / 1024)}kb png`);
+      const blob = await renderShareImage({ games, groups, picks, specials, week: CURRENT_WEEK });
+      log.push(`canvas render: ${Math.round(blob.size / 1024)}kb png`);
 
       const filename = `pickem-week-${CURRENT_WEEK}.png`;
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
       const file = new File([blob], filename, { type: "image/png" });
 
       const canShareFiles = !!navigator.canShare?.({ files: [file] });
@@ -223,10 +103,12 @@ export default function Home() {
         });
         log.push("share sheet: opened");
       } else {
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.href = dataUrl;
+        link.href = url;
         link.download = filename;
         link.click();
+        URL.revokeObjectURL(url);
         log.push("download: triggered");
       }
     } catch (err) {
@@ -357,34 +239,6 @@ export default function Home() {
           </>
         )}
       </main>
-
-      {loaded && (
-        <div
-          aria-hidden="true"
-          style={{ position: "fixed", top: 0, left: -99999, pointerEvents: "none" }}
-        >
-          <div
-            ref={shareCardRef}
-            style={{ width: SHARE_CARD_WIDTH, backgroundColor: SHARE_BG, padding: "40px 48px 56px" }}
-          >
-            <div className="text-center">
-              <h1 className="text-3xl tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-                NFL PICK&rsquo;EM
-              </h1>
-              <p className="text-sm text-white/50 mt-1">
-                Week {CURRENT_WEEK} &middot; {pickedCount} / {games.length} picked
-              </p>
-            </div>
-            <StatPills stats={stats} lockedCount={lockedCount} blowoutCount={blowoutCount} />
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4 items-stretch mt-8">
-              {Array.from({ length: rowCount }).flatMap((_, i) => [
-                renderGridCell(col1[i]),
-                renderGridCell(col2[i]),
-              ])}
-            </div>
-          </div>
-        </div>
-      )}
 
       {shareDebug && (
         <div className="fixed inset-x-3 bottom-3 z-50 rounded-lg bg-black text-white text-[11px] leading-relaxed font-mono p-3 max-h-[50vh] overflow-y-auto shadow-lg border border-white/20">
