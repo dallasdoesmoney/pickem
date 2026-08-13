@@ -92,17 +92,7 @@ export default function Home() {
       const filename = `pickem-week-${CURRENT_WEEK}.png`;
       const file = new File([blob], filename, { type: "image/png" });
 
-      const canShareFiles = !!navigator.canShare?.({ files: [file] });
-      log.push(`canShare files: ${canShareFiles}`);
-
-      if (canShareFiles) {
-        await navigator.share({
-          files: [file],
-          title: "NFL Pick'em",
-          text: `My Week ${CURRENT_WEEK} picks`,
-        });
-        log.push("share sheet: opened");
-      } else {
+      function download() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
@@ -111,12 +101,34 @@ export default function Home() {
         URL.revokeObjectURL(url);
         log.push("download: triggered");
       }
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        log.push("share sheet: cancelled by user");
+
+      // Desktop Chrome (especially macOS) frequently advertises file
+      // sharing support and then aborts immediately with no working share
+      // target - confirmed on-device. Coarse pointer (touch) is a much
+      // more reliable signal for "has a real native share sheet" than
+      // canShare() alone, which the API spec never ties to that.
+      const isTouchPrimary = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+      const canShareFiles = isTouchPrimary && !!navigator.canShare?.({ files: [file] });
+      log.push(`touch primary: ${isTouchPrimary}, canShare files: ${canShareFiles}`);
+
+      if (canShareFiles) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: "NFL Pick'em",
+            text: `My Week ${CURRENT_WEEK} picks`,
+          });
+          log.push("share sheet: opened");
+        } catch (shareErr) {
+          const cancelled = shareErr instanceof Error && shareErr.name === "AbortError";
+          log.push(cancelled ? "share sheet: cancelled, falling back to download" : `share sheet failed: ${String(shareErr)}, falling back to download`);
+          download();
+        }
       } else {
-        log.push(`ERROR: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
+        download();
       }
+    } catch (err) {
+      log.push(`ERROR: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
     } finally {
       setSharing(false);
       setShareDebug(log);
