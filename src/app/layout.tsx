@@ -30,15 +30,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${bungee.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-50">
+        <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-60">
           <pattern
             id="press-backdrop"
-            width="220"
-            height="220"
+            width="300"
+            height="300"
             patternUnits="userSpaceOnUse"
             patternTransform="rotate(-45)"
           >
-            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="40" y="40" width="140" height="140" />
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="50" y="50" width="200" height="200" />
           </pattern>
           <rect width="100%" height="100%" fill="url(#press-backdrop)" />
         </svg>
