@@ -5,7 +5,16 @@ import { TeamAbbr, TEAMS } from "@/data/teams";
 
 const BORDER_WIDTH = 3;
 export const PILL_WIDTH = 343; // px - fixed size, every card locks to this regardless of viewport
-export const PILL_HEIGHT = 112; // px (h-28)
+export const PILL_HEIGHT = 80; // px
+const FOOTER_HEIGHT = 26; // px
+const LOGO_AREA_HEIGHT = PILL_HEIGHT - FOOTER_HEIGHT; // logo centers in this region, not the full card
+
+function darkenColor(hex: string, factor: number, alpha: number) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${Math.round(r * factor)},${Math.round(g * factor)},${Math.round(b * factor)},${alpha})`;
+}
 
 function TeamHalf({
   team,
@@ -33,8 +42,8 @@ function TeamHalf({
   return (
     <button
       onClick={onClick}
-      className="relative flex-1 h-28 cursor-pointer active:scale-95 transition-transform duration-150"
-      style={{ zIndex: isPicked ? 10 : 0 }}
+      className="relative flex-1 cursor-pointer active:scale-95 transition-transform duration-150"
+      style={{ height: PILL_HEIGHT, zIndex: isPicked ? 10 : 0 }}
     >
       <div
         className={`absolute inset-0 ${radius} overflow-hidden`}
@@ -47,16 +56,22 @@ function TeamHalf({
           filter: fadedFilter,
         }}
       >
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="absolute inset-x-0 top-0 flex items-center justify-center"
+          style={{ height: LOGO_AREA_HEIGHT }}
+        >
           <img
             src={team.logo}
             alt={team.name}
-            className="h-28 w-28 object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+            className="h-[76px] w-[76px] object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
           />
         </div>
         <div
-          className="absolute inset-x-0 bottom-0 h-8 flex items-center justify-center gap-1.5"
-          style={{ backgroundColor: "rgba(0,0,0,0.72)" }}
+          className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5"
+          style={{
+            height: FOOTER_HEIGHT,
+            backgroundColor: isFaded ? team.color : darkenColor(team.color, 0.6, 0.93),
+          }}
         >
           {spreadLabel && (
             <span
