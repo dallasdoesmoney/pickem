@@ -50,17 +50,12 @@ export default function Home() {
   const stats = computePickStats(games, picks);
   const tags = computePickTags(games, picks);
   const [sharing, setSharing] = useState(false);
-  const [shareDebug, setShareDebug] = useState<string[] | null>(null);
 
   async function handleShare() {
     if (sharing) return;
     setSharing(true);
-    const log: string[] = [];
     try {
-      log.push(`ua: ${navigator.userAgent}`);
       const blob = await renderShareImage({ games, groups, picks, week: CURRENT_WEEK });
-      log.push(`canvas render: ${Math.round(blob.size / 1024)}kb png`);
-
       const filename = `pickem-week-${CURRENT_WEEK}.png`;
       const file = new File([blob], filename, { type: "image/png" });
 
@@ -71,7 +66,6 @@ export default function Home() {
         link.download = filename;
         link.click();
         URL.revokeObjectURL(url);
-        log.push("download: triggered");
       }
 
       // Desktop Chrome (especially macOS) frequently advertises file
@@ -81,7 +75,6 @@ export default function Home() {
       // canShare() alone, which the API spec never ties to that.
       const isTouchPrimary = window.matchMedia?.("(pointer: coarse)").matches ?? false;
       const canShareFiles = isTouchPrimary && !!navigator.canShare?.({ files: [file] });
-      log.push(`touch primary: ${isTouchPrimary}, canShare files: ${canShareFiles}`);
 
       if (canShareFiles) {
         try {
@@ -90,20 +83,16 @@ export default function Home() {
             title: "NFL Pick'em",
             text: `My Week ${CURRENT_WEEK} picks`,
           });
-          log.push("share sheet: opened");
         } catch (shareErr) {
-          const cancelled = shareErr instanceof Error && shareErr.name === "AbortError";
-          log.push(cancelled ? "share sheet: cancelled, falling back to download" : `share sheet failed: ${String(shareErr)}, falling back to download`);
-          download();
+          if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();
         }
       } else {
         download();
       }
     } catch (err) {
-      log.push(`ERROR: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
+      console.error("Share failed", err);
     } finally {
       setSharing(false);
-      setShareDebug(log);
     }
   }
 
@@ -231,22 +220,6 @@ export default function Home() {
           </>
         )}
       </main>
-
-      {shareDebug && (
-        <div className="fixed inset-x-3 bottom-3 z-50 rounded-lg bg-black text-white text-[11px] leading-relaxed font-mono p-3 max-h-[50vh] overflow-y-auto shadow-lg border border-white/20">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-white/50">share debug</span>
-            <button onClick={() => setShareDebug(null)} className="text-white/70 underline">
-              dismiss
-            </button>
-          </div>
-          {shareDebug.map((line, i) => (
-            <div key={i} className="whitespace-pre-wrap break-all">
-              {line}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
