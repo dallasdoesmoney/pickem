@@ -29,7 +29,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${bungee.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-50">
+          <pattern
+            id="press-backdrop"
+            width="220"
+            height="220"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(-45)"
+          >
+            <image href="/press-logo.png" xlinkHref="/press-logo.png" x="40" y="40" width="140" height="140" />
+          </pattern>
+          <rect width="100%" height="100%" fill="url(#press-backdrop)" />
+        </svg>
+        {children}
+      </body>
     </html>
   );
 }
