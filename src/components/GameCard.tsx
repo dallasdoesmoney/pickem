@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 import { SpecialPick } from "@/hooks/usePicks";
@@ -8,7 +7,6 @@ import { SpecialPick } from "@/hooks/usePicks";
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
 const SPECIAL_BORDER_WIDTH = 5;
-const LONG_PRESS_MS = 450;
 export const PILL_WIDTH = 343; // px - fixed size, every card locks to this regardless of viewport
 export const PILL_HEIGHT = 80; // px
 const FOOTER_HEIGHT = 26; // px
@@ -26,19 +24,56 @@ function darkenColor(hex: string, factor: number, alpha: number) {
   return `rgba(${Math.round(r * factor)},${Math.round(g * factor)},${Math.round(b * factor)},${alpha})`;
 }
 
-function SpecialBadge({ side, special }: { side: "left" | "right"; special: SpecialPick }) {
+// Tap target that flags a picked team as Lock/Blowout. Shows a small
+// dashed-circle hint (matching the header's sign-in button) until tapped,
+// then grows into the full emoji badge - tapping again cycles onward.
+// This is a real click, not a long-press: press-and-hold on an <img>
+// triggers the browser's native save/view-image menu on mobile (especially
+// inside in-app browsers like TikTok's), which made long-press unreliable.
+function SpecialTrigger({
+  side,
+  special,
+  onClick,
+}: {
+  side: "left" | "right";
+  special?: SpecialPick;
+  onClick: () => void;
+}) {
+  const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
+
+  if (!special) {
+    return (
+      <button
+        aria-label="Mark this pick as a Lock or Blowout"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className="absolute -top-2.5 z-20 h-7 w-7 rounded-full border-2 border-dashed border-white/50 text-white/60 text-sm flex items-center justify-center"
+        style={{ ...positionStyle, backgroundColor: "#0e1b33" }}
+      >
+        +
+      </button>
+    );
+  }
+
   const { color, emoji } = SPECIAL_STYLE[special];
   return (
-    <div
-      className="pointer-events-none absolute -top-2.5 z-20 text-[42px] leading-none"
+    <button
+      aria-label={`Special pick: ${special}. Tap to change.`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="absolute -top-2.5 z-20 text-[42px] leading-none"
       style={{
-        [side === "left" ? "left" : "right"]: "-10px",
+        ...positionStyle,
         transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
         filter: `drop-shadow(0 2px 3px rgba(0,0,0,0.6)) drop-shadow(0 0 3px ${color})`,
       }}
     >
       {emoji}
-    </div>
+    </button>
   );
 }
 
@@ -51,7 +86,7 @@ function TeamHalf({
   spreadLabel,
   record,
   onClick,
-  onLongPress,
+  onCycleSpecial,
 }: {
   team: (typeof TEAMS)[TeamAbbr];
   isPicked: boolean;
@@ -61,7 +96,7 @@ function TeamHalf({
   spreadLabel?: string;
   record: string;
   onClick: () => void;
-  onLongPress?: () => void;
+  onCycleSpecial?: () => void;
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
@@ -70,41 +105,15 @@ function TeamHalf({
   const borderWidth = special ? SPECIAL_BORDER_WIDTH : isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
 
-  const pressTimer = useRef<number | null>(null);
-  const longPressFired = useRef(false);
-
-  function startPressTimer() {
-    if (!isPicked || !onLongPress) return;
-    longPressFired.current = false;
-    pressTimer.current = window.setTimeout(() => {
-      longPressFired.current = true;
-      onLongPress();
-    }, LONG_PRESS_MS);
-  }
-  function clearPressTimer() {
-    if (pressTimer.current !== null) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  }
-  function handleClick() {
-    if (longPressFired.current) {
-      longPressFired.current = false;
-      return;
-    }
-    onClick();
-  }
-
   return (
-    <button
-      onClick={handleClick}
-      onPointerDown={startPressTimer}
-      onPointerUp={clearPressTimer}
-      onPointerLeave={clearPressTimer}
-      onPointerCancel={clearPressTimer}
-      className="relative flex-1 cursor-pointer active:scale-95 transition-transform duration-150"
+    <div
+      className="relative flex-1"
       style={{ height: PILL_HEIGHT, zIndex: isPicked ? 10 : 0 }}
     >
+      <button
+        onClick={onClick}
+        className="absolute inset-0 h-full w-full cursor-pointer active:scale-95 transition-transform duration-150"
+      >
       <div
         className={`absolute inset-0 ${radius} overflow-hidden`}
         style={{
@@ -123,7 +132,9 @@ function TeamHalf({
           <img
             src={team.logo}
             alt={team.name}
-            className="h-[117px] w-auto max-w-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+            draggable={false}
+            className="h-[117px] w-auto max-w-none select-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+            style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
           />
         </div>
         <div
@@ -174,8 +185,11 @@ function TeamHalf({
           }}
         />
       )}
-      {isPicked && special && <SpecialBadge side={side} special={special} />}
-    </button>
+      </button>
+      {isPicked && onCycleSpecial && (
+        <SpecialTrigger side={side} special={special} onClick={onCycleSpecial} />
+      )}
+    </div>
   );
 }
 
@@ -223,7 +237,7 @@ export function GameCard({
         spreadLabel={awaySpread}
         record={game.awayRecord ?? "0-0"}
         onClick={() => onPick(away.abbr)}
-        onLongPress={onCycleSpecial}
+        onCycleSpecial={picked === away.abbr ? onCycleSpecial : undefined}
       />
       <TeamHalf
         team={home}
@@ -234,7 +248,7 @@ export function GameCard({
         spreadLabel={homeSpread}
         record={game.homeRecord ?? "0-0"}
         onClick={() => onPick(home.abbr)}
-        onLongPress={onCycleSpecial}
+        onCycleSpecial={picked === home.abbr ? onCycleSpecial : undefined}
       />
     </div>
   );
