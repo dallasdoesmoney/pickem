@@ -6,6 +6,8 @@ import { TeamAbbr } from "@/data/teams";
 type Picks = Record<string, TeamAbbr>;
 type Locks = Record<string, boolean>;
 
+export const MAX_LOCKS = 3;
+
 export function usePicks(week: number) {
   const picksKey = `pickem:picks:week-${week}`;
   const locksKey = `pickem:locks:week-${week}`;
@@ -50,7 +52,14 @@ export function usePicks(week: number) {
   }
 
   function toggleLock(gameId: string) {
-    setLocks((prev) => ({ ...prev, [gameId]: !prev[gameId] }));
+    setLocks((prev) => {
+      const isLocked = !!prev[gameId];
+      if (!isLocked) {
+        const lockedCount = Object.values(prev).filter(Boolean).length;
+        if (lockedCount >= MAX_LOCKS) return prev;
+      }
+      return { ...prev, [gameId]: !isLocked };
+    });
   }
 
   return { picks, setPick, locks, toggleLock, loaded };

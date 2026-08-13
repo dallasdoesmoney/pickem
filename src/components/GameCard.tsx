@@ -1,10 +1,13 @@
 "use client";
 
+import { useRef } from "react";
 import { Game } from "@/data/games";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
+const LOCK_BORDER_WIDTH = 5;
+const LONG_PRESS_MS = 450;
 export const PILL_WIDTH = 343; // px - fixed size, every card locks to this regardless of viewport
 export const PILL_HEIGHT = 80; // px
 const FOOTER_HEIGHT = 26; // px
@@ -17,33 +20,86 @@ function darkenColor(hex: string, factor: number, alpha: number) {
   return `rgba(${Math.round(r * factor)},${Math.round(g * factor)},${Math.round(b * factor)},${alpha})`;
 }
 
+function LockBadge({ side }: { side: "left" | "right" }) {
+  return (
+    <div
+      className={`pointer-events-none absolute top-1.5 z-20 flex h-9 w-9 items-center justify-center rounded-full ${
+        side === "left" ? "left-1.5" : "right-1.5"
+      }`}
+      style={{
+        backgroundColor: "#0e1b33",
+        border: "2px solid #fbbf24",
+        boxShadow: "0 0 8px 2px rgba(251,191,36,0.75)",
+      }}
+    >
+      <svg width="16" height="18" viewBox="0 0 12 13" fill="none">
+        <rect x="1.5" y="5.5" width="9" height="6.5" rx="1.5" fill="#fbbf24" />
+        <path d="M3.5 5.5V3.75a2.5 2.5 0 0 1 5 0V5.5" stroke="#fbbf24" strokeWidth="1.4" fill="none" />
+      </svg>
+    </div>
+  );
+}
+
 function TeamHalf({
   team,
   isPicked,
   isFaded,
+  isLocked,
   side,
   spreadLabel,
   record,
   onClick,
+  onLongPress,
 }: {
   team: (typeof TEAMS)[TeamAbbr];
   isPicked: boolean;
   isFaded: boolean;
+  isLocked: boolean;
   side: "left" | "right";
   spreadLabel?: string;
   record: string;
   onClick: () => void;
+  onLongPress?: () => void;
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
   const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
-  const borderColor = isPicked ? "#4ade80" : "white";
-  const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
+  const borderColor = isLocked ? "#fbbf24" : isPicked ? "#4ade80" : "white";
+  const borderWidth = isLocked ? LOCK_BORDER_WIDTH : isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
+
+  const pressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
+
+  function startPressTimer() {
+    if (!isPicked || !onLongPress) return;
+    longPressFired.current = false;
+    pressTimer.current = window.setTimeout(() => {
+      longPressFired.current = true;
+      onLongPress();
+    }, LONG_PRESS_MS);
+  }
+  function clearPressTimer() {
+    if (pressTimer.current !== null) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  }
+  function handleClick() {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    onClick();
+  }
 
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
+      onPointerDown={startPressTimer}
+      onPointerUp={clearPressTimer}
+      onPointerLeave={clearPressTimer}
+      onPointerCancel={clearPressTimer}
       className="relative flex-1 cursor-pointer active:scale-95 transition-transform duration-150"
       style={{ height: PILL_HEIGHT, zIndex: isPicked ? 10 : 0 }}
     >
@@ -110,49 +166,13 @@ function TeamHalf({
         <div
           className={`pointer-events-none absolute inset-0 ${radius}`}
           style={{
-            boxShadow: "0 0 6px 1px rgba(74,222,128,0.6)",
+            boxShadow: isLocked
+              ? "0 0 8px 2px rgba(251,191,36,0.7)"
+              : "0 0 6px 1px rgba(74,222,128,0.6)",
           }}
         />
       )}
-    </button>
-  );
-}
-
-function LockToggle({
-  isLocked,
-  disabled,
-  onClick,
-}: {
-  isLocked: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const color = disabled ? "#5b6472" : isLocked ? "#fbbf24" : "#e5e7eb";
-  return (
-    <button
-      aria-label={isLocked ? "Unlock this pick" : "Lock this pick for double points"}
-      disabled={disabled}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className="absolute left-1/2 -top-[13px] z-20 flex h-[26px] w-[26px] -translate-x-1/2 items-center justify-center rounded-full"
-      style={{
-        backgroundColor: "#0e1b33",
-        border: `2px solid ${color}`,
-        cursor: disabled ? "default" : "pointer",
-        boxShadow: isLocked ? "0 0 6px 1px rgba(251,191,36,0.7)" : undefined,
-      }}
-    >
-      <svg width="12" height="13" viewBox="0 0 12 13" fill="none">
-        <rect x="1.5" y="5.5" width="9" height="6.5" rx="1.5" fill={color} />
-        <path
-          d="M3.5 5.5V3.75a2.5 2.5 0 0 1 5 0V5.5"
-          stroke={color}
-          strokeWidth="1.4"
-          fill="none"
-        />
-      </svg>
+      {isPicked && isLocked && <LockBadge side={side} />}
     </button>
   );
 }
@@ -163,16 +183,19 @@ export function GameCard({
   onPick,
   isLocked = false,
   onToggleLock,
+  locksAvailable = true,
 }: {
   game: Game;
   picked?: TeamAbbr;
   onPick: (team: TeamAbbr) => void;
   isLocked?: boolean;
   onToggleLock?: () => void;
+  locksAvailable?: boolean;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
   const hasPick = !!picked;
+  const canLongPress = onToggleLock && (isLocked || locksAvailable);
 
   const awaySpread =
     game.favorite && game.spread !== undefined
@@ -197,22 +220,23 @@ export function GameCard({
         side="left"
         isPicked={picked === away.abbr}
         isFaded={hasPick && picked !== away.abbr}
+        isLocked={isLocked && picked === away.abbr}
         spreadLabel={awaySpread}
         record={game.awayRecord ?? "0-0"}
         onClick={() => onPick(away.abbr)}
+        onLongPress={canLongPress ? onToggleLock : undefined}
       />
       <TeamHalf
         team={home}
         side="right"
         isPicked={picked === home.abbr}
         isFaded={hasPick && picked !== home.abbr}
+        isLocked={isLocked && picked === home.abbr}
         spreadLabel={homeSpread}
         record={game.homeRecord ?? "0-0"}
         onClick={() => onPick(home.abbr)}
+        onLongPress={canLongPress ? onToggleLock : undefined}
       />
-      {onToggleLock && (
-        <LockToggle isLocked={isLocked} disabled={!hasPick} onClick={onToggleLock} />
-      )}
     </div>
   );
 }

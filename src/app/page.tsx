@@ -2,7 +2,7 @@
 
 import { CURRENT_WEEK, GAMES_BY_WEEK, Game } from "@/data/games";
 import { GameCard } from "@/components/GameCard";
-import { usePicks } from "@/hooks/usePicks";
+import { usePicks, MAX_LOCKS } from "@/hooks/usePicks";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 
@@ -77,6 +77,7 @@ export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
   const { picks, setPick, locks, toggleLock, loaded } = usePicks(CURRENT_WEEK);
   const pickedCount = Object.keys(picks).length;
+  const lockedCount = Object.values(locks).filter(Boolean).length;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
 
@@ -103,6 +104,7 @@ export default function Home() {
           onPick={(team) => setPick(item.game.id, team)}
           isLocked={!!locks[item.game.id]}
           onToggleLock={() => toggleLock(item.game.id)}
+          locksAvailable={lockedCount < MAX_LOCKS}
         />
       </div>
     ) : null;
@@ -131,6 +133,7 @@ export default function Home() {
         onPick={(team) => setPick(item.game.id, team)}
         isLocked={!!locks[item.game.id]}
         onToggleLock={() => toggleLock(item.game.id)}
+        locksAvailable={lockedCount < MAX_LOCKS}
       />
     );
   };
@@ -185,6 +188,15 @@ export default function Home() {
               {stats.chalkPct !== null ? `${stats.chalkPct}%` : "-"}
             </div>
             <div className="text-[9px] text-white/55">CHALK</div>
+          </div>
+          <div
+            className="shrink-0 min-w-[88px] rounded-full border-2 text-center px-4 py-1.5"
+            style={{ borderColor: "#fbbf24" }}
+          >
+            <div className="text-base" style={{ fontFamily: "var(--font-display)", color: "#fbbf24" }}>
+              {lockedCount}/{MAX_LOCKS}
+            </div>
+            <div className="text-[9px] text-white/55">LOCKS</div>
           </div>
         </div>
       </header>
