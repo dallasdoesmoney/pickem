@@ -84,8 +84,9 @@ function SeasonTeamHalf({
           )}
           {outcomeColor && (
             <span
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl"
+              className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-center text-6xl"
               style={{
+                height: LOGO_AREA_HEIGHT,
                 fontFamily: "var(--font-display)",
                 color: outcomeColor,
                 transform: "rotate(-12deg)",

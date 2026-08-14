@@ -32,14 +32,13 @@ const LOSS_COLOR_RGB = "239,68,68";
 // draw - kept as named constants so the two can't drift apart.
 const KICKER_BLOCK_H = 25;
 const TITLE_BLOCK_H = 64;
-const SUBTITLE_BLOCK_H = 44;
-const HEADER_H = KICKER_BLOCK_H + TITLE_BLOCK_H + SUBTITLE_BLOCK_H;
+const HEADER_H = KICKER_BLOCK_H + TITLE_BLOCK_H;
 const STAT_PILL_W = 240;
 const STAT_PILL_H = 92;
 const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
-const BRAND_FOOTER_H = 14 + 104 + 10;
+const BRAND_FOOTER_H = 14 + 132 + 10;
 
 type Outcome = "win" | "loss" | null;
 
@@ -101,7 +100,9 @@ function drawSeasonHalfLetter(ctx: CanvasRenderingContext2D, displayFont: string
   if (!outcome) return;
   const outcomeColor = outcome === "win" ? WIN_COLOR : LOSS_COLOR;
   ctx.save();
-  ctx.translate(x + w / 2, y + h / 2);
+  // Confined to the logo area only (not the full half height) so it never
+  // bleeds into the footer band and collides with the shared week label.
+  ctx.translate(x + w / 2, y + LOGO_AREA_H / 2);
   ctx.rotate((-12 * Math.PI) / 180);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -343,28 +344,13 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
 
   ctx.font = "15px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("PRE-SEASON", WIDTH / 2, cursorY + 15);
+  ctx.fillText("SCHEDULE PREDICTOR", WIDTH / 2, cursorY + 15);
   cursorY += KICKER_BLOCK_H;
 
   ctx.font = `50px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
-  ctx.fillText("SCHEDULE PREDICTOR", WIDTH / 2, cursorY + 44);
+  ctx.fillText(`${team.city.toUpperCase()} ${team.name.toUpperCase()}`, WIDTH / 2, cursorY + 44);
   cursorY += TITLE_BLOCK_H;
-
-  ctx.font = "16px system-ui, sans-serif";
-  const subtitle = `${team.name}’ full 2026 schedule`;
-  const subtitleW = ctx.measureText(subtitle).width;
-  const subLogoH = 26;
-  const subLogoW = teamLogo ? (teamLogo.naturalWidth / teamLogo.naturalHeight) * subLogoH : 0;
-  const subGap = teamLogo ? 10 : 0;
-  const subTotalW = subLogoW + subGap + subtitleW;
-  const subStartX = WIDTH / 2 - subTotalW / 2;
-  if (teamLogo) ctx.drawImage(teamLogo, subStartX, cursorY, subLogoW, subLogoH);
-  ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(subtitle, subStartX + subLogoW + subGap, cursorY + 19);
-  ctx.textAlign = "center";
-  cursorY += SUBTITLE_BLOCK_H;
 
   schedule.forEach((row, i) => {
     const rowIdx = Math.floor(i / 2);
@@ -446,10 +432,10 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   // "this is yours" accent so it's unmistakably the headline stat when
   // someone else is looking at the image cold.
   ctx.font = `36px ${displayFont}`;
-  const { w: recordW } = measureRecordPillWidth(ctx, displayFont, teamLogo, `${wins}-${losses}`, "MY PREDICTED RECORD");
+  const { w: recordW } = measureRecordPillWidth(ctx, displayFont, teamLogo, `${wins}-${losses}`, "MY PREDICTION");
   const pillsW = winTotal !== undefined ? recordW + STAT_PILL_GAP + STAT_PILL_W : recordW;
   let pillX = WIDTH / 2 - pillsW / 2;
-  drawRecordPill(ctx, displayFont, pillX, cursorY, teamLogo, `${wins}-${losses}`, "MY PREDICTED RECORD");
+  drawRecordPill(ctx, displayFont, pillX, cursorY, teamLogo, `${wins}-${losses}`, "MY PREDICTION");
   pillX += recordW + STAT_PILL_GAP;
   if (winTotal !== undefined) {
     drawStatPill(ctx, displayFont, pillX, cursorY, "#ffffff", "#ffffff", `${winTotal}`, "VEGAS PREDICTION");

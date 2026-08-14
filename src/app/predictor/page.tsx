@@ -63,21 +63,17 @@ export default function PredictorPage() {
 
   return (
     <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
-      <div className="relative text-center mb-8 overflow-x-hidden">
+      <div className="relative text-center mb-8 overflow-hidden h-[180px] sm:h-[220px] flex flex-col items-center justify-center">
         <img
           src={team.logo}
           alt=""
-          className="pointer-events-none select-none absolute left-[-40px] top-1/2 -translate-y-1/2 h-[280px] sm:h-[360px] w-auto opacity-[0.14] -z-10"
+          className="pointer-events-none select-none absolute left-[-40px] top-1/2 -translate-y-1/2 h-full w-auto opacity-[0.14] -z-10"
           crossOrigin="anonymous"
         />
-        <div className="text-xs text-white/45 tracking-[0.25em] mb-1">PRE-SEASON</div>
+        <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SCHEDULE PREDICTOR</div>
         <h1 className="text-[clamp(2rem,8vw,3rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-          SCHEDULE PREDICTOR
+          {team.city.toUpperCase()} {team.name.toUpperCase()}
         </h1>
-        <div className="flex items-center justify-center gap-2 mt-3">
-          <img src={team.logo} alt="" className="h-6 w-auto" crossOrigin="anonymous" />
-          <p className="text-sm text-white/50">{team.name}&rsquo; full 2026 schedule</p>
-        </div>
       </div>
 
       {loaded && (
@@ -104,7 +100,7 @@ export default function PredictorPage() {
                   <div className="text-3xl leading-none" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
                     {wins}-{losses}
                   </div>
-                  <div className="text-[10px] text-white/55 mt-1 tracking-wide">MY PREDICTED RECORD</div>
+                  <div className="text-[10px] text-white/55 mt-1 tracking-wide">MY PREDICTION</div>
                 </div>
               </div>
 

@@ -62,7 +62,11 @@ export function drawBrandFooter(
   const logoAspect = brandLogo ? brandLogo.naturalWidth / brandLogo.naturalHeight : 1;
   let y = startY + 14;
 
-  const cardH = 104;
+  // Card height drives logo size (logoH = cardH - vertical padding), so the
+  // logo can be made more prominent everywhere this footer is used just by
+  // growing cardH - the text stays the same size and simply recenters via
+  // the baseline formula below.
+  const cardH = 132;
   const pad = 18;
   const logoTextGap = 16;
   const logoH = cardH - pad * 2;
@@ -86,12 +90,16 @@ export function drawBrandFooter(
   const textX = cardX + pad + (brandLogo ? logoW + logoTextGap : 0);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
+  // Text block stays visually centered in the card regardless of cardH, so
+  // enlarging the logo above doesn't need a matching manual reposition here.
+  const labelY = cardH / 2 - 10;
+  const valueY = cardH / 2 + 20;
   ctx.font = "11px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("POWERED BY", textX, y + 42);
+  ctx.fillText("POWERED BY", textX, y + labelY);
   ctx.font = `24px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
-  ctx.fillText("sidelinebrew.com", textX, y + 72);
+  ctx.fillText("sidelinebrew.com", textX, y + valueY);
 
   return y + cardH + 10;
 }
