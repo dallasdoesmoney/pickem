@@ -62,7 +62,7 @@ export function drawBrandFooter(
   const logoAspect = brandLogo ? brandLogo.naturalWidth / brandLogo.naturalHeight : 1;
   let y = startY + 14;
 
-  const cardH = 88;
+  const cardH = 104;
   const pad = 18;
   const logoTextGap = 16;
   const logoH = cardH - pad * 2;
@@ -88,10 +88,10 @@ export function drawBrandFooter(
   ctx.textBaseline = "alphabetic";
   ctx.font = "11px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("POWERED BY", textX, y + 34);
+  ctx.fillText("POWERED BY", textX, y + 42);
   ctx.font = `24px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
-  ctx.fillText("sidelinebrew.com", textX, y + 64);
+  ctx.fillText("sidelinebrew.com", textX, y + 72);
 
   return y + cardH + 10;
 }

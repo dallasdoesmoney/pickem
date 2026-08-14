@@ -1,15 +1,20 @@
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { TeamScheduleRow } from "@/lib/teamSchedule";
-import { BRAND_LOGO_SRC, Radii, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
+import { BRAND_LOGO_SRC, Radii, darken, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
 
+// Cell dimensions match the weekly picks page's GameCard pill exactly
+// (343x80, 26px footer band) so the two pages feel like one product -
+// the only real difference is what goes in that footer band, since
+// there's no spread or record yet: a single "WEEK N" label centered
+// across the whole pill instead of two per-team stat lines.
 const WIDTH = 840;
-const CELL_W = 360;
-const CELL_H = 74;
+const CELL_W = 343;
+const CELL_H = 80;
+const FOOTER_H = 26;
+const LOGO_AREA_H = CELL_H - FOOTER_H;
 const GAP_X = 32;
 const GAP_Y = 16;
-const LABEL_H = 24;
-const LABEL_GAP = 6;
-const ROW_H = LABEL_H + LABEL_GAP + CELL_H;
+const ROW_H = CELL_H;
 const BODY_W = CELL_W * 2 + GAP_X;
 const LEFT_X = (WIDTH - BODY_W) / 2;
 const PAD_TOP = 40;
@@ -34,13 +39,12 @@ const STAT_PILL_H = 92;
 const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
-const BRAND_FOOTER_H = 14 + 88 + 10;
+const BRAND_FOOTER_H = 14 + 104 + 10;
 
 type Outcome = "win" | "loss" | null;
 
 function drawSeasonHalfFill(
   ctx: CanvasRenderingContext2D,
-  displayFont: string,
   opts: {
     x: number;
     y: number;
@@ -65,10 +69,13 @@ function drawSeasonHalfFill(
   ctx.fillRect(x, y, w, h);
 
   if (logo) {
-    const logoH = 106;
+    const logoH = 117;
     const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
-    ctx.drawImage(logo, x + w / 2 - logoW / 2, y + h / 2 - logoH / 2, logoW, logoH);
+    ctx.drawImage(logo, x + w / 2 - logoW / 2, y + LOGO_AREA_H / 2 - logoH / 2, logoW, logoH);
   }
+
+  ctx.fillStyle = darken(team.color, 0.6, 0.93);
+  ctx.fillRect(x, y + LOGO_AREA_H, w, FOOTER_H);
 
   const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
   const outcomeRgb = outcome === "win" ? WIN_COLOR_RGB : outcome === "loss" ? LOSS_COLOR_RGB : null;
@@ -76,20 +83,6 @@ function drawSeasonHalfFill(
   if (outcomeColor) {
     ctx.fillStyle = `rgba(${outcomeRgb},0.16)`;
     ctx.fillRect(x, y, w, h);
-
-    ctx.save();
-    ctx.translate(x + w / 2, y + h / 2);
-    ctx.rotate((-12 * Math.PI) / 180);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = `50px ${displayFont}`;
-    ctx.lineJoin = "round";
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(outcome === "win" ? "W" : "L", 0, 3);
-    ctx.fillStyle = outcomeColor;
-    ctx.fillText(outcome === "win" ? "W" : "L", 0, 3);
-    ctx.restore();
   }
 
   // Same proven-reliable dimming trick as the weekly share image: a plain
@@ -100,6 +93,25 @@ function drawSeasonHalfFill(
     ctx.fillRect(x, y, w, h);
   }
 
+  ctx.restore();
+}
+
+function drawSeasonHalfLetter(ctx: CanvasRenderingContext2D, displayFont: string, opts: { x: number; y: number; w: number; h: number; outcome: Outcome }) {
+  const { x, y, w, h, outcome } = opts;
+  if (!outcome) return;
+  const outcomeColor = outcome === "win" ? WIN_COLOR : LOSS_COLOR;
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.rotate((-12 * Math.PI) / 180);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `60px ${displayFont}`;
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = "#ffffff";
+  ctx.strokeText(outcome === "win" ? "W" : "L", 0, 4);
+  ctx.fillStyle = outcomeColor;
+  ctx.fillText(outcome === "win" ? "W" : "L", 0, 4);
   ctx.restore();
 }
 
@@ -129,7 +141,21 @@ function drawSeasonHalfBorder(
   ctx.shadowBlur = 0;
 }
 
-function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: number, y: number, w: number, h: number, logo: HTMLImageElement | null) {
+// One shared label straddling the seam between the two halves, in the
+// footer band - stands in for the weekly page's per-team spread/record
+// since there's nothing like that to show yet.
+function drawWeekLabel(ctx: CanvasRenderingContext2D, displayFont: string, x: number, y: number, w: number, week: number) {
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `13px ${displayFont}`;
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 3;
+  ctx.fillText(`WEEK ${week}`, x + w / 2, y + LOGO_AREA_H + FOOTER_H / 2 + 1);
+  ctx.shadowBlur = 0;
+}
+
+function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: number, y: number, w: number, h: number, week: number, logo: HTMLImageElement | null) {
   const r: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
   roundRectPath(ctx, x, y, w, h, r);
   ctx.fillStyle = "rgba(255,255,255,0.03)";
@@ -148,11 +174,16 @@ function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: numb
   const gap = logo ? 12 : 0;
   const totalW = logoW + gap + labelW;
   const startX = x + w / 2 - totalW / 2;
-  if (logo) ctx.drawImage(logo, startX, y + h / 2 - logoH / 2, logoW, logoH);
+  const contentMidY = y + LOGO_AREA_H / 2;
+  if (logo) ctx.drawImage(logo, startX, contentMidY - logoH / 2, logoW, logoH);
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
-  ctx.fillText(label, startX + logoW + gap, y + h / 2 + 1);
+  ctx.fillText(label, startX + logoW + gap, contentMidY + 1);
   ctx.textAlign = "center";
+
+  ctx.font = `13px ${displayFont}`;
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillText(`WEEK ${week}`, x + w / 2, y + LOGO_AREA_H + FOOTER_H / 2 + 1);
 }
 
 function drawStatPill(
@@ -299,7 +330,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   // at a glance whose schedule this is, even in a cropped share preview.
   if (teamLogo) {
     ctx.save();
-    ctx.globalAlpha = 0.08;
+    ctx.globalAlpha = 0.14;
     const bgLogoH = 320;
     const bgLogoW = (teamLogo.naturalWidth / teamLogo.naturalHeight) * bgLogoH;
     ctx.drawImage(teamLogo, -40, PAD_TOP - 60, bgLogoW, bgLogoH);
@@ -339,16 +370,10 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     const rowIdx = Math.floor(i / 2);
     const col = i % 2;
     const cellX = LEFT_X + col * (CELL_W + GAP_X);
-    const cellTopY = cursorY + rowIdx * (ROW_H + GAP_Y);
-
-    ctx.font = `13px ${displayFont}`;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(`WEEK ${row.week}`, cellX + CELL_W / 2, cellTopY + LABEL_H - 8);
-
-    const pillY = cellTopY + LABEL_H + LABEL_GAP;
+    const cellY = cursorY + rowIdx * (ROW_H + GAP_Y);
 
     if ("bye" in row) {
-      drawByeCell(ctx, displayFont, cellX, pillY, CELL_W, CELL_H, teamLogo);
+      drawByeCell(ctx, displayFont, cellX, cellY, CELL_W, CELL_H, row.week, teamLogo);
       return;
     }
 
@@ -368,7 +393,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
 
     const awayOpts = {
       x: cellX,
-      y: pillY,
+      y: cellY,
       w: halfW,
       h: CELL_H,
       side: "left" as const,
@@ -379,7 +404,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     };
     const homeOpts = {
       x: cellX + halfW,
-      y: pillY,
+      y: cellY,
       w: halfW,
       h: CELL_H,
       side: "right" as const,
@@ -393,8 +418,11 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     // centered on the shared seam, so drawing a half's fill after the
     // other half's border already ran there paints over part of that
     // stroke (see shareImage.ts's drawTeamHalfFill for the full story).
-    drawSeasonHalfFill(ctx, displayFont, awayOpts);
-    drawSeasonHalfFill(ctx, displayFont, homeOpts);
+    drawSeasonHalfFill(ctx, awayOpts);
+    drawSeasonHalfFill(ctx, homeOpts);
+    drawSeasonHalfLetter(ctx, displayFont, awayOpts);
+    drawSeasonHalfLetter(ctx, displayFont, homeOpts);
+    drawWeekLabel(ctx, displayFont, cellX, cellY, CELL_W, row.week);
 
     // The tracked team's border is drawn LAST regardless of which side
     // it's on, so its color always wins the shared seam even against the

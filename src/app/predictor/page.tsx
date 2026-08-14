@@ -63,11 +63,11 @@ export default function PredictorPage() {
 
   return (
     <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
-      <div className="relative text-center mb-8 overflow-hidden">
+      <div className="relative text-center mb-8 overflow-x-hidden">
         <img
           src={team.logo}
           alt=""
-          className="pointer-events-none select-none absolute left-[-40px] top-1/2 -translate-y-1/2 h-[280px] sm:h-[360px] w-auto opacity-[0.08] -z-10"
+          className="pointer-events-none select-none absolute left-[-40px] top-1/2 -translate-y-1/2 h-[280px] sm:h-[360px] w-auto opacity-[0.14] -z-10"
           crossOrigin="anonymous"
         />
         <div className="text-xs text-white/45 tracking-[0.25em] mb-1">PRE-SEASON</div>
@@ -87,7 +87,7 @@ export default function PredictorPage() {
               <SeasonRow key={row.week} row={row} trackedTeam={TRACKED_TEAM} picks={picks} setPick={setPick} />
             ))}
           </div>
-          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4">
+          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 lg:items-center">
             {schedule.map((row) => (
               <SeasonRow key={row.week} row={row} trackedTeam={TRACKED_TEAM} picks={picks} setPick={setPick} />
             ))}
@@ -173,22 +173,16 @@ function SeasonRow({
   picks: Record<number, TeamAbbr>;
   setPick: (week: number, winner: TeamAbbr) => void;
 }) {
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <span className="text-[11px] text-white tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
-        WEEK {row.week}
-      </span>
-      {"bye" in row ? (
-        <SeasonByeCard team={trackedTeam} />
-      ) : (
-        <SeasonGameCard
-          away={row.away}
-          home={row.home}
-          trackedTeam={trackedTeam}
-          picked={picks[row.week]}
-          onPick={(winner) => setPick(row.week, winner)}
-        />
-      )}
-    </div>
+  return "bye" in row ? (
+    <SeasonByeCard team={trackedTeam} week={row.week} />
+  ) : (
+    <SeasonGameCard
+      away={row.away}
+      home={row.home}
+      trackedTeam={trackedTeam}
+      week={row.week}
+      picked={picks[row.week]}
+      onPick={(winner) => setPick(row.week, winner)}
+    />
   );
 }
