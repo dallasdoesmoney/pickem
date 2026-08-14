@@ -17,49 +17,51 @@ function PillTexture() {
   );
 }
 
+const PILL_STYLE = { background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" };
+
 function StatPills({ stats }: { stats: PickStats }) {
   return (
-    <div className="flex gap-5 mt-2 justify-center flex-wrap pt-2">
+    <div className="flex gap-2 lg:gap-5 justify-center flex-wrap">
       <div
-        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center"
-        style={{ width: 172, height: 88, background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center w-[88px] h-[56px] lg:w-[172px] lg:h-[88px]"
+        style={PILL_STYLE}
       >
         <PillTexture />
-        <span className="absolute -top-3 -left-1.5 text-5xl rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10">🐶</span>
-        <div className="relative z-10 text-2xl" style={{ fontFamily: "var(--font-display)" }}>
+        <span className="absolute -top-2 -left-1 lg:-top-3 lg:-left-1.5 text-2xl lg:text-5xl rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10">🐶</span>
+        <div className="relative z-10 text-base lg:text-2xl" style={{ fontFamily: "var(--font-display)" }}>
           {stats.underdogCount}
         </div>
-        <div className="relative z-10 text-[11px] text-white/55 mt-0.5">UNDERDOGS</div>
+        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">UNDERDOGS</div>
       </div>
       <div
-        className="relative shrink-0 rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center"
-        style={{ width: 250, height: 88, background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+        className="relative shrink-0 rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center w-[144px] h-[56px] lg:w-[250px] lg:h-[88px]"
+        style={PILL_STYLE}
       >
         <PillTexture />
-        <span className="absolute -top-3 -left-1.5 text-5xl rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10">💎</span>
+        <span className="absolute -top-2 -left-1 lg:-top-3 lg:-left-1.5 text-2xl lg:text-5xl rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10">💎</span>
         <div
-          className="relative z-10 text-2xl flex items-center justify-center gap-1.5"
+          className="relative z-10 text-base lg:text-2xl flex items-center justify-center gap-1 lg:gap-1.5"
           style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}
         >
           {stats.boldestTeam ? (
             <>
-              <img src={stats.boldestTeam.logo} alt="" crossOrigin="anonymous" className="h-[64px] w-auto" />+{stats.boldestSpread}
+              <img src={stats.boldestTeam.logo} alt="" crossOrigin="anonymous" className="h-8 lg:h-[64px] w-auto" />+{stats.boldestSpread}
             </>
           ) : (
             "-"
           )}
         </div>
-        <div className="relative z-10 text-[11px] text-white/55 mt-0.5">BOLDEST PICK</div>
+        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">BOLDEST PICK</div>
       </div>
       <div
-        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center"
-        style={{ width: 172, height: 88, background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center w-[88px] h-[56px] lg:w-[172px] lg:h-[88px]"
+        style={PILL_STYLE}
       >
         <PillTexture />
-        <div className="relative z-10 text-2xl" style={{ fontFamily: "var(--font-display)" }}>
+        <div className="relative z-10 text-base lg:text-2xl" style={{ fontFamily: "var(--font-display)" }}>
           {stats.chalkPct !== null ? `${stats.chalkPct}%` : "-"}
         </div>
-        <div className="relative z-10 text-[11px] text-white/55 mt-0.5">CHALK</div>
+        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">CHALK</div>
       </div>
     </div>
   );
@@ -195,8 +197,6 @@ export default function Home() {
             </h1>
           </div>
         </div>
-
-        <StatPills stats={stats} />
       </header>
 
       <main className="flex-1 px-4 pb-10 max-w-4xl w-full mx-auto">
@@ -212,7 +212,11 @@ export default function Home() {
               ])}
             </div>
 
-            <div className="flex justify-center mt-8">
+            <div className="mt-8">
+              <StatPills stats={stats} />
+            </div>
+
+            <div className="flex justify-center mt-5">
               <button
                 aria-label="Share your picks"
                 onClick={handleShare}

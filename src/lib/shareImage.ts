@@ -144,31 +144,72 @@ function drawDayHeader(ctx: CanvasRenderingContext2D, displayFont: string, label
   ctx.fillText(label, x + w / 2, y + h - 10);
 }
 
-function drawTeamHalf(
-  ctx: CanvasRenderingContext2D,
-  displayFont: string,
-  opts: {
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    side: "left" | "right";
-    team: (typeof TEAMS)[TeamAbbr];
-    isPicked: boolean;
-    isFaded: boolean;
-    tag?: PickTag;
-    spreadLabel?: string;
-    record: string;
-    logo: HTMLImageElement | null;
-  }
-) {
-  const { x, y, w, h, side, team, isPicked, isFaded, tag, spreadLabel, record, logo } = opts;
+// Die-cut-sticker picks-count badge next to the "WEEK N" kicker - mirrors
+// the live header's tilted sticker (solid fill, white border, hard offset
+// shadow). `leftX` is where the sticker's left edge should sit; its width
+// is measured from its own text, then it's drawn centered within a
+// translate+rotate so the tilt pivots around the sticker's own center.
+function drawWeekSticker(ctx: CanvasRenderingContext2D, displayFont: string, leftX: number, centerY: number, text: string, rotateDeg: number) {
+  const fontPx = 18;
+  ctx.font = `${fontPx}px ${displayFont}`;
+  const padX = 14;
+  const padY = 8;
+  const textW = ctx.measureText(text).width;
+  const w = textW + padX * 2;
+  const h = fontPx + padY * 2;
+  const cx = leftX + w / 2;
+
+  ctx.save();
+  ctx.translate(cx, centerY);
+  ctx.rotate((rotateDeg * Math.PI) / 180);
+
+  const radii: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
+  roundRectPath(ctx, -w / 2 + 3, -h / 2 + 3, w, h, radii);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fill();
+
+  roundRectPath(ctx, -w / 2, -h / 2, w, h, radii);
+  ctx.fillStyle = "#1b2947";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text, 0, 1);
+
+  ctx.restore();
+}
+
+type TeamHalfOpts = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  side: "left" | "right";
+  team: (typeof TEAMS)[TeamAbbr];
+  isPicked: boolean;
+  isFaded: boolean;
+  tag?: PickTag;
+  spreadLabel?: string;
+  record: string;
+  logo: HTMLImageElement | null;
+};
+
+// Split into a fill pass and a border/badge pass so a game's two halves can
+// be drawn fill-then-fill, border-then-border. Border strokes are centered
+// on the shared seam between the halves - drawing left's border, then
+// right's *fill* right after it, painted over the half of that stroke that
+// fell inside right's rectangle (visible as the picked team's green seam
+// looking half-erased in the exported image). Deferring every border until
+// both fills are down avoids that.
+function drawTeamHalfFill(ctx: CanvasRenderingContext2D, displayFont: string, opts: TeamHalfOpts) {
+  const { x, y, w, h, side, team, isPicked, isFaded, spreadLabel, record, logo } = opts;
   const radius = h / 2;
   const r: Radii =
     side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
-
-  const borderColor = isPicked ? PICKED_COLOR : isFaded ? "rgba(255,255,255,0.35)" : "#ffffff";
-  const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
 
   ctx.save();
   roundRectPath(ctx, x, y, w, h, r);
@@ -242,6 +283,15 @@ function drawTeamHalf(
   }
 
   ctx.restore();
+}
+
+function drawTeamHalfBorder(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts) {
+  const { x, y, w, h, side, isPicked, isFaded } = opts;
+  const radius = h / 2;
+  const r: Radii =
+    side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
+  const borderColor = isPicked ? PICKED_COLOR : isFaded ? "rgba(255,255,255,0.35)" : "#ffffff";
+  const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
 
   roundRectPath(ctx, x, y, w, h, r);
   ctx.lineWidth = borderWidth;
@@ -252,26 +302,28 @@ function drawTeamHalf(
   }
   ctx.stroke();
   ctx.shadowBlur = 0;
+}
 
-  if (tag) {
-    // CSS rotates the badge around its own center by default; rotating
-    // around a corner (as this used to) swings it visibly off-target. Only
-    // let it protrude ~12px past the pill edge - GAP_X between columns is
-    // 32px, and a wider protrusion bleeds into the neighboring pill.
-    const protrusion = 12;
-    const centerX = side === "left" ? x - protrusion + 19 : x + w + protrusion - 19;
-    const centerY = y - 8 + 19;
-    ctx.save();
-    ctx.translate(centerX, centerY);
-    ctx.rotate(((side === "left" ? -22 : 22) * Math.PI) / 180);
-    ctx.font = "38px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.shadowColor = "rgba(0,0,0,0.6)";
-    ctx.shadowBlur = 4;
-    ctx.fillText(tag.emoji, 0, 0);
-    ctx.restore();
-  }
+function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts) {
+  const { x, y, w, side, tag } = opts;
+  if (!tag) return;
+  // CSS rotates the badge around its own center by default; rotating
+  // around a corner (as this used to) swings it visibly off-target. Only
+  // let it protrude ~12px past the pill edge - GAP_X between columns is
+  // 32px, and a wider protrusion bleeds into the neighboring pill.
+  const protrusion = 12;
+  const centerX = side === "left" ? x - protrusion + 19 : x + w + protrusion - 19;
+  const centerY = y - 8 + 19;
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(((side === "left" ? -22 : 22) * Math.PI) / 180);
+  ctx.font = "38px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 4;
+  ctx.fillText(tag.emoji, 0, 0);
+  ctx.restore();
 }
 
 const BRAND_FOOTER_H = 14 + 88 + 10;
@@ -363,7 +415,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     if (i < rowCount - 1) bodyHeight += GAP_Y;
   }
 
-  const headerHeight = 104 + 8 + 24 + 88;
+  const headerHeight = 141 + 24 + 88;
   const totalHeight = PAD_TOP + headerHeight + 24 + bodyHeight + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const pixelRatio = 2;
@@ -380,13 +432,28 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   let cursorY = PAD_TOP;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
+
+  // "WEEK N" kicker + tilted picks-count sticker, mirroring the live header.
+  const kickerFontPx = 30;
+  ctx.font = `${kickerFontPx}px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
+  const kickerText = `WEEK ${week}`;
+  const kickerBaselineY = cursorY + kickerFontPx;
+  ctx.fillText(kickerText, WIDTH / 2, kickerBaselineY);
+  const kickerWidth = ctx.measureText(kickerText).width;
+  const kickerCenterY = kickerBaselineY - kickerFontPx * 0.35;
+  drawWeekSticker(ctx, displayFont, WIDTH / 2 + kickerWidth / 2 - 10, kickerCenterY, `🏈 ${pickedCount}/${games.length}`, 10);
+  cursorY += kickerFontPx + 14;
+
+  const dividerW = 48;
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fillRect(WIDTH / 2 - dividerW / 2, cursorY, dividerW, 3);
+  cursorY += 3 + 20;
+
   ctx.font = `66px ${displayFont}`;
+  ctx.fillStyle = "#ffffff";
   ctx.fillText("NFL PICK’EM", WIDTH / 2, cursorY + 58);
-  ctx.font = "18px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillText(`Week ${week} · ${pickedCount} / ${games.length} picked`, WIDTH / 2, cursorY + 88);
-  cursorY += 104 + 8;
+  cursorY += 66 + 8;
 
   const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeEmoji?: string }> = [
     { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeEmoji: "\u{1F436}" },
@@ -447,7 +514,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
             : `+${game.spread}`
           : undefined;
 
-      drawTeamHalf(ctx, displayFont, {
+      const awayOpts: TeamHalfOpts = {
         x,
         y: cursorY,
         w: halfW,
@@ -460,8 +527,8 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         spreadLabel: awaySpread,
         record: game.awayRecord ?? "0-0",
         logo: logos.get(away.logo) ?? null,
-      });
-      drawTeamHalf(ctx, displayFont, {
+      };
+      const homeOpts: TeamHalfOpts = {
         x: x + halfW,
         y: cursorY,
         w: halfW,
@@ -474,7 +541,18 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         spreadLabel: homeSpread,
         record: game.homeRecord ?? "0-0",
         logo: logos.get(home.logo) ?? null,
-      });
+      };
+
+      // Fills first for both halves, then borders for both halves - a
+      // border stroke is centered on the shared seam, so drawing a half's
+      // fill after the other half's border has already run there would
+      // paint over part of that stroke (see drawTeamHalfFill's comment).
+      drawTeamHalfFill(ctx, displayFont, awayOpts);
+      drawTeamHalfFill(ctx, displayFont, homeOpts);
+      drawTeamHalfBorder(ctx, awayOpts);
+      drawTeamHalfBorder(ctx, homeOpts);
+      drawTeamHalfBadge(ctx, awayOpts);
+      drawTeamHalfBadge(ctx, homeOpts);
     });
     cursorY += h + GAP_Y;
   }
