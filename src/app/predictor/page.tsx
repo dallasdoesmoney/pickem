@@ -90,15 +90,14 @@ export default function PredictorPage() {
   return (
     <div className="relative isolate flex-1 min-h-full">
       <div className="absolute inset-0 -z-10" style={{ background: bgColor }} />
-      {/* mix-blend-mode: overlay barely moves a base this dark (overlay's
-          math leaves near-black pixels close to unchanged), which is why
-          this was invisible even at higher opacity. Plain alpha blending
-          (no blend mode) works regardless of background brightness - the
-          white/black flecks in noise.png just lighten/darken the pixels
-          under them directly. */}
+      {/* Plain alpha blending, not mix-blend-mode - overlay barely moves a
+          base this dark, since overlay's math leaves near-black pixels
+          close to unchanged regardless of opacity. Alpha blending works
+          regardless of background brightness - the texture's light/dark
+          flecks just lighten/darken the pixels under them directly. */}
       <div
         className="absolute inset-0 -z-10 pointer-events-none"
-        style={{ backgroundImage: "url(/noise.png)", backgroundSize: "128px 128px", opacity: 0.22 }}
+        style={{ backgroundImage: "url(/predictor-texture.webp)", backgroundSize: "512px 512px", opacity: 0.16 }}
       />
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">
