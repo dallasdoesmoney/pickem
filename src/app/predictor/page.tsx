@@ -88,29 +88,34 @@ export default function PredictorPage() {
           </div>
 
           <div className="flex flex-col items-center mt-10">
-            <div
-              className="rounded-full border-2 border-white text-center px-8 py-4"
-              style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
-            >
-              <div className="text-3xl" style={{ fontFamily: "var(--font-display)" }}>
-                {wins}-{losses}
+            <div className="flex gap-3 justify-center flex-wrap">
+              <div
+                className="rounded-full border-2 border-white text-center px-6 py-3.5"
+                style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+              >
+                <div className="text-2xl" style={{ fontFamily: "var(--font-display)" }}>
+                  {wins}-{losses}
+                </div>
+                <div className="text-[10px] text-white/55 mt-0.5 tracking-wide">PREDICTED RECORD</div>
               </div>
-              <div className="text-[11px] text-white/55 mt-1 tracking-wide">PREDICTED RECORD</div>
+
+              {winTotal !== undefined && (
+                <div
+                  className="rounded-full border-2 border-emerald-400 text-center px-6 py-3.5"
+                  style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+                >
+                  <div className="text-2xl" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
+                    {winTotal}
+                  </div>
+                  <div className="text-[10px] text-white/55 mt-0.5 tracking-wide">VEGAS PREDICTION</div>
+                </div>
+              )}
             </div>
 
-            {winTotal !== undefined && (
-              <p className="text-sm text-white/60 mt-4 text-center max-w-xs">
-                Vegas has the {team.name} at <span className="text-white">{winTotal}</span> wins
-                {diff !== null && (
-                  <>
-                    {" "}
-                    &mdash; you&rsquo;re predicting{" "}
-                    <span className="font-bold" style={{ color: diff > 0 ? "#4ade80" : diff < 0 ? "#ef4444" : "#ffffff" }}>
-                      {diff > 0 ? "+" : ""}
-                      {diff} {diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH"}
-                    </span>
-                  </>
-                )}
+            {diff !== null && (
+              <p className="text-sm font-bold mt-3" style={{ color: diff > 0 ? "#4ade80" : diff < 0 ? "#ef4444" : "#ffffff" }}>
+                {diff > 0 ? "+" : ""}
+                {diff} {diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH"} Vegas&rsquo; line
               </p>
             )}
 

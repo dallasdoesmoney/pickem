@@ -27,11 +27,13 @@ const LOSS_COLOR_RGB = "239,68,68";
 // draw - kept as named constants so the two can't drift apart.
 const KICKER_BLOCK_H = 25;
 const TITLE_BLOCK_H = 64;
-const SUBTITLE_BLOCK_H = 56;
+const SUBTITLE_BLOCK_H = 44;
 const HEADER_H = KICKER_BLOCK_H + TITLE_BLOCK_H + SUBTITLE_BLOCK_H;
-const GRID_TO_SUMMARY_GAP = 36;
-const RECORD_PILL_H = 84;
-const SUMMARY_H = RECORD_PILL_H + 16 + 24 + 24;
+const STAT_PILL_W = 200;
+const STAT_PILL_H = 76;
+const STAT_PILL_GAP = 20;
+const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
+const STATS_TO_GRID_GAP = 32;
 const BRAND_FOOTER_H = 14 + 88 + 10;
 
 type Outcome = "win" | "loss" | null;
@@ -103,16 +105,22 @@ function drawSeasonHalfFill(
 
 function drawSeasonHalfBorder(
   ctx: CanvasRenderingContext2D,
-  opts: { x: number; y: number; w: number; h: number; side: "left" | "right"; outcome: Outcome }
+  opts: { x: number; y: number; w: number; h: number; side: "left" | "right"; outcome: Outcome; isFaded: boolean }
 ) {
-  const { x, y, w, h, side, outcome } = opts;
+  const { x, y, w, h, side, outcome, isFaded } = opts;
   const radius = h / 2;
   const r: Radii = side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
   const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
+  // Faded halves get a translucent border to match their dimmed fill -
+  // an opaque one would look like it never dimmed at all, and (since
+  // border strokes are centered on the shared seam between the two
+  // halves) would risk painting over the tracked team's colored border
+  // there even when drawn first.
+  const borderColor = outcomeColor ?? (isFaded ? "rgba(255,255,255,0.35)" : "#ffffff");
 
   roundRectPath(ctx, x, y, w, h, r);
   ctx.lineWidth = outcomeColor ? OUTCOME_BORDER_WIDTH : BORDER_WIDTH;
-  ctx.strokeStyle = outcomeColor ?? "#ffffff";
+  ctx.strokeStyle = borderColor;
   if (outcomeColor) {
     ctx.shadowColor = `rgba(${outcome === "win" ? WIN_COLOR_RGB : LOSS_COLOR_RGB},0.6)`;
     ctx.shadowBlur = 6;
@@ -145,6 +153,34 @@ function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: numb
   ctx.textAlign = "left";
   ctx.fillText(label, startX + logoW + gap, y + h / 2 + 1);
   ctx.textAlign = "center";
+}
+
+function drawStatPill(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  x: number,
+  y: number,
+  borderColor: string,
+  valueColor: string,
+  value: string,
+  label: string
+) {
+  const r: Radii = { tl: STAT_PILL_H / 2, tr: STAT_PILL_H / 2, br: STAT_PILL_H / 2, bl: STAT_PILL_H / 2 };
+  roundRectPath(ctx, x, y, STAT_PILL_W, STAT_PILL_H, r);
+  ctx.fillStyle = "#1b2947";
+  ctx.fill();
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `28px ${displayFont}`;
+  ctx.fillStyle = valueColor;
+  ctx.fillText(value, x + STAT_PILL_W / 2, y + 42);
+  ctx.font = "10px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText(label, x + STAT_PILL_W / 2, y + 60);
 }
 
 export type PredictorShareParams = {
@@ -181,9 +217,13 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   ]);
   const logos = new Map(logoEntries);
 
+  const wins = Object.values(picks).filter((winner) => winner === trackedTeam).length;
+  const losses = Object.values(picks).filter((winner) => winner !== trackedTeam).length;
+  const diff = winTotal !== undefined && wins + losses > 0 ? Math.round((wins - winTotal) * 2) / 2 : null;
+
   const rowCount = Math.ceil(schedule.length / 2);
   const gridH = rowCount * ROW_H + (rowCount - 1) * GAP_Y;
-  const totalHeight = PAD_TOP + HEADER_H + gridH + GRID_TO_SUMMARY_GAP + SUMMARY_H + BRAND_FOOTER_H + PAD_BOTTOM;
+  const totalHeight = PAD_TOP + HEADER_H + STATS_BLOCK_H + STATS_TO_GRID_GAP + gridH + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const pixelRatio = 2;
   const canvas = document.createElement("canvas");
@@ -219,15 +259,33 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   const subGap = teamLogo ? 10 : 0;
   const subTotalW = subLogoW + subGap + subtitleW;
   const subStartX = WIDTH / 2 - subTotalW / 2;
-  if (teamLogo) ctx.drawImage(teamLogo, subStartX, cursorY + 2, subLogoW, subLogoH);
+  if (teamLogo) ctx.drawImage(teamLogo, subStartX, cursorY, subLogoW, subLogoH);
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(subtitle, subStartX + subLogoW + subGap, cursorY + 21);
+  ctx.fillText(subtitle, subStartX + subLogoW + subGap, cursorY + 19);
   ctx.textAlign = "center";
   cursorY += SUBTITLE_BLOCK_H;
 
-  let wins = 0;
-  let losses = 0;
+  // Predicted record + Vegas prediction pills, kept at the top of the
+  // shared image even though they sit at the bottom of the live page -
+  // same reasoning as the weekly picks page's KPI row: makes more sense
+  // up front when someone else is looking at the image cold.
+  const pillsW = winTotal !== undefined ? STAT_PILL_W * 2 + STAT_PILL_GAP : STAT_PILL_W;
+  const pillsX = WIDTH / 2 - pillsW / 2;
+  drawStatPill(ctx, displayFont, pillsX, cursorY, "#ffffff", "#ffffff", `${wins}-${losses}`, "PREDICTED RECORD");
+  if (winTotal !== undefined) {
+    drawStatPill(ctx, displayFont, pillsX + STAT_PILL_W + STAT_PILL_GAP, cursorY, "#4ade80", "#4ade80", `${winTotal}`, "VEGAS PREDICTION");
+  }
+  cursorY += STAT_PILL_H + 10;
+
+  if (diff !== null) {
+    const overUnder = diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH";
+    const diffColor = diff > 0 ? WIN_COLOR : diff < 0 ? LOSS_COLOR : "#ffffff";
+    ctx.font = `20px ${displayFont}`;
+    ctx.fillStyle = diffColor;
+    ctx.fillText(`${diff > 0 ? "+" : ""}${diff} ${overUnder} Vegas’ line`, WIDTH / 2, cursorY + 18);
+  }
+  cursorY += 26 + STATS_TO_GRID_GAP;
 
   schedule.forEach((row, i) => {
     const rowIdx = Math.floor(i / 2);
@@ -260,9 +318,6 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
       return hasPick && abbr !== trackedTeam;
     }
 
-    if (picked === trackedTeam) wins++;
-    else if (hasPick) losses++;
-
     const awayOpts = {
       x: cellX,
       y: pillY,
@@ -292,48 +347,23 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     // stroke (see shareImage.ts's drawTeamHalfFill for the full story).
     drawSeasonHalfFill(ctx, displayFont, awayOpts);
     drawSeasonHalfFill(ctx, displayFont, homeOpts);
-    drawSeasonHalfBorder(ctx, awayOpts);
-    drawSeasonHalfBorder(ctx, homeOpts);
+
+    // The tracked team's border is drawn LAST regardless of which side
+    // it's on, so its color always wins the shared seam even against the
+    // opponent's own (now-translucent-when-faded, but still a live
+    // stroke) border - whichever border is stroked second wins the
+    // pixels they both cover at that boundary.
+    const trackedIsAway = row.away === trackedTeam;
+    if (trackedIsAway) {
+      drawSeasonHalfBorder(ctx, homeOpts);
+      drawSeasonHalfBorder(ctx, awayOpts);
+    } else {
+      drawSeasonHalfBorder(ctx, awayOpts);
+      drawSeasonHalfBorder(ctx, homeOpts);
+    }
   });
 
-  cursorY += gridH + GRID_TO_SUMMARY_GAP;
-
-  // Predicted record pill
-  const recordW = 200;
-  const recordX = WIDTH / 2 - recordW / 2;
-  roundRectPath(ctx, recordX, cursorY, recordW, RECORD_PILL_H, { tl: RECORD_PILL_H / 2, tr: RECORD_PILL_H / 2, br: RECORD_PILL_H / 2, bl: RECORD_PILL_H / 2 });
-  ctx.fillStyle = "#1b2947";
-  ctx.fill();
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `32px ${displayFont}`;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(`${wins}-${losses}`, WIDTH / 2, cursorY + 46);
-  ctx.font = "11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText("PREDICTED RECORD", WIDTH / 2, cursorY + 66);
-  cursorY += RECORD_PILL_H + 16;
-
-  if (winTotal !== undefined) {
-    const diff = wins + losses > 0 ? wins - winTotal : null;
-    ctx.font = "18px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    const line1 = `Vegas has the ${team.name} at ${winTotal} wins`;
-    ctx.fillText(line1, WIDTH / 2, cursorY + 18);
-    cursorY += 24;
-
-    if (diff !== null) {
-      const overUnder = diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH";
-      const diffColor = diff > 0 ? WIN_COLOR : diff < 0 ? LOSS_COLOR : "#ffffff";
-      ctx.font = `20px ${displayFont}`;
-      ctx.fillStyle = diffColor;
-      ctx.fillText(`${diff > 0 ? "+" : ""}${diff} ${overUnder}`, WIDTH / 2, cursorY + 20);
-      cursorY += 24;
-    }
-  }
+  cursorY += gridH;
 
   drawBrandFooter(ctx, displayFont, cursorY, brandLogo, WIDTH);
 
