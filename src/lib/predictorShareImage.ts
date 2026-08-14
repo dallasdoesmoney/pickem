@@ -12,6 +12,7 @@ import {
   PillOutcome,
   Radii,
   WIN_COLOR,
+  darken,
   drawBrandFooter,
   drawPillBordersOutcomeLast,
   drawPillHalfFill,
@@ -19,6 +20,8 @@ import {
   resolveDisplayFont,
   roundRectPath,
 } from "@/lib/canvasShare";
+
+const BG_TEXTURE_SRC = "/predictor-texture.webp";
 
 // Cell dimensions are the shared pill size (see canvasShare.ts) so this
 // page's grid can never drift out of sync with the weekly picks page's -
@@ -37,7 +40,6 @@ const BODY_W = CELL_W * 2 + GAP_X;
 const LEFT_X = (WIDTH - BODY_W) / 2;
 const PAD_TOP = 40;
 const PAD_BOTTOM = 28;
-const BG = "#0e1b33";
 
 // Same increments used both to size the canvas up front and to actually
 // draw - kept as named constants so the two can't drift apart.
@@ -273,7 +275,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     Promise.all(Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)),
     loadImage(BRAND_LOGO_SRC),
   ]);
-  const suspiciousDog = await loadImage(SUSPICIOUS_DOG_SRC);
+  const [suspiciousDog, bgTexture] = await Promise.all([loadImage(SUSPICIOUS_DOG_SRC), loadImage(BG_TEXTURE_SRC)]);
   const logos = new Map(logoEntries);
   const teamLogo = logos.get(team.logo) ?? null;
 
@@ -300,8 +302,24 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   if (!ctx) throw new Error("canvas 2d context unavailable");
   ctx.scale(pixelRatio, pixelRatio);
 
-  ctx.fillStyle = BG;
+  // Team-tinted, textured background - matches the live page: a solid
+  // wash of the team's own color, darkened since it's sitting behind
+  // everything, with the same texture asset tiled over it via plain alpha
+  // (not a canvas composite operation) so it reads the same way on a
+  // background this dark.
+  const bgColor = darken(team.color, 0.55, 1);
+  ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
+  if (bgTexture) {
+    const pattern = ctx.createPattern(bgTexture, "repeat");
+    if (pattern) {
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.fillStyle = pattern;
+      ctx.fillRect(0, 0, WIDTH, totalHeight);
+      ctx.restore();
+    }
+  }
 
   // Logo-left, kicker+title stacked right lockup - the logo is sized to the
   // combined header block height and vertically centered against it, rather
@@ -317,7 +335,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   const titleW = ctx.measureText(titleText).width;
   const textStackW = Math.max(kickerW, titleW);
 
-  const headerLogoH = 88;
+  const headerLogoH = 104;
   const headerLogoW = teamLogo ? (teamLogo.naturalWidth / teamLogo.naturalHeight) * headerLogoH : 0;
   const headerLogoGap = teamLogo ? 20 : 0;
   const headerTotalW = headerLogoW + headerLogoGap + textStackW;

@@ -104,7 +104,7 @@ export default function PredictorPage() {
         {/* Nudged up slightly - flexbox centers the boxes, but the title's
             display font carries extra space below its cap height, so true
             box-centering reads as the logo sitting a touch low. */}
-        <img src={team.logo} alt="" className="h-20 sm:h-24 w-auto shrink-0 relative -top-1.5" crossOrigin="anonymous" />
+        <img src={team.logo} alt="" className="h-24 sm:h-28 w-auto shrink-0 relative -top-1.5" crossOrigin="anonymous" />
         {/* w-min below lg: when the title wraps (as it always does on
             mobile), a plain flex item still keeps the full leftover row
             width, so the lockup centers on that oversized box and reads
@@ -136,42 +136,59 @@ export default function PredictorPage() {
           </div>
 
           <div className="flex flex-col items-center mt-10">
-            <div className="flex gap-3 justify-center flex-wrap items-center">
+            {/* Sized down on mobile (icon/text/padding) with the two-word
+                labels always stacked on two lines - a phrase like "VEGAS
+                PREDICTION" on one line forces the pill wide enough that
+                three of them can't fit on a 375px-wide screen; stacked, the
+                pill only has to fit its LONGER word. */}
+            <div className="flex gap-2 sm:gap-3 justify-center items-center">
               <div
-                className="rounded-full border-2 border-white text-center pl-4 pr-6 py-3 flex items-center gap-2.5"
+                className="rounded-full border-2 border-white text-center pl-2.5 pr-3 py-1.5 sm:pl-4 sm:pr-6 sm:py-3 flex items-center gap-1.5 sm:gap-2.5"
                 style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
-                <img src="/suspicious-dog.png" alt="" className="h-10 w-auto select-none" />
+                <img src="/suspicious-dog.png" alt="" className="h-7 sm:h-10 w-auto select-none shrink-0" />
                 <div className="text-left">
-                  <div className="text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                  <div className="text-base sm:text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
                     {suspiciousCount}
                   </div>
-                  <div className="text-[10px] text-white/55 mt-1 tracking-wide">SUSPICIOUS PICKS</div>
+                  <div className="text-[7px] sm:text-[10px] leading-tight text-white/55 mt-0.5 sm:mt-1 tracking-wide">
+                    SUSPICIOUS
+                    <br />
+                    PICKS
+                  </div>
                 </div>
               </div>
 
               <div
-                className="rounded-full border-2 border-emerald-400 text-center pl-4 pr-7 py-3 flex items-center gap-3"
+                className="rounded-full border-2 border-emerald-400 text-center pl-2.5 pr-3.5 py-1.5 sm:pl-4 sm:pr-7 sm:py-3 flex items-center gap-1.5 sm:gap-3"
                 style={{ background: "#1b2947", boxShadow: "0 0 0 4px rgba(74,222,128,0.12), 0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
-                <img src={team.logo} alt="" className="h-11 w-auto" crossOrigin="anonymous" />
+                <img src={team.logo} alt="" className="h-7 sm:h-11 w-auto shrink-0" crossOrigin="anonymous" />
                 <div className="text-left">
-                  <div className="text-3xl leading-none" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
+                  <div className="text-lg sm:text-3xl leading-none" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
                     {wins}-{losses}
                   </div>
-                  <div className="text-[10px] text-white/55 mt-1 tracking-wide">MY PREDICTION</div>
+                  <div className="text-[7px] sm:text-[10px] leading-tight text-white/55 mt-0.5 sm:mt-1 tracking-wide">
+                    MY
+                    <br />
+                    PREDICTION
+                  </div>
                 </div>
               </div>
 
               {winTotal !== undefined && (
                 <div
-                  className="rounded-full border-2 border-white text-center px-6 py-3.5"
+                  className="rounded-full border-2 border-white text-center px-3 py-1.5 sm:px-6 sm:py-3.5"
                   style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
                 >
-                  <div className="text-2xl" style={{ fontFamily: "var(--font-display)" }}>
+                  <div className="text-base sm:text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
                     {winTotal}
                   </div>
-                  <div className="text-[10px] text-white/55 mt-0.5 tracking-wide">VEGAS PREDICTION</div>
+                  <div className="text-[7px] sm:text-[10px] leading-tight text-white/55 mt-0.5 tracking-wide">
+                    VEGAS
+                    <br />
+                    PREDICTION
+                  </div>
                 </div>
               )}
             </div>
