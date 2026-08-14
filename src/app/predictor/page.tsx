@@ -5,6 +5,7 @@ import { TEAMS, TeamAbbr } from "@/data/teams";
 import { WIN_TOTALS } from "@/data/winTotals";
 import { isSuspiciousPick } from "@/data/powerRankings";
 import { SeasonGameCard, SeasonByeCard } from "@/components/SeasonGameCard";
+import { darkenColor } from "@/components/TeamHalfPill";
 import { getTeamSchedule } from "@/lib/teamSchedule";
 import { useSeasonPicks } from "@/hooks/useSeasonPicks";
 import { renderPredictorShareImage } from "@/lib/predictorShareImage";
@@ -17,7 +18,7 @@ const TRACKED_TEAM = "DAL" as const;
 export default function PredictorPage() {
   const team = TEAMS[TRACKED_TEAM];
   const schedule = getTeamSchedule(TRACKED_TEAM);
-  const { picks, setPick, loaded } = useSeasonPicks(TRACKED_TEAM);
+  const { picks, setPick, resetPicks, loaded } = useSeasonPicks(TRACKED_TEAM);
   const [sharing, setSharing] = useState(false);
   const winTotal = WIN_TOTALS[TRACKED_TEAM];
 
@@ -79,8 +80,21 @@ export default function PredictorPage() {
     }
   }
 
+  // EXPERIMENT: textured page background tinted to the tracked team's own
+  // color, darkened since it's sitting behind everything else. Only the
+  // team data model has one color per team right now, so "the darkest
+  // team color" is just team.color - if a second (lighter/accent) color
+  // ever gets added, swap in whichever of the two is darker here.
+  const bgColor = darkenColor(team.color, 0.55, 1);
+
   return (
-    <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
+    <div className="relative isolate flex-1 min-h-full">
+      <div className="absolute inset-0 -z-10" style={{ background: bgColor }} />
+      <div
+        className="absolute inset-0 -z-10 pointer-events-none"
+        style={{ backgroundImage: "url(/noise.png)", backgroundSize: "160px 160px", opacity: 0.08, mixBlendMode: "overlay" }}
+      />
+      <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">
         {/* Nudged up slightly - flexbox centers the boxes, but the title's
             display font carries extra space below its cap height, so true
@@ -191,10 +205,22 @@ export default function PredictorPage() {
                 </>
               )}
             </button>
+
+            <button
+              aria-label="Reset your predictions"
+              onClick={() => {
+                if (window.confirm("Reset all your schedule predictions?")) resetPicks();
+              }}
+              className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors mt-3"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              RESET
+            </button>
           </div>
         </>
       )}
-    </main>
+      </main>
+    </div>
   );
 }
 
