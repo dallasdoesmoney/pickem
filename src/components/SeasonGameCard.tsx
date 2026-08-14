@@ -148,8 +148,8 @@ export function SeasonByeCard({ team }: { team: TeamAbbr }) {
       className="relative flex items-center justify-center mx-auto w-full max-w-[343px] rounded-full border-2 border-white/15 bg-white/[0.03]"
       style={{ height: SEASON_PILL_HEIGHT }}
     >
-      <img src={t.logo} alt="" className="h-10 w-auto opacity-25 mr-3" crossOrigin="anonymous" />
-      <span className="text-white/35 text-lg tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
+      <img src={t.logo} alt="" className="h-10 w-auto mr-3" crossOrigin="anonymous" />
+      <span className="text-white text-lg tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
         BYE WEEK
       </span>
     </div>

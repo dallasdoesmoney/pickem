@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { TEAMS, TeamAbbr } from "@/data/teams";
+import { WIN_TOTALS } from "@/data/winTotals";
 import { SeasonGameCard, SeasonByeCard } from "@/components/SeasonGameCard";
 import { getTeamSchedule } from "@/lib/teamSchedule";
 import { useSeasonPicks } from "@/hooks/useSeasonPicks";
+import { renderPredictorShareImage } from "@/lib/predictorShareImage";
 
 // Pre-season only: predict how every game on one team's schedule goes
 // before there's a spread or record to go on. Cowboys-only for now -
@@ -14,6 +17,49 @@ export default function PredictorPage() {
   const team = TEAMS[TRACKED_TEAM];
   const schedule = getTeamSchedule(TRACKED_TEAM);
   const { picks, setPick, loaded } = useSeasonPicks(TRACKED_TEAM);
+  const [sharing, setSharing] = useState(false);
+  const winTotal = WIN_TOTALS[TRACKED_TEAM];
+
+  const wins = Object.values(picks).filter((winner) => winner === TRACKED_TEAM).length;
+  const losses = Object.values(picks).filter((winner) => winner !== TRACKED_TEAM).length;
+  const gamesPicked = wins + losses;
+  const diff = winTotal !== undefined && gamesPicked > 0 ? Math.round((wins - winTotal) * 2) / 2 : null;
+
+  async function handleShare() {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const blob = await renderPredictorShareImage({ team: TRACKED_TEAM, schedule, picks, winTotal });
+      const filename = `${team.name.toLowerCase()}-schedule-predictor.png`;
+      const file = new File([blob], filename, { type: "image/png" });
+
+      function download() {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      const isTouchPrimary = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+      const canShareFiles = isTouchPrimary && !!navigator.canShare?.({ files: [file] });
+
+      if (canShareFiles) {
+        try {
+          await navigator.share({ files: [file], title: "Schedule Predictor", text: `My predicted ${team.name} schedule` });
+        } catch (shareErr) {
+          if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();
+        }
+      } else {
+        download();
+      }
+    } catch (err) {
+      console.error("Share failed", err);
+    } finally {
+      setSharing(false);
+    }
+  }
 
   return (
     <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
@@ -40,6 +86,62 @@ export default function PredictorPage() {
               <SeasonRow key={row.week} row={row} trackedTeam={TRACKED_TEAM} picks={picks} setPick={setPick} />
             ))}
           </div>
+
+          <div className="flex flex-col items-center mt-10">
+            <div
+              className="rounded-full border-2 border-white text-center px-8 py-4"
+              style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+            >
+              <div className="text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+                {wins}-{losses}
+              </div>
+              <div className="text-[11px] text-white/55 mt-1 tracking-wide">PREDICTED RECORD</div>
+            </div>
+
+            {winTotal !== undefined && (
+              <p className="text-sm text-white/60 mt-4 text-center max-w-xs">
+                Vegas has the {team.name} at <span className="text-white">{winTotal}</span> wins
+                {diff !== null && (
+                  <>
+                    {" "}
+                    &mdash; you&rsquo;re predicting{" "}
+                    <span className="font-bold" style={{ color: diff > 0 ? "#4ade80" : diff < 0 ? "#ef4444" : "#ffffff" }}>
+                      {diff > 0 ? "+" : ""}
+                      {diff} {diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH"}
+                    </span>
+                  </>
+                )}
+              </p>
+            )}
+
+            <button
+              aria-label="Share your predicted schedule"
+              onClick={handleShare}
+              disabled={sharing}
+              className="flex items-center gap-2 rounded-full px-7 py-3.5 text-lg mt-6 shadow-[0_4px_20px_rgba(74,222,128,0.35)] active:scale-95 transition-transform duration-150 disabled:opacity-60"
+              style={{
+                fontFamily: "var(--font-display)",
+                background: "linear-gradient(135deg, #4ade80, #22c55e)",
+                color: "#0e1b33",
+              }}
+            >
+              {sharing ? (
+                <>
+                  <span className="h-4 w-4 rounded-full border-2 border-[#0e1b33]/40 border-t-[#0e1b33] animate-spin" />
+                  SHARING&hellip;
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 3v12" />
+                    <path d="M7 8l5-5 5 5" />
+                    <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+                  </svg>
+                  SHARE MY PREDICTIONS 🏈
+                </>
+              )}
+            </button>
+          </div>
         </>
       )}
     </main>
@@ -59,7 +161,7 @@ function SeasonRow({
 }) {
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <span className="text-[10px] text-white/35 tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
+      <span className="text-[11px] text-white tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
         WEEK {row.week}
       </span>
       {"bye" in row ? (
