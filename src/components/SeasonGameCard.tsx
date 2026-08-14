@@ -112,7 +112,7 @@ export function SeasonGameCard({
   }
 
   return (
-    <div className="relative flex items-center mx-auto shrink-0" style={{ width: SEASON_PILL_WIDTH }}>
+    <div className="relative flex items-center mx-auto flex-1 min-w-0 max-w-[343px]">
       <SeasonTeamHalf
         team={awayTeam}
         side="left"
@@ -138,8 +138,8 @@ export function SeasonByeCard({ team }: { team: TeamAbbr }) {
   const t = TEAMS[team];
   return (
     <div
-      className="relative flex items-center justify-center mx-auto shrink-0 rounded-full border-2 border-white/15 bg-white/[0.03]"
-      style={{ width: SEASON_PILL_WIDTH, height: SEASON_PILL_HEIGHT }}
+      className="relative flex items-center justify-center mx-auto flex-1 min-w-0 max-w-[343px] rounded-full border-2 border-white/15 bg-white/[0.03]"
+      style={{ height: SEASON_PILL_HEIGHT }}
     >
       <img src={t.logo} alt="" className="h-10 w-auto opacity-25 mr-3" crossOrigin="anonymous" />
       <span className="text-white/35 text-lg tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
