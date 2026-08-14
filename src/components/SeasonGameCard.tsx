@@ -111,20 +111,27 @@ export function SeasonGameCard({
     return picked === trackedTeam ? "win" : "loss";
   }
 
+  // Inverted from the weekly picks: the tracked team is the whole point of
+  // this page, so it never dims - only the opponent does, regardless of
+  // which of the two is predicted to win.
+  function isFadedFor(team: TeamAbbr): boolean {
+    return hasPick && team !== trackedTeam;
+  }
+
   return (
-    <div className="relative flex items-center mx-auto flex-1 min-w-0 max-w-[343px]">
+    <div className="relative flex items-center mx-auto w-full max-w-[343px]">
       <SeasonTeamHalf
         team={awayTeam}
         side="left"
         outcome={outcomeFor(away)}
-        isFaded={hasPick && picked !== away}
+        isFaded={isFadedFor(away)}
         onClick={() => onPick(away)}
       />
       <SeasonTeamHalf
         team={homeTeam}
         side="right"
         outcome={outcomeFor(home)}
-        isFaded={hasPick && picked !== home}
+        isFaded={isFadedFor(home)}
         onClick={() => onPick(home)}
       />
     </div>
@@ -138,7 +145,7 @@ export function SeasonByeCard({ team }: { team: TeamAbbr }) {
   const t = TEAMS[team];
   return (
     <div
-      className="relative flex items-center justify-center mx-auto flex-1 min-w-0 max-w-[343px] rounded-full border-2 border-white/15 bg-white/[0.03]"
+      className="relative flex items-center justify-center mx-auto w-full max-w-[343px] rounded-full border-2 border-white/15 bg-white/[0.03]"
       style={{ height: SEASON_PILL_HEIGHT }}
     >
       <img src={t.logo} alt="" className="h-10 w-auto opacity-25 mr-3" crossOrigin="anonymous" />

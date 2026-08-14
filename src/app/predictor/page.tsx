@@ -1,6 +1,6 @@
 "use client";
 
-import { TEAMS } from "@/data/teams";
+import { TEAMS, TeamAbbr } from "@/data/teams";
 import { SeasonGameCard, SeasonByeCard } from "@/components/SeasonGameCard";
 import { getTeamSchedule } from "@/lib/teamSchedule";
 import { useSeasonPicks } from "@/hooks/useSeasonPicks";
@@ -29,32 +29,50 @@ export default function PredictorPage() {
       </div>
 
       {loaded && (
-        <div className="flex flex-col gap-3 max-w-md mx-auto">
-          {schedule.map((row) =>
-            "bye" in row ? (
-              <div key={row.week} className="flex items-center gap-2 lg:gap-3">
-                <span className="w-5 lg:w-9 shrink-0 text-right text-[11px] text-white/35 tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-                  {row.week}
-                </span>
-                <SeasonByeCard team={TRACKED_TEAM} />
-              </div>
-            ) : (
-              <div key={row.week} className="flex items-center gap-2 lg:gap-3">
-                <span className="w-5 lg:w-9 shrink-0 text-right text-[11px] text-white/35 tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-                  {row.week}
-                </span>
-                <SeasonGameCard
-                  away={row.away}
-                  home={row.home}
-                  trackedTeam={TRACKED_TEAM}
-                  picked={picks[row.week]}
-                  onPick={(winner) => setPick(row.week, winner)}
-                />
-              </div>
-            )
-          )}
-        </div>
+        <>
+          <div className="flex flex-col gap-4 max-w-md mx-auto lg:hidden">
+            {schedule.map((row) => (
+              <SeasonRow key={row.week} row={row} trackedTeam={TRACKED_TEAM} picks={picks} setPick={setPick} />
+            ))}
+          </div>
+          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4">
+            {schedule.map((row) => (
+              <SeasonRow key={row.week} row={row} trackedTeam={TRACKED_TEAM} picks={picks} setPick={setPick} />
+            ))}
+          </div>
+        </>
       )}
     </main>
+  );
+}
+
+function SeasonRow({
+  row,
+  trackedTeam,
+  picks,
+  setPick,
+}: {
+  row: ReturnType<typeof getTeamSchedule>[number];
+  trackedTeam: TeamAbbr;
+  picks: Record<number, TeamAbbr>;
+  setPick: (week: number, winner: TeamAbbr) => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <span className="text-[10px] text-white/35 tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
+        WEEK {row.week}
+      </span>
+      {"bye" in row ? (
+        <SeasonByeCard team={trackedTeam} />
+      ) : (
+        <SeasonGameCard
+          away={row.away}
+          home={row.home}
+          trackedTeam={trackedTeam}
+          picked={picks[row.week]}
+          onPick={(winner) => setPick(row.week, winner)}
+        />
+      )}
+    </div>
   );
 }
