@@ -63,7 +63,13 @@ export default function PredictorPage() {
 
   return (
     <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
-      <div className="text-center mb-8">
+      <div className="relative text-center mb-8 overflow-hidden">
+        <img
+          src={team.logo}
+          alt=""
+          className="pointer-events-none select-none absolute left-[-40px] top-1/2 -translate-y-1/2 h-[280px] sm:h-[360px] w-auto opacity-[0.08] -z-10"
+          crossOrigin="anonymous"
+        />
         <div className="text-xs text-white/45 tracking-[0.25em] mb-1">PRE-SEASON</div>
         <h1 className="text-[clamp(2rem,8vw,3rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
           SCHEDULE PREDICTOR
@@ -88,23 +94,26 @@ export default function PredictorPage() {
           </div>
 
           <div className="flex flex-col items-center mt-10">
-            <div className="flex gap-3 justify-center flex-wrap">
+            <div className="flex gap-3 justify-center flex-wrap items-center">
               <div
-                className="rounded-full border-2 border-white text-center px-6 py-3.5"
-                style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+                className="rounded-full border-2 border-emerald-400 text-center pl-4 pr-7 py-3 flex items-center gap-3"
+                style={{ background: "#1b2947", boxShadow: "0 0 0 4px rgba(74,222,128,0.12), 0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
-                <div className="text-2xl" style={{ fontFamily: "var(--font-display)" }}>
-                  {wins}-{losses}
+                <img src={team.logo} alt="" className="h-11 w-auto" crossOrigin="anonymous" />
+                <div className="text-left">
+                  <div className="text-3xl leading-none" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
+                    {wins}-{losses}
+                  </div>
+                  <div className="text-[10px] text-white/55 mt-1 tracking-wide">MY PREDICTED RECORD</div>
                 </div>
-                <div className="text-[10px] text-white/55 mt-0.5 tracking-wide">PREDICTED RECORD</div>
               </div>
 
               {winTotal !== undefined && (
                 <div
-                  className="rounded-full border-2 border-emerald-400 text-center px-6 py-3.5"
+                  className="rounded-full border-2 border-white text-center px-6 py-3.5"
                   style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
                 >
-                  <div className="text-2xl" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
+                  <div className="text-2xl" style={{ fontFamily: "var(--font-display)" }}>
                     {winTotal}
                   </div>
                   <div className="text-[10px] text-white/55 mt-0.5 tracking-wide">VEGAS PREDICTION</div>

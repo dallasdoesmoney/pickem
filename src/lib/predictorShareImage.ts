@@ -183,6 +183,63 @@ function drawStatPill(
   ctx.fillText(label, x + STAT_PILL_W / 2, y + 74);
 }
 
+// The record is the headline stat - it gets the team logo, a green
+// "this is yours" accent border with a soft glow, and left-aligned text
+// instead of centered, so it visually outranks the neutral Vegas pill
+// next to it. Width is content-fit (logo + longer of value/label) rather
+// than fixed, since the logo makes a fixed width awkward across teams.
+function measureRecordPillWidth(ctx: CanvasRenderingContext2D, displayFont: string, logo: HTMLImageElement | null, value: string, label: string) {
+  const padX = 20;
+  const logoH = 52;
+  const logoW = logo ? (logo.naturalWidth / logo.naturalHeight) * logoH : 0;
+  const gap = logo ? 14 : 0;
+  ctx.font = `36px ${displayFont}`;
+  const valueW = ctx.measureText(value).width;
+  ctx.font = "11px system-ui, sans-serif";
+  const labelW = ctx.measureText(label).width;
+  const textW = Math.max(valueW, labelW);
+  return { w: padX * 2 + logoW + gap + textW, padX, logoH, logoW, gap };
+}
+
+function drawRecordPill(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  x: number,
+  y: number,
+  logo: HTMLImageElement | null,
+  value: string,
+  label: string
+) {
+  const { w, padX, logoH, logoW, gap } = measureRecordPillWidth(ctx, displayFont, logo, value, label);
+  const h = STAT_PILL_H;
+  const r: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
+
+  roundRectPath(ctx, x, y, w, h, r);
+  ctx.fillStyle = "#1b2947";
+  ctx.fill();
+  ctx.strokeStyle = "#4ade80";
+  ctx.lineWidth = 3;
+  ctx.shadowColor = "rgba(74,222,128,0.4)";
+  ctx.shadowBlur = 10;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  if (logo) ctx.drawImage(logo, x + padX, y + h / 2 - logoH / 2, logoW, logoH);
+
+  const textX = x + padX + logoW + gap;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `36px ${displayFont}`;
+  ctx.fillStyle = "#4ade80";
+  ctx.fillText(value, textX, y + 50);
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText(label, textX, y + 72);
+  ctx.textAlign = "center";
+
+  return w;
+}
+
 export type PredictorShareParams = {
   team: TeamAbbr;
   schedule: TeamScheduleRow[];
@@ -216,6 +273,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     loadImage(BRAND_LOGO_SRC),
   ]);
   const logos = new Map(logoEntries);
+  const teamLogo = logos.get(team.logo) ?? null;
 
   const wins = Object.values(picks).filter((winner) => winner === trackedTeam).length;
   const losses = Object.values(picks).filter((winner) => winner !== trackedTeam).length;
@@ -223,7 +281,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
 
   const rowCount = Math.ceil(schedule.length / 2);
   const gridH = rowCount * ROW_H + (rowCount - 1) * GAP_Y;
-  const totalHeight = PAD_TOP + HEADER_H + STATS_BLOCK_H + STATS_TO_GRID_GAP + gridH + BRAND_FOOTER_H + PAD_BOTTOM;
+  const totalHeight = PAD_TOP + HEADER_H + gridH + STATS_TO_GRID_GAP + STATS_BLOCK_H + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const pixelRatio = 2;
   const canvas = document.createElement("canvas");
@@ -235,6 +293,18 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
 
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
+
+  // Huge, faded team-logo watermark bleeding off the left edge, behind the
+  // header text - mirrors the live page's header treatment so it's clear
+  // at a glance whose schedule this is, even in a cropped share preview.
+  if (teamLogo) {
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    const bgLogoH = 320;
+    const bgLogoW = (teamLogo.naturalWidth / teamLogo.naturalHeight) * bgLogoH;
+    ctx.drawImage(teamLogo, -40, PAD_TOP - 60, bgLogoW, bgLogoH);
+    ctx.restore();
+  }
 
   let cursorY = PAD_TOP;
   ctx.textAlign = "center";
@@ -250,7 +320,6 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   ctx.fillText("SCHEDULE PREDICTOR", WIDTH / 2, cursorY + 44);
   cursorY += TITLE_BLOCK_H;
 
-  const teamLogo = logos.get(team.logo) ?? null;
   ctx.font = "16px system-ui, sans-serif";
   const subtitle = `${team.name}’ full 2026 schedule`;
   const subtitleW = ctx.measureText(subtitle).width;
@@ -265,27 +334,6 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   ctx.fillText(subtitle, subStartX + subLogoW + subGap, cursorY + 19);
   ctx.textAlign = "center";
   cursorY += SUBTITLE_BLOCK_H;
-
-  // Predicted record + Vegas prediction pills, kept at the top of the
-  // shared image even though they sit at the bottom of the live page -
-  // same reasoning as the weekly picks page's KPI row: makes more sense
-  // up front when someone else is looking at the image cold.
-  const pillsW = winTotal !== undefined ? STAT_PILL_W * 2 + STAT_PILL_GAP : STAT_PILL_W;
-  const pillsX = WIDTH / 2 - pillsW / 2;
-  drawStatPill(ctx, displayFont, pillsX, cursorY, "#ffffff", "#ffffff", `${wins}-${losses}`, "PREDICTED RECORD");
-  if (winTotal !== undefined) {
-    drawStatPill(ctx, displayFont, pillsX + STAT_PILL_W + STAT_PILL_GAP, cursorY, "#4ade80", "#4ade80", `${winTotal}`, "VEGAS PREDICTION");
-  }
-  cursorY += STAT_PILL_H + 10;
-
-  if (diff !== null) {
-    const overUnder = diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH";
-    const diffColor = diff > 0 ? WIN_COLOR : diff < 0 ? LOSS_COLOR : "#ffffff";
-    ctx.font = `20px ${displayFont}`;
-    ctx.fillStyle = diffColor;
-    ctx.fillText(`${diff > 0 ? "+" : ""}${diff} ${overUnder} Vegas’ line`, WIDTH / 2, cursorY + 18);
-  }
-  cursorY += 26 + STATS_TO_GRID_GAP;
 
   schedule.forEach((row, i) => {
     const rowIdx = Math.floor(i / 2);
@@ -363,7 +411,31 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     }
   });
 
-  cursorY += gridH;
+  cursorY += gridH + STATS_TO_GRID_GAP;
+
+  // Predicted record + Vegas prediction pills, back at the bottom to match
+  // the live page. The record pill carries the team logo and a green
+  // "this is yours" accent so it's unmistakably the headline stat when
+  // someone else is looking at the image cold.
+  ctx.font = `36px ${displayFont}`;
+  const { w: recordW } = measureRecordPillWidth(ctx, displayFont, teamLogo, `${wins}-${losses}`, "MY PREDICTED RECORD");
+  const pillsW = winTotal !== undefined ? recordW + STAT_PILL_GAP + STAT_PILL_W : recordW;
+  let pillX = WIDTH / 2 - pillsW / 2;
+  drawRecordPill(ctx, displayFont, pillX, cursorY, teamLogo, `${wins}-${losses}`, "MY PREDICTED RECORD");
+  pillX += recordW + STAT_PILL_GAP;
+  if (winTotal !== undefined) {
+    drawStatPill(ctx, displayFont, pillX, cursorY, "#ffffff", "#ffffff", `${winTotal}`, "VEGAS PREDICTION");
+  }
+  cursorY += STAT_PILL_H + 10;
+
+  if (diff !== null) {
+    const overUnder = diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH";
+    const diffColor = diff > 0 ? WIN_COLOR : diff < 0 ? LOSS_COLOR : "#ffffff";
+    ctx.font = `20px ${displayFont}`;
+    ctx.fillStyle = diffColor;
+    ctx.fillText(`${diff > 0 ? "+" : ""}${diff} ${overUnder} Vegas’ line`, WIDTH / 2, cursorY + 18);
+  }
+  cursorY += 26;
 
   drawBrandFooter(ctx, displayFont, cursorY, brandLogo, WIDTH);
 
