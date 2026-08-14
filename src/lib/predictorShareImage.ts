@@ -252,7 +252,14 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   const headerStartX = WIDTH / 2 - headerTotalW / 2;
   const textX = headerStartX + headerLogoW + headerLogoGap;
 
-  if (teamLogo) ctx.drawImage(teamLogo, headerStartX, cursorY + HEADER_H / 2 - headerLogoH / 2, headerLogoW, headerLogoH);
+  // Centered against the text's VISIBLE span, not HEADER_H - the title
+  // block reserves space below its baseline that no ink reaches (the
+  // header text is all caps, so nothing descends), which made a
+  // block-centered logo read as sitting too low.
+  const headerInkTop = 4; // kicker cap top (15px font, baseline at +15)
+  const headerInkBottom = KICKER_BLOCK_H + 44; // title baseline
+  const headerLogoY = cursorY + (headerInkTop + headerInkBottom) / 2 - headerLogoH / 2;
+  if (teamLogo) ctx.drawImage(teamLogo, headerStartX, headerLogoY, headerLogoW, headerLogoH);
 
   ctx.textAlign = "left";
   ctx.font = "15px system-ui, sans-serif";

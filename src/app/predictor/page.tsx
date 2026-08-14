@@ -71,9 +71,17 @@ export default function PredictorPage() {
   return (
     <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">
-        <img src={team.logo} alt="" className="h-20 sm:h-24 w-auto shrink-0" crossOrigin="anonymous" />
-        <div className="text-left">
-          <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SCHEDULE PREDICTOR</div>
+        {/* Nudged up slightly - flexbox centers the boxes, but the title's
+            display font carries extra space below its cap height, so true
+            box-centering reads as the logo sitting a touch low. */}
+        <img src={team.logo} alt="" className="h-20 sm:h-24 w-auto shrink-0 relative -top-1.5" crossOrigin="anonymous" />
+        {/* w-min below lg: when the title wraps (as it always does on
+            mobile), a plain flex item still keeps the full leftover row
+            width, so the lockup centers on that oversized box and reads
+            as shoved left. min-content sizing shrink-wraps the box to the
+            wrapped lines so logo+text center as one unit. */}
+        <div className="text-left w-min lg:w-auto">
+          <div className="text-xs text-white/45 tracking-[0.25em] mb-1 whitespace-nowrap">SCHEDULE PREDICTOR</div>
           <h1 className="text-[clamp(2rem,8vw,3rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
             {team.city.toUpperCase()} {team.name.toUpperCase()}
           </h1>
