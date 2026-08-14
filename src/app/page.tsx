@@ -69,7 +69,7 @@ function StatPills({ stats }: { stats: PickStats }) {
 
 export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
-  const { picks, setPick, loaded } = usePicks(CURRENT_WEEK);
+  const { picks, setPick, resetPicks, loaded } = usePicks(CURRENT_WEEK);
   const pickedCount = Object.keys(picks).length;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
@@ -243,6 +243,19 @@ export default function Home() {
                     SHARE MY PICKS 🏈
                   </>
                 )}
+              </button>
+            </div>
+
+            <div className="flex justify-center mt-3">
+              <button
+                aria-label="Reset your picks"
+                onClick={() => {
+                  if (window.confirm("Reset all your picks for this week?")) resetPicks();
+                }}
+                className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                RESET
               </button>
             </div>
           </>

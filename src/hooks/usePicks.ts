@@ -33,5 +33,9 @@ export function usePicks(week: number) {
     });
   }
 
-  return { picks, setPick, loaded };
+  function resetPicks() {
+    setPicks({});
+  }
+
+  return { picks, setPick, resetPicks, loaded };
 }

@@ -144,45 +144,6 @@ function drawDayHeader(ctx: CanvasRenderingContext2D, displayFont: string, label
   ctx.fillText(label, x + w / 2, y + h - 10);
 }
 
-// Die-cut-sticker picks-count badge next to the "WEEK N" kicker - mirrors
-// the live header's tilted sticker (solid fill, white border, hard offset
-// shadow). `leftX` is where the sticker's left edge should sit; its width
-// is measured from its own text, then it's drawn centered within a
-// translate+rotate so the tilt pivots around the sticker's own center.
-function drawWeekSticker(ctx: CanvasRenderingContext2D, displayFont: string, leftX: number, centerY: number, text: string, rotateDeg: number) {
-  const fontPx = 18;
-  ctx.font = `${fontPx}px ${displayFont}`;
-  const padX = 14;
-  const padY = 8;
-  const textW = ctx.measureText(text).width;
-  const w = textW + padX * 2;
-  const h = fontPx + padY * 2;
-  const cx = leftX + w / 2;
-
-  ctx.save();
-  ctx.translate(cx, centerY);
-  ctx.rotate((rotateDeg * Math.PI) / 180);
-
-  const radii: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
-  roundRectPath(ctx, -w / 2 + 3, -h / 2 + 3, w, h, radii);
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
-  ctx.fill();
-
-  roundRectPath(ctx, -w / 2, -h / 2, w, h, radii);
-  ctx.fillStyle = "#1b2947";
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#ffffff";
-  ctx.stroke();
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(text, 0, 1);
-
-  ctx.restore();
-}
-
 type TeamHalfOpts = {
   x: number;
   y: number;
@@ -381,7 +342,6 @@ export type ShareImageParams = {
 
 export async function renderShareImage(params: ShareImageParams): Promise<Blob> {
   const { games, groups, picks, week } = params;
-  const pickedCount = Object.keys(picks).length;
   const stats: PickStats = computePickStats(games, picks);
   const tags = computePickTags(games, picks);
   const { col1, col2 } = splitIntoColumns(groups);
@@ -433,16 +393,15 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
-  // "WEEK N" kicker + tilted picks-count sticker, mirroring the live header.
+  // "WEEK N" kicker, mirroring the live header (minus the picks-count
+  // sticker - redundant in a shared image since every pick is already
+  // visible below).
   const kickerFontPx = 30;
   ctx.font = `${kickerFontPx}px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
   const kickerText = `WEEK ${week}`;
   const kickerBaselineY = cursorY + kickerFontPx;
   ctx.fillText(kickerText, WIDTH / 2, kickerBaselineY);
-  const kickerWidth = ctx.measureText(kickerText).width;
-  const kickerCenterY = kickerBaselineY - kickerFontPx * 0.35;
-  drawWeekSticker(ctx, displayFont, WIDTH / 2 + kickerWidth / 2 - 10, kickerCenterY, `🏈 ${pickedCount}/${games.length}`, 10);
   cursorY += kickerFontPx + 14;
 
   const dividerW = 48;
