@@ -52,18 +52,16 @@ function SeasonTeamHalf({
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
 
   return (
-    <div className="relative flex-1" style={{ height: SEASON_PILL_HEIGHT, zIndex: outcomeColor ? 10 : 0 }}>
+    // Content (fill/logo/footer/letter) always stays at the base stacking
+    // level so the shared week label - drawn once by the parent - can sit
+    // above it. The border ring is its own layer on top of everything,
+    // including that label, so a picked half's colored border stays a
+    // continuous unbroken ring instead of the label cutting through it.
+    <div className="relative flex-1" style={{ height: SEASON_PILL_HEIGHT }}>
       <button onClick={onClick} className="absolute inset-0 h-full w-full cursor-pointer active:scale-95 transition-transform duration-150">
         <div
           className={`absolute inset-0 ${radius} overflow-hidden`}
-          style={{
-            backgroundColor: team.color,
-            borderTop: `${borderWidth}px solid ${borderColor}`,
-            borderBottom: `${borderWidth}px solid ${borderColor}`,
-            [outerBorderSide]: `${borderWidth}px solid ${borderColor}`,
-            [innerBorderSide]: outcomeColor ? `${borderWidth}px solid ${borderColor}` : undefined,
-            filter: fadedFilter,
-          }}
+          style={{ backgroundColor: team.color, filter: fadedFilter }}
         >
           <div className="absolute inset-x-0 top-0 flex items-center justify-center" style={{ height: LOGO_AREA_HEIGHT }}>
             <img
@@ -98,10 +96,17 @@ function SeasonTeamHalf({
             </span>
           )}
         </div>
-        {outcomeColor && (
-          <div className={`pointer-events-none absolute inset-0 ${radius}`} style={{ boxShadow: `0 0 6px 1px rgba(${outcomeColorRgb},0.6)` }} />
-        )}
       </button>
+      <div
+        className={`pointer-events-none absolute inset-0 ${radius} z-30`}
+        style={{
+          borderTop: `${borderWidth}px solid ${borderColor}`,
+          borderBottom: `${borderWidth}px solid ${borderColor}`,
+          [outerBorderSide]: `${borderWidth}px solid ${borderColor}`,
+          [innerBorderSide]: outcomeColor ? `${borderWidth}px solid ${borderColor}` : undefined,
+          boxShadow: outcomeColor ? `0 0 6px 1px rgba(${outcomeColorRgb},0.6)` : undefined,
+        }}
+      />
     </div>
   );
 }
@@ -142,7 +147,7 @@ export function SeasonGameCard({
       <SeasonTeamHalf team={awayTeam} side="left" outcome={outcomeFor(away)} isFaded={isFadedFor(away)} onClick={() => onPick(away)} />
       <SeasonTeamHalf team={homeTeam} side="right" outcome={outcomeFor(home)} isFaded={isFadedFor(home)} onClick={() => onPick(home)} />
       <span
-        className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center text-white/50 text-xs tracking-wide z-20"
+        className={`pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center text-xs tracking-wide z-20 ${hasPick ? "text-white/50" : "text-white"}`}
         style={{ height: FOOTER_HEIGHT, fontFamily: "var(--font-display)" }}
       >
         WEEK {week}

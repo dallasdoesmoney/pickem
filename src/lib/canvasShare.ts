@@ -85,7 +85,10 @@ export function drawBrandFooter(
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  if (brandLogo) ctx.drawImage(brandLogo, cardX + padX, y + padY, logoW, logoH);
+  // Nudged up relative to the vertically-centered text beside it - a purely
+  // centered logo read as sitting a touch low next to the two-line text block.
+  const logoYShift = 6;
+  if (brandLogo) ctx.drawImage(brandLogo, cardX + padX, y + padY - logoYShift, logoW, logoH);
 
   const textX = cardX + padX + (brandLogo ? logoW + logoTextGap : 0);
   ctx.textAlign = "left";

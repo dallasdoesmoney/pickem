@@ -145,11 +145,11 @@ function drawSeasonHalfBorder(
 // One shared label straddling the seam between the two halves, in the
 // footer band - stands in for the weekly page's per-team spread/record
 // since there's nothing like that to show yet.
-function drawWeekLabel(ctx: CanvasRenderingContext2D, displayFont: string, x: number, y: number, w: number, week: number) {
+function drawWeekLabel(ctx: CanvasRenderingContext2D, displayFont: string, x: number, y: number, w: number, week: number, hasPick: boolean) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = `13px ${displayFont}`;
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.fillStyle = hasPick ? "rgba(255,255,255,0.5)" : "#ffffff";
   ctx.fillText(`WEEK ${week}`, x + w / 2, y + LOGO_AREA_H + FOOTER_H / 2 + 1);
 }
 
@@ -323,27 +323,38 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
 
+  // Logo-left, kicker+title stacked right lockup - the logo is sized to the
+  // combined header block height and vertically centered against it, rather
+  // than sitting inline with just the title's own line height.
   let cursorY = PAD_TOP;
-  ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
+  const kickerText = "SCHEDULE PREDICTOR";
+  const titleText = `${team.city.toUpperCase()} ${team.name.toUpperCase()}`;
+  ctx.font = "15px system-ui, sans-serif";
+  const kickerW = ctx.measureText(kickerText).width;
+  ctx.font = `50px ${displayFont}`;
+  const titleW = ctx.measureText(titleText).width;
+  const textStackW = Math.max(kickerW, titleW);
+
+  const headerLogoH = 88;
+  const headerLogoW = teamLogo ? (teamLogo.naturalWidth / teamLogo.naturalHeight) * headerLogoH : 0;
+  const headerLogoGap = teamLogo ? 20 : 0;
+  const headerTotalW = headerLogoW + headerLogoGap + textStackW;
+  const headerStartX = WIDTH / 2 - headerTotalW / 2;
+  const textX = headerStartX + headerLogoW + headerLogoGap;
+
+  if (teamLogo) ctx.drawImage(teamLogo, headerStartX, cursorY + HEADER_H / 2 - headerLogoH / 2, headerLogoW, headerLogoH);
+
+  ctx.textAlign = "left";
   ctx.font = "15px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("SCHEDULE PREDICTOR", WIDTH / 2, cursorY + 15);
+  ctx.fillText(kickerText, textX, cursorY + 15);
   cursorY += KICKER_BLOCK_H;
 
   ctx.font = `50px ${displayFont}`;
-  const titleText = `${team.city.toUpperCase()} ${team.name.toUpperCase()}`;
-  const titleTextW = ctx.measureText(titleText).width;
-  const titleLogoH = 48;
-  const titleLogoW = teamLogo ? (teamLogo.naturalWidth / teamLogo.naturalHeight) * titleLogoH : 0;
-  const titleGap = teamLogo ? 14 : 0;
-  const titleTotalW = titleLogoW + titleGap + titleTextW;
-  const titleStartX = WIDTH / 2 - titleTotalW / 2;
-  if (teamLogo) ctx.drawImage(teamLogo, titleStartX, cursorY + 44 - titleLogoH + 10, titleLogoW, titleLogoH);
-  ctx.textAlign = "left";
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(titleText, titleStartX + titleLogoW + titleGap, cursorY + 44);
+  ctx.fillText(titleText, textX, cursorY + 44);
   ctx.textAlign = "center";
   cursorY += TITLE_BLOCK_H;
 
@@ -403,7 +414,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     drawSeasonHalfFill(ctx, homeOpts);
     drawSeasonHalfLetter(ctx, displayFont, awayOpts);
     drawSeasonHalfLetter(ctx, displayFont, homeOpts);
-    drawWeekLabel(ctx, displayFont, cellX, cellY, CELL_W, row.week);
+    drawWeekLabel(ctx, displayFont, cellX, cellY, CELL_W, row.week, hasPick);
 
     // The tracked team's border is drawn LAST regardless of which side
     // it's on, so its color always wins the shared seam even against the

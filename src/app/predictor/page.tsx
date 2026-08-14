@@ -63,10 +63,10 @@ export default function PredictorPage() {
 
   return (
     <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
-      <div className="text-center mb-8">
-        <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SCHEDULE PREDICTOR</div>
-        <div className="flex items-center justify-center gap-3">
-          <img src={team.logo} alt="" className="h-10 sm:h-12 w-auto" crossOrigin="anonymous" />
+      <div className="mb-8 flex items-center justify-center gap-5">
+        <img src={team.logo} alt="" className="h-20 sm:h-24 w-auto shrink-0" crossOrigin="anonymous" />
+        <div className="text-left">
+          <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SCHEDULE PREDICTOR</div>
           <h1 className="text-[clamp(2rem,8vw,3rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
             {team.city.toUpperCase()} {team.name.toUpperCase()}
           </h1>
