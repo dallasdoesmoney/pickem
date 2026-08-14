@@ -40,7 +40,7 @@ export default function PredictorPage() {
     const winner = picks[row.week];
     if (!winner) return false;
     const loser = winner === row.away ? row.home : row.away;
-    return isSuspiciousPick(winner, loser);
+    return isSuspiciousPick(winner, loser, winner === row.home);
   }).length;
 
   async function handleShare() {

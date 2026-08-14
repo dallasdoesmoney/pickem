@@ -11,8 +11,14 @@ export function usePicks(week: number) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const rawPicks = localStorage.getItem(picksKey);
-    setPicks(rawPicks ? JSON.parse(rawPicks) : {});
+    // Corrupt/legacy stored values must not crash the page - fall back to
+    // no picks and let the next save overwrite the bad entry.
+    try {
+      const rawPicks = localStorage.getItem(picksKey);
+      setPicks(rawPicks ? JSON.parse(rawPicks) : {});
+    } catch {
+      setPicks({});
+    }
     setLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picksKey]);

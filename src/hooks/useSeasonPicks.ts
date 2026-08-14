@@ -11,8 +11,14 @@ export function useSeasonPicks(team: TeamAbbr) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const raw = localStorage.getItem(picksKey);
-    setPicks(raw ? JSON.parse(raw) : {});
+    // Corrupt/legacy stored values must not crash the page - fall back to
+    // no picks and let the next save overwrite the bad entry.
+    try {
+      const raw = localStorage.getItem(picksKey);
+      setPicks(raw ? JSON.parse(raw) : {});
+    } catch {
+      setPicks({});
+    }
     setLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picksKey]);

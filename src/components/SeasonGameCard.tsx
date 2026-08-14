@@ -63,7 +63,7 @@ export function SeasonGameCard({
     return hasPick && team !== trackedTeam;
   }
 
-  const suspicious = hasPick && isSuspiciousPick(picked, picked === away ? home : away);
+  const suspicious = hasPick && isSuspiciousPick(picked, picked === away ? home : away, picked === home);
 
   return (
     // isolate scopes the halves' z-30 border layers and this card's z-20

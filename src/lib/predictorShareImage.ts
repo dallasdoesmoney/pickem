@@ -292,7 +292,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     if ("bye" in row) return false;
     const winner = picks[row.week];
     if (!winner) return false;
-    return isSuspiciousPick(winner, winner === row.away ? row.home : row.away);
+    return isSuspiciousPick(winner, winner === row.away ? row.home : row.away, winner === row.home);
   }).length;
 
   const rowCount = Math.ceil(schedule.length / 2);
@@ -416,7 +416,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     // drawPillBordersOutcomeLast's comment for why.
     drawPillBordersOutcomeLast(ctx, awayOpts, homeOpts);
 
-    if (hasPick && isSuspiciousPick(picked, picked === row.away ? row.home : row.away)) {
+    if (hasPick && isSuspiciousPick(picked, picked === row.away ? row.home : row.away, picked === row.home)) {
       drawSuspiciousBadge(ctx, suspiciousDog, cellX, cellY, picked === row.away ? "left" : "right");
     }
   });
