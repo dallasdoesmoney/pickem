@@ -3,8 +3,8 @@ import { TeamScheduleRow } from "@/lib/teamSchedule";
 import { BRAND_LOGO_SRC, Radii, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
 
 const WIDTH = 840;
-const CELL_W = 343;
-const CELL_H = 64;
+const CELL_W = 360;
+const CELL_H = 74;
 const GAP_X = 32;
 const GAP_Y = 16;
 const LABEL_H = 24;
@@ -13,7 +13,7 @@ const ROW_H = LABEL_H + LABEL_GAP + CELL_H;
 const BODY_W = CELL_W * 2 + GAP_X;
 const LEFT_X = (WIDTH - BODY_W) / 2;
 const PAD_TOP = 40;
-const PAD_BOTTOM = 56;
+const PAD_BOTTOM = 28;
 const BG = "#0e1b33";
 
 const BORDER_WIDTH = 4;
@@ -29,9 +29,9 @@ const KICKER_BLOCK_H = 25;
 const TITLE_BLOCK_H = 64;
 const SUBTITLE_BLOCK_H = 44;
 const HEADER_H = KICKER_BLOCK_H + TITLE_BLOCK_H + SUBTITLE_BLOCK_H;
-const STAT_PILL_W = 200;
-const STAT_PILL_H = 76;
-const STAT_PILL_GAP = 20;
+const STAT_PILL_W = 240;
+const STAT_PILL_H = 92;
+const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
 const BRAND_FOOTER_H = 14 + 88 + 10;
@@ -65,7 +65,7 @@ function drawSeasonHalfFill(
   ctx.fillRect(x, y, w, h);
 
   if (logo) {
-    const logoH = 92;
+    const logoH = 106;
     const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
     ctx.drawImage(logo, x + w / 2 - logoW / 2, y + h / 2 - logoH / 2, logoW, logoH);
   }
@@ -82,7 +82,7 @@ function drawSeasonHalfFill(
     ctx.rotate((-12 * Math.PI) / 180);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = `44px ${displayFont}`;
+    ctx.font = `50px ${displayFont}`;
     ctx.lineJoin = "round";
     ctx.lineWidth = 5;
     ctx.strokeStyle = "#ffffff";
@@ -140,10 +140,10 @@ function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: numb
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `18px ${displayFont}`;
+  ctx.font = `20px ${displayFont}`;
   const label = "BYE WEEK";
   const labelW = ctx.measureText(label).width;
-  const logoH = 34;
+  const logoH = 40;
   const logoW = logo ? (logo.naturalWidth / logo.naturalHeight) * logoH : 0;
   const gap = logo ? 12 : 0;
   const totalW = logoW + gap + labelW;
@@ -175,12 +175,12 @@ function drawStatPill(
 
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  ctx.font = `28px ${displayFont}`;
+  ctx.font = `36px ${displayFont}`;
   ctx.fillStyle = valueColor;
-  ctx.fillText(value, x + STAT_PILL_W / 2, y + 42);
-  ctx.font = "10px system-ui, sans-serif";
+  ctx.fillText(value, x + STAT_PILL_W / 2, y + 52);
+  ctx.font = "11px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(label, x + STAT_PILL_W / 2, y + 60);
+  ctx.fillText(label, x + STAT_PILL_W / 2, y + 74);
 }
 
 export type PredictorShareParams = {
