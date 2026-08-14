@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { WIN_TOTALS } from "@/data/winTotals";
+import { isSuspiciousPick } from "@/data/powerRankings";
 import { SeasonGameCard, SeasonByeCard } from "@/components/SeasonGameCard";
 import { getTeamSchedule } from "@/lib/teamSchedule";
 import { useSeasonPicks } from "@/hooks/useSeasonPicks";
@@ -31,6 +32,16 @@ export default function PredictorPage() {
   const losses = Object.values(picks).filter((winner) => winner !== TRACKED_TEAM).length;
   const gamesPicked = wins + losses;
   const diff = winTotal !== undefined && gamesPicked > 0 ? Math.round((wins - winTotal) * 2) / 2 : null;
+
+  // Picks that defy the power rankings - each one earns the side-eye dog
+  // on its card, and the total gets its own KPI pill below.
+  const suspiciousCount = schedule.filter((row) => {
+    if ("bye" in row) return false;
+    const winner = picks[row.week];
+    if (!winner) return false;
+    const loser = winner === row.away ? row.home : row.away;
+    return isSuspiciousPick(winner, loser);
+  }).length;
 
   async function handleShare() {
     if (sharing) return;
@@ -107,6 +118,19 @@ export default function PredictorPage() {
 
           <div className="flex flex-col items-center mt-10">
             <div className="flex gap-3 justify-center flex-wrap items-center">
+              <div
+                className="rounded-full border-2 border-white text-center pl-4 pr-6 py-3 flex items-center gap-2.5"
+                style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+              >
+                <img src="/suspicious-dog.png" alt="" className="h-10 w-auto select-none" style={{ transform: "scaleX(-1)" }} />
+                <div className="text-left">
+                  <div className="text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                    {suspiciousCount}
+                  </div>
+                  <div className="text-[10px] text-white/55 mt-1 tracking-wide">SUSPICIOUS PICKS</div>
+                </div>
+              </div>
+
               <div
                 className="rounded-full border-2 border-emerald-400 text-center pl-4 pr-7 py-3 flex items-center gap-3"
                 style={{ background: "#1b2947", boxShadow: "0 0 0 4px rgba(74,222,128,0.12), 0 6px 16px -6px rgba(0,0,0,0.5)" }}

@@ -1,4 +1,5 @@
 import { TEAMS, TeamAbbr } from "@/data/teams";
+import { isSuspiciousPick } from "@/data/powerRankings";
 import { TeamScheduleRow } from "@/lib/teamSchedule";
 import {
   BRAND_LOGO_SRC,
@@ -49,6 +50,28 @@ const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
 const BRAND_FOOTER_H = 14 + 98 + 10;
+
+const SUSPICIOUS_DOG_SRC = "/suspicious-dog.png";
+
+// Side-eye dog meme on the corner of the predicted winner's half when the
+// pick defies the power rankings - same placement pattern as the weekly
+// share image's emoji badges (rotate around the badge's own center, small
+// protrusion past the pill edge so it doesn't bleed into the next column).
+function drawSuspiciousBadge(ctx: CanvasRenderingContext2D, dog: HTMLImageElement | null, cellX: number, cellY: number, side: "left" | "right") {
+  if (!dog) return;
+  const badgeH = 44;
+  const badgeW = (dog.naturalWidth / dog.naturalHeight) * badgeH;
+  const protrusion = 12;
+  const centerX = side === "left" ? cellX - protrusion + 19 : cellX + CELL_W + protrusion - 19;
+  const centerY = cellY - 8 + 19;
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(((side === "left" ? -22 : 22) * Math.PI) / 180);
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 4;
+  ctx.drawImage(dog, -badgeW / 2, -badgeH / 2, badgeW, badgeH);
+  ctx.restore();
+}
 
 // One shared label straddling the seam between the two halves, in the
 // footer band - stands in for the weekly page's per-team spread/record
@@ -118,6 +141,54 @@ function drawStatPill(
   ctx.font = "11px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.fillText(label, x + STAT_PILL_W / 2, y + 74);
+}
+
+// Neutral-styled cousin of the record pill: dog image + suspicious-pick
+// count. Content-fit width for the same reason as the record pill.
+function measureSuspiciousPillWidth(ctx: CanvasRenderingContext2D, displayFont: string, dog: HTMLImageElement | null, value: string, label: string) {
+  const padX = 20;
+  const dogH = 48;
+  const dogW = dog ? (dog.naturalWidth / dog.naturalHeight) * dogH : 0;
+  const gap = dog ? 12 : 0;
+  ctx.font = `30px ${displayFont}`;
+  const valueW = ctx.measureText(value).width;
+  ctx.font = "11px system-ui, sans-serif";
+  const labelW = ctx.measureText(label).width;
+  const textW = Math.max(valueW, labelW);
+  return { w: padX * 2 + dogW + gap + textW, padX, dogH, dogW, gap };
+}
+
+function drawSuspiciousPill(ctx: CanvasRenderingContext2D, displayFont: string, x: number, y: number, dog: HTMLImageElement | null, value: string, label: string) {
+  const { w, padX, dogH, dogW, gap } = measureSuspiciousPillWidth(ctx, displayFont, dog, value, label);
+  const h = STAT_PILL_H;
+  roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
+  ctx.fillStyle = "#1b2947";
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  if (dog) {
+    // Mirrored so the dog side-eyes toward the record pill next door.
+    ctx.save();
+    ctx.translate(x + padX + dogW / 2, y + h / 2);
+    ctx.scale(-1, 1);
+    ctx.drawImage(dog, -dogW / 2, -dogH / 2, dogW, dogH);
+    ctx.restore();
+  }
+
+  const textX = x + padX + dogW + gap;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `30px ${displayFont}`;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(value, textX, y + 48);
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText(label, textX, y + 70);
+  ctx.textAlign = "center";
+
+  return w;
 }
 
 // The record is the headline stat - it gets the team logo, a green
@@ -209,12 +280,20 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     Promise.all(Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)),
     loadImage(BRAND_LOGO_SRC),
   ]);
+  const suspiciousDog = await loadImage(SUSPICIOUS_DOG_SRC);
   const logos = new Map(logoEntries);
   const teamLogo = logos.get(team.logo) ?? null;
 
   const wins = Object.values(picks).filter((winner) => winner === trackedTeam).length;
   const losses = Object.values(picks).filter((winner) => winner !== trackedTeam).length;
   const diff = winTotal !== undefined && wins + losses > 0 ? Math.round((wins - winTotal) * 2) / 2 : null;
+
+  const suspiciousCount = schedule.filter((row) => {
+    if ("bye" in row) return false;
+    const winner = picks[row.week];
+    if (!winner) return false;
+    return isSuspiciousPick(winner, winner === row.away ? row.home : row.away);
+  }).length;
 
   const rowCount = Math.ceil(schedule.length / 2);
   const gridH = rowCount * ROW_H + (rowCount - 1) * GAP_Y;
@@ -336,18 +415,23 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     // colored border always wins the shared seam - see
     // drawPillBordersOutcomeLast's comment for why.
     drawPillBordersOutcomeLast(ctx, awayOpts, homeOpts);
+
+    if (hasPick && isSuspiciousPick(picked, picked === row.away ? row.home : row.away)) {
+      drawSuspiciousBadge(ctx, suspiciousDog, cellX, cellY, picked === row.away ? "left" : "right");
+    }
   });
 
   cursorY += gridH + STATS_TO_GRID_GAP;
 
-  // Predicted record + Vegas prediction pills, back at the bottom to match
-  // the live page. The record pill carries the team logo and a green
-  // "this is yours" accent so it's unmistakably the headline stat when
-  // someone else is looking at the image cold.
-  ctx.font = `36px ${displayFont}`;
+  // Bottom KPI row, matching the live page left-to-right: suspicious-pick
+  // counter, predicted record (the headline stat - team logo + green
+  // accent), Vegas prediction.
+  const { w: suspiciousW } = measureSuspiciousPillWidth(ctx, displayFont, suspiciousDog, `${suspiciousCount}`, "SUSPICIOUS PICKS");
   const { w: recordW } = measureRecordPillWidth(ctx, displayFont, teamLogo, `${wins}-${losses}`, "MY PREDICTION");
-  const pillsW = winTotal !== undefined ? recordW + STAT_PILL_GAP + STAT_PILL_W : recordW;
+  const pillsW = suspiciousW + STAT_PILL_GAP + recordW + (winTotal !== undefined ? STAT_PILL_GAP + STAT_PILL_W : 0);
   let pillX = WIDTH / 2 - pillsW / 2;
+  drawSuspiciousPill(ctx, displayFont, pillX, cursorY, suspiciousDog, `${suspiciousCount}`, "SUSPICIOUS PICKS");
+  pillX += suspiciousW + STAT_PILL_GAP;
   drawRecordPill(ctx, displayFont, pillX, cursorY, teamLogo, `${wins}-${losses}`, "MY PREDICTION");
   pillX += recordW + STAT_PILL_GAP;
   if (winTotal !== undefined) {
