@@ -23,7 +23,7 @@ const GAP_Y = 16;
 const HEADER_ROW_H = 56;
 const BG = "#0e1b33";
 const BRAND_LOGO_SRC = "/press-logo.png";
-const BRAND_FOOTER_H = 280;
+const BRAND_FOOTER_H = 150;
 
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
@@ -411,20 +411,38 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   }
 
   cursorY += 20;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = "12px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("P O W E R E D   B Y", WIDTH / 2, cursorY + 12);
-  cursorY += 12 + 14;
 
+  // "POWERED BY" sits inline to the left of the logo mark as one row,
+  // rather than stacked above it, so the footer doesn't eat a ton of
+  // vertical space.
+  const brandLabel = "P O W E R E D   B Y";
+  ctx.font = "13px system-ui, sans-serif";
+  const brandLabelW = ctx.measureText(brandLabel).width;
+
+  let brandLogoW = 0;
+  const brandLogoH = 52;
   if (brandLogo) {
-    const logoH = 170;
-    const logoW = (brandLogo.naturalWidth / brandLogo.naturalHeight) * logoH;
-    ctx.drawImage(brandLogo, WIDTH / 2 - logoW / 2, cursorY, logoW, logoH);
-    cursorY += logoH + 26;
+    brandLogoW = (brandLogo.naturalWidth / brandLogo.naturalHeight) * brandLogoH;
   }
 
+  const brandGap = 12;
+  const brandRowW = brandLabelW + (brandLogo ? brandGap + brandLogoW : 0);
+  const brandRowH = Math.max(13, brandLogoH);
+  const brandRowX = WIDTH / 2 - brandRowW / 2;
+  const brandRowMidY = cursorY + brandRowH / 2;
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.fillText(brandLabel, brandRowX, brandRowMidY);
+
+  if (brandLogo) {
+    ctx.drawImage(brandLogo, brandRowX + brandLabelW + brandGap, cursorY + (brandRowH - brandLogoH) / 2, brandLogoW, brandLogoH);
+  }
+  cursorY += brandRowH + 16;
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
   ctx.font = `22px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
   ctx.fillText("sidelinebrew.com", WIDTH / 2, cursorY + 20);
