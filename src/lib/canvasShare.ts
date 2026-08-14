@@ -61,6 +61,11 @@ export const WIN_COLOR = "#64e066";
 export const WIN_COLOR_RGB = "100,224,102";
 export const LOSS_COLOR = "#ef4444";
 export const LOSS_COLOR_RGB = "239,68,68";
+// What white looks like under the same brightness(0.55) that dims a faded
+// half's fill/logo - a solid opaque gray, NOT a translucent white (a
+// translucent stroke lets the fill show through the border itself, which
+// reads as a rendering bug rather than a muted color).
+export const FADED_BORDER_COLOR = "#8c8c8c";
 
 export type PillOutcome = "win" | "loss" | null;
 
@@ -147,25 +152,23 @@ export function drawPillHalfFill(
   ctx.restore();
 }
 
-// Always fully opaque - white when there's no outcome, the outcome color
-// when there is. (A translucent "dimmed" variant was tried for faded
-// halves so the border would fade along with the fill, but a translucent
-// stroke lets the fill/logo underneath show through the border itself,
-// which reads as a rendering bug rather than a muted color - and it
-// doesn't match the live DOM pages, where borders are always opaque and
-// fades are a filter on the fill/logo only.) Callers must draw whichever
-// half has an outcome LAST via drawPillBordersOutcomeLast - a border
-// stroke is centered on the shared seam, so the one drawn last wins those
-// pixels.
+// Always fully opaque - the outcome color when there is one, a solid
+// dimmed gray (FADED_BORDER_COLOR) when the half is faded, white
+// otherwise. The faded case is deliberately opaque, never translucent - a
+// translucent stroke lets the fill/logo underneath show through the border
+// itself, which reads as a rendering bug rather than a muted color.
+// Callers must draw whichever half has an outcome LAST via
+// drawPillBordersOutcomeLast - a border stroke is centered on the shared
+// seam, so the one drawn last wins those pixels.
 export function drawPillHalfBorder(ctx: CanvasRenderingContext2D, opts: PillHalfOpts) {
-  const { x, y, w, h, side, outcome } = opts;
+  const { x, y, w, h, side, outcome, isFaded } = opts;
   const radius = h / 2;
   const r: Radii = side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
   const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
 
   roundRectPath(ctx, x, y, w, h, r);
   ctx.lineWidth = outcomeColor ? PILL_OUTCOME_BORDER_WIDTH : PILL_BORDER_WIDTH;
-  ctx.strokeStyle = outcomeColor ?? "#ffffff";
+  ctx.strokeStyle = outcomeColor ?? (isFaded ? FADED_BORDER_COLOR : "#ffffff");
   if (outcomeColor) {
     ctx.shadowColor = `rgba(${outcome === "win" ? WIN_COLOR_RGB : LOSS_COLOR_RGB},0.6)`;
     ctx.shadowBlur = 6;

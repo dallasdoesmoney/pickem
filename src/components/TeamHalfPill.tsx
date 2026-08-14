@@ -18,6 +18,11 @@ export const WIN_COLOR = "#64e066";
 const WIN_COLOR_RGB = "100,224,102";
 export const LOSS_COLOR = "#ef4444";
 const LOSS_COLOR_RGB = "239,68,68";
+// What white looks like under the same brightness(0.55) that dims a faded
+// half's fill/logo - a solid opaque gray, NOT a translucent white (a
+// translucent stroke lets the fill show through the border itself, which
+// reads as a rendering bug rather than a muted color).
+export const FADED_BORDER_COLOR = "#8c8c8c";
 
 export function darkenColor(hex: string, factor: number, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -50,6 +55,7 @@ export function TeamHalfPill({
   const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
   const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
   const outcomeColorRgb = outcome === "win" ? WIN_COLOR_RGB : outcome === "loss" ? LOSS_COLOR_RGB : null;
+  const borderColor = outcomeColor ?? (isFaded ? FADED_BORDER_COLOR : "white");
   const borderWidth = outcomeColor ? OUTCOME_BORDER_WIDTH : BORDER_WIDTH;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
 
@@ -57,9 +63,9 @@ export function TeamHalfPill({
     // Content (fill/logo/footer/letter) always stays at the base stacking
     // level so a page can layer its own overlay (e.g. the predictor's
     // shared week label) above it. The border ring is its own layer on top
-    // of everything - always fully opaque, never dimmed, so a picked
-    // half's colored border stays a continuous unbroken ring and a
-    // caller's overlay can't cut through it.
+    // of everything - always fully opaque so a picked half's colored
+    // border stays a continuous unbroken ring; a faded half's border dims
+    // to a solid gray in step with its fill/logo.
     <div className="relative flex-1" style={{ height: PILL_HEIGHT }}>
       <button onClick={onClick} className="absolute inset-0 h-full w-full cursor-pointer active:scale-95 transition-transform duration-150">
         <div className={`absolute inset-0 ${radius} overflow-hidden`} style={{ backgroundColor: team.color, filter: fadedFilter }}>
@@ -101,10 +107,10 @@ export function TeamHalfPill({
       <div
         className={`pointer-events-none absolute inset-0 ${radius} z-30`}
         style={{
-          borderTop: `${borderWidth}px solid ${outcomeColor ?? "white"}`,
-          borderBottom: `${borderWidth}px solid ${outcomeColor ?? "white"}`,
-          [outerBorderSide]: `${borderWidth}px solid ${outcomeColor ?? "white"}`,
-          [innerBorderSide]: outcomeColor ? `${borderWidth}px solid ${outcomeColor}` : undefined,
+          borderTop: `${borderWidth}px solid ${borderColor}`,
+          borderBottom: `${borderWidth}px solid ${borderColor}`,
+          [outerBorderSide]: `${borderWidth}px solid ${borderColor}`,
+          [innerBorderSide]: outcomeColor ? `${borderWidth}px solid ${borderColor}` : undefined,
           boxShadow: outcomeColor ? `0 0 6px 1px rgba(${outcomeColorRgb},0.6)` : undefined,
         }}
       />
