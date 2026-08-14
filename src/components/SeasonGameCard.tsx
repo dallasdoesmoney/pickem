@@ -15,10 +15,10 @@ export const SEASON_PILL_HEIGHT = PILL_HEIGHT;
 
 // Side-eye dog meme on the corner of the predicted winner's half when the
 // pick defies the power rankings - same placement pattern as the weekly
-// page's underdog/boldest emoji badges. Peeks in with an animation on
-// mount (see suspicious-peek in globals.css); the rotation lives in the
-// --peek-rot custom property because the keyframes own `transform`, so a
-// static inline rotate would be overwritten while the animation runs.
+// page's underdog/boldest emoji badges. Jumbo-zoom entrance on mount (see
+// suspicious-jumbo in globals.css); the resting rotation and the start
+// offset live in custom properties because the keyframes own `transform`,
+// so a static inline rotate would be overwritten while the animation runs.
 function SuspiciousBadge({ side }: { side: "left" | "right" }) {
   const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
   return (
@@ -29,8 +29,10 @@ function SuspiciousBadge({ side }: { side: "left" | "right" }) {
       style={{
         ...positionStyle,
         "--peek-rot": side === "left" ? "-22deg" : "22deg",
+        "--jumbo-x": side === "left" ? "120px" : "-120px",
         transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
-        animation: "suspicious-peek 0.8s cubic-bezier(0.34, 1.2, 0.64, 1) both",
+        transformOrigin: side === "left" ? "40% 60%" : "60% 60%",
+        animation: "suspicious-jumbo 1.5s cubic-bezier(0.35, 0, 0.15, 1) both",
         filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
       } as React.CSSProperties}
     />

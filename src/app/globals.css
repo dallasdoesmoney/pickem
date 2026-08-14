@@ -19,24 +19,27 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Suspicious-pick dog badge: rises up over the card corner like it's
-   slowly peeking in to judge the pick, overshoots its tilt a touch, then
-   settles. --peek-rot is the badge's resting rotation (mirrored per side),
-   set inline where the badge is rendered. */
-@keyframes suspicious-peek {
+/* Suspicious-pick dog badge: fades in HUGE over the middle of the card,
+   holds the stare for a beat, then shrinks back to its corner in one
+   continuous eased glide (no overshoot - kept deliberately smooth).
+   Custom properties, set inline where the badge is rendered:
+   --peek-rot  resting rotation (mirrored per side)
+   --jumbo-x   x-offset from the corner to the card middle (mirrored) */
+@keyframes suspicious-jumbo {
   0% {
     opacity: 0;
-    transform: translateY(26px) rotate(0deg) scale(0.8);
+    transform: translate(var(--jumbo-x), 90px) rotate(calc(var(--peek-rot) / 5.5)) scale(5.4);
   }
-  55% {
+  20% {
     opacity: 1;
-    transform: translateY(-3px) rotate(var(--peek-rot)) scale(1.05);
+    transform: translate(var(--jumbo-x), 90px) rotate(calc(var(--peek-rot) / 5.5)) scale(5);
   }
-  75% {
-    transform: translateY(1px) rotate(calc(var(--peek-rot) * 1.25)) scale(1);
+  45% {
+    opacity: 1;
+    transform: translate(var(--jumbo-x), 90px) rotate(calc(var(--peek-rot) / 5.5)) scale(5);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) rotate(var(--peek-rot)) scale(1);
+    transform: translate(0, 0) rotate(var(--peek-rot)) scale(1);
   }
 }

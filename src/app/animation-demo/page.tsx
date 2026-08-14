@@ -6,7 +6,7 @@ import { TEAMS } from "@/data/teams";
 // Temporary side-by-side demo of candidate "suspicious pick" badge
 // animations - not linked from the nav. Delete once a winner is picked.
 const VARIANTS = [
-  { id: "jumbo", name: "1. Jumbo zoom-out", blurb: "Huge and in your face, then backs off to the corner - still watching." },
+  { id: "jumbo", name: "1. Jumbo zoom-out (smoothed)", blurb: "Huge and in your face, then one smooth glide back to the corner. Now live on the predictor." },
   { id: "zoomin", name: "2. Dramatic slow zoom-in", blurb: "Pops on, then the camera slowly pushes into his face before snapping back." },
   { id: "slide", name: "3. Slide-eye reveal", blurb: "Slides in straight-faced, stops... then snaps the head-tilt." },
   { id: "drop", name: "4. Bounce drop", blurb: "Drops from above, squashes on impact, boings before settling." },
@@ -70,14 +70,13 @@ export default function AnimationDemoPage() {
     <main className="flex-1 px-4 pb-16 pt-8 max-w-2xl w-full mx-auto">
       <style>{`
         .demo-jumbo {
-          animation: demo-jumbo 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation: demo-jumbo 1.5s cubic-bezier(0.35, 0, 0.15, 1) both;
           transform-origin: 60% 60%;
         }
         @keyframes demo-jumbo {
-          0% { opacity: 0; transform: translate(-120px, 90px) rotate(4deg) scale(5); }
-          12% { opacity: 1; }
+          0% { opacity: 0; transform: translate(-120px, 90px) rotate(4deg) scale(5.4); }
+          20% { opacity: 1; transform: translate(-120px, 90px) rotate(4deg) scale(5); }
           45% { opacity: 1; transform: translate(-120px, 90px) rotate(4deg) scale(5); }
-          75% { transform: translate(0, -4px) rotate(24deg) scale(1.08); }
           100% { transform: translate(0, 0) rotate(var(--peek-rot)) scale(1); }
         }
 
