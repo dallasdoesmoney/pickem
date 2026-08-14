@@ -8,35 +8,58 @@ import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
 
+function PillTexture() {
+  return (
+    <div
+      className="absolute inset-0 rounded-full overflow-hidden pointer-events-none"
+      style={{ backgroundImage: "url(/noise.png)", backgroundSize: "64px 64px", opacity: 0.1, mixBlendMode: "overlay" }}
+    />
+  );
+}
+
 function StatPills({ stats }: { stats: PickStats }) {
   return (
-    <div className="flex gap-2 mt-4 justify-center flex-wrap">
-      <div className="shrink-0 min-w-[88px] rounded-full border-2 border-white text-center px-4 py-1.5">
-        <div className="text-base" style={{ fontFamily: "var(--font-display)" }}>
+    <div className="flex gap-5 mt-2 justify-center flex-wrap pt-2">
+      <div
+        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center"
+        style={{ width: 172, height: 88, background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+      >
+        <PillTexture />
+        <span className="absolute -top-3 -left-1.5 text-5xl rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10">🐶</span>
+        <div className="relative z-10 text-2xl" style={{ fontFamily: "var(--font-display)" }}>
           {stats.underdogCount}
         </div>
-        <div className="text-[9px] text-white/55">UNDERDOGS</div>
+        <div className="relative z-10 text-[11px] text-white/55 mt-0.5">UNDERDOGS</div>
       </div>
-      <div className="shrink-0 min-w-[110px] rounded-full border-2 border-emerald-400 text-center px-4 py-1.5">
+      <div
+        className="relative shrink-0 rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center"
+        style={{ width: 250, height: 88, background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+      >
+        <PillTexture />
+        <span className="absolute -top-3 -left-1.5 text-5xl rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10">💎</span>
         <div
-          className="text-base flex items-center justify-center gap-1"
+          className="relative z-10 text-2xl flex items-center justify-center gap-1.5"
           style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}
         >
           {stats.boldestTeam ? (
             <>
-              <img src={stats.boldestTeam.logo} alt="" crossOrigin="anonymous" className="h-[34px] w-auto" />+{stats.boldestSpread}
+              <img src={stats.boldestTeam.logo} alt="" crossOrigin="anonymous" className="h-[64px] w-auto" />+{stats.boldestSpread}
             </>
           ) : (
             "-"
           )}
         </div>
-        <div className="text-[9px] text-white/55">BOLDEST PICK</div>
+        <div className="relative z-10 text-[11px] text-white/55 mt-0.5">BOLDEST PICK</div>
       </div>
-      <div className="shrink-0 min-w-[88px] rounded-full border-2 border-white text-center px-4 py-1.5">
-        <div className="text-base" style={{ fontFamily: "var(--font-display)" }}>
+      <div
+        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center"
+        style={{ width: 172, height: 88, background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+      >
+        <PillTexture />
+        <div className="relative z-10 text-2xl" style={{ fontFamily: "var(--font-display)" }}>
           {stats.chalkPct !== null ? `${stats.chalkPct}%` : "-"}
         </div>
-        <div className="text-[9px] text-white/55">CHALK</div>
+        <div className="relative z-10 text-[11px] text-white/55 mt-0.5">CHALK</div>
       </div>
     </div>
   );
@@ -151,25 +174,26 @@ export default function Home() {
 
   return (
     <div className="flex flex-col flex-1">
-      <header className="px-4 pt-6 pb-3 max-w-4xl w-full mx-auto relative">
+      <header className="px-4 pt-6 pb-8 max-w-4xl w-full mx-auto relative">
         <div className="flex flex-col items-center">
           <div className="text-center">
+            <span className="relative inline-block text-xl text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
+              WEEK {CURRENT_WEEK}
+              <span
+                className="absolute top-1/2 -right-4 translate-x-full -translate-y-1/2 whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
+                style={{ fontFamily: "var(--font-display)", background: "#1b2947", boxShadow: "2.5px 2.5px 0 rgba(0,0,0,0.45)" }}
+              >
+                🏈 {pickedCount}/{games.length}
+              </span>
+            </span>
+            <div className="w-10 h-[2px] bg-white/25 mx-auto mb-3" />
             <h1
-              className="text-3xl tracking-wide"
+              className="text-[clamp(2.25rem,9vw,3.5rem)] leading-none tracking-wide"
               style={{ fontFamily: "var(--font-display)" }}
             >
               NFL PICK&rsquo;EM
             </h1>
-            <p className="text-sm text-white/50 mt-1">
-              Week {CURRENT_WEEK} &middot; {pickedCount} / {games.length} picked
-            </p>
           </div>
-          <button
-            aria-label="Sign in"
-            className="h-9 w-9 shrink-0 rounded-full border-2 border-dashed border-white/40 text-white/50 text-lg flex items-center justify-center absolute top-6 right-4"
-          >
-            +
-          </button>
         </div>
 
         <StatPills stats={stats} />

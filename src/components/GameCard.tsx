@@ -10,6 +10,8 @@ export const PILL_WIDTH = 343; // px - fixed size, every card locks to this rega
 export const PILL_HEIGHT = 80; // px
 const FOOTER_HEIGHT = 26; // px
 const LOGO_AREA_HEIGHT = PILL_HEIGHT - FOOTER_HEIGHT; // logo centers in this region, not the full card
+const PICKED_COLOR = "#64e066"; // border + "W" color for a picked team
+const PICKED_COLOR_RGB = "100,224,102"; // same color, for rgba() glow/tint
 
 function darkenColor(hex: string, factor: number, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -60,7 +62,7 @@ function TeamHalf({
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
   const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
-  const borderColor = isPicked ? "#4ade80" : "white";
+  const borderColor = isPicked ? PICKED_COLOR : "white";
   const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
 
@@ -117,7 +119,7 @@ function TeamHalf({
         {isPicked && (
           <div
             className="pointer-events-none absolute inset-0"
-            style={{ backgroundColor: "rgba(74,222,128,0.16)" }}
+            style={{ backgroundColor: `rgba(${PICKED_COLOR_RGB},0.16)` }}
           />
         )}
         {isPicked && (
@@ -125,7 +127,7 @@ function TeamHalf({
             className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl"
             style={{
               fontFamily: "var(--font-display)",
-              color: "#4ade80",
+              color: PICKED_COLOR,
               transform: "rotate(-12deg)",
               textShadow:
                 "-1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff, 0 3px 5px rgba(0,0,0,0.4)",
@@ -138,7 +140,7 @@ function TeamHalf({
       {isPicked && (
         <div
           className={`pointer-events-none absolute inset-0 ${radius}`}
-          style={{ boxShadow: "0 0 6px 1px rgba(74,222,128,0.6)" }}
+          style={{ boxShadow: `0 0 6px 1px rgba(${PICKED_COLOR_RGB},0.6)` }}
         />
       )}
       </button>

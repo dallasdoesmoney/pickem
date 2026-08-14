@@ -23,10 +23,11 @@ const GAP_Y = 16;
 const HEADER_ROW_H = 56;
 const BG = "#0e1b33";
 const BRAND_LOGO_SRC = "/press-logo.png";
-const BRAND_FOOTER_H = 150;
 
 const BORDER_WIDTH = 4;
 const PICKED_BORDER_WIDTH = 5;
+const PICKED_COLOR = "#64e066"; // border + "W" color for a picked team
+const PICKED_COLOR_RGB = "100,224,102"; // same color, for rgba() glow/tint
 
 function darken(hex: string, factor: number, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -79,35 +80,55 @@ function drawStatPill(
   valueColor: string,
   value: string,
   label: string,
-  logo?: HTMLImageElement | null
+  logo?: HTMLImageElement | null,
+  badgeEmoji?: string
 ) {
   roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
   ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.stroke();
 
   ctx.textAlign = "center";
   ctx.fillStyle = valueColor;
-  ctx.font = `16px ${displayFont}`;
-  const valueY = y + h * 0.4;
+  ctx.font = `32px ${displayFont}`;
+  const valueY = y + h * 0.42;
 
   if (logo) {
-    const logoH = 26;
+    const logoH = 66;
     const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
     const valueWidth = ctx.measureText(value).width;
-    const totalW = logoW + 4 + valueWidth;
+    const totalW = logoW + 8 + valueWidth;
     const startX = x + w / 2 - totalW / 2;
     ctx.drawImage(logo, startX, valueY - logoH * 0.72, logoW, logoH);
     ctx.textAlign = "left";
-    ctx.fillText(value, startX + logoW + 4, valueY);
+    ctx.fillText(value, startX + logoW + 8, valueY);
     ctx.textAlign = "center";
   } else {
     ctx.fillText(value, x + w / 2, valueY);
   }
 
-  ctx.font = "9px system-ui, sans-serif";
+  ctx.font = "14px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(label, x + w / 2, y + h * 0.75);
+  ctx.fillText(label, x + w / 2, y + h * 0.8);
+
+  if (badgeEmoji) {
+    ctx.save();
+    ctx.translate(x + 10, y + 2);
+    ctx.rotate((-18 * Math.PI) / 180);
+    ctx.font = "54px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    // Chrome multiplies color-emoji glyphs by fillStyle's alpha channel even
+    // though it ignores the hue - without resetting to fully opaque here,
+    // this badge inherits the label's rgba(255,255,255,0.55) and renders
+    // washed out.
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.6)";
+    ctx.shadowBlur = 4;
+    ctx.fillText(badgeEmoji, 0, 0);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
 }
 
 function rowHeight(a: FlowItem | undefined, b: FlowItem | undefined) {
@@ -146,7 +167,7 @@ function drawTeamHalf(
   const r: Radii =
     side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
 
-  const borderColor = isPicked ? "#4ade80" : isFaded ? "rgba(255,255,255,0.35)" : "#ffffff";
+  const borderColor = isPicked ? PICKED_COLOR : isFaded ? "rgba(255,255,255,0.35)" : "#ffffff";
   const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
 
   ctx.save();
@@ -197,7 +218,7 @@ function drawTeamHalf(
   }
 
   if (isPicked) {
-    ctx.fillStyle = "rgba(74,222,128,0.16)";
+    ctx.fillStyle = `rgba(${PICKED_COLOR_RGB},0.16)`;
     ctx.fillRect(x, y, w, h);
 
     ctx.save();
@@ -210,7 +231,7 @@ function drawTeamHalf(
     ctx.lineWidth = 6;
     ctx.strokeStyle = "#ffffff";
     ctx.strokeText("W", 0, 4);
-    ctx.fillStyle = "#4ade80";
+    ctx.fillStyle = PICKED_COLOR;
     ctx.fillText("W", 0, 4);
     ctx.restore();
   }
@@ -226,7 +247,7 @@ function drawTeamHalf(
   ctx.lineWidth = borderWidth;
   ctx.strokeStyle = borderColor;
   if (isPicked) {
-    ctx.shadowColor = "rgba(74,222,128,0.6)";
+    ctx.shadowColor = `rgba(${PICKED_COLOR_RGB},0.6)`;
     ctx.shadowBlur = 6;
   }
   ctx.stroke();
@@ -251,6 +272,52 @@ function drawTeamHalf(
     ctx.fillText(tag.emoji, 0, 0);
     ctx.restore();
   }
+}
+
+const BRAND_FOOTER_H = 14 + 88 + 10;
+
+// Card/pill: logo on the left, "Powered by" + url stacked on the right,
+// framed in a bordered rounded rect so the footer reads as one distinct
+// block rather than loose elements floating in space.
+function drawBrandFooter(ctx: CanvasRenderingContext2D, displayFont: string, startY: number, brandLogo: HTMLImageElement | null) {
+  const logoAspect = brandLogo ? brandLogo.naturalWidth / brandLogo.naturalHeight : 1;
+  let y = startY + 14;
+
+  const cardH = 88;
+  const pad = 18;
+  const logoTextGap = 16;
+  const logoH = cardH - pad * 2;
+  const logoW = brandLogo ? logoAspect * logoH : 0;
+
+  // Size the card to its actual content (logo + longer of the two text
+  // lines) instead of a fixed width, so it doesn't carry dead space when
+  // the content is narrower than the box.
+  ctx.font = "11px system-ui, sans-serif";
+  const labelW = ctx.measureText("POWERED BY").width;
+  ctx.font = `24px ${displayFont}`;
+  const urlW = ctx.measureText("sidelinebrew.com").width;
+  const textW = Math.max(labelW, urlW);
+
+  const cardW = pad + logoW + (brandLogo ? logoTextGap : 0) + textW + pad;
+  const cardX = WIDTH / 2 - cardW / 2;
+  roundRectPath(ctx, cardX, y, cardW, cardH, { tl: 16, tr: 16, br: 16, bl: 16 });
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  if (brandLogo) ctx.drawImage(brandLogo, cardX + pad, y + pad, logoW, logoH);
+
+  const textX = cardX + pad + (brandLogo ? logoW + logoTextGap : 0);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.fillText("POWERED BY", textX, y + 34);
+  ctx.font = `24px ${displayFont}`;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("sidelinebrew.com", textX, y + 64);
+
+  return y + cardH + 10;
 }
 
 export type ShareImageParams = {
@@ -296,7 +363,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     if (i < rowCount - 1) bodyHeight += GAP_Y;
   }
 
-  const headerHeight = 64 + 8 + 44;
+  const headerHeight = 104 + 8 + 24 + 88;
   const totalHeight = PAD_TOP + headerHeight + 24 + bodyHeight + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const pixelRatio = 2;
@@ -314,31 +381,33 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = "#ffffff";
-  ctx.font = `30px ${displayFont}`;
-  ctx.fillText("NFL PICK’EM", WIDTH / 2, cursorY + 28);
-  ctx.font = "14px system-ui, sans-serif";
+  ctx.font = `66px ${displayFont}`;
+  ctx.fillText("NFL PICK’EM", WIDTH / 2, cursorY + 58);
+  ctx.font = "18px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillText(`Week ${week} · ${pickedCount} / ${games.length} picked`, WIDTH / 2, cursorY + 50);
-  cursorY += 64 + 8;
+  ctx.fillText(`Week ${week} · ${pickedCount} / ${games.length} picked`, WIDTH / 2, cursorY + 88);
+  cursorY += 104 + 8;
 
-  const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null }> = [
-    { w: 88, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS" },
+  const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeEmoji?: string }> = [
+    { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeEmoji: "\u{1F436}" },
     {
-      w: 110,
+      w: 250,
       borderColor: "#4ade80",
       valueColor: "#4ade80",
       value: stats.boldestTeam ? `+${stats.boldestSpread}` : "-",
       label: "BOLDEST PICK",
       logo: stats.boldestTeam ? logos.get(stats.boldestTeam.logo) : undefined,
+      badgeEmoji: "\u{1F48E}",
     },
-    { w: 88, borderColor: "#ffffff", valueColor: "#ffffff", value: stats.chalkPct !== null ? `${stats.chalkPct}%` : "-", label: "CHALK" },
+    { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: stats.chalkPct !== null ? `${stats.chalkPct}%` : "-", label: "CHALK" },
   ];
-  const pillGap = 8;
-  const pillH = 44;
+  const pillGap = 24;
+  const pillH = 88;
+  cursorY += 24;
   const totalPillsW = pillDefs.reduce((s, p) => s + p.w, 0) + pillGap * (pillDefs.length - 1);
   let pillX = WIDTH / 2 - totalPillsW / 2;
   for (const p of pillDefs) {
-    drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo);
+    drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeEmoji);
     pillX += p.w + pillGap;
   }
   cursorY += pillH + 24;
@@ -410,42 +479,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     cursorY += h + GAP_Y;
   }
 
-  cursorY += 20;
-
-  // "POWERED BY" sits inline to the left of the logo mark as one row,
-  // rather than stacked above it, so the footer doesn't eat a ton of
-  // vertical space.
-  const brandLabel = "P O W E R E D   B Y";
-  ctx.font = "13px system-ui, sans-serif";
-  const brandLabelW = ctx.measureText(brandLabel).width;
-
-  let brandLogoW = 0;
-  const brandLogoH = 52;
-  if (brandLogo) {
-    brandLogoW = (brandLogo.naturalWidth / brandLogo.naturalHeight) * brandLogoH;
-  }
-
-  const brandGap = 12;
-  const brandRowW = brandLabelW + (brandLogo ? brandGap + brandLogoW : 0);
-  const brandRowH = Math.max(13, brandLogoH);
-  const brandRowX = WIDTH / 2 - brandRowW / 2;
-  const brandRowMidY = cursorY + brandRowH / 2;
-
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText(brandLabel, brandRowX, brandRowMidY);
-
-  if (brandLogo) {
-    ctx.drawImage(brandLogo, brandRowX + brandLabelW + brandGap, cursorY + (brandRowH - brandLogoH) / 2, brandLogoW, brandLogoH);
-  }
-  cursorY += brandRowH + 16;
-
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `22px ${displayFont}`;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("sidelinebrew.com", WIDTH / 2, cursorY + 20);
+  drawBrandFooter(ctx, displayFont, cursorY, brandLogo);
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("canvas.toBlob returned null"))), "image/png");
