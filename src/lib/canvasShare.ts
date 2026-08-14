@@ -195,6 +195,14 @@ export function drawPillBordersOutcomeLast(ctx: CanvasRenderingContext2D, awayOp
 // block rather than loose elements floating in space. Sized to its own
 // content (logo + longer of the two text lines) instead of a fixed width,
 // so it doesn't carry dead space when the content is narrower than the box.
+// Opaque-pixel bounds of press-logo.png as fractions of the bitmap - the
+// file bakes in transparent margins (the artwork only fills ~76% of the
+// bitmap's height), which rendered as dead space inside the card no matter
+// how tight the card's own padding was. Cropping to these bounds when
+// drawing makes padY the REAL visible gap. Measured from the 500x500 file
+// (opaque bbox 22,61 -> 479,443); re-measure if the logo file changes.
+const BRAND_LOGO_CROP = { x: 22 / 500, y: 61 / 500, w: (479 - 22) / 500, h: (443 - 61) / 500 };
+
 export function drawBrandFooter(
   ctx: CanvasRenderingContext2D,
   displayFont: string,
@@ -202,16 +210,15 @@ export function drawBrandFooter(
   brandLogo: HTMLImageElement | null,
   canvasWidth: number
 ) {
-  const logoAspect = brandLogo ? brandLogo.naturalWidth / brandLogo.naturalHeight : 1;
+  const logoAspect = BRAND_LOGO_CROP.w / BRAND_LOGO_CROP.h;
   let y = startY + 14;
 
-  // Logo size is set directly (not derived from a tall cardH) so the card
-  // can stay close-fitted to its content - a tight vertical pad instead of
-  // a big margin - while the logo itself is still sized independently.
+  // logoH is the VISIBLE artwork height (post-crop), so cardH really is
+  // logo plus a tight pad - no hidden margins inflating it.
   const padX = 18;
-  const padY = 8;
+  const padY = 7;
   const logoTextGap = 16;
-  const logoH = 100;
+  const logoH = 84;
   const cardH = logoH + padY * 2;
   const logoW = brandLogo ? logoAspect * logoH : 0;
 
@@ -228,10 +235,13 @@ export function drawBrandFooter(
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Nudged up relative to the vertically-centered text beside it - a purely
-  // centered logo read as sitting a touch low next to the two-line text block.
-  const logoYShift = 6;
-  if (brandLogo) ctx.drawImage(brandLogo, cardX + padX, y + padY - logoYShift, logoW, logoH);
+  if (brandLogo) {
+    const sx = brandLogo.naturalWidth * BRAND_LOGO_CROP.x;
+    const sy = brandLogo.naturalHeight * BRAND_LOGO_CROP.y;
+    const sw = brandLogo.naturalWidth * BRAND_LOGO_CROP.w;
+    const sh = brandLogo.naturalHeight * BRAND_LOGO_CROP.h;
+    ctx.drawImage(brandLogo, sx, sy, sw, sh, cardX + padX, y + padY, logoW, logoH);
+  }
 
   const textX = cardX + padX + (brandLogo ? logoW + logoTextGap : 0);
   ctx.textAlign = "left";

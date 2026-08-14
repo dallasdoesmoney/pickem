@@ -48,7 +48,7 @@ const STAT_PILL_H = 92;
 const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
-const BRAND_FOOTER_H = 14 + 116 + 10;
+const BRAND_FOOTER_H = 14 + 98 + 10;
 
 // One shared label straddling the seam between the two halves, in the
 // footer band - stands in for the weekly page's per-team spread/record

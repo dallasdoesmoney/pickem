@@ -156,7 +156,7 @@ function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts) {
   ctx.restore();
 }
 
-const BRAND_FOOTER_H = 14 + 116 + 10;
+const BRAND_FOOTER_H = 14 + 98 + 10;
 
 export type ShareImageParams = {
   games: Game[];
