@@ -168,14 +168,7 @@ function drawSuspiciousPill(ctx: CanvasRenderingContext2D, displayFont: string, 
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  if (dog) {
-    // Mirrored so the dog side-eyes toward the record pill next door.
-    ctx.save();
-    ctx.translate(x + padX + dogW / 2, y + h / 2);
-    ctx.scale(-1, 1);
-    ctx.drawImage(dog, -dogW / 2, -dogH / 2, dogW, dogH);
-    ctx.restore();
-  }
+  if (dog) ctx.drawImage(dog, x + padX, y + h / 2 - dogH / 2, dogW, dogH);
 
   const textX = x + padX + dogW + gap;
   ctx.textAlign = "left";

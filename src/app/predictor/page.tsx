@@ -122,7 +122,7 @@ export default function PredictorPage() {
                 className="rounded-full border-2 border-white text-center pl-4 pr-6 py-3 flex items-center gap-2.5"
                 style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
-                <img src="/suspicious-dog.png" alt="" className="h-10 w-auto select-none" style={{ transform: "scaleX(-1)" }} />
+                <img src="/suspicious-dog.png" alt="" className="h-10 w-auto select-none" />
                 <div className="text-left">
                   <div className="text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
                     {suspiciousCount}
