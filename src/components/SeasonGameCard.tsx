@@ -143,7 +143,11 @@ export function SeasonGameCard({
   }
 
   return (
-    <div className="relative flex items-center mx-auto shrink-0" style={{ width: SEASON_PILL_WIDTH }}>
+    // isolate scopes the halves' z-30 border layers and the z-20 week label
+    // to a fresh local stacking context, so those values only ever compete
+    // with each other - without it they compare against the page's global
+    // stacking order and can render above a sticky header while scrolling.
+    <div className="relative isolate flex items-center mx-auto shrink-0" style={{ width: SEASON_PILL_WIDTH }}>
       <SeasonTeamHalf team={awayTeam} side="left" outcome={outcomeFor(away)} isFaded={isFadedFor(away)} onClick={() => onPick(away)} />
       <SeasonTeamHalf team={homeTeam} side="right" outcome={outcomeFor(home)} isFaded={isFadedFor(home)} onClick={() => onPick(home)} />
       <span

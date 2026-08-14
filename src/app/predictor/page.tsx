@@ -20,6 +20,13 @@ export default function PredictorPage() {
   const [sharing, setSharing] = useState(false);
   const winTotal = WIN_TOTALS[TRACKED_TEAM];
 
+  // Desktop's two columns should read top-to-bottom then wrap (weeks 1-9,
+  // then 10-18), not interleave left/right like CSS grid's default
+  // row-major auto-placement would.
+  const scheduleHalf = Math.ceil(schedule.length / 2);
+  const scheduleCol1 = schedule.slice(0, scheduleHalf);
+  const scheduleCol2 = schedule.slice(scheduleHalf);
+
   const wins = Object.values(picks).filter((winner) => winner === TRACKED_TEAM).length;
   const losses = Object.values(picks).filter((winner) => winner !== TRACKED_TEAM).length;
   const gamesPicked = wins + losses;
@@ -80,9 +87,13 @@ export default function PredictorPage() {
               <SeasonRow key={row.week} row={row} trackedTeam={TRACKED_TEAM} picks={picks} setPick={setPick} />
             ))}
           </div>
-          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 lg:items-center">
-            {schedule.map((row) => (
-              <SeasonRow key={row.week} row={row} trackedTeam={TRACKED_TEAM} picks={picks} setPick={setPick} />
+          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
+            {[scheduleCol1, scheduleCol2].map((col, i) => (
+              <div key={i} className="flex flex-col gap-4">
+                {col.map((row) => (
+                  <SeasonRow key={row.week} row={row} trackedTeam={TRACKED_TEAM} picks={picks} setPick={setPick} />
+                ))}
+              </div>
             ))}
           </div>
 

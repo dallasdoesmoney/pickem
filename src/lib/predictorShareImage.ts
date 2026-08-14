@@ -359,8 +359,11 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   cursorY += TITLE_BLOCK_H;
 
   schedule.forEach((row, i) => {
-    const rowIdx = Math.floor(i / 2);
-    const col = i % 2;
+    // Column-major, matching the live page: weeks 1..rowCount fill the
+    // left column top-to-bottom, then rowCount+1..end fill the right one -
+    // not left/right/left/right row-major order.
+    const col = Math.floor(i / rowCount);
+    const rowIdx = i % rowCount;
     const cellX = LEFT_X + col * (CELL_W + GAP_X);
     const cellY = cursorY + rowIdx * (ROW_H + GAP_Y);
 
