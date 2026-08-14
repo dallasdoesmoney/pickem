@@ -73,12 +73,13 @@ export function SeasonGameCard({
   const suspicious = hasPick && isSuspiciousPick(picked, picked === away ? home : away, picked === home);
 
   return (
-    // isolate scopes the halves' z-30 border layers and this card's z-20
-    // week label to a fresh local stacking context, so those values only
-    // ever compete with each other - without it they compare against the
-    // page's global stacking order and can render above a sticky header
-    // while scrolling.
-    <div className="relative isolate flex items-center mx-auto shrink-0" style={{ width: SEASON_PILL_WIDTH }}>
+    // No isolate here - the suspicious-pick badge scales up huge and needs
+    // to escape this card's own box to render above EVERY other card on
+    // the page, not just within a locally-scoped stacking context. That's
+    // safe now that the sticky header (NavShell) sits at z-50, above
+    // every in-card z-index (badge z-40, border z-30, label z-20) - see
+    // NavShell.tsx for the other half of this.
+    <div className="relative flex items-center mx-auto shrink-0" style={{ width: SEASON_PILL_WIDTH }}>
       <TeamHalfPill
         team={awayTeam}
         side="left"

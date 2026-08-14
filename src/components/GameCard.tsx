@@ -56,7 +56,13 @@ export function GameCard({
       : undefined;
 
   return (
-    <div className="relative isolate flex items-center mx-auto shrink-0" style={{ width: PILL_WIDTH }}>
+    // No isolate here - a suspicious-pick/tag badge needs to escape this
+    // card's own box (it scales up huge) and render above EVERY other
+    // card on the page, not just within a locally-scoped stacking
+    // context. That's safe now that the sticky header (NavShell) sits at
+    // z-50, above every in-card z-index (badge z-40, border z-30, label
+    // z-20) - see NavShell.tsx for the other half of this.
+    <div className="relative flex items-center mx-auto shrink-0" style={{ width: PILL_WIDTH }}>
       <TeamHalfPill
         team={away}
         side="left"

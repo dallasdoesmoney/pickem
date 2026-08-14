@@ -156,7 +156,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="sticky top-0 z-30 relative flex items-center justify-center px-4 lg:px-6 h-[72px] border-b border-white/10 bg-[#0e1b33]/90 backdrop-blur">
+        <div className="sticky top-0 z-50 relative flex items-center justify-center px-4 lg:px-6 h-[72px] border-b border-white/10 bg-[#0e1b33]/90 backdrop-blur">
           <button
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}
