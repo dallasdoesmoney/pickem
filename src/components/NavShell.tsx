@@ -115,7 +115,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div className={`flex items-center h-16 px-4 ${collapsed ? "justify-center" : ""}`}>
-          <img src="/press-logo.png" alt="Sideline Brew" className="h-9 w-auto" />
+          <img src="/press-logo.png" alt="Sideline Brew" className="h-12 w-auto" />
         </div>
         <nav className="flex flex-col gap-1 px-3">
           {NAV_ITEMS.map((item) => (
@@ -136,7 +136,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="w-64 bg-[#0b1730] border-r border-white/10 flex flex-col">
             <div className="flex items-center justify-between h-16 px-4">
-              <img src="/press-logo.png" alt="Sideline Brew" className="h-9 w-auto" />
+              <img src="/press-logo.png" alt="Sideline Brew" className="h-12 w-auto" />
               <button
                 aria-label="Close menu"
                 onClick={() => setMobileOpen(false)}
@@ -156,7 +156,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="sticky top-0 z-30 relative flex items-center justify-center px-4 lg:px-6 py-2 border-b border-white/10 bg-[#0e1b33]/90 backdrop-blur">
+        <div className="sticky top-0 z-30 relative flex items-center justify-center px-4 lg:px-6 h-[72px] border-b border-white/10 bg-[#0e1b33]/90 backdrop-blur">
           <button
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}
@@ -164,7 +164,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
           >
             <HamburgerIcon className="h-5 w-5" />
           </button>
-          <img src="/header-logo.png" alt="Sideline Brew" className="h-14 w-auto" />
+          <img src="/header-logo.png" alt="Sideline Brew" className="h-16 w-auto" />
         </div>
         {children}
       </div>

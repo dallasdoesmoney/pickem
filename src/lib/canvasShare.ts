@@ -47,6 +47,146 @@ export function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.closePath();
 }
 
+// Shared team-half pill chrome - used by both the weekly picks share image
+// and the season predictor's, so the two can't drift out of sync the way
+// they did before this was extracted (different pill sizes, letter
+// placement, and border-dimming behavior between the two pages).
+export const PILL_W = 343;
+export const PILL_H = 80;
+export const PILL_FOOTER_H = 26;
+export const PILL_LOGO_AREA_H = PILL_H - PILL_FOOTER_H;
+export const PILL_BORDER_WIDTH = 4;
+export const PILL_OUTCOME_BORDER_WIDTH = 5;
+export const WIN_COLOR = "#64e066";
+export const WIN_COLOR_RGB = "100,224,102";
+export const LOSS_COLOR = "#ef4444";
+export const LOSS_COLOR_RGB = "239,68,68";
+
+export type PillOutcome = "win" | "loss" | null;
+
+export type PillHalfOpts = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  side: "left" | "right";
+  team: { color: string };
+  outcome: PillOutcome;
+  isFaded: boolean;
+  logo: HTMLImageElement | null;
+};
+
+// Fill + logo + footer band + optional footer content + outcome tint/letter
+// + fade dim, all clipped to the half's own rounded shape. Border is a
+// separate pass (drawPillHalfBorder) - a border stroke is centered on the
+// shared seam between two halves, so drawing a half's fill after the other
+// half's border has already run there would paint over part of that stroke.
+export function drawPillHalfFill(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  opts: PillHalfOpts,
+  drawFooterContent?: (ctx: CanvasRenderingContext2D, footerMidY: number) => void
+) {
+  const { x, y, w, h, side, team, outcome, isFaded, logo } = opts;
+  const radius = h / 2;
+  const r: Radii = side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
+  const logoAreaH = h - PILL_FOOTER_H;
+
+  ctx.save();
+  roundRectPath(ctx, x, y, w, h, r);
+  ctx.clip();
+
+  ctx.fillStyle = team.color;
+  ctx.fillRect(x, y, w, h);
+
+  if (logo) {
+    const logoH = 117;
+    const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
+    ctx.drawImage(logo, x + w / 2 - logoW / 2, y + logoAreaH / 2 - logoH / 2, logoW, logoH);
+  }
+
+  ctx.fillStyle = isFaded ? team.color : darken(team.color, 0.6, 0.93);
+  ctx.fillRect(x, y + logoAreaH, w, PILL_FOOTER_H);
+
+  if (drawFooterContent) drawFooterContent(ctx, y + logoAreaH + PILL_FOOTER_H / 2);
+
+  const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
+  const outcomeRgb = outcome === "win" ? WIN_COLOR_RGB : outcome === "loss" ? LOSS_COLOR_RGB : null;
+
+  if (outcomeColor) {
+    ctx.fillStyle = `rgba(${outcomeRgb},0.16)`;
+    ctx.fillRect(x, y, w, h);
+
+    // Centered on the half's FULL height (not just the logo area) - matches
+    // the weekly picks page exactly, so the letter sits at the same visual
+    // height on both pages.
+    ctx.save();
+    ctx.translate(x + w / 2, y + h / 2);
+    ctx.rotate((-12 * Math.PI) / 180);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `60px ${displayFont}`;
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#ffffff";
+    const letter = outcome === "win" ? "W" : "L";
+    ctx.strokeText(letter, 0, 4);
+    ctx.fillStyle = outcomeColor;
+    ctx.fillText(letter, 0, 4);
+    ctx.restore();
+  }
+
+  // Same proven-reliable dimming trick used everywhere else in the app - a
+  // plain translucent overlay instead of ctx.filter, which silently no-ops
+  // on at least one real device this shipped to.
+  if (isFaded) {
+    ctx.fillStyle = "rgba(6,10,20,0.6)";
+    ctx.fillRect(x, y, w, h);
+  }
+
+  ctx.restore();
+}
+
+// Always fully opaque - white when there's no outcome, the outcome color
+// when there is. (A translucent "dimmed" variant was tried for faded
+// halves so the border would fade along with the fill, but a translucent
+// stroke lets the fill/logo underneath show through the border itself,
+// which reads as a rendering bug rather than a muted color - and it
+// doesn't match the live DOM pages, where borders are always opaque and
+// fades are a filter on the fill/logo only.) Callers must draw whichever
+// half has an outcome LAST via drawPillBordersOutcomeLast - a border
+// stroke is centered on the shared seam, so the one drawn last wins those
+// pixels.
+export function drawPillHalfBorder(ctx: CanvasRenderingContext2D, opts: PillHalfOpts) {
+  const { x, y, w, h, side, outcome } = opts;
+  const radius = h / 2;
+  const r: Radii = side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
+  const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
+
+  roundRectPath(ctx, x, y, w, h, r);
+  ctx.lineWidth = outcomeColor ? PILL_OUTCOME_BORDER_WIDTH : PILL_BORDER_WIDTH;
+  ctx.strokeStyle = outcomeColor ?? "#ffffff";
+  if (outcomeColor) {
+    ctx.shadowColor = `rgba(${outcome === "win" ? WIN_COLOR_RGB : LOSS_COLOR_RGB},0.6)`;
+    ctx.shadowBlur = 6;
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+// Draws both halves' borders with whichever side has an outcome (if any)
+// last, so its colored ring always wins the shared center seam regardless
+// of which side it's on.
+export function drawPillBordersOutcomeLast(ctx: CanvasRenderingContext2D, awayOpts: PillHalfOpts, homeOpts: PillHalfOpts) {
+  if (awayOpts.outcome) {
+    drawPillHalfBorder(ctx, homeOpts);
+    drawPillHalfBorder(ctx, awayOpts);
+  } else {
+    drawPillHalfBorder(ctx, awayOpts);
+    drawPillHalfBorder(ctx, homeOpts);
+  }
+}
+
 // Card/pill: logo on the left, "Powered by" + url stacked on the right,
 // framed in a bordered rounded rect so the footer reads as one distinct
 // block rather than loose elements floating in space. Sized to its own

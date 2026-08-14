@@ -1,25 +1,28 @@
 import { Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { DayGroup, FlowItem, PickStats, PickTag, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
-import { BRAND_LOGO_SRC, Radii, darken, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
+import {
+  BRAND_LOGO_SRC,
+  PILL_W,
+  PILL_H,
+  PillHalfOpts,
+  Radii,
+  drawBrandFooter,
+  drawPillBordersOutcomeLast,
+  drawPillHalfFill,
+  loadImage,
+  resolveDisplayFont,
+  roundRectPath,
+} from "@/lib/canvasShare";
 
 const WIDTH = 840;
 const PAD_X = 48;
 const PAD_TOP = 40;
 const PAD_BOTTOM = 56;
-const PILL_W = 343;
-const PILL_H = 80;
-const FOOTER_H = 26;
-const LOGO_AREA_H = PILL_H - FOOTER_H;
 const GAP_X = 32;
 const GAP_Y = 16;
 const HEADER_ROW_H = 56;
 const BG = "#0e1b33";
-
-const BORDER_WIDTH = 4;
-const PICKED_BORDER_WIDTH = 5;
-const PICKED_COLOR = "#64e066"; // border + "W" color for a picked team
-const PICKED_COLOR_RGB = "100,224,102"; // same color, for rgba() glow/tint
 
 function drawStatPill(
   ctx: CanvasRenderingContext2D,
@@ -96,59 +99,17 @@ function drawDayHeader(ctx: CanvasRenderingContext2D, displayFont: string, label
   ctx.fillText(label, x + w / 2, y + h - 10);
 }
 
-type TeamHalfOpts = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  side: "left" | "right";
-  team: (typeof TEAMS)[TeamAbbr];
-  isPicked: boolean;
-  isFaded: boolean;
+type TeamHalfOpts = PillHalfOpts & {
   tag?: PickTag;
   spreadLabel?: string;
   record: string;
-  logo: HTMLImageElement | null;
 };
 
-// Split into a fill pass and a border/badge pass so a game's two halves can
-// be drawn fill-then-fill, border-then-border. Border strokes are centered
-// on the shared seam between the halves - drawing left's border, then
-// right's *fill* right after it, painted over the half of that stroke that
-// fell inside right's rectangle (visible as the picked team's green seam
-// looking half-erased in the exported image). Deferring every border until
-// both fills are down avoids that.
-function drawTeamHalfFill(ctx: CanvasRenderingContext2D, displayFont: string, opts: TeamHalfOpts) {
-  const { x, y, w, h, side, team, isPicked, isFaded, spreadLabel, record, logo } = opts;
-  const radius = h / 2;
-  const r: Radii =
-    side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
-
-  ctx.save();
-  roundRectPath(ctx, x, y, w, h, r);
-  ctx.clip();
-
-  // `ctx.filter` (grayscale/brightness) isn't reliable across every canvas
-  // implementation - confirmed it silently no-ops on at least one real
-  // device this shipped to. A plain translucent-black overlay drawn last,
-  // using nothing but fillRect+rgba, dims and mutes the whole half
-  // (background, logo, footer, text alike) with zero dependency on filter
-  // support.
-  ctx.fillStyle = team.color;
-  ctx.fillRect(x, y, w, h);
-
-  if (logo) {
-    const logoH = 117;
-    const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
-    ctx.drawImage(logo, x + w / 2 - logoW / 2, y + LOGO_AREA_H / 2 - logoH / 2, logoW, logoH);
-  }
-
-  ctx.fillStyle = darken(team.color, 0.6, 0.93);
-  ctx.fillRect(x, y + LOGO_AREA_H, w, FOOTER_H);
-
-  const footerMidY = y + LOGO_AREA_H + FOOTER_H / 2;
+// This game's own footer content (spread + record) - drawn inside the
+// shared drawPillHalfFill so it's clipped, tinted, and dimmed exactly like
+// the rest of the half's fill.
+function drawGameFooterContent(ctx: CanvasRenderingContext2D, displayFont: string, x: number, w: number, footerMidY: number, spreadLabel: string | undefined, record: string) {
   ctx.textBaseline = "middle";
-  let textX = x + w / 2;
   if (spreadLabel) {
     ctx.font = `14px ${displayFont}`;
     ctx.fillStyle = "#ffffff";
@@ -157,7 +118,7 @@ function drawTeamHalfFill(ctx: CanvasRenderingContext2D, displayFont: string, op
     ctx.font = recordFont;
     const recordW = ctx.measureText(record).width;
     const totalW = spreadW + 6 + recordW;
-    textX = x + w / 2 - totalW / 2;
+    const textX = x + w / 2 - totalW / 2;
     ctx.textAlign = "left";
     ctx.font = `14px ${displayFont}`;
     ctx.fillText(spreadLabel, textX, footerMidY);
@@ -170,51 +131,7 @@ function drawTeamHalfFill(ctx: CanvasRenderingContext2D, displayFont: string, op
     ctx.fillStyle = "rgba(255,255,255,0.7)";
     ctx.fillText(record, x + w / 2, footerMidY);
   }
-
-  if (isPicked) {
-    ctx.fillStyle = `rgba(${PICKED_COLOR_RGB},0.16)`;
-    ctx.fillRect(x, y, w, h);
-
-    ctx.save();
-    ctx.translate(x + w / 2, y + h / 2);
-    ctx.rotate((-12 * Math.PI) / 180);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = `60px ${displayFont}`;
-    ctx.lineJoin = "round";
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeText("W", 0, 4);
-    ctx.fillStyle = PICKED_COLOR;
-    ctx.fillText("W", 0, 4);
-    ctx.restore();
-  }
-
-  if (isFaded) {
-    ctx.fillStyle = "rgba(6,10,20,0.6)";
-    ctx.fillRect(x, y, w, h);
-  }
-
-  ctx.restore();
-}
-
-function drawTeamHalfBorder(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts) {
-  const { x, y, w, h, side, isPicked, isFaded } = opts;
-  const radius = h / 2;
-  const r: Radii =
-    side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
-  const borderColor = isPicked ? PICKED_COLOR : isFaded ? "rgba(255,255,255,0.35)" : "#ffffff";
-  const borderWidth = isPicked ? PICKED_BORDER_WIDTH : BORDER_WIDTH;
-
-  roundRectPath(ctx, x, y, w, h, r);
-  ctx.lineWidth = borderWidth;
-  ctx.strokeStyle = borderColor;
-  if (isPicked) {
-    ctx.shadowColor = `rgba(${PICKED_COLOR_RGB},0.6)`;
-    ctx.shadowBlur = 6;
-  }
-  ctx.stroke();
-  ctx.shadowBlur = 0;
+  ctx.textAlign = "center";
 }
 
 function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts) {
@@ -388,7 +305,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         h: PILL_H,
         side: "left",
         team: away,
-        isPicked: picked === away.abbr,
+        outcome: picked === away.abbr ? "win" : null,
         isFaded: hasPick && picked !== away.abbr,
         tag: picked === away.abbr ? tag : undefined,
         spreadLabel: awaySpread,
@@ -402,7 +319,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         h: PILL_H,
         side: "right",
         team: home,
-        isPicked: picked === home.abbr,
+        outcome: picked === home.abbr ? "win" : null,
         isFaded: hasPick && picked !== home.abbr,
         tag: picked === home.abbr ? tag : undefined,
         spreadLabel: homeSpread,
@@ -413,11 +330,10 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       // Fills first for both halves, then borders for both halves - a
       // border stroke is centered on the shared seam, so drawing a half's
       // fill after the other half's border has already run there would
-      // paint over part of that stroke (see drawTeamHalfFill's comment).
-      drawTeamHalfFill(ctx, displayFont, awayOpts);
-      drawTeamHalfFill(ctx, displayFont, homeOpts);
-      drawTeamHalfBorder(ctx, awayOpts);
-      drawTeamHalfBorder(ctx, homeOpts);
+      // paint over part of that stroke (see drawPillHalfFill's comment).
+      drawPillHalfFill(ctx, displayFont, awayOpts, (c, midY) => drawGameFooterContent(c, displayFont, awayOpts.x, awayOpts.w, midY, awayOpts.spreadLabel, awayOpts.record));
+      drawPillHalfFill(ctx, displayFont, homeOpts, (c, midY) => drawGameFooterContent(c, displayFont, homeOpts.x, homeOpts.w, midY, homeOpts.spreadLabel, homeOpts.record));
+      drawPillBordersOutcomeLast(ctx, awayOpts, homeOpts);
       drawTeamHalfBadge(ctx, awayOpts);
       drawTeamHalfBadge(ctx, homeOpts);
     });

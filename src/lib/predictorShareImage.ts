@@ -1,17 +1,34 @@
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { TeamScheduleRow } from "@/lib/teamSchedule";
-import { BRAND_LOGO_SRC, Radii, darken, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
+import {
+  BRAND_LOGO_SRC,
+  LOSS_COLOR,
+  PILL_FOOTER_H,
+  PILL_H,
+  PILL_LOGO_AREA_H,
+  PILL_W,
+  PillHalfOpts,
+  PillOutcome,
+  Radii,
+  WIN_COLOR,
+  drawBrandFooter,
+  drawPillBordersOutcomeLast,
+  drawPillHalfFill,
+  loadImage,
+  resolveDisplayFont,
+  roundRectPath,
+} from "@/lib/canvasShare";
 
-// Cell dimensions match the weekly picks page's GameCard pill exactly
-// (343x80, 26px footer band) so the two pages feel like one product -
-// the only real difference is what goes in that footer band, since
-// there's no spread or record yet: a single "WEEK N" label centered
-// across the whole pill instead of two per-team stat lines.
+// Cell dimensions are the shared pill size (see canvasShare.ts) so this
+// page's grid can never drift out of sync with the weekly picks page's -
+// the only real difference is what goes in the footer band, since there's
+// no spread or record yet: a single "WEEK N" label centered across the
+// whole pill instead of two per-team stat lines.
 const WIDTH = 840;
-const CELL_W = 343;
-const CELL_H = 80;
-const FOOTER_H = 26;
-const LOGO_AREA_H = CELL_H - FOOTER_H;
+const CELL_W = PILL_W;
+const CELL_H = PILL_H;
+const FOOTER_H = PILL_FOOTER_H;
+const LOGO_AREA_H = PILL_LOGO_AREA_H;
 const GAP_X = 32;
 const GAP_Y = 16;
 const ROW_H = CELL_H;
@@ -20,13 +37,6 @@ const LEFT_X = (WIDTH - BODY_W) / 2;
 const PAD_TOP = 40;
 const PAD_BOTTOM = 28;
 const BG = "#0e1b33";
-
-const BORDER_WIDTH = 4;
-const OUTCOME_BORDER_WIDTH = 5;
-const WIN_COLOR = "#64e066";
-const WIN_COLOR_RGB = "100,224,102";
-const LOSS_COLOR = "#ef4444";
-const LOSS_COLOR_RGB = "239,68,68";
 
 // Same increments used both to size the canvas up front and to actually
 // draw - kept as named constants so the two can't drift apart.
@@ -39,108 +49,6 @@ const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
 const BRAND_FOOTER_H = 14 + 116 + 10;
-
-type Outcome = "win" | "loss" | null;
-
-function drawSeasonHalfFill(
-  ctx: CanvasRenderingContext2D,
-  opts: {
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    side: "left" | "right";
-    team: (typeof TEAMS)[TeamAbbr];
-    outcome: Outcome;
-    isFaded: boolean;
-    logo: HTMLImageElement | null;
-  }
-) {
-  const { x, y, w, h, side, team, outcome, isFaded, logo } = opts;
-  const radius = h / 2;
-  const r: Radii = side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
-
-  ctx.save();
-  roundRectPath(ctx, x, y, w, h, r);
-  ctx.clip();
-
-  ctx.fillStyle = team.color;
-  ctx.fillRect(x, y, w, h);
-
-  if (logo) {
-    const logoH = 117;
-    const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
-    ctx.drawImage(logo, x + w / 2 - logoW / 2, y + LOGO_AREA_H / 2 - logoH / 2, logoW, logoH);
-  }
-
-  ctx.fillStyle = darken(team.color, 0.6, 0.93);
-  ctx.fillRect(x, y + LOGO_AREA_H, w, FOOTER_H);
-
-  const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
-  const outcomeRgb = outcome === "win" ? WIN_COLOR_RGB : outcome === "loss" ? LOSS_COLOR_RGB : null;
-
-  if (outcomeColor) {
-    ctx.fillStyle = `rgba(${outcomeRgb},0.16)`;
-    ctx.fillRect(x, y, w, h);
-  }
-
-  // Same proven-reliable dimming trick as the weekly share image: a plain
-  // translucent overlay instead of ctx.filter, which silently no-ops on at
-  // least one real device this app ships to.
-  if (isFaded) {
-    ctx.fillStyle = "rgba(6,10,20,0.6)";
-    ctx.fillRect(x, y, w, h);
-  }
-
-  ctx.restore();
-}
-
-function drawSeasonHalfLetter(ctx: CanvasRenderingContext2D, displayFont: string, opts: { x: number; y: number; w: number; h: number; outcome: Outcome }) {
-  const { x, y, w, h, outcome } = opts;
-  if (!outcome) return;
-  const outcomeColor = outcome === "win" ? WIN_COLOR : LOSS_COLOR;
-  ctx.save();
-  // Confined to the logo area only (not the full half height) so it never
-  // bleeds into the footer band and collides with the shared week label.
-  ctx.translate(x + w / 2, y + LOGO_AREA_H / 2);
-  ctx.rotate((-12 * Math.PI) / 180);
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = `60px ${displayFont}`;
-  ctx.lineJoin = "round";
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = "#ffffff";
-  ctx.strokeText(outcome === "win" ? "W" : "L", 0, 4);
-  ctx.fillStyle = outcomeColor;
-  ctx.fillText(outcome === "win" ? "W" : "L", 0, 4);
-  ctx.restore();
-}
-
-function drawSeasonHalfBorder(
-  ctx: CanvasRenderingContext2D,
-  opts: { x: number; y: number; w: number; h: number; side: "left" | "right"; outcome: Outcome; isFaded: boolean }
-) {
-  const { x, y, w, h, side, outcome, isFaded } = opts;
-  const radius = h / 2;
-  const r: Radii = side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
-  const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
-  // Faded halves get a translucent border to match their dimmed fill -
-  // an opaque one would look like it never dimmed at all, and (since
-  // border strokes are centered on the shared seam between the two
-  // halves) would risk painting over the tracked team's colored border
-  // there even when drawn first.
-  const borderColor = outcomeColor ?? (isFaded ? "rgba(255,255,255,0.35)" : "#ffffff");
-
-  roundRectPath(ctx, x, y, w, h, r);
-  ctx.lineWidth = outcomeColor ? OUTCOME_BORDER_WIDTH : BORDER_WIDTH;
-  ctx.strokeStyle = borderColor;
-  if (outcomeColor) {
-    ctx.shadowColor = `rgba(${outcome === "win" ? WIN_COLOR_RGB : LOSS_COLOR_RGB},0.6)`;
-    ctx.shadowBlur = 6;
-  }
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-}
 
 // One shared label straddling the seam between the two halves, in the
 // footer band - stands in for the weekly page's per-team spread/record
@@ -378,7 +286,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     const away = TEAMS[row.away];
     const home = TEAMS[row.home];
 
-    function outcomeFor(abbr: TeamAbbr): Outcome {
+    function outcomeFor(abbr: TeamAbbr): PillOutcome {
       if (!hasPick || abbr !== trackedTeam) return null;
       return picked === trackedTeam ? "win" : "loss";
     }
@@ -386,23 +294,23 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
       return hasPick && abbr !== trackedTeam;
     }
 
-    const awayOpts = {
+    const awayOpts: PillHalfOpts = {
       x: cellX,
       y: cellY,
       w: halfW,
       h: CELL_H,
-      side: "left" as const,
+      side: "left",
       team: away,
       outcome: outcomeFor(row.away),
       isFaded: isFadedFor(row.away),
       logo: logos.get(away.logo) ?? null,
     };
-    const homeOpts = {
+    const homeOpts: PillHalfOpts = {
       x: cellX + halfW,
       y: cellY,
       w: halfW,
       h: CELL_H,
-      side: "right" as const,
+      side: "right",
       team: home,
       outcome: outcomeFor(row.home),
       isFaded: isFadedFor(row.home),
@@ -412,26 +320,15 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     // Fills for both halves before either border - a border stroke is
     // centered on the shared seam, so drawing a half's fill after the
     // other half's border already ran there paints over part of that
-    // stroke (see shareImage.ts's drawTeamHalfFill for the full story).
-    drawSeasonHalfFill(ctx, awayOpts);
-    drawSeasonHalfFill(ctx, homeOpts);
-    drawSeasonHalfLetter(ctx, displayFont, awayOpts);
-    drawSeasonHalfLetter(ctx, displayFont, homeOpts);
+    // stroke (see canvasShare.ts's drawPillHalfFill for the full story).
+    drawPillHalfFill(ctx, displayFont, awayOpts);
+    drawPillHalfFill(ctx, displayFont, homeOpts);
     drawWeekLabel(ctx, displayFont, cellX, cellY, CELL_W, row.week, hasPick);
 
-    // The tracked team's border is drawn LAST regardless of which side
-    // it's on, so its color always wins the shared seam even against the
-    // opponent's own (now-translucent-when-faded, but still a live
-    // stroke) border - whichever border is stroked second wins the
-    // pixels they both cover at that boundary.
-    const trackedIsAway = row.away === trackedTeam;
-    if (trackedIsAway) {
-      drawSeasonHalfBorder(ctx, homeOpts);
-      drawSeasonHalfBorder(ctx, awayOpts);
-    } else {
-      drawSeasonHalfBorder(ctx, awayOpts);
-      drawSeasonHalfBorder(ctx, homeOpts);
-    }
+    // Whichever half has the outcome (if any) is drawn last, so its
+    // colored border always wins the shared seam - see
+    // drawPillBordersOutcomeLast's comment for why.
+    drawPillBordersOutcomeLast(ctx, awayOpts, homeOpts);
   });
 
   cursorY += gridH + STATS_TO_GRID_GAP;
