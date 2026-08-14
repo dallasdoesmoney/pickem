@@ -38,7 +38,7 @@ const STAT_PILL_H = 92;
 const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
-const BRAND_FOOTER_H = 14 + 132 + 10;
+const BRAND_FOOTER_H = 14 + 116 + 10;
 
 type Outcome = "win" | "loss" | null;
 
@@ -149,11 +149,8 @@ function drawWeekLabel(ctx: CanvasRenderingContext2D, displayFont: string, x: nu
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = `13px ${displayFont}`;
-  ctx.fillStyle = "#ffffff";
-  ctx.shadowColor = "rgba(0,0,0,0.6)";
-  ctx.shadowBlur = 3;
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
   ctx.fillText(`WEEK ${week}`, x + w / 2, y + LOGO_AREA_H + FOOTER_H / 2 + 1);
-  ctx.shadowBlur = 0;
 }
 
 function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: number, y: number, w: number, h: number, week: number, logo: HTMLImageElement | null) {
@@ -326,18 +323,6 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
 
-  // Huge, faded team-logo watermark bleeding off the left edge, behind the
-  // header text - mirrors the live page's header treatment so it's clear
-  // at a glance whose schedule this is, even in a cropped share preview.
-  if (teamLogo) {
-    ctx.save();
-    ctx.globalAlpha = 0.14;
-    const bgLogoH = 320;
-    const bgLogoW = (teamLogo.naturalWidth / teamLogo.naturalHeight) * bgLogoH;
-    ctx.drawImage(teamLogo, -40, PAD_TOP - 60, bgLogoW, bgLogoH);
-    ctx.restore();
-  }
-
   let cursorY = PAD_TOP;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -348,8 +333,18 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   cursorY += KICKER_BLOCK_H;
 
   ctx.font = `50px ${displayFont}`;
+  const titleText = `${team.city.toUpperCase()} ${team.name.toUpperCase()}`;
+  const titleTextW = ctx.measureText(titleText).width;
+  const titleLogoH = 48;
+  const titleLogoW = teamLogo ? (teamLogo.naturalWidth / teamLogo.naturalHeight) * titleLogoH : 0;
+  const titleGap = teamLogo ? 14 : 0;
+  const titleTotalW = titleLogoW + titleGap + titleTextW;
+  const titleStartX = WIDTH / 2 - titleTotalW / 2;
+  if (teamLogo) ctx.drawImage(teamLogo, titleStartX, cursorY + 44 - titleLogoH + 10, titleLogoW, titleLogoH);
+  ctx.textAlign = "left";
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(`${team.city.toUpperCase()} ${team.name.toUpperCase()}`, WIDTH / 2, cursorY + 44);
+  ctx.fillText(titleText, titleStartX + titleLogoW + titleGap, cursorY + 44);
+  ctx.textAlign = "center";
   cursorY += TITLE_BLOCK_H;
 
   schedule.forEach((row, i) => {

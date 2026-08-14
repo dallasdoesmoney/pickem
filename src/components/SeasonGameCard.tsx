@@ -142,8 +142,8 @@ export function SeasonGameCard({
       <SeasonTeamHalf team={awayTeam} side="left" outcome={outcomeFor(away)} isFaded={isFadedFor(away)} onClick={() => onPick(away)} />
       <SeasonTeamHalf team={homeTeam} side="right" outcome={outcomeFor(home)} isFaded={isFadedFor(home)} onClick={() => onPick(home)} />
       <span
-        className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center text-white text-xs tracking-wide z-20"
-        style={{ height: FOOTER_HEIGHT, fontFamily: "var(--font-display)", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}
+        className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center text-white/50 text-xs tracking-wide z-20"
+        style={{ height: FOOTER_HEIGHT, fontFamily: "var(--font-display)" }}
       >
         WEEK {week}
       </span>

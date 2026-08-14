@@ -62,14 +62,14 @@ export function drawBrandFooter(
   const logoAspect = brandLogo ? brandLogo.naturalWidth / brandLogo.naturalHeight : 1;
   let y = startY + 14;
 
-  // Card height drives logo size (logoH = cardH - vertical padding), so the
-  // logo can be made more prominent everywhere this footer is used just by
-  // growing cardH - the text stays the same size and simply recenters via
-  // the baseline formula below.
-  const cardH = 132;
-  const pad = 18;
+  // Logo size is set directly (not derived from a tall cardH) so the card
+  // can stay close-fitted to its content - a tight vertical pad instead of
+  // a big margin - while the logo itself is still sized independently.
+  const padX = 18;
+  const padY = 8;
   const logoTextGap = 16;
-  const logoH = cardH - pad * 2;
+  const logoH = 100;
+  const cardH = logoH + padY * 2;
   const logoW = brandLogo ? logoAspect * logoH : 0;
 
   ctx.font = "11px system-ui, sans-serif";
@@ -78,16 +78,16 @@ export function drawBrandFooter(
   const urlW = ctx.measureText("sidelinebrew.com").width;
   const textW = Math.max(labelW, urlW);
 
-  const cardW = pad + logoW + (brandLogo ? logoTextGap : 0) + textW + pad;
+  const cardW = padX + logoW + (brandLogo ? logoTextGap : 0) + textW + padX;
   const cardX = canvasWidth / 2 - cardW / 2;
   roundRectPath(ctx, cardX, y, cardW, cardH, { tl: 16, tr: 16, br: 16, bl: 16 });
   ctx.strokeStyle = "rgba(255,255,255,0.18)";
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  if (brandLogo) ctx.drawImage(brandLogo, cardX + pad, y + pad, logoW, logoH);
+  if (brandLogo) ctx.drawImage(brandLogo, cardX + padX, y + padY, logoW, logoH);
 
-  const textX = cardX + pad + (brandLogo ? logoW + logoTextGap : 0);
+  const textX = cardX + padX + (brandLogo ? logoW + logoTextGap : 0);
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   // Text block stays visually centered in the card regardless of cardH, so
