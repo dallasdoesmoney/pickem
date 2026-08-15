@@ -125,7 +125,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
         // 85vh, vertically stretching it out of its aspect ratio instead
         // of letting it render at its natural (much wider) size and just
         // clip against the screen edge.
-        className="fixed -z-10 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.12] h-[85vh] w-auto max-w-none left-[-15vh] lg:left-[20px]"
+        className="fixed -z-10 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.17] h-[85vh] w-auto max-w-none left-[-15vh] lg:left-[20px]"
       />
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">
