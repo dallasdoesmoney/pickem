@@ -50,8 +50,12 @@ const HEADER_H = KICKER_BLOCK_H + TITLE_BLOCK_H;
 // title - there was no gap here at all before, just HEADER_H running
 // straight into the first row.
 const HEADER_TO_GRID_GAP = 32;
-const STAT_PILL_W = 190;
-const STAT_PILL_H = 108;
+// Matches the weekly share image's stat pills exactly (drawStatPill in
+// shareImage.ts) - same height, same value/label font sizes, same
+// icon-as-rotated-corner-tag treatment - per feedback that this page's
+// pills read heavier/taller than the weekly page's for no real reason
+// once the two-line labels became one line.
+const STAT_PILL_H = 88;
 const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
@@ -153,146 +157,100 @@ function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: numb
   ctx.fillText(`WEEK ${week}`, x + w / 2, y + LOGO_AREA_H + FOOTER_H / 2 + 1);
 }
 
-// Vegas pill: fixed width, content centered as a block, two-line label -
-// matches the live page's always-stacked "VEGAS / PREDICTION" (no
-// single-line variant at any breakpoint, unlike the record pill).
-function drawStatPill(
+// Same rotated-corner-tag treatment as the weekly share image's emoji
+// badges (drawStatPill's badgeEmoji in shareImage.ts) - just an image
+// instead of a text glyph, for the suspicious-dog and team-logo tags.
+function drawPillTag(ctx: CanvasRenderingContext2D, img: HTMLImageElement | null, pillX: number, pillY: number) {
+  if (!img) return;
+  const h = 50;
+  const w = (img.naturalWidth / img.naturalHeight) * h;
+  ctx.save();
+  ctx.translate(pillX + 10, pillY + 2);
+  ctx.rotate((-18 * Math.PI) / 180);
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 4;
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+// Matches the weekly share image's stat pills exactly (same height,
+// value/label font sizes, centered text) now that the icon moved from
+// inline content to a corner tag - value/label vertical fractions
+// (0.42 / 0.8 of h) are the same ones used there.
+function measurePillContentWidth(ctx: CanvasRenderingContext2D, displayFont: string, value: string, label: string, padX: number) {
+  ctx.font = `32px ${displayFont}`;
+  const valueW = ctx.measureText(value).width;
+  ctx.font = "14px system-ui, sans-serif";
+  const labelW = ctx.measureText(label).width;
+  return Math.max(valueW, labelW) + padX * 2;
+}
+
+function drawNeutralPill(
   ctx: CanvasRenderingContext2D,
   displayFont: string,
   x: number,
   y: number,
+  w: number,
   borderColor: string,
   valueColor: string,
   value: string,
-  labelLine1: string,
-  labelLine2: string
+  label: string,
+  tag?: HTMLImageElement | null
 ) {
-  const w = STAT_PILL_W;
   const h = STAT_PILL_H;
-  const r: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
-  roundRectPath(ctx, x, y, w, h, r);
+  roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
   ctx.strokeStyle = borderColor;
   ctx.lineWidth = 2;
   ctx.stroke();
 
   const cx = x + w / 2;
-  const cy = y + h / 2;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  ctx.font = `36px ${displayFont}`;
+  ctx.font = `32px ${displayFont}`;
   ctx.fillStyle = valueColor;
-  ctx.fillText(value, cx, cy - 8);
-  ctx.font = "11px system-ui, sans-serif";
+  ctx.fillText(value, cx, y + h * 0.42);
+  ctx.font = "14px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(labelLine1, cx, cy + 20);
-  ctx.fillText(labelLine2, cx, cy + 34);
+  ctx.fillText(label, cx, y + h * 0.8);
+
+  if (tag) drawPillTag(ctx, tag, x, y);
 }
 
-// Neutral-styled cousin of the record pill: dog image + suspicious-pick
-// count. Fixed width (same as the Vegas pill, matching the live page's
-// bookend pills) with the icon+text row centered as a group, and a
-// two-line "SUSPICIOUS / PICKS" label matching the live page.
-function drawSuspiciousPill(
-  ctx: CanvasRenderingContext2D,
-  displayFont: string,
-  x: number,
-  y: number,
-  dog: HTMLImageElement | null,
-  value: string,
-  labelLine1: string,
-  labelLine2: string
-) {
-  const w = STAT_PILL_W;
-  const h = STAT_PILL_H;
-  roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  const dogH = 48;
-  const dogW = dog ? (dog.naturalWidth / dog.naturalHeight) * dogH : 0;
-  const gap = dog ? 14 : 0;
-
-  ctx.font = `30px ${displayFont}`;
-  const valueW = ctx.measureText(value).width;
-  ctx.font = "11px system-ui, sans-serif";
-  const labelW = Math.max(ctx.measureText(labelLine1).width, ctx.measureText(labelLine2).width);
-  const textW = Math.max(valueW, labelW);
-
-  const rowW = dogW + gap + textW;
-  const cy = y + h / 2;
-  const rowLeft = x + w / 2 - rowW / 2;
-
-  if (dog) ctx.drawImage(dog, rowLeft, cy - dogH / 2, dogW, dogH);
-
-  const textX = rowLeft + dogW + gap;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `30px ${displayFont}`;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(value, textX, cy - 8);
-  ctx.font = "11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(labelLine1, textX, cy + 14);
-  ctx.fillText(labelLine2, textX, cy + 28);
-  ctx.textAlign = "center";
-}
-
-// The record is the headline stat - it gets the team's own color as its
-// fill (same as a game pill), white text/border, and left-aligned text
-// instead of centered, so it visually outranks the neutral Vegas pill
-// next to it. Width is content-fit (logo + longer of value/label) rather
-// than fixed, since the logo makes a fixed width awkward across teams;
-// wider padding than the neutral pills' padX=20 makes it read as
-// deliberately bigger, not just differently colored.
-function measureRecordPillWidth(ctx: CanvasRenderingContext2D, displayFont: string, logo: HTMLImageElement | null, value: string, label: string) {
-  const padX = 30;
-  const logoH = 52;
-  const logoW = logo ? (logo.naturalWidth / logo.naturalHeight) * logoH : 0;
-  const gap = logo ? 14 : 0;
-  ctx.font = `36px ${displayFont}`;
-  const valueW = ctx.measureText(value).width;
-  ctx.font = "11px system-ui, sans-serif";
-  const labelW = ctx.measureText(label).width;
-  const textW = Math.max(valueW, labelW);
-  return { w: padX * 2 + logoW + gap + textW, padX, logoH, logoW, gap };
-}
-
+// The record is the headline stat - it keeps the team's own color as its
+// fill (same as a game pill) so it visually outranks the neutral
+// Suspicious/Vegas pills next to it, but is otherwise sized and laid out
+// identically to them now that its logo moved to a corner tag too.
 function drawRecordPill(
   ctx: CanvasRenderingContext2D,
   displayFont: string,
   x: number,
   y: number,
+  w: number,
   logo: HTMLImageElement | null,
   teamColor: string,
   value: string,
   label: string
 ) {
-  const { w, padX, logoH, logoW, gap } = measureRecordPillWidth(ctx, displayFont, logo, value, label);
   const h = STAT_PILL_H;
-  const r: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
-
-  roundRectPath(ctx, x, y, w, h, r);
+  roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
   ctx.fillStyle = teamColor;
   ctx.fill();
   ctx.strokeStyle = "#ffffff";
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  if (logo) ctx.drawImage(logo, x + padX, y + h / 2 - logoH / 2, logoW, logoH);
-
-  const textX = x + padX + logoW + gap;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `36px ${displayFont}`;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(value, textX, y + 50);
-  ctx.font = "11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
-  ctx.fillText(label, textX, y + 72);
+  const cx = x + w / 2;
   ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `32px ${displayFont}`;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(value, cx, y + h * 0.42);
+  ctx.font = "14px system-ui, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.fillText(label, cx, y + h * 0.8);
 
-  return w;
+  drawPillTag(ctx, logo, x, y);
 }
 
 export type PredictorShareParams = {
@@ -345,7 +303,11 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
 
   const rowCount = Math.ceil(schedule.length / 2);
   const gridH = rowCount * ROW_H + (rowCount - 1) * GAP_Y;
-  const totalHeight = PAD_TOP + HEADER_H + HEADER_TO_GRID_GAP + gridH + STATS_TO_GRID_GAP + STATS_BLOCK_H + BRAND_FOOTER_H + PAD_BOTTOM;
+  // Stats block now sits between the header and the grid (matching the
+  // weekly share image's layout), with just one GAP_Y - the same trailing
+  // gap the weekly page's row loop bakes in before its footer - between
+  // the last schedule row and the brand footer.
+  const totalHeight = PAD_TOP + HEADER_H + HEADER_TO_GRID_GAP + STATS_BLOCK_H + STATS_TO_GRID_GAP + gridH + GAP_Y + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const pixelRatio = 2;
   const canvas = document.createElement("canvas");
@@ -406,6 +368,37 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   ctx.fillText(titleText, textX, cursorY + 44);
   ctx.textAlign = "center";
   cursorY += TITLE_BLOCK_H + HEADER_TO_GRID_GAP;
+
+  // KPI row, matching the weekly share image's layout: stat pills sit
+  // above the matchups, not below them - suspicious-pick counter,
+  // predicted record (the headline stat - team color + accent), Vegas
+  // prediction, left to right.
+  const suspiciousLabel = "SUSPICIOUS PICKS";
+  const vegasLabel = "VEGAS PREDICTION";
+  const bookendW = Math.max(
+    measurePillContentWidth(ctx, displayFont, `${suspiciousCount}`, suspiciousLabel, 24),
+    winTotal !== undefined ? measurePillContentWidth(ctx, displayFont, `${winTotal}`, vegasLabel, 24) : 0
+  );
+  const recordW = measurePillContentWidth(ctx, displayFont, `${wins}-${losses}`, "MY PREDICTION", 30);
+  const pillsW = bookendW + STAT_PILL_GAP + recordW + (winTotal !== undefined ? STAT_PILL_GAP + bookendW : 0);
+  let pillX = WIDTH / 2 - pillsW / 2;
+  drawNeutralPill(ctx, displayFont, pillX, cursorY, bookendW, "#ffffff", "#ffffff", `${suspiciousCount}`, suspiciousLabel, suspiciousDog);
+  pillX += bookendW + STAT_PILL_GAP;
+  drawRecordPill(ctx, displayFont, pillX, cursorY, recordW, teamLogo, team.color, `${wins}-${losses}`, "MY PREDICTION");
+  pillX += recordW + STAT_PILL_GAP;
+  if (winTotal !== undefined) {
+    drawNeutralPill(ctx, displayFont, pillX, cursorY, bookendW, "#ffffff", "#ffffff", `${winTotal}`, vegasLabel);
+  }
+  cursorY += STAT_PILL_H + 10;
+
+  if (diff !== null) {
+    const overUnder = diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH";
+    const diffColor = diff > 0 ? WIN_COLOR : diff < 0 ? LOSS_COLOR : "#ffffff";
+    ctx.font = `20px ${displayFont}`;
+    ctx.fillStyle = diffColor;
+    ctx.fillText(`${diff > 0 ? "+" : ""}${diff} ${overUnder} Vegas’ line`, WIDTH / 2, cursorY + 18);
+  }
+  cursorY += 26 + STATS_TO_GRID_GAP;
 
   schedule.forEach((row, i) => {
     // Column-major, matching the live page: weeks 1..rowCount fill the
@@ -476,31 +469,10 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     }
   });
 
-  cursorY += gridH + STATS_TO_GRID_GAP;
-
-  // Bottom KPI row, matching the live page left-to-right: suspicious-pick
-  // counter, predicted record (the headline stat - team logo + green
-  // accent), Vegas prediction.
-  const { w: recordW } = measureRecordPillWidth(ctx, displayFont, teamLogo, `${wins}-${losses}`, "MY PREDICTION");
-  const pillsW = STAT_PILL_W + STAT_PILL_GAP + recordW + (winTotal !== undefined ? STAT_PILL_GAP + STAT_PILL_W : 0);
-  let pillX = WIDTH / 2 - pillsW / 2;
-  drawSuspiciousPill(ctx, displayFont, pillX, cursorY, suspiciousDog, `${suspiciousCount}`, "SUSPICIOUS", "PICKS");
-  pillX += STAT_PILL_W + STAT_PILL_GAP;
-  drawRecordPill(ctx, displayFont, pillX, cursorY, teamLogo, team.color, `${wins}-${losses}`, "MY PREDICTION");
-  pillX += recordW + STAT_PILL_GAP;
-  if (winTotal !== undefined) {
-    drawStatPill(ctx, displayFont, pillX, cursorY, "#ffffff", "#ffffff", `${winTotal}`, "VEGAS", "PREDICTION");
-  }
-  cursorY += STAT_PILL_H + 10;
-
-  if (diff !== null) {
-    const overUnder = diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH";
-    const diffColor = diff > 0 ? WIN_COLOR : diff < 0 ? LOSS_COLOR : "#ffffff";
-    ctx.font = `20px ${displayFont}`;
-    ctx.fillStyle = diffColor;
-    ctx.fillText(`${diff > 0 ? "+" : ""}${diff} ${overUnder} Vegas’ line`, WIDTH / 2, cursorY + 18);
-  }
-  cursorY += 26;
+  // Same trailing gap the weekly share image's row loop bakes in before
+  // its footer (GAP_Y, 16px) - drawBrandFooter adds its own top padding
+  // on top of this, matching that page's total gap exactly.
+  cursorY += gridH + GAP_Y;
 
   drawBrandFooter(ctx, displayFont, cursorY, brandLogo, WIDTH);
 
