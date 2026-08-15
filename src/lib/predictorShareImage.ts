@@ -59,27 +59,20 @@ const BRAND_FOOTER_H = 14 + 98 + 10;
 
 const SUSPICIOUS_DOG_SRC = "/suspicious-dog.png";
 
-// Matches the live predictor page's background: one oversized team logo
+// Matches the live predictor page's background: one huge team logo
 // bleeding off the left edge at low opacity, not the old repeating-logo
 // watermark pattern (that's the app-wide SidelineBrew chrome in
 // layout.tsx, used elsewhere - this page replaced its own copy of it with
 // a single giant logo per feedback that the pattern read as "busy").
-// On the live page the logo is "fixed" to the viewport (~85% of a
-// ~800-900px-tall screen), so only one screen's worth of it is ever
-// visible at once and it reads as one clean shape. This canvas is a
-// single flattened export of the WHOLE scrollable page (often 2000px+
-// tall) - sizing the logo at 85% of that full height and centering it
-// over the whole canvas spreads it across nearly every row, so the
-// opaque game pills chop it into disconnected slivers instead of one
-// recognizable mark. Anchoring a viewport-scaled logo to the open
-// header area instead keeps its dense center visible as one shape,
-// with only its faint edges trailing into the first couple of rows.
-function drawGiantLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null, w: number, headerCenterY: number) {
+// Sized big and left-heavy on purpose - about a third of its width off
+// the canvas's left edge - starting just below the header so it never
+// crosses into the title text, then running big down through the grid.
+function drawGiantLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null, gridStartY: number, gridH: number) {
   if (!logo) return;
-  const logoH = 620;
+  const logoH = gridH * 1.15;
   const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
-  const x = -logoW * 0.18;
-  const y = headerCenterY - logoH / 2;
+  const x = -logoW / 3;
+  const y = gridStartY;
   ctx.save();
   ctx.globalAlpha = 0.12;
   ctx.drawImage(logo, x, y, logoW, logoH);
@@ -361,7 +354,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   const bgColor = darken(team.color, BG_DARKEN_FACTOR, 1);
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
-  drawGiantLogoBackdrop(ctx, teamLogo, WIDTH, PAD_TOP + HEADER_H / 2);
+  drawGiantLogoBackdrop(ctx, teamLogo, PAD_TOP + HEADER_H + HEADER_TO_GRID_GAP, gridH);
 
   // Logo-left, kicker+title stacked right lockup - the logo is sized to the
   // combined header block height and vertically centered against it, rather
