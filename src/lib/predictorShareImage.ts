@@ -171,8 +171,6 @@ function drawStatPill(
   const h = STAT_PILL_H;
   const r: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
   roundRectPath(ctx, x, y, w, h, r);
-  ctx.fillStyle = "#1b2947";
-  ctx.fill();
   ctx.strokeStyle = borderColor;
   ctx.lineWidth = 2;
   ctx.stroke();
@@ -207,8 +205,6 @@ function drawSuspiciousPill(
   const w = STAT_PILL_W;
   const h = STAT_PILL_H;
   roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
-  ctx.fillStyle = "#1b2947";
-  ctx.fill();
   ctx.strokeStyle = "#ffffff";
   ctx.lineWidth = 2;
   ctx.stroke();

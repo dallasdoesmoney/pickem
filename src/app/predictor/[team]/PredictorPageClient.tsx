@@ -182,7 +182,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             <div className="flex gap-2 sm:gap-3 justify-center items-center">
               <div
                 className="w-[108px] h-[54px] sm:w-[190px] sm:h-[108px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center gap-1.5 sm:gap-3"
-                style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+                style={{ background: "transparent", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
                 <img src="/suspicious-dog.png" alt="" className="h-7 sm:h-12 w-auto select-none shrink-0" />
                 <div className="text-left">
@@ -220,7 +220,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               {winTotal !== undefined && (
                 <div
                   className="w-[108px] h-[54px] sm:w-[190px] sm:h-[108px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center"
-                  style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+                  style={{ background: "transparent", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
                 >
                   <div className="text-center">
                     <div className="text-base sm:text-4xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
