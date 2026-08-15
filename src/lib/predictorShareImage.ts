@@ -59,20 +59,32 @@ const BRAND_FOOTER_H = 14 + 98 + 10;
 
 const SUSPICIOUS_DOG_SRC = "/suspicious-dog.png";
 
+// The team logo asset is a 500x500 raster (see espnLogo() in teams.ts) -
+// fine at pill size, but stretching it to a thousand-plus px for this
+// backdrop upscales it ~4-5x and reads as blurry. ESPN's combiner
+// endpoint re-renders the same mark at a much higher resolution instead
+// of just scaling the small PNG, so the backdrop stays crisp.
+function hiResLogoUrl(url: string): string {
+  const path = url.replace("https://a.espncdn.com", "");
+  return `https://a.espncdn.com/combiner/i?img=${path}&w=2000&h=2000`;
+}
+
 // Matches the live predictor page's background: one huge team logo
 // bleeding off the left edge at low opacity, not the old repeating-logo
 // watermark pattern (that's the app-wide SidelineBrew chrome in
 // layout.tsx, used elsewhere - this page replaced its own copy of it with
 // a single giant logo per feedback that the pattern read as "busy").
-// Sized big and left-heavy on purpose - about a third of its width off
-// the canvas's left edge - starting just below the header so it never
-// crosses into the title text, then running big down through the grid.
+// Sized big and left-heavy on purpose - bled off the canvas's left edge -
+// starting just below the header so it never crosses into the title
+// text, then running big down through the grid. Values picked from a
+// five-way placement comparison (sizeMult/xFrac/yOffset all tunable if
+// this needs revisiting).
 function drawGiantLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null, gridStartY: number, gridH: number) {
   if (!logo) return;
-  const logoH = gridH * 1.5;
+  const logoH = gridH * 1.275;
   const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
   const x = -logoW * 0.48;
-  const y = gridStartY - 24;
+  const y = gridStartY - 50;
   ctx.save();
   ctx.globalAlpha = 0.12;
   ctx.drawImage(logo, x, y, logoW, logoH);
@@ -315,9 +327,10 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
       logoUrls.add(TEAMS[row.home].logo);
     }
   });
-  const [logoEntries, brandLogo] = await Promise.all([
+  const [logoEntries, brandLogo, hiResTeamLogo] = await Promise.all([
     Promise.all(Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)),
     loadImage(BRAND_LOGO_SRC),
+    loadImage(hiResLogoUrl(team.logo)),
   ]);
   const suspiciousDog = await loadImage(SUSPICIOUS_DOG_SRC);
   const logos = new Map(logoEntries);
@@ -354,7 +367,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   const bgColor = darken(team.color, BG_DARKEN_FACTOR, 1);
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
-  drawGiantLogoBackdrop(ctx, teamLogo, PAD_TOP + HEADER_H + HEADER_TO_GRID_GAP, gridH);
+  drawGiantLogoBackdrop(ctx, hiResTeamLogo, PAD_TOP + HEADER_H + HEADER_TO_GRID_GAP, gridH);
 
   // Logo-left, kicker+title stacked right lockup - the logo is sized to the
   // combined header block height and vertically centered against it, rather
