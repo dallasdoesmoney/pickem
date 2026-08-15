@@ -104,20 +104,28 @@ export default function PredictorPage() {
       {/* One giant logo pinned to the left - fixed (not absolute) so it
           stays put as the page scrolls instead of sliding away with the
           schedule grid, reading as a persistent brand mark rather than
-          part of the scrolling content. Sized/positioned per breakpoint:
-          on mobile there's no sidebar and the viewport is narrow, so the
-          85vh desktop size would span edge-to-edge and read as centered
-          rather than left-aligned - smaller + a slight negative bleed
-          keeps it clearly anchored to the left with room to its right.
-          At lg the sidebar (80-240px depending on collapsed state) already
-          covers everything left of the content pane, so the logo sits
-          just past it (20px) rather than bleeding off the true edge,
-          which would only hide more of it for nothing. */}
+          part of the scrolling content. Same oversized 85vh height at
+          every width - it should stay big on mobile, not shrink to fit.
+          Left position differs by breakpoint: at lg the sidebar (80-240px
+          depending on collapsed state) already covers everything left of
+          the content pane, so the logo sits just past it (20px) rather
+          than bleeding off the true edge, which would only hide more of
+          it for nothing. Below lg there's no sidebar, so it's fine - the
+          goal there is the opposite: pushed well off the left edge so
+          it's unambiguously "bleeding in from off-screen" rather than
+          looking like a big shape roughly centered in the viewport. */}
       <img
         src={team.logo}
         alt=""
         crossOrigin="anonymous"
-        className="fixed -z-10 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.12] h-[42vh] left-[-50px] lg:h-[85vh] lg:left-[20px] w-auto"
+        // max-w-none overrides Tailwind's preflight `img { max-width:
+        // 100% }` - without it, a fixed element's containing block is the
+        // viewport, so on mobile the browser was capping this image's
+        // rendered WIDTH at the viewport's width while height stayed at
+        // 85vh, vertically stretching it out of its aspect ratio instead
+        // of letting it render at its natural (much wider) size and just
+        // clip against the screen edge.
+        className="fixed -z-10 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.12] h-[85vh] w-auto max-w-none left-[-15vh] lg:left-[20px]"
       />
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">
@@ -156,15 +164,18 @@ export default function PredictorPage() {
           </div>
 
           <div className="flex flex-col items-center mt-10">
-            {/* Sized down on mobile (icon/text/padding) so all three fit on
-                one row at 375px wide - a phrase like "VEGAS PREDICTION" on
-                one line forces the pill too wide for that at small sizes,
-                so the label stacks on two lines only below sm. From sm up
-                there's room, so it matches the share image: one line,
-                bigger icon/text, closer to that version's proportions. */}
+            {/* Suspicious Picks and Vegas Prediction share one explicit
+                width at each breakpoint (instead of sizing to their own
+                content) so they land as equal-size bookends - which is
+                also what keeps My Prediction, the one pill in between,
+                sitting at the row's true center instead of drifting
+                toward whichever side has the wider neighbor. Both always
+                stack their label on two lines: at the width needed for
+                them to match each other, "SUSPICIOUS PICKS" or "VEGAS
+                PREDICTION" on one line wouldn't fit. */}
             <div className="flex gap-2 sm:gap-3 justify-center items-center">
               <div
-                className="rounded-full border-2 border-white text-center pl-2.5 pr-3 py-1.5 sm:pl-5 sm:pr-7 sm:py-3.5 flex items-center gap-1.5 sm:gap-3"
+                className="w-[108px] sm:w-[190px] shrink-0 rounded-full border-2 border-white text-center py-1.5 sm:py-3.5 flex items-center justify-center gap-1.5 sm:gap-3"
                 style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
                 <img src="/suspicious-dog.png" alt="" className="h-7 sm:h-12 w-auto select-none shrink-0" />
@@ -173,18 +184,15 @@ export default function PredictorPage() {
                     {suspiciousCount}
                   </div>
                   <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
-                    <span className="sm:hidden">
-                      SUSPICIOUS
-                      <br />
-                      PICKS
-                    </span>
-                    <span className="hidden sm:inline whitespace-nowrap">SUSPICIOUS PICKS</span>
+                    SUSPICIOUS
+                    <br />
+                    PICKS
                   </div>
                 </div>
               </div>
 
               <div
-                className="rounded-full border-2 border-emerald-400 text-center pl-2.5 pr-3.5 py-1.5 sm:pl-5 sm:pr-8 sm:py-3.5 flex items-center gap-1.5 sm:gap-3.5"
+                className="shrink-0 rounded-full border-2 border-emerald-400 text-center pl-2.5 pr-3.5 py-1.5 sm:pl-5 sm:pr-8 sm:py-3.5 flex items-center gap-1.5 sm:gap-3.5"
                 style={{ background: "#1b2947", boxShadow: "0 0 0 4px rgba(74,222,128,0.12), 0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
                 <img src={team.logo} alt="" className="h-7 sm:h-[52px] w-auto shrink-0" crossOrigin="anonymous" />
@@ -205,19 +213,18 @@ export default function PredictorPage() {
 
               {winTotal !== undefined && (
                 <div
-                  className="rounded-full border-2 border-white text-center px-3 py-1.5 sm:px-8 sm:py-4"
+                  className="w-[108px] sm:w-[190px] shrink-0 rounded-full border-2 border-white text-center py-1.5 sm:py-4 flex items-center justify-center"
                   style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
                 >
-                  <div className="text-base sm:text-4xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
-                    {winTotal}
-                  </div>
-                  <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
-                    <span className="sm:hidden">
+                  <div className="text-center">
+                    <div className="text-base sm:text-4xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                      {winTotal}
+                    </div>
+                    <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
                       VEGAS
                       <br />
                       PREDICTION
-                    </span>
-                    <span className="hidden sm:inline whitespace-nowrap">VEGAS PREDICTION</span>
+                    </div>
                   </div>
                 </div>
               )}
