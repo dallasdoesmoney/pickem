@@ -242,13 +242,15 @@ function drawSuspiciousPill(
   ctx.textAlign = "center";
 }
 
-// The record is the headline stat - it gets the team logo, a green
-// "this is yours" accent border with a soft glow, and left-aligned text
+// The record is the headline stat - it gets the team's own color as its
+// fill (same as a game pill), white text/border, and left-aligned text
 // instead of centered, so it visually outranks the neutral Vegas pill
 // next to it. Width is content-fit (logo + longer of value/label) rather
-// than fixed, since the logo makes a fixed width awkward across teams.
+// than fixed, since the logo makes a fixed width awkward across teams;
+// wider padding than the neutral pills' padX=20 makes it read as
+// deliberately bigger, not just differently colored.
 function measureRecordPillWidth(ctx: CanvasRenderingContext2D, displayFont: string, logo: HTMLImageElement | null, value: string, label: string) {
-  const padX = 20;
+  const padX = 30;
   const logoH = 52;
   const logoW = logo ? (logo.naturalWidth / logo.naturalHeight) * logoH : 0;
   const gap = logo ? 14 : 0;
@@ -266,6 +268,7 @@ function drawRecordPill(
   x: number,
   y: number,
   logo: HTMLImageElement | null,
+  teamColor: string,
   value: string,
   label: string
 ) {
@@ -274,14 +277,11 @@ function drawRecordPill(
   const r: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
 
   roundRectPath(ctx, x, y, w, h, r);
-  ctx.fillStyle = "#1b2947";
+  ctx.fillStyle = teamColor;
   ctx.fill();
-  ctx.strokeStyle = "#4ade80";
-  ctx.lineWidth = 3;
-  ctx.shadowColor = "rgba(74,222,128,0.4)";
-  ctx.shadowBlur = 10;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.shadowBlur = 0;
 
   if (logo) ctx.drawImage(logo, x + padX, y + h / 2 - logoH / 2, logoW, logoH);
 
@@ -289,10 +289,10 @@ function drawRecordPill(
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = `36px ${displayFont}`;
-  ctx.fillStyle = "#4ade80";
+  ctx.fillStyle = "#ffffff";
   ctx.fillText(value, textX, y + 50);
   ctx.font = "11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
   ctx.fillText(label, textX, y + 72);
   ctx.textAlign = "center";
 
@@ -490,7 +490,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   let pillX = WIDTH / 2 - pillsW / 2;
   drawSuspiciousPill(ctx, displayFont, pillX, cursorY, suspiciousDog, `${suspiciousCount}`, "SUSPICIOUS", "PICKS");
   pillX += STAT_PILL_W + STAT_PILL_GAP;
-  drawRecordPill(ctx, displayFont, pillX, cursorY, teamLogo, `${wins}-${losses}`, "MY PREDICTION");
+  drawRecordPill(ctx, displayFont, pillX, cursorY, teamLogo, team.color, `${wins}-${losses}`, "MY PREDICTION");
   pillX += recordW + STAT_PILL_GAP;
   if (winTotal !== undefined) {
     drawStatPill(ctx, displayFont, pillX, cursorY, "#ffffff", "#ffffff", `${winTotal}`, "VEGAS", "PREDICTION");

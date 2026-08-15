@@ -197,12 +197,12 @@ export default function PredictorPage() {
               </div>
 
               <div
-                className="h-[54px] sm:h-[108px] shrink-0 rounded-full border-2 border-emerald-400 text-center pl-2.5 pr-3.5 sm:pl-5 sm:pr-8 flex items-center gap-1.5 sm:gap-3.5"
-                style={{ background: "#1b2947", boxShadow: "0 0 0 4px rgba(74,222,128,0.12), 0 6px 16px -6px rgba(0,0,0,0.5)" }}
+                className="h-[54px] sm:h-[108px] shrink-0 rounded-full border-2 border-white text-center pl-3.5 pr-4.5 sm:pl-7 sm:pr-10 flex items-center gap-1.5 sm:gap-3.5"
+                style={{ background: team.color, boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
                 <img src={team.logo} alt="" className="h-7 sm:h-[52px] w-auto shrink-0" crossOrigin="anonymous" />
                 <div className="text-left">
-                  <div className="text-lg sm:text-4xl leading-none" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
+                  <div className="text-lg sm:text-4xl leading-none text-white" style={{ fontFamily: "var(--font-display)" }}>
                     {wins}-{losses}
                   </div>
                   <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
