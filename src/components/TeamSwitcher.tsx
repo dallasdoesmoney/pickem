@@ -48,8 +48,14 @@ export function TeamSwitcher({ currentTeam, className = "" }: { currentTeam: Tea
       if (e.key === "Escape") setOpen(false);
     }
     // Closing on scroll/resize is simpler and safer than re-tracking the
-    // trigger's position continuously for a menu this short-lived.
-    function onScrollOrResize() {
+    // trigger's position continuously for a menu this short-lived. Capture
+    // phase so a scroll ANYWHERE on the page is caught even from inside a
+    // nested scroll container - but that includes the panel's own list,
+    // whose scroll events would otherwise close it the instant you try to
+    // scroll through the teams. Ignore scrolls whose target is the panel
+    // itself.
+    function onScrollOrResize(e: Event) {
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
       setOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
