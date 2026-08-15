@@ -379,7 +379,10 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     measurePillContentWidth(ctx, displayFont, `${suspiciousCount}`, suspiciousLabel, 24),
     winTotal !== undefined ? measurePillContentWidth(ctx, displayFont, `${winTotal}`, vegasLabel, 24) : 0
   );
-  const recordW = measurePillContentWidth(ctx, displayFont, `${wins}-${losses}`, "MY PREDICTION", 30);
+  // Guaranteed wider than the bookend pills (not just content-fit) so it
+  // reads as the most prominent of the three regardless of how short its
+  // own value/label happen to measure.
+  const recordW = Math.max(measurePillContentWidth(ctx, displayFont, `${wins}-${losses}`, "MY PREDICTION", 30), bookendW * 1.25);
   const pillsW = bookendW + STAT_PILL_GAP + recordW + (winTotal !== undefined ? STAT_PILL_GAP + bookendW : 0);
   let pillX = WIDTH / 2 - pillsW / 2;
   drawNeutralPill(ctx, displayFont, pillX, cursorY, bookendW, "#ffffff", "#ffffff", `${suspiciousCount}`, suspiciousLabel, suspiciousDog);
