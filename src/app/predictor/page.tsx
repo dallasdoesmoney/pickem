@@ -95,15 +95,21 @@ export default function PredictorPage() {
   return (
     <div className="relative isolate flex-1 min-h-full">
       <div className="absolute inset-0 -z-10" style={{ background: bgColor }} />
-      {/* Plain alpha blending, not mix-blend-mode - overlay barely moves a
-          base this dark, since overlay's math leaves near-black pixels
-          close to unchanged regardless of opacity. Alpha blending works
-          regardless of background brightness - the texture's light/dark
-          flecks just lighten/darken the pixels under them directly. */}
-      <div
-        className="absolute inset-0 -z-10 pointer-events-none"
-        style={{ backgroundImage: "url(/predictor-texture.webp)", backgroundSize: "512px 512px", opacity: 0.16 }}
-      />
+      {/* Exact same brick-stagger SVG pattern as the app-wide SidelineBrew
+          watermark in layout.tsx (same tile size, image size, offsets,
+          -45deg rotation, 0.2 opacity) - just the team's own logo instead
+          of the press logo, and scoped to this container instead of the
+          whole viewport. */}
+      <svg aria-hidden="true" className="absolute inset-0 -z-10 h-full w-full opacity-20 pointer-events-none">
+        <pattern id="team-logo-backdrop" width="500" height="500" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+          <image href={team.logo} xlinkHref={team.logo} x="140" y="140" width="220" height="220" />
+          <image href={team.logo} xlinkHref={team.logo} x="390" y="390" width="220" height="220" />
+          <image href={team.logo} xlinkHref={team.logo} x="-110" y="390" width="220" height="220" />
+          <image href={team.logo} xlinkHref={team.logo} x="390" y="-110" width="220" height="220" />
+          <image href={team.logo} xlinkHref={team.logo} x="-110" y="-110" width="220" height="220" />
+        </pattern>
+        <rect width="100%" height="100%" fill="url(#team-logo-backdrop)" />
+      </svg>
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">
         {/* Nudged up slightly - flexbox centers the boxes, but the title's

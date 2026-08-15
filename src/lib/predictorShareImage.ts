@@ -21,7 +21,6 @@ import {
   roundRectPath,
 } from "@/lib/canvasShare";
 
-const BG_TEXTURE_SRC = "/predictor-texture.webp";
 
 // Cell dimensions are the shared pill size (see canvasShare.ts) so this
 // page's grid can never drift out of sync with the weekly picks page's -
@@ -59,6 +58,44 @@ const STATS_TO_GRID_GAP = 32;
 const BRAND_FOOTER_H = 14 + 98 + 10;
 
 const SUSPICIOUS_DOG_SRC = "/suspicious-dog.png";
+
+// Exact same brick-stagger pattern as the app-wide SidelineBrew watermark
+// (layout.tsx's SVG <pattern>) and the live predictor page's SVG version -
+// a 500x500 tile with the logo repeated at five offsets, rotated -45deg -
+// just built on canvas instead of SVG since that's what this renderer has.
+// Builds an offscreen tile once, then uses it as a repeating fill pattern
+// so the rotation only has to transform the fill, not five separate
+// drawImage calls per screen-sized area.
+function drawTeamLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null, w: number, h: number) {
+  if (!logo) return;
+  const tile = document.createElement("canvas");
+  tile.width = 500;
+  tile.height = 500;
+  const tctx = tile.getContext("2d");
+  if (!tctx) return;
+  const positions: [number, number][] = [
+    [140, 140],
+    [390, 390],
+    [-110, 390],
+    [390, -110],
+    [-110, -110],
+  ];
+  for (const [x, y] of positions) tctx.drawImage(logo, x, y, 220, 220);
+
+  const pattern = ctx.createPattern(tile, "repeat");
+  if (!pattern) return;
+
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate((-45 * Math.PI) / 180);
+  ctx.translate(-w / 2, -h / 2);
+  ctx.fillStyle = pattern;
+  // Oversized so the rotated fill has no gaps at the canvas's corners.
+  const pad = Math.max(w, h);
+  ctx.fillRect(-pad, -pad, w + pad * 2, h + pad * 2);
+  ctx.restore();
+}
 
 // Side-eye dog meme on the corner of the predicted winner's half when the
 // pick defies the power rankings - same placement pattern as the weekly
@@ -280,7 +317,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     Promise.all(Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)),
     loadImage(BRAND_LOGO_SRC),
   ]);
-  const [suspiciousDog, bgTexture] = await Promise.all([loadImage(SUSPICIOUS_DOG_SRC), loadImage(BG_TEXTURE_SRC)]);
+  const suspiciousDog = await loadImage(SUSPICIOUS_DOG_SRC);
   const logos = new Map(logoEntries);
   const teamLogo = logos.get(team.logo) ?? null;
 
@@ -307,26 +344,15 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   if (!ctx) throw new Error("canvas 2d context unavailable");
   ctx.scale(pixelRatio, pixelRatio);
 
-  // Team-tinted, textured background - matches the live page: a solid
-  // wash of the team's own color, darkened since it's sitting behind
-  // everything, with the same texture asset tiled over it via plain alpha
-  // (not a canvas composite operation) so it reads the same way on a
-  // background this dark. BG_DARKEN_FACTOR is compound: 0.55 was the
-  // original darkening pass, then another 30% darker on top (x0.7).
+  // Team-tinted background - matches the live page: a solid wash of the
+  // team's own color, darkened since it's sitting behind everything.
+  // BG_DARKEN_FACTOR is compound: 0.55 was the original darkening pass,
+  // then another 30% darker on top (x0.7).
   const BG_DARKEN_FACTOR = 0.55 * 0.7;
   const bgColor = darken(team.color, BG_DARKEN_FACTOR, 1);
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
-  if (bgTexture) {
-    const pattern = ctx.createPattern(bgTexture, "repeat");
-    if (pattern) {
-      ctx.save();
-      ctx.globalAlpha = 0.16;
-      ctx.fillStyle = pattern;
-      ctx.fillRect(0, 0, WIDTH, totalHeight);
-      ctx.restore();
-    }
-  }
+  drawTeamLogoBackdrop(ctx, teamLogo, WIDTH, totalHeight);
 
   // Logo-left, kicker+title stacked right lockup - the logo is sized to the
   // combined header block height and vertically centered against it, rather
