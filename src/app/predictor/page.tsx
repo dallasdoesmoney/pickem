@@ -95,12 +95,12 @@ export default function PredictorPage() {
   return (
     <div className="relative isolate flex-1 min-h-full">
       <div className="absolute inset-0 -z-10" style={{ background: bgColor }} />
-      {/* Exact same brick-stagger SVG pattern as the app-wide SidelineBrew
+      {/* Same brick-stagger SVG pattern as the app-wide SidelineBrew
           watermark in layout.tsx (same tile size, image size, offsets,
-          -45deg rotation, 0.2 opacity) - just the team's own logo instead
-          of the press logo, and scoped to this container instead of the
-          whole viewport. */}
-      <svg aria-hidden="true" className="absolute inset-0 -z-10 h-full w-full opacity-20 pointer-events-none">
+          -45deg rotation) but dimmer (0.12 vs its 0.2) - just the team's
+          own logo instead of the press logo, and scoped to this container
+          instead of the whole viewport. */}
+      <svg aria-hidden="true" className="absolute inset-0 -z-10 h-full w-full opacity-[0.12] pointer-events-none">
         <pattern id="team-logo-backdrop" width="500" height="500" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
           <image href={team.logo} xlinkHref={team.logo} x="140" y="140" width="220" height="220" />
           <image href={team.logo} xlinkHref={team.logo} x="390" y="390" width="220" height="220" />

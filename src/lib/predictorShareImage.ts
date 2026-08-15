@@ -86,7 +86,7 @@ function drawTeamLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageElem
   if (!pattern) return;
 
   ctx.save();
-  ctx.globalAlpha = 0.2;
+  ctx.globalAlpha = 0.12;
   ctx.translate(w / 2, h / 2);
   ctx.rotate((-45 * Math.PI) / 180);
   ctx.translate(-w / 2, -h / 2);
