@@ -117,8 +117,8 @@ export function SeasonByeCard({ team, week }: { team: TeamAbbr; week: number }) 
       style={{ width: SEASON_PILL_WIDTH, height: SEASON_PILL_HEIGHT }}
     >
       <div className="absolute inset-x-0 top-0 flex items-center justify-center" style={{ height: LOGO_AREA_HEIGHT }}>
-        <img src={t.logo} alt="" className="h-10 w-auto mr-3" crossOrigin="anonymous" />
-        <span className="text-white text-lg tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
+        <img src={t.logo} alt="" className="h-14 w-auto mr-4" crossOrigin="anonymous" />
+        <span className="text-white text-2xl tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
           BYE WEEK
         </span>
       </div>

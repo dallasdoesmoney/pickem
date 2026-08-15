@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard } from "@/components/GameCard";
 import { usePicks } from "@/hooks/usePicks";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
@@ -70,6 +71,7 @@ function StatPills({ stats }: { stats: PickStats }) {
 export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
   const { picks, setPick, resetPicks, loaded } = usePicks(CURRENT_WEEK);
+  const { confirm, dialog } = useConfirmDialog();
   const pickedCount = Object.keys(picks).length;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
@@ -249,8 +251,8 @@ export default function Home() {
             <div className="flex justify-center mt-3">
               <button
                 aria-label="Reset your picks"
-                onClick={() => {
-                  if (window.confirm("Reset all your picks for this week?")) resetPicks();
+                onClick={async () => {
+                  if (await confirm("Reset all your picks for this week?")) resetPicks();
                 }}
                 className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors"
                 style={{ fontFamily: "var(--font-display)" }}
@@ -261,6 +263,7 @@ export default function Home() {
           </>
         )}
       </main>
+      {dialog}
     </div>
   );
 }

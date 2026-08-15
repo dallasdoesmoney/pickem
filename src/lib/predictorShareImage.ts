@@ -102,12 +102,12 @@ function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: numb
 
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `20px ${displayFont}`;
+  ctx.font = `27px ${displayFont}`;
   const label = "BYE WEEK";
   const labelW = ctx.measureText(label).width;
-  const logoH = 40;
+  const logoH = 56;
   const logoW = logo ? (logo.naturalWidth / logo.naturalHeight) * logoH : 0;
-  const gap = logo ? 12 : 0;
+  const gap = logo ? 16 : 0;
   const totalW = logoW + gap + labelW;
   const startX = x + w / 2 - totalW / 2;
   const contentMidY = y + LOGO_AREA_H / 2;

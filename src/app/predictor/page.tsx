@@ -8,6 +8,7 @@ import { SeasonGameCard, SeasonByeCard } from "@/components/SeasonGameCard";
 import { darkenColor } from "@/components/TeamHalfPill";
 import { getTeamSchedule } from "@/lib/teamSchedule";
 import { useSeasonPicks } from "@/hooks/useSeasonPicks";
+import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { renderPredictorShareImage } from "@/lib/predictorShareImage";
 
 // Pre-season only: predict how every game on one team's schedule goes
@@ -19,6 +20,7 @@ export default function PredictorPage() {
   const team = TEAMS[TRACKED_TEAM];
   const schedule = getTeamSchedule(TRACKED_TEAM);
   const { picks, setPick, resetPicks, loaded } = useSeasonPicks(TRACKED_TEAM);
+  const { confirm, dialog } = useConfirmDialog();
   const [sharing, setSharing] = useState(false);
   const winTotal = WIN_TOTALS[TRACKED_TEAM];
 
@@ -246,8 +248,8 @@ export default function PredictorPage() {
 
             <button
               aria-label="Reset your predictions"
-              onClick={() => {
-                if (window.confirm("Reset all your schedule predictions?")) resetPicks();
+              onClick={async () => {
+                if (await confirm("Reset all your schedule predictions?")) resetPicks();
               }}
               className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors mt-3"
               style={{ fontFamily: "var(--font-display)" }}
@@ -258,6 +260,7 @@ export default function PredictorPage() {
         </>
       )}
       </main>
+      {dialog}
     </div>
   );
 }
