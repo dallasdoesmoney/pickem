@@ -69,7 +69,7 @@ const SUSPICIOUS_DOG_SRC = "/suspicious-dog.png";
 // crosses into the title text, then running big down through the grid.
 function drawGiantLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null, gridStartY: number, gridH: number) {
   if (!logo) return;
-  const logoH = gridH * 1.15;
+  const logoH = gridH * 1.5;
   const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
   const x = -logoW / 3;
   const y = gridStartY;
