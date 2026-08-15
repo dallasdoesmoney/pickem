@@ -13,11 +13,24 @@ type NavItem = {
   exact?: boolean;
 };
 
-const MOBILE_NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Weekly Pick’em", icon: PicksIcon, matchPrefix: "/", exact: true },
-  { href: "/predictor", label: "Team Pick’em", icon: PredictorIcon, matchPrefix: "/predictor" },
-  { href: "/account", label: "Account", icon: AccountIcon, matchPrefix: "/account" },
+type NavSection = { label: string; items: NavItem[] };
+
+// Grouped the same way the desktop "Pick'em" dropdown groups its two
+// pages - on mobile that grouping was missing entirely (every page just
+// flattened into one list), which won't scale as more page groups get
+// added later. Account stands alone here too, matching how it sits
+// outside the Pick'em dropdown on desktop.
+const MOBILE_NAV_SECTIONS: NavSection[] = [
+  {
+    label: "Pick’em",
+    items: [
+      { href: "/", label: "Weekly Pick’em", icon: PicksIcon, matchPrefix: "/", exact: true },
+      { href: "/predictor", label: "Team Pick’em", icon: PredictorIcon, matchPrefix: "/predictor" },
+    ],
+  },
 ];
+
+const MOBILE_STANDALONE_ITEMS: NavItem[] = [{ href: "/account", label: "Account", icon: AccountIcon, matchPrefix: "/account" }];
 
 function PicksIcon({ className }: { className?: string }) {
   return (
@@ -107,10 +120,25 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                 <CloseIcon className="h-4 w-4" />
               </button>
             </div>
-            <nav className="flex flex-col gap-1 px-3">
-              {MOBILE_NAV_ITEMS.map((item) => (
-                <MobileNavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />
+            <nav className="flex flex-col gap-4 px-3">
+              {MOBILE_NAV_SECTIONS.map((section) => (
+                <div key={section.label} className="flex flex-col gap-1">
+                  <div
+                    className="px-3 text-[11px] text-white/35 tracking-[0.15em] uppercase"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    {section.label}
+                  </div>
+                  {section.items.map((item) => (
+                    <MobileNavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />
+                  ))}
+                </div>
               ))}
+              <div className="flex flex-col gap-1 pt-3 border-t border-white/10">
+                {MOBILE_STANDALONE_ITEMS.map((item) => (
+                  <MobileNavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />
+                ))}
+              </div>
             </nav>
           </div>
           <div className="flex-1 bg-black/50" onClick={() => setMobileOpen(false)} />
