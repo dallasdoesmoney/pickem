@@ -71,8 +71,8 @@ function drawGiantLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageEle
   if (!logo) return;
   const logoH = gridH * 1.5;
   const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
-  const x = -logoW / 3;
-  const y = gridStartY;
+  const x = -logoW * 0.48;
+  const y = gridStartY - 24;
   ctx.save();
   ctx.globalAlpha = 0.12;
   ctx.drawImage(logo, x, y, logoW, logoH);
