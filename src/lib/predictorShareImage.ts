@@ -55,7 +55,7 @@ const STAT_PILL_H = 108;
 const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
-const BRAND_FOOTER_H = 14 + 98 + 10;
+const BRAND_FOOTER_H = 14 + 140 + 12 + 24 + 10;
 
 const SUSPICIOUS_DOG_SRC = "/suspicious-dog.png";
 

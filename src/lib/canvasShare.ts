@@ -5,7 +5,7 @@
 // elements inside that class of library's SVG foreignObject step, while
 // plain canvas drawImage()/fillText() have none of that baggage.
 
-export const BRAND_LOGO_SRC = "/press-logo.png";
+export const BRAND_LOGO_SRC = "/header-logo.png";
 
 export function darken(hex: string, factor: number, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -190,18 +190,16 @@ export function drawPillBordersOutcomeLast(ctx: CanvasRenderingContext2D, awayOp
   }
 }
 
-// Card/pill: logo on the left, "Powered by" + url stacked on the right,
-// framed in a bordered rounded rect so the footer reads as one distinct
-// block rather than loose elements floating in space. Sized to its own
-// content (logo + longer of the two text lines) instead of a fixed width,
-// so it doesn't carry dead space when the content is narrower than the box.
-// Opaque-pixel bounds of press-logo.png as fractions of the bitmap - the
-// file bakes in transparent margins (the artwork only fills ~76% of the
-// bitmap's height), which rendered as dead space inside the card no matter
-// how tight the card's own padding was. Cropping to these bounds when
-// drawing makes padY the REAL visible gap. Measured from the 500x500 file
-// (opaque bbox 22,61 -> 479,443); re-measure if the logo file changes.
-const BRAND_LOGO_CROP = { x: 22 / 500, y: 61 / 500, w: (479 - 22) / 500, h: (443 - 61) / 500 };
+// The full icon+wordmark lockup (the same mark used in the site's own
+// header, not the small icon-only mark used elsewhere), stacked big above
+// a smaller url line, floating directly on the background - no card, so
+// it reads as a signature rather than a boxed "powered by" badge.
+// Opaque-pixel bounds of header-logo.png as fractions of the bitmap - the
+// file bakes in transparent margins, which rendered as dead space no
+// matter how tight the surrounding layout was. Cropping to these bounds
+// makes logoH the REAL visible height. Measured from the 1200x400 file
+// (opaque bbox 26,23 -> 1174,332); re-measure if the logo file changes.
+const BRAND_LOGO_CROP = { x: 26 / 1200, y: 23 / 400, w: (1174 - 26) / 1200, h: (332 - 23) / 400 };
 
 export function drawBrandFooter(
   ctx: CanvasRenderingContext2D,
@@ -211,51 +209,26 @@ export function drawBrandFooter(
   canvasWidth: number
 ) {
   const logoAspect = BRAND_LOGO_CROP.w / BRAND_LOGO_CROP.h;
-  let y = startY + 14;
+  const y = startY + 14;
 
-  // logoH is the VISIBLE artwork height (post-crop), so cardH really is
-  // logo plus a tight pad - no hidden margins inflating it.
-  const padX = 18;
-  const padY = 7;
-  const logoTextGap = 16;
-  const logoH = 84;
-  const cardH = logoH + padY * 2;
+  const logoH = 140;
+  const logoTextGap = 12;
+  const urlSize = 24;
   const logoW = brandLogo ? logoAspect * logoH : 0;
-
-  ctx.font = "11px system-ui, sans-serif";
-  const labelW = ctx.measureText("POWERED BY").width;
-  ctx.font = `24px ${displayFont}`;
-  const urlW = ctx.measureText("sidelinebrew.com").width;
-  const textW = Math.max(labelW, urlW);
-
-  const cardW = padX + logoW + (brandLogo ? logoTextGap : 0) + textW + padX;
-  const cardX = canvasWidth / 2 - cardW / 2;
-  roundRectPath(ctx, cardX, y, cardW, cardH, { tl: 16, tr: 16, br: 16, bl: 16 });
-  ctx.strokeStyle = "rgba(255,255,255,0.18)";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
 
   if (brandLogo) {
     const sx = brandLogo.naturalWidth * BRAND_LOGO_CROP.x;
     const sy = brandLogo.naturalHeight * BRAND_LOGO_CROP.y;
     const sw = brandLogo.naturalWidth * BRAND_LOGO_CROP.w;
     const sh = brandLogo.naturalHeight * BRAND_LOGO_CROP.h;
-    ctx.drawImage(brandLogo, sx, sy, sw, sh, cardX + padX, y + padY, logoW, logoH);
+    ctx.drawImage(brandLogo, sx, sy, sw, sh, canvasWidth / 2 - logoW / 2, y, logoW, logoH);
   }
 
-  const textX = cardX + padX + (brandLogo ? logoW + logoTextGap : 0);
-  ctx.textAlign = "left";
+  ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  // Text block stays visually centered in the card regardless of cardH, so
-  // enlarging the logo above doesn't need a matching manual reposition here.
-  const labelY = cardH / 2 - 10;
-  const valueY = cardH / 2 + 20;
-  ctx.font = "11px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fillText("POWERED BY", textX, y + labelY);
-  ctx.font = `24px ${displayFont}`;
+  ctx.font = `${urlSize}px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
-  ctx.fillText("sidelinebrew.com", textX, y + valueY);
+  ctx.fillText("sidelinebrew.com", canvasWidth / 2, y + logoH + logoTextGap + urlSize * 0.8);
 
-  return y + cardH + 10;
+  return y + logoH + logoTextGap + urlSize + 10;
 }
