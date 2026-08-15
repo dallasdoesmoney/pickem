@@ -119,7 +119,7 @@ export function drawPillHalfFill(
   const outcomeRgb = outcome === "win" ? WIN_COLOR_RGB : outcome === "loss" ? LOSS_COLOR_RGB : null;
 
   if (outcomeColor) {
-    ctx.fillStyle = `rgba(${outcomeRgb},0.16)`;
+    ctx.fillStyle = `rgba(${outcomeRgb},0.34)`;
     ctx.fillRect(x, y, w, h);
 
     // Centered on the half's FULL height (not just the logo area) - matches

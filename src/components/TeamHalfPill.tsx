@@ -86,7 +86,7 @@ export function TeamHalfPill({
             {footer}
           </div>
           {outcomeColor && (
-            <div className="pointer-events-none absolute inset-0" style={{ backgroundColor: `rgba(${outcomeColorRgb},0.16)` }} />
+            <div className="pointer-events-none absolute inset-0" style={{ backgroundColor: `rgba(${outcomeColorRgb},0.34)` }} />
           )}
           {outcomeColor && (
             <span
