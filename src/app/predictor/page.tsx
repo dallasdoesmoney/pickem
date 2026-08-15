@@ -23,6 +23,10 @@ export default function PredictorPage() {
   const { confirm, dialog } = useConfirmDialog();
   const [sharing, setSharing] = useState(false);
   const winTotal = WIN_TOTALS[TRACKED_TEAM];
+  // TEMP: comparing two background treatments live - the tiled logo
+  // pattern vs one giant logo pinned to the left. Remove this toggle (and
+  // the losing option's markup) once one is picked.
+  const [bgMode, setBgMode] = useState<"pattern" | "bigLogo">("pattern");
 
   // Desktop's two columns should read top-to-bottom then wrap (weeks 1-9,
   // then 10-18), not interleave left/right like CSS grid's default
@@ -93,23 +97,64 @@ export default function PredictorPage() {
   const bgColor = darkenColor(team.color, BG_DARKEN_FACTOR, 1);
 
   return (
-    <div className="relative isolate flex-1 min-h-full">
+    // No isolate here - it trapped the giant logo's -z-10 inside this
+    // wrapper's own local stacking context, so instead of correctly
+    // painting behind the sidebar (which has no z-index of its own), the
+    // whole wrapper - logo included - painted as one unit on top of it,
+    // making the sidebar look transparent. Without isolate, -z-10 compares
+    // globally and properly loses to the sidebar's opaque background.
+    <div className="relative flex-1 min-h-full">
       <div className="absolute inset-0 -z-10" style={{ background: bgColor }} />
-      {/* Same brick-stagger SVG pattern as the app-wide SidelineBrew
-          watermark in layout.tsx (same tile size, image size, offsets,
-          -45deg rotation) but dimmer (0.12 vs its 0.2) - just the team's
-          own logo instead of the press logo, and scoped to this container
-          instead of the whole viewport. */}
-      <svg aria-hidden="true" className="absolute inset-0 -z-10 h-full w-full opacity-[0.12] pointer-events-none">
-        <pattern id="team-logo-backdrop" width="500" height="500" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
-          <image href={team.logo} xlinkHref={team.logo} x="140" y="140" width="220" height="220" />
-          <image href={team.logo} xlinkHref={team.logo} x="390" y="390" width="220" height="220" />
-          <image href={team.logo} xlinkHref={team.logo} x="-110" y="390" width="220" height="220" />
-          <image href={team.logo} xlinkHref={team.logo} x="390" y="-110" width="220" height="220" />
-          <image href={team.logo} xlinkHref={team.logo} x="-110" y="-110" width="220" height="220" />
-        </pattern>
-        <rect width="100%" height="100%" fill="url(#team-logo-backdrop)" />
-      </svg>
+      {bgMode === "pattern" ? (
+        // Same brick-stagger SVG pattern as the app-wide SidelineBrew
+        // watermark in layout.tsx (same tile size, image size, offsets,
+        // -45deg rotation) but dimmer (0.12 vs its 0.2) - just the team's
+        // own logo instead of the press logo, and scoped to this container
+        // instead of the whole viewport.
+        <svg aria-hidden="true" className="absolute inset-0 -z-10 h-full w-full opacity-[0.12] pointer-events-none">
+          <pattern id="team-logo-backdrop" width="500" height="500" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+            <image href={team.logo} xlinkHref={team.logo} x="140" y="140" width="220" height="220" />
+            <image href={team.logo} xlinkHref={team.logo} x="390" y="390" width="220" height="220" />
+            <image href={team.logo} xlinkHref={team.logo} x="-110" y="390" width="220" height="220" />
+            <image href={team.logo} xlinkHref={team.logo} x="390" y="-110" width="220" height="220" />
+            <image href={team.logo} xlinkHref={team.logo} x="-110" y="-110" width="220" height="220" />
+          </pattern>
+          <rect width="100%" height="100%" fill="url(#team-logo-backdrop)" />
+        </svg>
+      ) : (
+        // One giant logo pinned to the left edge of the viewport - fixed
+        // (not absolute) so it stays put as the page scrolls instead of
+        // sliding away with the schedule grid, reading as a persistent
+        // brand mark rather than part of the scrolling content. left is a
+        // small positive offset, not a bleed-off-the-edge negative one -
+        // the sidebar (80-240px depending on collapsed state) already
+        // covers everything left of the content pane, so pushing the logo
+        // further left than that just hides more of it for nothing.
+        <img
+          src={team.logo}
+          alt=""
+          crossOrigin="anonymous"
+          className="fixed -z-10 top-1/2 -translate-y-1/2 pointer-events-none select-none"
+          style={{ left: "20px", height: "85vh", width: "auto", opacity: 0.12 }}
+        />
+      )}
+      {/* TEMP comparison toggle - remove with bgMode once a winner is picked. */}
+      <div className="sticky top-[80px] z-40 flex justify-center pt-2">
+        <div className="inline-flex rounded-full border border-white/15 bg-[#0b1730] p-1 text-xs" style={{ fontFamily: "var(--font-display)" }}>
+          <button
+            onClick={() => setBgMode("pattern")}
+            className={`rounded-full px-4 py-1.5 transition-colors ${bgMode === "pattern" ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"}`}
+          >
+            1. LOGO PATTERN
+          </button>
+          <button
+            onClick={() => setBgMode("bigLogo")}
+            className={`rounded-full px-4 py-1.5 transition-colors ${bgMode === "bigLogo" ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"}`}
+          >
+            2. GIANT LOGO
+          </button>
+        </div>
+      </div>
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">
         {/* Nudged up slightly - flexbox centers the boxes, but the title's
