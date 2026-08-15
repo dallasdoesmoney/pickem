@@ -95,7 +95,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full">
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-[60] flex">
           <div className="w-64 bg-[#0b1730] border-r border-white/10 flex flex-col">
             <div className="flex items-center justify-between h-16 px-4">
               <img src="/press-logo.png" alt="Sideline Brew" className="h-12 w-auto" />
