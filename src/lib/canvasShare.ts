@@ -208,12 +208,16 @@ export function drawBrandFooter(
   brandLogo: HTMLImageElement | null,
   canvasWidth: number
 ) {
-  const logoAspect = BRAND_LOGO_CROP.w / BRAND_LOGO_CROP.h;
   const y = startY + 14;
 
   const logoH = 140;
   const logoTextGap = 12;
   const urlSize = 24;
+  // Aspect of the CROPPED pixel region, not of the crop fractions - w and h
+  // above are each a fraction of a DIFFERENT base (bitmap width vs height),
+  // so dividing them directly only happens to cancel out correctly for a
+  // square source image. header-logo.png is 1200x400, not square.
+  const logoAspect = brandLogo ? (brandLogo.naturalWidth * BRAND_LOGO_CROP.w) / (brandLogo.naturalHeight * BRAND_LOGO_CROP.h) : 0;
   const logoW = brandLogo ? logoAspect * logoH : 0;
 
   if (brandLogo) {
