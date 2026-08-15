@@ -51,8 +51,8 @@ export function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: numbe
 // and the season predictor's, so the two can't drift out of sync the way
 // they did before this was extracted (different pill sizes, letter
 // placement, and border-dimming behavior between the two pages).
-export const PILL_W = 343;
-export const PILL_H = 80;
+export const PILL_W = 352;
+export const PILL_H = 86;
 export const PILL_FOOTER_H = 26;
 export const PILL_LOGO_AREA_H = PILL_H - PILL_FOOTER_H;
 export const PILL_BORDER_WIDTH = 4;
@@ -208,11 +208,11 @@ export function drawBrandFooter(
   brandLogo: HTMLImageElement | null,
   canvasWidth: number
 ) {
-  const y = startY + 14;
+  const y = startY + 12;
 
-  const logoH = 140;
-  const logoTextGap = 12;
-  const urlSize = 24;
+  const logoH = 104;
+  const logoTextGap = 10;
+  const urlSize = 18;
   // Aspect of the CROPPED pixel region, not of the crop fractions - w and h
   // above are each a fraction of a DIFFERENT base (bitmap width vs height),
   // so dividing them directly only happens to cancel out correctly for a
