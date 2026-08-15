@@ -173,9 +173,14 @@ export default function PredictorPage() {
                 stack their label on two lines: at the width needed for
                 them to match each other, "SUSPICIOUS PICKS" or "VEGAS
                 PREDICTION" on one line wouldn't fit. */}
+            {/* All three pills share one explicit height per breakpoint
+                (in addition to Suspicious/Vegas already sharing a width) -
+                their natural content heights differed by up to 18px since
+                each has a different icon/text/padding combination, which
+                read as visibly uneven despite the widths already matching. */}
             <div className="flex gap-2 sm:gap-3 justify-center items-center">
               <div
-                className="w-[108px] sm:w-[190px] shrink-0 rounded-full border-2 border-white text-center py-1.5 sm:py-3.5 flex items-center justify-center gap-1.5 sm:gap-3"
+                className="w-[108px] h-[54px] sm:w-[190px] sm:h-[108px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center gap-1.5 sm:gap-3"
                 style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
                 <img src="/suspicious-dog.png" alt="" className="h-7 sm:h-12 w-auto select-none shrink-0" />
@@ -192,7 +197,7 @@ export default function PredictorPage() {
               </div>
 
               <div
-                className="shrink-0 rounded-full border-2 border-emerald-400 text-center pl-2.5 pr-3.5 py-1.5 sm:pl-5 sm:pr-8 sm:py-3.5 flex items-center gap-1.5 sm:gap-3.5"
+                className="h-[54px] sm:h-[108px] shrink-0 rounded-full border-2 border-emerald-400 text-center pl-2.5 pr-3.5 sm:pl-5 sm:pr-8 flex items-center gap-1.5 sm:gap-3.5"
                 style={{ background: "#1b2947", boxShadow: "0 0 0 4px rgba(74,222,128,0.12), 0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
                 <img src={team.logo} alt="" className="h-7 sm:h-[52px] w-auto shrink-0" crossOrigin="anonymous" />
@@ -213,7 +218,7 @@ export default function PredictorPage() {
 
               {winTotal !== undefined && (
                 <div
-                  className="w-[108px] sm:w-[190px] shrink-0 rounded-full border-2 border-white text-center py-1.5 sm:py-4 flex items-center justify-center"
+                  className="w-[108px] h-[54px] sm:w-[190px] sm:h-[108px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center"
                   style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
                 >
                   <div className="text-center">
