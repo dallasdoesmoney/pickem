@@ -100,7 +100,7 @@ export default function PredictorPage() {
           flecks just lighten/darken the pixels under them directly. */}
       <div
         className="absolute inset-0 -z-10 pointer-events-none"
-        style={{ backgroundImage: "url(/predictor-texture.webp)", backgroundSize: "512px 512px", opacity: 0.5 }}
+        style={{ backgroundImage: "url(/predictor-texture.webp)", backgroundSize: "512px 512px", opacity: 0.16 }}
       />
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">

@@ -321,7 +321,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
     const pattern = ctx.createPattern(bgTexture, "repeat");
     if (pattern) {
       ctx.save();
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.16;
       ctx.fillStyle = pattern;
       ctx.fillRect(0, 0, WIDTH, totalHeight);
       ctx.restore();
