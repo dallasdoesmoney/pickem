@@ -1,14 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { TEAMS, TeamAbbr, Team } from "@/data/teams";
-
-// Sorted once at module scope, not per-render - the list never changes.
-const SORTED_TEAMS: Team[] = Object.values(TEAMS).sort((a, b) =>
-  `${a.city} ${a.name}`.localeCompare(`${b.city} ${b.name}`)
-);
+import { TeamAbbr, TEAMS_SORTED } from "@/data/teams";
+import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 
 const PANEL_WIDTH = 300; // px - matches the sm: width below; mobile uses min() against viewport
 
@@ -23,61 +18,7 @@ export function TeamSwitcher({
   onOpenChange: (open: boolean) => void;
   className?: string;
 }) {
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  // Positioned via a portal straight onto <body> with `fixed` coordinates
-  // computed from the trigger's own rect - a plain in-flow `absolute`
-  // dropdown here got painted BEHIND the schedule cards further down the
-  // page despite a higher z-index (some ancestor stacking-context
-  // interaction that didn't resolve with z-index alone); escaping to the
-  // body root sidesteps that entirely since nothing on the page can then
-  // sit in front of it short of an even higher z-index sibling at the
-  // same root level.
-  useLayoutEffect(() => {
-    if (!open || !buttonRef.current) return;
-    const rect = buttonRef.current.getBoundingClientRect();
-    const width = Math.min(PANEL_WIDTH, window.innerWidth - 24);
-    let left = rect.left + rect.width / 2 - width / 2;
-    left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
-    setCoords({ top: rect.bottom + 10, left });
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    // pointerdown (not click) so the outside-close and an item's own click
-    // don't race on the same interaction.
-    function onPointerDown(e: PointerEvent) {
-      const target = e.target as Node;
-      if (buttonRef.current?.contains(target)) return;
-      if (panelRef.current && !panelRef.current.contains(target)) onOpenChange(false);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onOpenChange(false);
-    }
-    // Closing on scroll/resize is simpler and safer than re-tracking the
-    // trigger's position continuously for a menu this short-lived. Capture
-    // phase so a scroll ANYWHERE on the page is caught even from inside a
-    // nested scroll container - but that includes the panel's own list,
-    // whose scroll events would otherwise close it the instant you try to
-    // scroll through the teams. Ignore scrolls whose target is the panel
-    // itself.
-    function onScrollOrResize(e: Event) {
-      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
-      onOpenChange(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
-    };
-  }, [open]);
+  const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
 
   return (
     <div className={`relative ${className}`}>
@@ -111,7 +52,7 @@ export function TeamSwitcher({
             style={{ top: coords.top, left: coords.left, width: Math.min(PANEL_WIDTH, typeof window !== "undefined" ? window.innerWidth - 24 : PANEL_WIDTH) }}
             className="fixed z-[100] max-h-[60vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#101d38] shadow-2xl shadow-black/60 p-2"
           >
-            {SORTED_TEAMS.map((team) => {
+            {TEAMS_SORTED.map((team) => {
               const isCurrent = team.abbr === currentTeam;
               return (
                 <Link

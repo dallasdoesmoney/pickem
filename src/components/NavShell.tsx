@@ -2,24 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-
-const COLLAPSE_KEY = "pickem:nav-collapsed";
+import { useState } from "react";
+import { PickemMenu } from "@/components/PickemMenu";
 
 type NavItem = {
   href: string;
   label: string;
   icon: (props: { className?: string }) => React.JSX.Element;
-  // Marks this item active for any path under it, not just an exact
-  // match - the predictor link points at a specific team (/predictor/dal)
-  // but should still read as active on every other team's page.
-  matchPrefix?: string;
+  matchPrefix: string;
+  exact?: boolean;
 };
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Pick’em", icon: PicksIcon },
-  { href: "/predictor/dal", label: "Predictor", icon: PredictorIcon, matchPrefix: "/predictor" },
-  { href: "/account", label: "Account", icon: AccountIcon },
+const MOBILE_NAV_ITEMS: NavItem[] = [
+  { href: "/", label: "Weekly Pick’em", icon: PicksIcon, matchPrefix: "/", exact: true },
+  { href: "/predictor", label: "Team Pick’em", icon: PredictorIcon, matchPrefix: "/predictor" },
+  { href: "/account", label: "Account", icon: AccountIcon, matchPrefix: "/account" },
 ];
 
 function PicksIcon({ className }: { className?: string }) {
@@ -73,73 +70,30 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
-function ChevronIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M15 6l-6 6 6 6" />
-    </svg>
-  );
-}
-
-function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: boolean; onClick?: () => void }) {
+function MobileNavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const pathname = usePathname();
-  const active = item.matchPrefix ? pathname.startsWith(item.matchPrefix) : pathname === item.href;
+  const active = item.exact ? pathname === item.href : pathname.startsWith(item.matchPrefix);
   const Icon = item.icon;
   return (
     <Link
       href={item.href}
       onClick={onClick}
-      title={collapsed ? item.label : undefined}
       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
         active ? "bg-white/10 text-white" : "text-white/55 hover:text-white hover:bg-white/5"
-      } ${collapsed ? "justify-center" : ""}`}
+      }`}
     >
       <Icon className={`h-5 w-5 shrink-0 ${active ? "text-[#4ade80]" : ""}`} />
-      {!collapsed && <span className="text-sm">{item.label}</span>}
+      <span className="text-sm">{item.label}</span>
     </Link>
   );
 }
 
 export function NavShell({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
-    setLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!loaded) return;
-    localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
-  }, [collapsed, loaded]);
+  const [pickemMenuOpen, setPickemMenuOpen] = useState(false);
 
   return (
     <div className="flex min-h-full">
-      <aside
-        className={`hidden lg:flex relative flex-col shrink-0 border-r border-white/10 bg-[#0b1730] transition-[width] duration-200 ${
-          collapsed ? "w-20" : "w-60"
-        }`}
-      >
-        <div className={`flex items-center h-16 px-4 ${collapsed ? "justify-center" : ""}`}>
-          <img src="/press-logo.png" alt="Sideline Brew" className="h-12 w-auto" />
-        </div>
-        <nav className="flex flex-col gap-1 px-3">
-          {NAV_ITEMS.map((item) => (
-            <NavLink key={item.href} item={item} collapsed={collapsed} />
-          ))}
-        </nav>
-
-        <button
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          onClick={() => setCollapsed((c) => !c)}
-          className="absolute top-1/2 -right-3.5 -translate-y-1/2 h-8 w-8 rounded-full border border-white/15 bg-[#0b1730] text-white/60 hover:text-white hover:border-white/30 flex items-center justify-center shadow-lg shadow-black/30 z-10"
-        >
-          <ChevronIcon className={`h-4 w-4 transition-transform ${collapsed ? "rotate-180" : ""}`} />
-        </button>
-      </aside>
-
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="w-64 bg-[#0b1730] border-r border-white/10 flex flex-col">
@@ -154,8 +108,8 @@ export function NavShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <nav className="flex flex-col gap-1 px-3">
-              {NAV_ITEMS.map((item) => (
-                <NavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />
+              {MOBILE_NAV_ITEMS.map((item) => (
+                <MobileNavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />
               ))}
             </nav>
           </div>
@@ -172,7 +126,21 @@ export function NavShell({ children }: { children: React.ReactNode }) {
           >
             <HamburgerIcon className="h-5 w-5" />
           </button>
+
+          <div className="hidden lg:block absolute left-6">
+            <PickemMenu open={pickemMenuOpen} onOpenChange={setPickemMenuOpen} />
+          </div>
+
           <img src="/header-logo.png" alt="Sideline Brew" className="h-16 w-auto" />
+
+          <Link
+            href="/account"
+            className="hidden lg:flex items-center gap-2 absolute right-6 text-sm text-white/70 hover:text-white transition-colors"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            <AccountIcon className="h-5 w-5" />
+            Account
+          </Link>
         </div>
         {children}
       </div>

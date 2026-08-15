@@ -52,3 +52,7 @@ export const TEAMS: Record<TeamAbbr, Team> = {
   TEN: { abbr: "TEN", city: "Tennessee", name: "Titans", color: "#4B92DB", logo: espnLogo("ten") },
   WAS: { abbr: "WAS", city: "Washington", name: "Commanders", color: "#5A1414", logo: espnLogo("wsh") },
 };
+
+// Alphabetical by city then name - shared by every team picker (nav
+// switcher, the team-select landing page) so they can't drift apart.
+export const TEAMS_SORTED: Team[] = Object.values(TEAMS).sort((a, b) => `${a.city} ${a.name}`.localeCompare(`${b.city} ${b.name}`));
