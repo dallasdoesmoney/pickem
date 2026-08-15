@@ -1,9 +1,39 @@
 import { TeamAbbr } from "./teams";
 
 // Vegas season win-total lines (over/under), for comparing against a
-// predicted record on the Schedule Predictor page. These move throughout
-// the offseason - only Dallas is filled in for now as a working example;
-// update/add teams here as real lines come in.
+// predicted record on the Schedule Predictor page. Source: ESPN's 2026
+// NFL win totals picks page - update as lines move throughout the season.
 export const WIN_TOTALS: Partial<Record<TeamAbbr, number>> = {
+  ARI: 4.5,
+  ATL: 6.5,
+  BAL: 11.5,
+  BUF: 10.5,
+  CAR: 7.5,
+  CHI: 9.5,
+  CIN: 9.5,
+  CLE: 6.5,
   DAL: 9.5,
+  DEN: 9.5,
+  DET: 10.5,
+  GB: 10.5,
+  HOU: 9.5,
+  IND: 7.5,
+  JAX: 8.5,
+  KC: 10.5,
+  LAC: 9.5,
+  LAR: 10.5,
+  LV: 5.5,
+  MIA: 4.5,
+  MIN: 8.5,
+  NE: 9.5,
+  NO: 7.5,
+  NYG: 7.5,
+  NYJ: 5.5,
+  PHI: 10.5,
+  PIT: 8.5,
+  SEA: 10.5,
+  SF: 10.5,
+  TB: 8.5,
+  TEN: 6.5,
+  WAS: 7.5,
 };
