@@ -6,11 +6,19 @@ import { useEffect, useState } from "react";
 
 const COLLAPSE_KEY = "pickem:nav-collapsed";
 
-type NavItem = { href: string; label: string; icon: (props: { className?: string }) => React.JSX.Element };
+type NavItem = {
+  href: string;
+  label: string;
+  icon: (props: { className?: string }) => React.JSX.Element;
+  // Marks this item active for any path under it, not just an exact
+  // match - the predictor link points at a specific team (/predictor/dal)
+  // but should still read as active on every other team's page.
+  matchPrefix?: string;
+};
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Pick’em", icon: PicksIcon },
-  { href: "/predictor", label: "Predictor", icon: PredictorIcon },
+  { href: "/predictor/dal", label: "Predictor", icon: PredictorIcon, matchPrefix: "/predictor" },
   { href: "/account", label: "Account", icon: AccountIcon },
 ];
 
@@ -75,7 +83,7 @@ function ChevronIcon({ className }: { className?: string }) {
 
 function NavLink({ item, collapsed, onClick }: { item: NavItem; collapsed?: boolean; onClick?: () => void }) {
   const pathname = usePathname();
-  const active = pathname === item.href;
+  const active = item.matchPrefix ? pathname.startsWith(item.matchPrefix) : pathname === item.href;
   const Icon = item.icon;
   return (
     <Link
