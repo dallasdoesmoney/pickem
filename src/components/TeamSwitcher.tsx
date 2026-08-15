@@ -12,8 +12,17 @@ const SORTED_TEAMS: Team[] = Object.values(TEAMS).sort((a, b) =>
 
 const PANEL_WIDTH = 300; // px - matches the sm: width below; mobile uses min() against viewport
 
-export function TeamSwitcher({ currentTeam, className = "" }: { currentTeam: TeamAbbr; className?: string }) {
-  const [open, setOpen] = useState(false);
+export function TeamSwitcher({
+  currentTeam,
+  open,
+  onOpenChange,
+  className = "",
+}: {
+  currentTeam: TeamAbbr;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  className?: string;
+}) {
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -42,10 +51,10 @@ export function TeamSwitcher({ currentTeam, className = "" }: { currentTeam: Tea
     function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
       if (buttonRef.current?.contains(target)) return;
-      if (panelRef.current && !panelRef.current.contains(target)) setOpen(false);
+      if (panelRef.current && !panelRef.current.contains(target)) onOpenChange(false);
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") onOpenChange(false);
     }
     // Closing on scroll/resize is simpler and safer than re-tracking the
     // trigger's position continuously for a menu this short-lived. Capture
@@ -56,7 +65,7 @@ export function TeamSwitcher({ currentTeam, className = "" }: { currentTeam: Tea
     // itself.
     function onScrollOrResize(e: Event) {
       if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
-      setOpen(false);
+      onOpenChange(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -77,7 +86,7 @@ export function TeamSwitcher({ currentTeam, className = "" }: { currentTeam: Tea
         type="button"
         aria-label="Switch team"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => onOpenChange(!open)}
         className="flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-full border border-white/20 hover:border-white/40 hover:bg-white/5 active:scale-95 transition-colors shrink-0"
       >
         <svg
@@ -109,7 +118,7 @@ export function TeamSwitcher({ currentTeam, className = "" }: { currentTeam: Tea
                   key={team.abbr}
                   href={`/predictor/${team.abbr.toLowerCase()}`}
                   role="menuitem"
-                  onClick={() => setOpen(false)}
+                  onClick={() => onOpenChange(false)}
                   className={`flex items-center gap-3 rounded-xl px-3 py-2 transition-colors ${
                     isCurrent ? "bg-white/10" : "hover:bg-white/5"
                   }`}

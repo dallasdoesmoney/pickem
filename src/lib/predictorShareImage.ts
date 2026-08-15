@@ -371,7 +371,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   let cursorY = PAD_TOP;
   ctx.textBaseline = "alphabetic";
 
-  const kickerText = "SCHEDULE PREDICTOR";
+  const kickerText = "RECORD PREDICTOR";
   const titleText = `${team.city.toUpperCase()} ${team.name.toUpperCase()}`;
   ctx.font = "15px system-ui, sans-serif";
   const kickerW = ctx.measureText(kickerText).width;

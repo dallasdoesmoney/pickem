@@ -18,6 +18,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const { picks, setPick, resetPicks, loaded } = useSeasonPicks(trackedTeam);
   const { confirm, dialog } = useConfirmDialog();
   const [sharing, setSharing] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const winTotal = WIN_TOTALS[trackedTeam];
 
   // Desktop's two columns should read top-to-bottom then wrap (weeks 1-9,
@@ -66,7 +67,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
         try {
           await navigator.share({
             files: [file],
-            title: "Schedule Predictor",
+            title: "Record Predictor",
             text: `I think the ${team.name} will win ${wins} games!\n\nSidelinebrew.com`,
           });
         } catch (shareErr) {
@@ -139,14 +140,24 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             as shoved left. min-content sizing shrink-wraps the box to the
             wrapped lines so logo+text center as one unit. */}
         <div className="text-left w-min lg:w-auto">
-          <div className="text-xs text-white/45 tracking-[0.25em] mb-1 whitespace-nowrap">SCHEDULE PREDICTOR</div>
+          <div className="text-xs text-white/45 tracking-[0.25em] mb-1 whitespace-nowrap">RECORD PREDICTOR</div>
           {/* The switcher lives INSIDE the h1's own text flow (not as a
               flex sibling in a separate row) so it wraps along with the
               title text on mobile instead of overflowing past whichever
-              wrapped line happens to be narrower than the full row. */}
+              wrapped line happens to be narrower than the full row. The
+              team name itself also opens it - clicking the small chevron
+              specifically isn't an obvious enough target - by toggling the
+              same lifted-up open state the chevron button controls. */}
           <h1 className="text-[clamp(2rem,8vw,3rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-            {team.city.toUpperCase()} {team.name.toUpperCase()}{" "}
-            <TeamSwitcher currentTeam={trackedTeam} className="inline-flex align-middle -translate-y-1" />
+            <button type="button" onClick={() => setSwitcherOpen((v) => !v)} className="hover:opacity-80 transition-opacity cursor-pointer">
+              {team.city.toUpperCase()} {team.name.toUpperCase()}
+            </button>{" "}
+            <TeamSwitcher
+              currentTeam={trackedTeam}
+              open={switcherOpen}
+              onOpenChange={setSwitcherOpen}
+              className="inline-flex align-middle -translate-y-1"
+            />
           </h1>
         </div>
       </div>
@@ -254,16 +265,17 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               aria-label="Share your predicted schedule"
               onClick={handleShare}
               disabled={sharing}
-              className="flex items-center gap-2 rounded-full px-7 py-3.5 text-lg mt-6 shadow-[0_4px_20px_rgba(74,222,128,0.35)] active:scale-95 transition-transform duration-150 disabled:opacity-60"
+              className="flex items-center gap-2 rounded-full px-7 py-3.5 text-lg mt-6 active:scale-95 transition-transform duration-150 disabled:opacity-60"
               style={{
                 fontFamily: "var(--font-display)",
-                background: "linear-gradient(135deg, #4ade80, #22c55e)",
-                color: "#0e1b33",
+                background: team.color,
+                color: "#ffffff",
+                boxShadow: `0 4px 20px ${darkenColor(team.color, 1, 0.35)}`,
               }}
             >
               {sharing ? (
                 <>
-                  <span className="h-4 w-4 rounded-full border-2 border-[#0e1b33]/40 border-t-[#0e1b33] animate-spin" />
+                  <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
                   SHARING&hellip;
                 </>
               ) : (
