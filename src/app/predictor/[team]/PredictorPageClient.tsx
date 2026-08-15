@@ -64,7 +64,11 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
 
       if (canShareFiles) {
         try {
-          await navigator.share({ files: [file], title: "Schedule Predictor", text: `My predicted ${team.name} schedule` });
+          await navigator.share({
+            files: [file],
+            title: "Schedule Predictor",
+            text: `I think the ${team.name} will win ${wins} games!\n\nSidelinebrew.com`,
+          });
         } catch (shareErr) {
           if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();
         }
