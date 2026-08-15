@@ -46,6 +46,11 @@ const PAD_BOTTOM = 28;
 const KICKER_BLOCK_H = 25;
 const TITLE_BLOCK_H = 64;
 const HEADER_H = KICKER_BLOCK_H + TITLE_BLOCK_H;
+// Matches STATS_TO_GRID_GAP below the grid, so the grid sits vertically
+// centered between the header and the footer instead of hugging the
+// title - there was no gap here at all before, just HEADER_H running
+// straight into the first row.
+const HEADER_TO_GRID_GAP = 32;
 const STAT_PILL_W = 240;
 const STAT_PILL_H = 92;
 const STAT_PILL_GAP = 24;
@@ -292,7 +297,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
 
   const rowCount = Math.ceil(schedule.length / 2);
   const gridH = rowCount * ROW_H + (rowCount - 1) * GAP_Y;
-  const totalHeight = PAD_TOP + HEADER_H + gridH + STATS_TO_GRID_GAP + STATS_BLOCK_H + BRAND_FOOTER_H + PAD_BOTTOM;
+  const totalHeight = PAD_TOP + HEADER_H + HEADER_TO_GRID_GAP + gridH + STATS_TO_GRID_GAP + STATS_BLOCK_H + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const pixelRatio = 2;
   const canvas = document.createElement("canvas");
@@ -361,7 +366,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   ctx.fillStyle = "#ffffff";
   ctx.fillText(titleText, textX, cursorY + 44);
   ctx.textAlign = "center";
-  cursorY += TITLE_BLOCK_H;
+  cursorY += TITLE_BLOCK_H + HEADER_TO_GRID_GAP;
 
   schedule.forEach((row, i) => {
     // Column-major, matching the live page: weeks 1..rowCount fill the
