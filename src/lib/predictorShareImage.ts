@@ -50,8 +50,8 @@ const HEADER_H = KICKER_BLOCK_H + TITLE_BLOCK_H;
 // title - there was no gap here at all before, just HEADER_H running
 // straight into the first row.
 const HEADER_TO_GRID_GAP = 32;
-const STAT_PILL_W = 240;
-const STAT_PILL_H = 92;
+const STAT_PILL_W = 190;
+const STAT_PILL_H = 108;
 const STAT_PILL_GAP = 24;
 const STATS_BLOCK_H = STAT_PILL_H + 10 + 26; // pills + gap + diff line
 const STATS_TO_GRID_GAP = 32;
@@ -59,41 +59,22 @@ const BRAND_FOOTER_H = 14 + 98 + 10;
 
 const SUSPICIOUS_DOG_SRC = "/suspicious-dog.png";
 
-// Exact same brick-stagger pattern as the app-wide SidelineBrew watermark
-// (layout.tsx's SVG <pattern>) and the live predictor page's SVG version -
-// a 500x500 tile with the logo repeated at five offsets, rotated -45deg -
-// just built on canvas instead of SVG since that's what this renderer has.
-// Builds an offscreen tile once, then uses it as a repeating fill pattern
-// so the rotation only has to transform the fill, not five separate
-// drawImage calls per screen-sized area.
-function drawTeamLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null, w: number, h: number) {
+// Matches the live predictor page's background: one oversized team logo
+// bleeding off the left edge at low opacity, not the old repeating-logo
+// watermark pattern (that's the app-wide SidelineBrew chrome in
+// layout.tsx, used elsewhere - this page replaced its own copy of it with
+// a single giant logo per feedback that the pattern read as "busy").
+function drawGiantLogoBackdrop(ctx: CanvasRenderingContext2D, logo: HTMLImageElement | null, w: number, h: number) {
   if (!logo) return;
-  const tile = document.createElement("canvas");
-  tile.width = 500;
-  tile.height = 500;
-  const tctx = tile.getContext("2d");
-  if (!tctx) return;
-  const positions: [number, number][] = [
-    [140, 140],
-    [390, 390],
-    [-110, 390],
-    [390, -110],
-    [-110, -110],
-  ];
-  for (const [x, y] of positions) tctx.drawImage(logo, x, y, 220, 220);
-
-  const pattern = ctx.createPattern(tile, "repeat");
-  if (!pattern) return;
-
+  const logoH = h * 0.85;
+  const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
+  // Bleeds off the left edge by the same proportion as the live page's
+  // mobile treatment (-15vh against a ~812px-tall viewport, ~18%).
+  const x = -logoW * 0.18;
+  const y = (h - logoH) / 2;
   ctx.save();
   ctx.globalAlpha = 0.12;
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate((-45 * Math.PI) / 180);
-  ctx.translate(-w / 2, -h / 2);
-  ctx.fillStyle = pattern;
-  // Oversized so the rotated fill has no gaps at the canvas's corners.
-  const pad = Math.max(w, h);
-  ctx.fillRect(-pad, -pad, w + pad * 2, h + pad * 2);
+  ctx.drawImage(logo, x, y, logoW, logoH);
   ctx.restore();
 }
 
@@ -159,6 +140,9 @@ function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: numb
   ctx.fillText(`WEEK ${week}`, x + w / 2, y + LOGO_AREA_H + FOOTER_H / 2 + 1);
 }
 
+// Vegas pill: fixed width, content centered as a block, two-line label -
+// matches the live page's always-stacked "VEGAS / PREDICTION" (no
+// single-line variant at any breakpoint, unlike the record pill).
 function drawStatPill(
   ctx: CanvasRenderingContext2D,
   displayFont: string,
@@ -167,43 +151,47 @@ function drawStatPill(
   borderColor: string,
   valueColor: string,
   value: string,
-  label: string
+  labelLine1: string,
+  labelLine2: string
 ) {
-  const r: Radii = { tl: STAT_PILL_H / 2, tr: STAT_PILL_H / 2, br: STAT_PILL_H / 2, bl: STAT_PILL_H / 2 };
-  roundRectPath(ctx, x, y, STAT_PILL_W, STAT_PILL_H, r);
+  const w = STAT_PILL_W;
+  const h = STAT_PILL_H;
+  const r: Radii = { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 };
+  roundRectPath(ctx, x, y, w, h, r);
   ctx.fillStyle = "#1b2947";
   ctx.fill();
   ctx.strokeStyle = borderColor;
   ctx.lineWidth = 2;
   ctx.stroke();
 
+  const cx = x + w / 2;
+  const cy = y + h / 2;
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.font = `36px ${displayFont}`;
   ctx.fillStyle = valueColor;
-  ctx.fillText(value, x + STAT_PILL_W / 2, y + 52);
+  ctx.fillText(value, cx, cy - 8);
   ctx.font = "11px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(label, x + STAT_PILL_W / 2, y + 74);
+  ctx.fillText(labelLine1, cx, cy + 20);
+  ctx.fillText(labelLine2, cx, cy + 34);
 }
 
 // Neutral-styled cousin of the record pill: dog image + suspicious-pick
-// count. Content-fit width for the same reason as the record pill.
-function measureSuspiciousPillWidth(ctx: CanvasRenderingContext2D, displayFont: string, dog: HTMLImageElement | null, value: string, label: string) {
-  const padX = 20;
-  const dogH = 48;
-  const dogW = dog ? (dog.naturalWidth / dog.naturalHeight) * dogH : 0;
-  const gap = dog ? 12 : 0;
-  ctx.font = `30px ${displayFont}`;
-  const valueW = ctx.measureText(value).width;
-  ctx.font = "11px system-ui, sans-serif";
-  const labelW = ctx.measureText(label).width;
-  const textW = Math.max(valueW, labelW);
-  return { w: padX * 2 + dogW + gap + textW, padX, dogH, dogW, gap };
-}
-
-function drawSuspiciousPill(ctx: CanvasRenderingContext2D, displayFont: string, x: number, y: number, dog: HTMLImageElement | null, value: string, label: string) {
-  const { w, padX, dogH, dogW, gap } = measureSuspiciousPillWidth(ctx, displayFont, dog, value, label);
+// count. Fixed width (same as the Vegas pill, matching the live page's
+// bookend pills) with the icon+text row centered as a group, and a
+// two-line "SUSPICIOUS / PICKS" label matching the live page.
+function drawSuspiciousPill(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  x: number,
+  y: number,
+  dog: HTMLImageElement | null,
+  value: string,
+  labelLine1: string,
+  labelLine2: string
+) {
+  const w = STAT_PILL_W;
   const h = STAT_PILL_H;
   roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
   ctx.fillStyle = "#1b2947";
@@ -212,20 +200,33 @@ function drawSuspiciousPill(ctx: CanvasRenderingContext2D, displayFont: string, 
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  if (dog) ctx.drawImage(dog, x + padX, y + h / 2 - dogH / 2, dogW, dogH);
+  const dogH = 48;
+  const dogW = dog ? (dog.naturalWidth / dog.naturalHeight) * dogH : 0;
+  const gap = dog ? 14 : 0;
 
-  const textX = x + padX + dogW + gap;
+  ctx.font = `30px ${displayFont}`;
+  const valueW = ctx.measureText(value).width;
+  ctx.font = "11px system-ui, sans-serif";
+  const labelW = Math.max(ctx.measureText(labelLine1).width, ctx.measureText(labelLine2).width);
+  const textW = Math.max(valueW, labelW);
+
+  const rowW = dogW + gap + textW;
+  const cy = y + h / 2;
+  const rowLeft = x + w / 2 - rowW / 2;
+
+  if (dog) ctx.drawImage(dog, rowLeft, cy - dogH / 2, dogW, dogH);
+
+  const textX = rowLeft + dogW + gap;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = `30px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(value, textX, y + 48);
+  ctx.fillText(value, textX, cy - 8);
   ctx.font = "11px system-ui, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(label, textX, y + 70);
+  ctx.fillText(labelLine1, textX, cy + 14);
+  ctx.fillText(labelLine2, textX, cy + 28);
   ctx.textAlign = "center";
-
-  return w;
 }
 
 // The record is the headline stat - it gets the team logo, a green
@@ -352,7 +353,7 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   const bgColor = darken(team.color, BG_DARKEN_FACTOR, 1);
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
-  drawTeamLogoBackdrop(ctx, teamLogo, WIDTH, totalHeight);
+  drawGiantLogoBackdrop(ctx, teamLogo, WIDTH, totalHeight);
 
   // Logo-left, kicker+title stacked right lockup - the logo is sized to the
   // combined header block height and vertically centered against it, rather
@@ -470,16 +471,15 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   // Bottom KPI row, matching the live page left-to-right: suspicious-pick
   // counter, predicted record (the headline stat - team logo + green
   // accent), Vegas prediction.
-  const { w: suspiciousW } = measureSuspiciousPillWidth(ctx, displayFont, suspiciousDog, `${suspiciousCount}`, "SUSPICIOUS PICKS");
   const { w: recordW } = measureRecordPillWidth(ctx, displayFont, teamLogo, `${wins}-${losses}`, "MY PREDICTION");
-  const pillsW = suspiciousW + STAT_PILL_GAP + recordW + (winTotal !== undefined ? STAT_PILL_GAP + STAT_PILL_W : 0);
+  const pillsW = STAT_PILL_W + STAT_PILL_GAP + recordW + (winTotal !== undefined ? STAT_PILL_GAP + STAT_PILL_W : 0);
   let pillX = WIDTH / 2 - pillsW / 2;
-  drawSuspiciousPill(ctx, displayFont, pillX, cursorY, suspiciousDog, `${suspiciousCount}`, "SUSPICIOUS PICKS");
-  pillX += suspiciousW + STAT_PILL_GAP;
+  drawSuspiciousPill(ctx, displayFont, pillX, cursorY, suspiciousDog, `${suspiciousCount}`, "SUSPICIOUS", "PICKS");
+  pillX += STAT_PILL_W + STAT_PILL_GAP;
   drawRecordPill(ctx, displayFont, pillX, cursorY, teamLogo, `${wins}-${losses}`, "MY PREDICTION");
   pillX += recordW + STAT_PILL_GAP;
   if (winTotal !== undefined) {
-    drawStatPill(ctx, displayFont, pillX, cursorY, "#ffffff", "#ffffff", `${winTotal}`, "VEGAS PREDICTION");
+    drawStatPill(ctx, displayFont, pillX, cursorY, "#ffffff", "#ffffff", `${winTotal}`, "VEGAS", "PREDICTION");
   }
   cursorY += STAT_PILL_H + 10;
 
