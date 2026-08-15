@@ -131,7 +131,9 @@ export function NavShell({ children }: { children: React.ReactNode }) {
             <PickemMenu open={pickemMenuOpen} onOpenChange={setPickemMenuOpen} />
           </div>
 
-          <img src="/header-logo.png" alt="Sideline Brew" className="h-16 w-auto" />
+          <Link href="/" aria-label="Go to the homepage">
+            <img src="/header-logo.png" alt="Sideline Brew" className="h-16 w-auto" />
+          </Link>
 
           <Link
             href="/account"
