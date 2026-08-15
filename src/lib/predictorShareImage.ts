@@ -311,15 +311,17 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   // wash of the team's own color, darkened since it's sitting behind
   // everything, with the same texture asset tiled over it via plain alpha
   // (not a canvas composite operation) so it reads the same way on a
-  // background this dark.
-  const bgColor = darken(team.color, 0.55, 1);
+  // background this dark. BG_DARKEN_FACTOR is compound: 0.55 was the
+  // original darkening pass, then another 30% darker on top (x0.7).
+  const BG_DARKEN_FACTOR = 0.55 * 0.7;
+  const bgColor = darken(team.color, BG_DARKEN_FACTOR, 1);
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, WIDTH, totalHeight);
   if (bgTexture) {
     const pattern = ctx.createPattern(bgTexture, "repeat");
     if (pattern) {
       ctx.save();
-      ctx.globalAlpha = 0.16;
+      ctx.globalAlpha = 0.5;
       ctx.fillStyle = pattern;
       ctx.fillRect(0, 0, WIDTH, totalHeight);
       ctx.restore();

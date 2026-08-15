@@ -85,7 +85,10 @@ export default function PredictorPage() {
   // team data model has one color per team right now, so "the darkest
   // team color" is just team.color - if a second (lighter/accent) color
   // ever gets added, swap in whichever of the two is darker here.
-  const bgColor = darkenColor(team.color, 0.55, 1);
+  // BG_DARKEN_FACTOR is compound: 0.55 was the original darkening pass,
+  // then another 30% darker on top (x0.7) per feedback.
+  const BG_DARKEN_FACTOR = 0.55 * 0.7;
+  const bgColor = darkenColor(team.color, BG_DARKEN_FACTOR, 1);
 
   return (
     <div className="relative isolate flex-1 min-h-full">
@@ -97,7 +100,7 @@ export default function PredictorPage() {
           flecks just lighten/darken the pixels under them directly. */}
       <div
         className="absolute inset-0 -z-10 pointer-events-none"
-        style={{ backgroundImage: "url(/predictor-texture.webp)", backgroundSize: "512px 512px", opacity: 0.16 }}
+        style={{ backgroundImage: "url(/predictor-texture.webp)", backgroundSize: "512px 512px", opacity: 0.5 }}
       />
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="mb-8 flex items-center justify-center gap-5">
@@ -136,65 +139,78 @@ export default function PredictorPage() {
           </div>
 
           <div className="flex flex-col items-center mt-10">
-            {/* Sized down on mobile (icon/text/padding) with the two-word
-                labels always stacked on two lines - a phrase like "VEGAS
-                PREDICTION" on one line forces the pill wide enough that
-                three of them can't fit on a 375px-wide screen; stacked, the
-                pill only has to fit its LONGER word. */}
+            {/* Sized down on mobile (icon/text/padding) so all three fit on
+                one row at 375px wide - a phrase like "VEGAS PREDICTION" on
+                one line forces the pill too wide for that at small sizes,
+                so the label stacks on two lines only below sm. From sm up
+                there's room, so it matches the share image: one line,
+                bigger icon/text, closer to that version's proportions. */}
             <div className="flex gap-2 sm:gap-3 justify-center items-center">
               <div
-                className="rounded-full border-2 border-white text-center pl-2.5 pr-3 py-1.5 sm:pl-4 sm:pr-6 sm:py-3 flex items-center gap-1.5 sm:gap-2.5"
+                className="rounded-full border-2 border-white text-center pl-2.5 pr-3 py-1.5 sm:pl-5 sm:pr-7 sm:py-3.5 flex items-center gap-1.5 sm:gap-3"
                 style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
-                <img src="/suspicious-dog.png" alt="" className="h-7 sm:h-10 w-auto select-none shrink-0" />
+                <img src="/suspicious-dog.png" alt="" className="h-7 sm:h-12 w-auto select-none shrink-0" />
                 <div className="text-left">
-                  <div className="text-base sm:text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                  <div className="text-base sm:text-3xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
                     {suspiciousCount}
                   </div>
-                  <div className="text-[7px] sm:text-[10px] leading-tight text-white/55 mt-0.5 sm:mt-1 tracking-wide">
-                    SUSPICIOUS
-                    <br />
-                    PICKS
+                  <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
+                    <span className="sm:hidden">
+                      SUSPICIOUS
+                      <br />
+                      PICKS
+                    </span>
+                    <span className="hidden sm:inline whitespace-nowrap">SUSPICIOUS PICKS</span>
                   </div>
                 </div>
               </div>
 
               <div
-                className="rounded-full border-2 border-emerald-400 text-center pl-2.5 pr-3.5 py-1.5 sm:pl-4 sm:pr-7 sm:py-3 flex items-center gap-1.5 sm:gap-3"
+                className="rounded-full border-2 border-emerald-400 text-center pl-2.5 pr-3.5 py-1.5 sm:pl-5 sm:pr-8 sm:py-3.5 flex items-center gap-1.5 sm:gap-3.5"
                 style={{ background: "#1b2947", boxShadow: "0 0 0 4px rgba(74,222,128,0.12), 0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
-                <img src={team.logo} alt="" className="h-7 sm:h-11 w-auto shrink-0" crossOrigin="anonymous" />
+                <img src={team.logo} alt="" className="h-7 sm:h-[52px] w-auto shrink-0" crossOrigin="anonymous" />
                 <div className="text-left">
-                  <div className="text-lg sm:text-3xl leading-none" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
+                  <div className="text-lg sm:text-4xl leading-none" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
                     {wins}-{losses}
                   </div>
-                  <div className="text-[7px] sm:text-[10px] leading-tight text-white/55 mt-0.5 sm:mt-1 tracking-wide">
-                    MY
-                    <br />
-                    PREDICTION
+                  <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
+                    <span className="sm:hidden">
+                      MY
+                      <br />
+                      PREDICTION
+                    </span>
+                    <span className="hidden sm:inline whitespace-nowrap">MY PREDICTION</span>
                   </div>
                 </div>
               </div>
 
               {winTotal !== undefined && (
                 <div
-                  className="rounded-full border-2 border-white text-center px-3 py-1.5 sm:px-6 sm:py-3.5"
+                  className="rounded-full border-2 border-white text-center px-3 py-1.5 sm:px-8 sm:py-4"
                   style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
                 >
-                  <div className="text-base sm:text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                  <div className="text-base sm:text-4xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
                     {winTotal}
                   </div>
-                  <div className="text-[7px] sm:text-[10px] leading-tight text-white/55 mt-0.5 tracking-wide">
-                    VEGAS
-                    <br />
-                    PREDICTION
+                  <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
+                    <span className="sm:hidden">
+                      VEGAS
+                      <br />
+                      PREDICTION
+                    </span>
+                    <span className="hidden sm:inline whitespace-nowrap">VEGAS PREDICTION</span>
                   </div>
                 </div>
               )}
             </div>
 
             {diff !== null && (
-              <p className="text-sm font-bold mt-3" style={{ color: diff > 0 ? "#4ade80" : diff < 0 ? "#ef4444" : "#ffffff" }}>
+              <p
+                className="text-sm sm:text-lg mt-3 sm:mt-4"
+                style={{ fontFamily: "var(--font-display)", color: diff > 0 ? "#4ade80" : diff < 0 ? "#ef4444" : "#ffffff" }}
+              >
                 {diff > 0 ? "+" : ""}
                 {diff} {diff > 0 ? "OVER" : diff < 0 ? "UNDER" : "PUSH"} Vegas&rsquo; line
               </p>
