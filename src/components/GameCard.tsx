@@ -27,21 +27,6 @@ function TagBadge({ side, tag }: { side: "left" | "right"; tag: PickTag }) {
   );
 }
 
-// Small corner badge marking which side was picked, used instead of the
-// underdog/boldest tag once a game has a real result - after the fact,
-// "was I right" matters more than the pre-game tag did.
-function PickedBadge({ side }: { side: "left" | "right" }) {
-  const positionStyle = { [side === "left" ? "left" : "right"]: "-8px" } as const;
-  return (
-    <span
-      className="absolute -top-2 z-40 h-5 w-5 rounded-full bg-white text-[#0e1b33] text-[10px] flex items-center justify-center font-bold pointer-events-none"
-      style={{ ...positionStyle, fontFamily: "var(--font-display)", boxShadow: "0 2px 4px rgba(0,0,0,0.5)" }}
-    >
-      ★
-    </span>
-  );
-}
-
 export function GameCard({
   game,
   picked,
@@ -62,9 +47,14 @@ export function GameCard({
   const hasPick = !!picked;
   const hasResult = !!result;
 
+  // Only the side you picked ever gets a verdict - green W if it matches
+  // the real result, red L if it doesn't. Same pattern as the team
+  // predictor's tracked-team highlight, just pointed at "were you right"
+  // instead of "who are you rooting for."
   function outcomeFor(team: TeamAbbr): "win" | "loss" | null {
-    if (hasResult) return team === result ? "win" : "loss";
-    return picked === team ? "win" : null;
+    if (team !== picked) return null;
+    if (hasResult) return picked === result ? "win" : "loss";
+    return "win";
   }
 
   const awaySpread =
@@ -92,18 +82,10 @@ export function GameCard({
         team={away}
         side="left"
         outcome={outcomeFor(away.abbr)}
-        isFaded={!hasResult && hasPick && picked !== away.abbr}
+        isFaded={hasPick && picked !== away.abbr}
         onClick={() => onPick(away.abbr)}
         disabled={locked}
-        badge={
-          hasResult ? (
-            picked === away.abbr ? (
-              <PickedBadge side="left" />
-            ) : undefined
-          ) : picked === away.abbr && tag ? (
-            <TagBadge side="left" tag={tag} />
-          ) : undefined
-        }
+        badge={picked === away.abbr && tag ? <TagBadge side="left" tag={tag} /> : undefined}
         footer={
           <>
             {awaySpread && (
@@ -119,18 +101,10 @@ export function GameCard({
         team={home}
         side="right"
         outcome={outcomeFor(home.abbr)}
-        isFaded={!hasResult && hasPick && picked !== home.abbr}
+        isFaded={hasPick && picked !== home.abbr}
         onClick={() => onPick(home.abbr)}
         disabled={locked}
-        badge={
-          hasResult ? (
-            picked === home.abbr ? (
-              <PickedBadge side="right" />
-            ) : undefined
-          ) : picked === home.abbr && tag ? (
-            <TagBadge side="right" tag={tag} />
-          ) : undefined
-        }
+        badge={picked === home.abbr && tag ? <TagBadge side="right" tag={tag} /> : undefined}
         footer={
           <>
             {homeSpread && (
