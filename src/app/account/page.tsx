@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useProfile } from "@/hooks/useProfile";
 import { useAuth, type Profile } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
@@ -8,6 +9,7 @@ import { useUsernameField } from "@/hooks/useUsernameField";
 import { updateAvatar, claimUsername, updateDisplayName } from "@/lib/supabase/profile";
 import { USERNAME_MIN, USERNAME_MAX } from "@/lib/usernamePolicy";
 import { validateDisplayName, DISPLAY_NAME_MAX } from "@/lib/displayNamePolicy";
+import { fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { errorMessage } from "@/lib/errorMessage";
 
@@ -76,6 +78,17 @@ function SignedInAccount({
   }, [authProfile, initializedDisplayName]);
 
   const displayNameCheck = displayName === (authProfile?.display_name ?? "") ? null : validateDisplayName(displayName);
+
+  // "Everything a signed-in user can see about themselves" is the
+  // superset the public /leaderboard/[username] page is a filtered view
+  // of - own record here reuses that exact same leaderboard row/query,
+  // just scoped to this account instead of everyone.
+  const [myRecord, setMyRecord] = useState<LeaderboardRow | null | undefined>(undefined);
+  useEffect(() => {
+    fetchMyLeaderboardEntry(userId)
+      .then(setMyRecord)
+      .catch(() => setMyRecord(null));
+  }, [userId]);
 
   async function handleSaveDisplayName() {
     if (!displayNameCheck?.valid || savingDisplayName) return;
@@ -163,6 +176,25 @@ function SignedInAccount({
           </button>
           {avatarError && <p className="text-xs text-red-400 text-center max-w-xs">{avatarError}</p>}
         </div>
+
+        {myRecord && (
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center w-[140px] h-[88px]"
+              style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+            >
+              <div className="text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                {myRecord.correct}-{myRecord.graded - myRecord.correct}
+              </div>
+              <div className="text-[11px] text-white/55 mt-1.5 tracking-wide">SEASON RECORD</div>
+            </div>
+            {myRecord.username && (
+              <Link href={`/leaderboard/${myRecord.username}`} className="text-xs text-white/40 hover:text-white/70 transition-colors">
+                View your public profile &rarr;
+              </Link>
+            )}
+          </div>
+        )}
 
         <div className="w-full flex flex-col gap-2">
           <span className="text-xs text-white/50 tracking-wide">DISPLAY NAME</span>

@@ -27,3 +27,11 @@ export async function fetchLeaderboardEntry(username: string): Promise<Leaderboa
   if (error) throw error;
   return data as LeaderboardRow | null;
 }
+
+// By user_id rather than username - the account page's own username field
+// can be mid-edit, so this keys off something that can't be ambiguous.
+export async function fetchMyLeaderboardEntry(userId: string): Promise<LeaderboardRow | null> {
+  const { data, error } = await supabase.from("leaderboard").select(COLUMNS).eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return data as LeaderboardRow | null;
+}
