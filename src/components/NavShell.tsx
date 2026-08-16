@@ -80,6 +80,15 @@ function NotificationsIcon({ className }: { className?: string }) {
   );
 }
 
+function AchievementsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="6" />
+      <path d="M9 13.5L7 22l5-3 5 3-2-8.5" />
+    </svg>
+  );
+}
+
 function AccountIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
@@ -195,6 +204,14 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                       <NotificationsIcon className="h-5 w-5 shrink-0" />
                       <span className="text-sm flex-1">Notifications</span>
                       {pendingCount > 0 && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
+                    </Link>
+                    <Link
+                      href="/achievements"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <AchievementsIcon className="h-5 w-5 shrink-0" />
+                      <span className="text-sm">Achievements</span>
                     </Link>
                     {profile?.is_admin && (
                       <Link

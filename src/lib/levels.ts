@@ -3,22 +3,22 @@
 // every number and name here can be retuned later with zero migration,
 // once real point sources exist and the curve's actual pace is known.
 
-export type RankTier = { name: string; color: string };
+export type RankTier = { name: string; color: string; emoji: string };
 
 // 10 named ranks x 5 sub-levels = 50 levels. Escalating accent colors so a
 // badge reads as "further along" at a glance even before you notice the
 // number.
-const RANKS: RankTier[] = [
-  { name: "Rookie", color: "#94a3b8" },
-  { name: "Practice Squad", color: "#38bdf8" },
-  { name: "Special Teams", color: "#22d3ee" },
-  { name: "Starter", color: "#34d399" },
-  { name: "Team Captain", color: "#4ade80" },
-  { name: "Pro Bowler", color: "#facc15" },
-  { name: "All-Pro", color: "#fb923c" },
-  { name: "MVP", color: "#f87171" },
-  { name: "Hall of Famer", color: "#c084fc" },
-  { name: "GOAT", color: "#f472b6" },
+export const RANKS: RankTier[] = [
+  { name: "Rookie", color: "#94a3b8", emoji: "🐣" },
+  { name: "Practice Squad", color: "#38bdf8", emoji: "🎽" },
+  { name: "Special Teams", color: "#22d3ee", emoji: "🎯" },
+  { name: "Starter", color: "#34d399", emoji: "🏈" },
+  { name: "Team Captain", color: "#4ade80", emoji: "🧢" },
+  { name: "Pro Bowler", color: "#facc15", emoji: "🌟" },
+  { name: "All-Pro", color: "#fb923c", emoji: "🥇" },
+  { name: "MVP", color: "#f87171", emoji: "🏆" },
+  { name: "Hall of Famer", color: "#c084fc", emoji: "👑" },
+  { name: "GOAT", color: "#f472b6", emoji: "🐐" },
 ];
 
 const LEVELS_PER_RANK = 5;
@@ -40,6 +40,7 @@ export type LevelInfo = {
   isMaxLevel: boolean;
   rankName: string;
   rankColor: string;
+  rankEmoji: string;
   subLevel: number; // 1-5 within the rank, 0 if unranked
   pointsIntoLevel: number;
   pointsForNextLevel: number | null;
@@ -47,12 +48,16 @@ export type LevelInfo = {
   totalPoints: number;
 };
 
+function rankForLevel(level: number): RankTier {
+  return RANKS[Math.min(Math.floor((Math.max(level, 1) - 1) / LEVELS_PER_RANK), RANKS.length - 1)];
+}
+
 export function getLevelInfo(totalPoints: number): LevelInfo {
   let level = 0;
   while (level < MAX_LEVEL && totalPoints >= cumulativeForLevel(level + 1)) level++;
 
   const isUnranked = level === 0;
-  const rank = RANKS[Math.min(Math.floor((level - 1) / LEVELS_PER_RANK), RANKS.length - 1)] ?? RANKS[0];
+  const rank = rankForLevel(level);
   const subLevel = isUnranked ? 0 : ((level - 1) % LEVELS_PER_RANK) + 1;
 
   const floor = cumulativeForLevel(level);
@@ -65,6 +70,7 @@ export function getLevelInfo(totalPoints: number): LevelInfo {
     isMaxLevel,
     rankName: rank.name,
     rankColor: rank.color,
+    rankEmoji: rank.emoji,
     subLevel,
     pointsIntoLevel: totalPoints - floor,
     pointsForNextLevel: nextThreshold === null ? null : nextThreshold - floor,
@@ -77,3 +83,29 @@ const ROMAN = ["I", "II", "III", "IV", "V"];
 export function subLevelRoman(subLevel: number): string {
   return ROMAN[subLevel - 1] ?? String(subLevel);
 }
+
+export type LevelListEntry = {
+  level: number;
+  rankName: string;
+  rankColor: string;
+  rankEmoji: string;
+  subLevel: number;
+  cumulativePoints: number;
+  pointsForThisLevel: number;
+};
+
+// The full ladder, for a "see every level" view - built once and reused
+// rather than recomputed per render.
+export const ALL_LEVELS: LevelListEntry[] = Array.from({ length: MAX_LEVEL }, (_, i) => {
+  const level = i + 1;
+  const rank = rankForLevel(level);
+  return {
+    level,
+    rankName: rank.name,
+    rankColor: rank.color,
+    rankEmoji: rank.emoji,
+    subLevel: ((level - 1) % LEVELS_PER_RANK) + 1,
+    cumulativePoints: cumulativeForLevel(level),
+    pointsForThisLevel: BASE_POINTS * level,
+  };
+});

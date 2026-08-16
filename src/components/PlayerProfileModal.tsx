@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { FriendButton } from "@/components/FriendButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
+import { LevelListModal } from "@/components/LevelListModal";
+import { getLevelInfo } from "@/lib/levels";
 
 // Same overlay/panel styling as useConfirmDialog, reused here so a
 // leaderboard click surfaces a player's record without leaving the
@@ -21,6 +24,8 @@ export function PlayerProfileModal({
   onClose: () => void;
   onFriendshipChange?: () => void;
 }) {
+  const [levelModalOpen, setLevelModalOpen] = useState(false);
+
   if (!row) return null;
   const label = row.display_name || row.username;
 
@@ -52,6 +57,9 @@ export function PlayerProfileModal({
           </h2>
           <LevelBadge totalPoints={row.total_points} size="lg" />
         </div>
+        <button type="button" onClick={() => setLevelModalOpen(true)} className="text-[11px] text-white/35 hover:text-white/60 transition-colors">
+          View all levels &rarr;
+        </button>
         <p className="text-white/45 text-sm mt-1">@{row.username}</p>
         <PlayerBadges userId={row.user_id} />
 
@@ -75,6 +83,8 @@ export function PlayerProfileModal({
           View full profile page &rarr;
         </Link>
       </div>
+
+      <LevelListModal open={levelModalOpen} currentLevel={getLevelInfo(row.total_points).level} onClose={() => setLevelModalOpen(false)} />
     </div>
   );
 }

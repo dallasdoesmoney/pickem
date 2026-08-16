@@ -14,6 +14,7 @@ import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { errorMessage } from "@/lib/errorMessage";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
+import { LevelListModal } from "@/components/LevelListModal";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 
 const AVATAR_SIZE = 200;
@@ -92,6 +93,7 @@ function SignedInAccount({
       .then(setMyRecord)
       .catch(() => setMyRecord(null));
   }, [userId]);
+  const [levelModalOpen, setLevelModalOpen] = useState(false);
 
   async function handleSaveDisplayName() {
     if (!displayNameCheck?.valid || savingDisplayName) return;
@@ -196,6 +198,15 @@ function SignedInAccount({
             </div>
             <PlayerBadges userId={userId} />
             <LevelProgress totalPoints={myRecord.total_points} />
+            <div className="flex items-center gap-3">
+              <Link href="/achievements" className="text-xs text-white/40 hover:text-white/70 transition-colors">
+                Achievements &rarr;
+              </Link>
+              <span className="text-white/20">·</span>
+              <button type="button" onClick={() => setLevelModalOpen(true)} className="text-xs text-white/40 hover:text-white/70 transition-colors">
+                View all levels &rarr;
+              </button>
+            </div>
             {myRecord.username && (
               <Link href={`/leaderboard/${myRecord.username}`} className="text-xs text-white/40 hover:text-white/70 transition-colors">
                 View your public profile &rarr;
@@ -267,6 +278,7 @@ function SignedInAccount({
       </div>
 
       {cropFile && <AvatarCropModal file={cropFile} outputSize={AVATAR_SIZE} onCancel={() => setCropFile(null)} onConfirm={handleCropConfirm} />}
+      <LevelListModal open={levelModalOpen} currentLevel={myRecord ? getLevelInfo(myRecord.total_points).level : undefined} onClose={() => setLevelModalOpen(false)} />
     </main>
   );
 }

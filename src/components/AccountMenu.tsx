@@ -108,6 +108,15 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
                 <span className="h-2 w-2 rounded-full bg-red-500" />
               )}
             </Link>
+            <Link
+              href="/achievements"
+              role="menuitem"
+              onClick={() => onOpenChange(false)}
+              className="block rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Achievements
+            </Link>
             {profile?.is_admin && (
               <Link
                 href="/admin"

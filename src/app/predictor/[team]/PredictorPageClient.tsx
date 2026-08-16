@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { supabase } from "@/lib/supabase/client";
 import { saveSeasonPicks } from "@/lib/supabase/picks";
+import { syncPredictorAchievements } from "@/lib/supabase/achievements";
 import { renderPredictorShareImage } from "@/lib/predictorShareImage";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
@@ -52,6 +53,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       // with a session, so there's nothing more to do in this click.
       if (!userId) return;
       await saveSeasonPicks(userId, trackedTeam, picks);
+      syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err));
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
@@ -68,6 +70,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
     sessionStorage.removeItem(PENDING_SAVE_KEY);
     saveSeasonPicks(user.id, trackedTeam, picks)
       .then(() => {
+        syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err));
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
       })

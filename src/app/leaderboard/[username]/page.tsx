@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { FriendButton } from "@/components/FriendButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
+import { LevelListModal } from "@/components/LevelListModal";
+import { getLevelInfo } from "@/lib/levels";
 
 // A client page (not the server-component-plus-notFound() pattern used by
 // /predictor/[team], which validates against a fixed, known team list) -
@@ -19,6 +21,7 @@ export default function PlayerPage() {
   const { user } = useAuth();
   const [row, setRow] = useState<LeaderboardRow | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [levelModalOpen, setLevelModalOpen] = useState(false);
 
   useEffect(() => {
     fetchLeaderboardEntry(params.username)
@@ -58,6 +61,9 @@ export default function PlayerPage() {
             </h1>
             <LevelBadge totalPoints={row.total_points} size="lg" />
           </div>
+          <button type="button" onClick={() => setLevelModalOpen(true)} className="text-[11px] text-white/35 hover:text-white/60 transition-colors">
+            View all levels &rarr;
+          </button>
           <p className="text-white/45 text-sm mt-1">@{row.username}</p>
           <PlayerBadges userId={row.user_id} />
 
@@ -78,6 +84,8 @@ export default function PlayerPage() {
           )}
         </div>
       ) : null}
+
+      {row && <LevelListModal open={levelModalOpen} currentLevel={getLevelInfo(row.total_points).level} onClose={() => setLevelModalOpen(false)} />}
     </main>
   );
 }

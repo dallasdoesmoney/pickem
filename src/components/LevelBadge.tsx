@@ -19,6 +19,7 @@ export function LevelBadge({ totalPoints, size = "sm" }: { totalPoints: number; 
         background: `${info.rankColor}1a`,
       }}
     >
+      <span>{info.rankEmoji}</span>
       LV {info.level}
     </span>
   );
