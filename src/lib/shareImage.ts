@@ -1,6 +1,6 @@
 import { Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
-import { DayGroup, FlowItem, PickStats, PickTag, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
+import { BOLDEST_PICK_ICON, DayGroup, FlowItem, PickStats, PickTag, UNDERDOG_ICON, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import {
   BRAND_LOGO_SRC,
   PILL_W,
@@ -36,7 +36,7 @@ function drawStatPill(
   value: string,
   label: string,
   logo?: HTMLImageElement | null,
-  badgeEmoji?: string
+  badgeIcon?: HTMLImageElement | null
 ) {
   roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
   ctx.strokeStyle = borderColor;
@@ -66,21 +66,15 @@ function drawStatPill(
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.fillText(label, x + w / 2, y + h * 0.8);
 
-  if (badgeEmoji) {
+  if (badgeIcon) {
+    const badgeH = 54;
+    const badgeW = (badgeIcon.naturalWidth / badgeIcon.naturalHeight) * badgeH;
     ctx.save();
     ctx.translate(x + 10, y + 2);
     ctx.rotate((-18 * Math.PI) / 180);
-    ctx.font = "54px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    // Chrome multiplies color-emoji glyphs by fillStyle's alpha channel even
-    // though it ignores the hue - without resetting to fully opaque here,
-    // this badge inherits the label's rgba(255,255,255,0.55) and renders
-    // washed out.
-    ctx.fillStyle = "#ffffff";
     ctx.shadowColor = "rgba(0,0,0,0.6)";
     ctx.shadowBlur = 4;
-    ctx.fillText(badgeEmoji, 0, 0);
+    ctx.drawImage(badgeIcon, -badgeW / 2, -badgeH / 2, badgeW, badgeH);
     ctx.shadowBlur = 0;
     ctx.restore();
   }
@@ -212,9 +206,9 @@ function drawGameFooterContent(ctx: CanvasRenderingContext2D, displayFont: strin
   ctx.textAlign = "center";
 }
 
-function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts) {
-  const { x, y, w, side, tag } = opts;
-  if (!tag) return;
+function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts, icon: HTMLImageElement | null | undefined) {
+  const { x, y, w, side } = opts;
+  if (!icon) return;
   // CSS rotates the badge around its own center by default; rotating
   // around a corner (as this used to) swings it visibly off-target. Only
   // let it protrude ~12px past the pill edge - GAP_X between columns is
@@ -222,15 +216,14 @@ function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts) {
   const protrusion = 12;
   const centerX = side === "left" ? x - protrusion + 19 : x + w + protrusion - 19;
   const centerY = y - 8 + 19;
+  const badgeH = 38;
+  const badgeW = (icon.naturalWidth / icon.naturalHeight) * badgeH;
   ctx.save();
   ctx.translate(centerX, centerY);
   ctx.rotate(((side === "left" ? -22 : 22) * Math.PI) / 180);
-  ctx.font = "38px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = 4;
-  ctx.fillText(tag.emoji, 0, 0);
+  ctx.drawImage(icon, -badgeW / 2, -badgeH / 2, badgeW, badgeH);
   ctx.restore();
 }
 
@@ -271,12 +264,15 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     logoUrls.add(TEAMS[g.home].logo);
   });
   if (stats.boldestTeam) logoUrls.add(stats.boldestTeam.logo);
-  const [logoEntries, brandLogo, avatarImg] = await Promise.all([
+  const [logoEntries, brandLogo, avatarImg, underdogIcon, boldestIcon] = await Promise.all([
     Promise.all(Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)),
     loadImage(BRAND_LOGO_SRC),
     hasResults && avatarUrl ? loadImage(avatarUrl) : Promise.resolve(null),
+    loadImage(UNDERDOG_ICON),
+    loadImage(BOLDEST_PICK_ICON),
   ]);
   const logos = new Map(logoEntries);
+  const tagIcons = new Map([[UNDERDOG_ICON, underdogIcon], [BOLDEST_PICK_ICON, boldestIcon]]);
 
   let bodyHeight = 0;
   for (let i = 0; i < rowCount; i++) {
@@ -330,8 +326,8 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     const recordW = 260;
     drawResultsRecordPill(ctx, displayFont, WIDTH / 2 - recordW / 2, cursorY, recordW, pillH, `${correctCount}-${gradedCount - correctCount}`, avatarImg);
   } else {
-    const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeEmoji?: string }> = [
-      { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeEmoji: "\u{1F436}" },
+    const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeIcon?: HTMLImageElement | null }> = [
+      { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeIcon: underdogIcon },
       {
         w: 250,
         borderColor: "#4ade80",
@@ -339,7 +335,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         value: stats.boldestTeam ? `+${stats.boldestSpread}` : "-",
         label: "BOLDEST PICK",
         logo: stats.boldestTeam ? logos.get(stats.boldestTeam.logo) : undefined,
-        badgeEmoji: "\u{1F48E}",
+        badgeIcon: boldestIcon,
       },
       { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: stats.chalkPct !== null ? `${stats.chalkPct}%` : "-", label: "CHALK" },
     ];
@@ -347,7 +343,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     const totalPillsW = pillDefs.reduce((s, p) => s + p.w, 0) + pillGap * (pillDefs.length - 1);
     let pillX = WIDTH / 2 - totalPillsW / 2;
     for (const p of pillDefs) {
-      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeEmoji);
+      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeIcon);
       pillX += p.w + pillGap;
     }
   }
@@ -439,8 +435,8 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       drawPillHalfFill(ctx, displayFont, awayOpts, (c, midY) => drawGameFooterContent(c, displayFont, awayOpts.x, awayOpts.w, midY, awayOpts.spreadLabel, awayOpts.record));
       drawPillHalfFill(ctx, displayFont, homeOpts, (c, midY) => drawGameFooterContent(c, displayFont, homeOpts.x, homeOpts.w, midY, homeOpts.spreadLabel, homeOpts.record));
       drawPillBordersOutcomeLast(ctx, awayOpts, homeOpts);
-      drawTeamHalfBadge(ctx, awayOpts);
-      drawTeamHalfBadge(ctx, homeOpts);
+      drawTeamHalfBadge(ctx, awayOpts, awayOpts.tag ? tagIcons.get(awayOpts.tag.icon) : undefined);
+      drawTeamHalfBadge(ctx, homeOpts, homeOpts.tag ? tagIcons.get(homeOpts.tag.icon) : undefined);
     });
     cursorY += h + GAP_Y;
   }

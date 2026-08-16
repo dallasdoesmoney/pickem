@@ -157,9 +157,9 @@ function drawByeCell(ctx: CanvasRenderingContext2D, displayFont: string, x: numb
   ctx.fillText(`WEEK ${week}`, x + w / 2, y + LOGO_AREA_H + FOOTER_H / 2 + 1);
 }
 
-// Same rotated-corner-tag treatment as the weekly share image's emoji
-// badges (drawStatPill's badgeEmoji in shareImage.ts) - just an image
-// instead of a text glyph, for the suspicious-dog and team-logo tags.
+// Same rotated-corner-tag treatment as the weekly share image's icon
+// badges (drawStatPill's badgeIcon in shareImage.ts) - for the
+// suspicious-dog and team-logo tags.
 function drawPillTag(ctx: CanvasRenderingContext2D, img: HTMLImageElement | null, pillX: number, pillY: number) {
   if (!img) return;
   const h = 50;

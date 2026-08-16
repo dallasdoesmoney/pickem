@@ -80,7 +80,10 @@ export function computePickStats(games: Game[], picks: Record<string, TeamAbbr>)
 
 export type PickStats = ReturnType<typeof computePickStats>;
 
-export type PickTag = { emoji: string; label: string };
+export type PickTag = { icon: string; label: string };
+
+export const UNDERDOG_ICON = "/underdog-bulldog.png";
+export const BOLDEST_PICK_ICON = "/boldest-pick-alarm.png";
 
 // Every underdog pick (picked team isn't the spread favorite) gets a plain
 // underdog tag, EXCEPT the single boldest one (biggest spread against it),
@@ -92,7 +95,7 @@ export function computePickTags(games: Game[], picks: Record<string, TeamAbbr>):
     const pick = picks[g.id];
     if (!pick || !g.favorite || g.spread === undefined || pick === g.favorite) continue;
     tags[g.id] =
-      g.id === boldest?.id ? { emoji: "\u{1F48E}", label: "Boldest Pick" } : { emoji: "\u{1F436}", label: "Underdog" };
+      g.id === boldest?.id ? { icon: BOLDEST_PICK_ICON, label: "Boldest Pick" } : { icon: UNDERDOG_ICON, label: "Underdog" };
   }
   return tags;
 }

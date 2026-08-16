@@ -12,18 +12,16 @@ export { PILL_WIDTH, PILL_HEIGHT } from "@/components/TeamHalfPill";
 function TagBadge({ side, tag }: { side: "left" | "right"; tag: PickTag }) {
   const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
   return (
-    <span
-      role="img"
-      aria-label={tag.label}
-      className="absolute -top-2.5 z-40 text-[42px] leading-none pointer-events-none"
+    <img
+      src={tag.icon}
+      alt={tag.label}
+      className="absolute -top-2.5 z-40 h-[42px] w-auto pointer-events-none"
       style={{
         ...positionStyle,
         transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
         filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
       }}
-    >
-      {tag.emoji}
-    </span>
+    />
   );
 }
 
