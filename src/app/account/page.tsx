@@ -112,31 +112,31 @@ function SignedInAccount({
             <div className="text-[11px] text-white/55 mt-1.5 tracking-wide">SEASON RECORD</div>
           </div>
           <PlayerBadges userId={userId} />
-          <LevelProgress totalPoints={myRecord.total_points} />
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 mt-8">
-        <Link
-          href="/achievements"
-          className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 py-4 hover:bg-white/10 hover:border-white/20 transition-colors"
-        >
-          <span className="text-2xl">🏆</span>
-          <span className="text-xs text-white/70" style={{ fontFamily: "var(--font-display)" }}>
-            ACHIEVEMENTS
-          </span>
-        </Link>
-        <button
-          type="button"
-          onClick={() => setLevelModalOpen(true)}
-          className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 py-4 hover:bg-white/10 hover:border-white/20 transition-colors"
-        >
-          <span className="text-2xl">⭐</span>
-          <span className="text-xs text-white/70" style={{ fontFamily: "var(--font-display)" }}>
-            ALL LEVELS
-          </span>
-        </button>
-      </div>
+      {/* This card + the achievements link below are deliberately stacked
+          and cross-referenced (same badge as the header, explicit "earn
+          points" copy) so the chain - achievements earn points, points
+          set your level, your level is the badge by your name - reads as
+          one connected system instead of three unrelated widgets. */}
+      {myRecord && (
+        <div className="flex flex-col gap-3 mt-6">
+          <LevelSummaryCard totalPoints={myRecord.total_points} onOpenLevels={() => setLevelModalOpen(true)} />
+          <Link
+            href="/achievements"
+            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-white/20 transition-colors"
+          >
+            <span className="text-2xl shrink-0">🏆</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+                ACHIEVEMENTS
+              </div>
+              <div className="text-[11px] text-white/45 mt-0.5">Earn points here to level up &rarr;</div>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {myRecord?.username && (
         <div className="text-center mt-6">
@@ -169,27 +169,47 @@ function SignedInAccount({
   );
 }
 
-// Own-account-only, not shown on the public profile - a nudge toward the
-// next level is personal motivation, not something worth surfacing about
-// someone else.
-function LevelProgress({ totalPoints }: { totalPoints: number }) {
+// Own-account-only, not shown on the public profile - this is the one
+// place that spells out the whole system: the badge, what rank it means,
+// and exactly how many points stand between here and the next one. Whole
+// card opens the same level-ladder modal as the header badge, so clicking
+// either one lands you in the same place.
+function LevelSummaryCard({ totalPoints, onOpenLevels }: { totalPoints: number; onOpenLevels: () => void }) {
   const info = getLevelInfo(totalPoints);
-  const nextLabel = info.isMaxLevel
-    ? "Max level reached"
-    : `${info.pointsForNextLevel! - info.pointsIntoLevel} pts to Level ${info.level + 1}`;
+  const nextLabel = info.isMaxLevel ? "Max level reached" : `${info.pointsForNextLevel! - info.pointsIntoLevel} pts to Level ${info.level + 1}`;
 
   return (
-    <div className="w-full max-w-[220px] flex flex-col items-center gap-1.5">
-      <p className="text-[11px] text-white/45 tracking-wide">
-        {info.isUnranked ? `${totalPoints} / 1,500 pts to Level 1` : `${info.rankName} ${subLevelRoman(info.subLevel)} · ${nextLabel}`}
-      </p>
-      <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${Math.min(info.progress, 1) * 100}%`, background: info.isUnranked ? "#94a3b8" : info.rankColor }}
-        />
+    <button
+      type="button"
+      onClick={onOpenLevels}
+      className="w-full text-left rounded-2xl border p-4 transition-colors hover:border-white/25"
+      style={{ borderColor: `${info.rankColor}55`, background: `linear-gradient(135deg, ${info.rankColor}22, ${info.rankColor}0a)` }}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className="h-11 w-11 rounded-full flex items-center justify-center text-xl shrink-0"
+          style={{ background: `${info.rankColor}26`, boxShadow: `0 0 16px -4px ${info.rankColor}` }}
+        >
+          {info.rankEmoji}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] text-white/45 tracking-wide">{info.isUnranked ? "NOT RANKED YET" : "YOUR LEVEL"}</div>
+          <div className="text-base truncate" style={{ color: info.rankColor, fontFamily: "var(--font-display)" }}>
+            {info.isUnranked ? "Unranked" : `${info.rankName} ${subLevelRoman(info.subLevel)} · Level ${info.level}`}
+          </div>
+        </div>
+        <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-white/30" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
       </div>
-    </div>
+
+      <div className="mt-3">
+        <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div className="h-full rounded-full" style={{ width: `${Math.min(info.progress, 1) * 100}%`, background: info.rankColor }} />
+        </div>
+        <p className="text-[11px] text-white/45 mt-1.5">{info.isUnranked ? `${totalPoints} / 150 pts to Level 1` : nextLabel}</p>
+      </div>
+    </button>
   );
 }
 
