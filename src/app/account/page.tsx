@@ -1,7 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProfile } from "@/hooks/useProfile";
+import { useAuth } from "@/hooks/useAuth";
+import { useSignInModal } from "@/hooks/useSignInModal";
+import { updateProfile } from "@/lib/supabase/profile";
 
 const AVATAR_SIZE = 200;
 
@@ -30,7 +33,134 @@ function resizeToSquareDataUrl(file: File): Promise<string> {
 }
 
 export default function AccountPage() {
+  const { user, profile: authProfile, loading: authLoading, signOut, refreshProfile } = useAuth();
+
+  if (authLoading) {
+    return (
+      <main className="flex-1 px-4 pb-16 pt-10 max-w-2xl w-full mx-auto flex items-center justify-center">
+        <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+      </main>
+    );
+  }
+
+  return user ? (
+    <SignedInAccount userId={user.id} email={user.email ?? ""} authProfile={authProfile} onSignOut={signOut} onProfileChange={refreshProfile} />
+  ) : (
+    <SignedOutAccount />
+  );
+}
+
+function SignedInAccount({
+  userId,
+  email,
+  authProfile,
+  onSignOut,
+  onProfileChange,
+}: {
+  userId: string;
+  email: string;
+  authProfile: { display_name: string; avatar_url: string | null } | null;
+  onSignOut: () => Promise<void>;
+  onProfileChange: () => Promise<void>;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [displayName, setDisplayName] = useState(authProfile?.display_name ?? "");
+  const [savingName, setSavingName] = useState(false);
+
+  useEffect(() => {
+    setDisplayName(authProfile?.display_name ?? "");
+  }, [authProfile?.display_name]);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const dataUrl = await resizeToSquareDataUrl(file);
+      await updateProfile(userId, { avatarDataUrl: dataUrl });
+      await onProfileChange();
+    } catch (err) {
+      console.error("Avatar upload failed", err);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleSaveName() {
+    if (savingName || displayName === (authProfile?.display_name ?? "")) return;
+    setSavingName(true);
+    try {
+      await updateProfile(userId, { displayName });
+      await onProfileChange();
+    } catch (err) {
+      console.error("Name update failed", err);
+    } finally {
+      setSavingName(false);
+    }
+  }
+
+  return (
+    <main className="flex-1 px-4 pb-16 pt-10 max-w-2xl w-full mx-auto">
+      <h1 className="text-4xl text-center" style={{ fontFamily: "var(--font-display)" }}>
+        ACCOUNT
+      </h1>
+      <p className="text-center text-white/50 text-sm mt-2 mb-10">{email}</p>
+
+      <div className="flex flex-col items-center gap-8">
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="relative h-28 w-28 rounded-full overflow-hidden border-2 border-white/20 bg-white/5 flex items-center justify-center"
+            aria-label="Change profile picture"
+          >
+            {authProfile?.avatar_url ? (
+              <img src={authProfile.avatar_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-3xl text-white/30">+</span>
+            )}
+            {uploading && (
+              <span className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span className="h-5 w-5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+              </span>
+            )}
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+          <button onClick={() => fileInputRef.current?.click()} className="text-xs text-white/50 hover:text-white">
+            {authProfile?.avatar_url ? "Change photo" : "Add photo"}
+          </button>
+        </div>
+
+        <label className="w-full flex flex-col gap-2">
+          <span className="text-xs text-white/50 tracking-wide">DISPLAY NAME</span>
+          <div className="flex gap-2">
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              onBlur={handleSaveName}
+              placeholder="Your name"
+              className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
+            />
+            {savingName && <span className="shrink-0 h-4 w-4 mt-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />}
+          </div>
+        </label>
+
+        <button
+          onClick={() => onSignOut()}
+          className="text-xs text-white/40 hover:text-white/70 rounded-full px-5 py-2 border border-white/15 hover:border-white/30 transition-colors"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          SIGN OUT
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function SignedOutAccount() {
   const { profile, setProfile, loaded } = useProfile();
+  const { requestSignIn, signInModal } = useSignInModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -52,9 +182,7 @@ export default function AccountPage() {
       <h1 className="text-4xl text-center" style={{ fontFamily: "var(--font-display)" }}>
         ACCOUNT
       </h1>
-      <p className="text-center text-white/50 text-sm mt-2 mb-10">
-        Full sign-in and cross-device sync are coming soon. For now, your profile is saved on this device.
-      </p>
+      <p className="text-center text-white/50 text-sm mt-2 mb-10">Sign in to save your profile and picks across devices.</p>
 
       {loaded && (
         <div className="flex flex-col items-center gap-8">
@@ -92,13 +220,18 @@ export default function AccountPage() {
           </label>
 
           <div className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-center">
-            <p className="text-sm text-white/60">Sign-in (Google / email) is on the way.</p>
-            <button disabled className="mt-3 rounded-full px-5 py-2 text-sm border border-white/15 text-white/40 cursor-not-allowed">
-              Sign in &mdash; coming soon
+            <p className="text-sm text-white/60">Signing in also saves your picks and syncs this profile to your account.</p>
+            <button
+              onClick={() => requestSignIn()}
+              className="mt-3 rounded-full px-6 py-2.5 text-sm active:scale-95 transition-transform duration-150"
+              style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #34d399, #059669)", color: "#ffffff" }}
+            >
+              SIGN IN
             </button>
           </div>
         </div>
       )}
+      {signInModal}
     </main>
   );
 }

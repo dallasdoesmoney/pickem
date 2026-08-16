@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { WIN_TOTALS } from "@/data/winTotals";
 import { isSuspiciousPick } from "@/data/powerRankings";
@@ -10,16 +10,73 @@ import { TeamSwitcher } from "@/components/TeamSwitcher";
 import { getTeamSchedule } from "@/lib/teamSchedule";
 import { useSeasonPicks } from "@/hooks/useSeasonPicks";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuth } from "@/hooks/useAuth";
+import { useSignInModal } from "@/hooks/useSignInModal";
+import { supabase } from "@/lib/supabase/client";
+import { saveSeasonPicks } from "@/lib/supabase/picks";
 import { renderPredictorShareImage } from "@/lib/predictorShareImage";
+
+const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
 export default function PredictorPageClient({ trackedTeam }: { trackedTeam: TeamAbbr }) {
   const team = TEAMS[trackedTeam];
   const schedule = getTeamSchedule(trackedTeam);
   const { picks, setPick, resetPicks, loaded } = useSeasonPicks(trackedTeam);
   const { confirm, dialog } = useConfirmDialog();
+  const { user } = useAuth();
+  const { requestSignIn, signInModal } = useSignInModal();
   const [sharing, setSharing] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const winTotal = WIN_TOTALS[trackedTeam];
+
+  async function handleSaveAndSubmit() {
+    if (saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      let userId = user?.id;
+      if (!userId) {
+        const signedIn = await requestSignIn();
+        if (!signedIn) {
+          setSaving(false);
+          return;
+        }
+        const { data } = await supabase.auth.getSession();
+        userId = data.session?.user.id;
+      }
+      // No userId here means the sign-in was a Google redirect - the
+      // pending-save effect below picks it back up once the page reloads
+      // with a session, so there's nothing more to do in this click.
+      if (!userId) return;
+      await saveSeasonPicks(userId, trackedTeam, picks);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error("Save failed", err);
+      setSaveError("Couldn't save your picks. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!user || !loaded) return;
+    if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
+    sessionStorage.removeItem(PENDING_SAVE_KEY);
+    saveSeasonPicks(user.id, trackedTeam, picks)
+      .then(() => {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      })
+      .catch((err) => {
+        console.error("Save failed", err);
+        setSaveError("Couldn't save your picks. Try again.");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loaded]);
 
   // Desktop's two columns should read top-to-bottom then wrap (weeks 1-9,
   // then 10-18), not interleave left/right like CSS grid's default
@@ -291,6 +348,42 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             </button>
 
             <button
+              aria-label="Save and submit your predictions"
+              onClick={handleSaveAndSubmit}
+              disabled={saving}
+              className="flex items-center gap-2 rounded-full px-6 py-3 text-sm mt-3 active:scale-95 transition-transform duration-150 disabled:opacity-60"
+              style={{
+                fontFamily: "var(--font-display)",
+                background: "linear-gradient(135deg, #34d399, #059669)",
+                color: "#ffffff",
+              }}
+            >
+              {saving ? (
+                <>
+                  <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  SAVING&hellip;
+                </>
+              ) : saved ? (
+                <>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                  SAVED
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                    <path d="M17 21v-8H7v8" />
+                    <path d="M7 3v5h8" />
+                  </svg>
+                  SAVE &amp; SUBMIT PICKS
+                </>
+              )}
+            </button>
+            {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
+
+            <button
               aria-label="Reset your predictions"
               onClick={async () => {
                 if (await confirm("Reset all your schedule predictions?")) resetPicks();
@@ -305,6 +398,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       )}
       </main>
       {dialog}
+      {signInModal}
     </div>
   );
 }

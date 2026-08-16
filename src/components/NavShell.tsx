@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { PickemMenu } from "@/components/PickemMenu";
+import { AccountMenu } from "@/components/AccountMenu";
+import { useAuth } from "@/hooks/useAuth";
 
 type NavItem = {
   href: string;
@@ -102,8 +104,10 @@ function MobileNavLink({ item, onClick }: { item: NavItem; onClick?: () => void 
 }
 
 export function NavShell({ children }: { children: React.ReactNode }) {
+  const { user, profile, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pickemMenuOpen, setPickemMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   return (
     <div className="flex min-h-full">
@@ -135,9 +139,34 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                 </div>
               ))}
               <div className="flex flex-col gap-1 pt-3 border-t border-white/10">
-                {MOBILE_STANDALONE_ITEMS.map((item) => (
-                  <MobileNavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />
-                ))}
+                {user ? (
+                  <>
+                    <Link
+                      href="/account"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/85 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      {profile?.avatar_url ? (
+                        <img src={profile.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <AccountIcon className="h-5 w-5 shrink-0" />
+                      )}
+                      <span className="text-sm truncate">{profile?.display_name || user.email}</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        signOut();
+                      }}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white hover:bg-white/5 transition-colors text-left"
+                    >
+                      <span className="text-sm">Sign out</span>
+                    </button>
+                  </>
+                ) : (
+                  MOBILE_STANDALONE_ITEMS.map((item) => <MobileNavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />)
+                )}
               </div>
             </nav>
           </div>
@@ -163,14 +192,9 @@ export function NavShell({ children }: { children: React.ReactNode }) {
             <img src="/header-logo.png" alt="Sideline Brew" className="h-16 w-auto" />
           </Link>
 
-          <Link
-            href="/account"
-            className="hidden lg:flex items-center gap-2 absolute right-6 text-sm text-white/70 hover:text-white transition-colors"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            <AccountIcon className="h-5 w-5" />
-            Account
-          </Link>
+          <div className="absolute right-6">
+            <AccountMenu open={accountMenuOpen} onOpenChange={setAccountMenuOpen} />
+          </div>
         </div>
         {children}
       </div>

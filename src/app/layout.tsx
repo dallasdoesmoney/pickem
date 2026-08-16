@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Bungee } from "next/font/google";
 import { NavShell } from "@/components/NavShell";
+import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -57,7 +58,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </pattern>
           <rect width="100%" height="100%" fill="url(#press-backdrop)" />
         </svg>
-        <NavShell>{children}</NavShell>
+        <AuthProvider>
+          <NavShell>{children}</NavShell>
+        </AuthProvider>
       </body>
     </html>
   );

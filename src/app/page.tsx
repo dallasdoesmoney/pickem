@@ -1,13 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard } from "@/components/GameCard";
 import { usePicks } from "@/hooks/usePicks";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
+import { useAuth } from "@/hooks/useAuth";
+import { useSignInModal } from "@/hooks/useSignInModal";
+import { supabase } from "@/lib/supabase/client";
+import { saveWeeklyPicks } from "@/lib/supabase/picks";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
+
+const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
 function PillTexture() {
   return (
@@ -72,11 +78,62 @@ export default function Home() {
   const games = GAMES_BY_WEEK[CURRENT_WEEK];
   const { picks, setPick, resetPicks, loaded } = usePicks(CURRENT_WEEK);
   const { confirm, dialog } = useConfirmDialog();
+  const { user } = useAuth();
+  const { requestSignIn, signInModal } = useSignInModal();
   const pickedCount = Object.keys(picks).length;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
   const tags = computePickTags(games, picks);
   const [sharing, setSharing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  async function handleSaveAndSubmit() {
+    if (saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      let userId = user?.id;
+      if (!userId) {
+        const signedIn = await requestSignIn();
+        if (!signedIn) {
+          setSaving(false);
+          return;
+        }
+        const { data } = await supabase.auth.getSession();
+        userId = data.session?.user.id;
+      }
+      // No userId here means the sign-in was a Google redirect - the
+      // pending-save effect below picks it back up once the page reloads
+      // with a session, so there's nothing more to do in this click.
+      if (!userId) return;
+      await saveWeeklyPicks(userId, CURRENT_WEEK, picks);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error("Save failed", err);
+      setSaveError("Couldn't save your picks. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!user || !loaded) return;
+    if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
+    sessionStorage.removeItem(PENDING_SAVE_KEY);
+    saveWeeklyPicks(user.id, CURRENT_WEEK, picks)
+      .then(() => {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      })
+      .catch((err) => {
+        console.error("Save failed", err);
+        setSaveError("Couldn't save your picks. Try again.");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loaded]);
 
   async function handleShare() {
     if (sharing) return;
@@ -248,6 +305,44 @@ export default function Home() {
               </button>
             </div>
 
+            <div className="flex flex-col items-center mt-3">
+              <button
+                aria-label="Save and submit your picks"
+                onClick={handleSaveAndSubmit}
+                disabled={saving}
+                className="flex items-center gap-2 rounded-full px-6 py-3 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  background: "linear-gradient(135deg, #34d399, #059669)",
+                  color: "#ffffff",
+                }}
+              >
+                {saving ? (
+                  <>
+                    <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    SAVING&hellip;
+                  </>
+                ) : saved ? (
+                  <>
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    SAVED
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                      <path d="M17 21v-8H7v8" />
+                      <path d="M7 3v5h8" />
+                    </svg>
+                    SAVE &amp; SUBMIT PICKS
+                  </>
+                )}
+              </button>
+              {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
+            </div>
+
             <div className="flex justify-center mt-3">
               <button
                 aria-label="Reset your picks"
@@ -264,6 +359,7 @@ export default function Home() {
         )}
       </main>
       {dialog}
+      {signInModal}
     </div>
   );
 }
