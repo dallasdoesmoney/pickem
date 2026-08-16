@@ -7,32 +7,9 @@ import { useSignInModal } from "@/hooks/useSignInModal";
 import { useUsernameField } from "@/hooks/useUsernameField";
 import { updateAvatar, claimUsername } from "@/lib/supabase/profile";
 import { USERNAME_MIN, USERNAME_MAX } from "@/lib/usernamePolicy";
+import { AvatarCropModal } from "@/components/AvatarCropModal";
 
 const AVATAR_SIZE = 200;
-
-function resizeToSquareDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = AVATAR_SIZE;
-      canvas.height = AVATAR_SIZE;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("canvas 2d context unavailable"));
-        return;
-      }
-      const side = Math.min(img.width, img.height);
-      const sx = (img.width - side) / 2;
-      const sy = (img.height - side) / 2;
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
-      URL.revokeObjectURL(img.src);
-    };
-    img.onerror = () => reject(new Error("failed to load image"));
-    img.src = URL.createObjectURL(file);
-  });
-}
 
 export default function AccountPage() {
   const { user, profile: authProfile, loading: authLoading, signOut, refreshProfile } = useAuth();
@@ -66,6 +43,7 @@ function SignedInAccount({
   onProfileChange: () => Promise<void>;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
@@ -82,21 +60,26 @@ function SignedInAccount({
     }
   }, [authProfile?.username, initializedUsername, setUsername]);
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    setUploading(true);
     setAvatarError(null);
+    setCropFile(file);
+  }
+
+  async function handleCropConfirm(dataUrl: string) {
+    setCropFile(null);
+    setUploading(true);
     try {
-      const dataUrl = await resizeToSquareDataUrl(file);
       await updateAvatar(userId, dataUrl);
       await onProfileChange();
     } catch (err) {
       console.error("Avatar upload failed", err);
-      setAvatarError("Couldn't upload that photo. Try again.");
+      const detail = err instanceof Error ? err.message : String(err);
+      setAvatarError(`Couldn't upload that photo: ${detail}`);
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
   }
 
@@ -146,7 +129,7 @@ function SignedInAccount({
           <button onClick={() => fileInputRef.current?.click()} className="text-xs text-white/50 hover:text-white">
             {authProfile?.avatar_url ? "Change photo" : "Add photo"}
           </button>
-          {avatarError && <p className="text-xs text-red-400">{avatarError}</p>}
+          {avatarError && <p className="text-xs text-red-400 text-center max-w-xs">{avatarError}</p>}
         </div>
 
         <div className="w-full flex flex-col gap-2">
@@ -185,6 +168,8 @@ function SignedInAccount({
           SIGN OUT
         </button>
       </div>
+
+      {cropFile && <AvatarCropModal file={cropFile} outputSize={AVATAR_SIZE} onCancel={() => setCropFile(null)} onConfirm={handleCropConfirm} />}
     </main>
   );
 }
@@ -193,19 +178,18 @@ function SignedOutAccount() {
   const { profile, setProfile, loaded } = useProfile();
   const { requestSignIn, signInModal } = useSignInModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    setUploading(true);
-    try {
-      const dataUrl = await resizeToSquareDataUrl(file);
-      setProfile((p) => ({ ...p, avatarDataUrl: dataUrl }));
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
+    setCropFile(file);
+  }
+
+  function handleCropConfirm(dataUrl: string) {
+    setCropFile(null);
+    setProfile((p) => ({ ...p, avatarDataUrl: dataUrl }));
   }
 
   return (
@@ -228,11 +212,6 @@ function SignedOutAccount() {
               ) : (
                 <span className="text-3xl text-white/30">+</span>
               )}
-              {uploading && (
-                <span className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <span className="h-5 w-5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                </span>
-              )}
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
             <button onClick={() => fileInputRef.current?.click()} className="text-xs text-white/50 hover:text-white">
@@ -253,6 +232,7 @@ function SignedOutAccount() {
         </div>
       )}
       {signInModal}
+      {cropFile && <AvatarCropModal file={cropFile} outputSize={AVATAR_SIZE} onCancel={() => setCropFile(null)} onConfirm={handleCropConfirm} />}
     </main>
   );
 }
