@@ -151,7 +151,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                       ) : (
                         <AccountIcon className="h-5 w-5 shrink-0" />
                       )}
-                      <span className="text-sm truncate">{profile?.display_name || user.email}</span>
+                      <span className="text-sm truncate">{profile?.username || user.email}</span>
                     </Link>
                     <button
                       type="button"

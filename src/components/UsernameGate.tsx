@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { checkUsernameAvailable, claimUsername } from "@/lib/supabase/profile";
-
-const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
-
-type Status = "idle" | "checking" | "available" | "taken" | "invalid";
+import { useUsernameField } from "@/hooks/useUsernameField";
+import { claimUsername } from "@/lib/supabase/profile";
+import { USERNAME_MIN, USERNAME_MAX } from "@/lib/usernamePolicy";
 
 // Mounted once, app-wide (see layout.tsx) - shows itself automatically
 // whenever someone is signed in but hasn't claimed a username yet. This
@@ -18,42 +16,11 @@ type Status = "idle" | "checking" | "available" | "taken" | "invalid";
 // this is laying groundwork for, so every account needs one.
 export function UsernameGate() {
   const { user, profile, loading, refreshProfile } = useAuth();
-  const [username, setUsername] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
+  const { username, setUsername, status } = useUsernameField();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = !loading && !!user && !!profile && !profile.username;
-
-  useEffect(() => {
-    if (!show) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (!username) {
-      setStatus("idle");
-      return;
-    }
-    if (!USERNAME_RE.test(username)) {
-      setStatus("invalid");
-      return;
-    }
-
-    setStatus("checking");
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const available = await checkUsernameAvailable(username);
-        setStatus(available ? "available" : "taken");
-      } catch {
-        setStatus("idle");
-      }
-    }, 400);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [username, show]);
-
   if (!show) return null;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -65,7 +32,6 @@ export function UsernameGate() {
     setSubmitting(false);
     if (error) {
       setSubmitError(error);
-      setStatus("taken");
       return;
     }
     await refreshProfile();
@@ -88,14 +54,14 @@ export function UsernameGate() {
             value={username}
             onChange={(e) => setUsername(e.target.value.trim())}
             placeholder="username"
-            maxLength={20}
+            maxLength={USERNAME_MAX}
             className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-white text-sm placeholder:text-white/30 outline-none focus:border-white/35"
           />
           <p className="text-xs h-4 -mt-1" style={{ color: hintColor }}>
             {status === "checking" && "Checking…"}
             {status === "available" && "Available"}
             {status === "taken" && "That username is taken"}
-            {status === "invalid" && "3-20 characters: letters, numbers, underscores only"}
+            {status === "invalid" && `${USERNAME_MIN}-${USERNAME_MAX} characters: letters, numbers, underscores only`}
           </p>
 
           {submitError && <p className="text-xs text-red-400">{submitError}</p>}

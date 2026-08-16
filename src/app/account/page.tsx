@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useProfile } from "@/hooks/useProfile";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, type Profile } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
-import { updateProfile } from "@/lib/supabase/profile";
+import { useUsernameField } from "@/hooks/useUsernameField";
+import { updateAvatar, claimUsername } from "@/lib/supabase/profile";
+import { USERNAME_MIN, USERNAME_MAX } from "@/lib/usernamePolicy";
 
 const AVATAR_SIZE = 200;
 
@@ -59,47 +61,61 @@ function SignedInAccount({
 }: {
   userId: string;
   email: string;
-  authProfile: { display_name: string; avatar_url: string | null } | null;
+  authProfile: Profile | null;
   onSignOut: () => Promise<void>;
   onProfileChange: () => Promise<void>;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [displayName, setDisplayName] = useState(authProfile?.display_name ?? "");
-  const [savingName, setSavingName] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  const { username, setUsername, status } = useUsernameField(authProfile?.username);
+  const [initializedUsername, setInitializedUsername] = useState(false);
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSaved, setUsernameSaved] = useState(false);
 
   useEffect(() => {
-    setDisplayName(authProfile?.display_name ?? "");
-  }, [authProfile?.display_name]);
+    if (!initializedUsername && authProfile?.username) {
+      setUsername(authProfile.username);
+      setInitializedUsername(true);
+    }
+  }, [authProfile?.username, initializedUsername, setUsername]);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setAvatarError(null);
     try {
       const dataUrl = await resizeToSquareDataUrl(file);
-      await updateProfile(userId, { avatarDataUrl: dataUrl });
+      await updateAvatar(userId, dataUrl);
       await onProfileChange();
     } catch (err) {
       console.error("Avatar upload failed", err);
+      setAvatarError("Couldn't upload that photo. Try again.");
     } finally {
       setUploading(false);
       e.target.value = "";
     }
   }
 
-  async function handleSaveName() {
-    if (savingName || displayName === (authProfile?.display_name ?? "")) return;
-    setSavingName(true);
-    try {
-      await updateProfile(userId, { displayName });
-      await onProfileChange();
-    } catch (err) {
-      console.error("Name update failed", err);
-    } finally {
-      setSavingName(false);
+  async function handleSaveUsername() {
+    if (status !== "available" || savingUsername) return;
+    setSavingUsername(true);
+    setUsernameError(null);
+    const { error } = await claimUsername(userId, username);
+    setSavingUsername(false);
+    if (error) {
+      setUsernameError(error);
+      return;
     }
+    setUsernameSaved(true);
+    setTimeout(() => setUsernameSaved(false), 2000);
+    await onProfileChange();
   }
+
+  const hintColor = status === "available" ? "#4ade80" : status === "taken" || status === "invalid" ? "#f87171" : "rgba(255,255,255,0.4)";
 
   return (
     <main className="flex-1 px-4 pb-16 pt-10 max-w-2xl w-full mx-auto">
@@ -130,21 +146,36 @@ function SignedInAccount({
           <button onClick={() => fileInputRef.current?.click()} className="text-xs text-white/50 hover:text-white">
             {authProfile?.avatar_url ? "Change photo" : "Add photo"}
           </button>
+          {avatarError && <p className="text-xs text-red-400">{avatarError}</p>}
         </div>
 
-        <label className="w-full flex flex-col gap-2">
-          <span className="text-xs text-white/50 tracking-wide">DISPLAY NAME</span>
+        <div className="w-full flex flex-col gap-2">
+          <span className="text-xs text-white/50 tracking-wide">USERNAME</span>
           <div className="flex gap-2">
             <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              onBlur={handleSaveName}
-              placeholder="Your name"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.trim())}
+              placeholder="username"
+              maxLength={USERNAME_MAX}
               className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
             />
-            {savingName && <span className="shrink-0 h-4 w-4 mt-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />}
+            <button
+              onClick={handleSaveUsername}
+              disabled={status !== "available" || savingUsername}
+              className="shrink-0 rounded-xl px-4 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-40"
+              style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
+            >
+              {savingUsername ? "…" : usernameSaved ? "Saved" : "Save"}
+            </button>
           </div>
-        </label>
+          <p className="text-xs h-4" style={{ color: hintColor }}>
+            {status === "checking" && "Checking…"}
+            {status === "available" && "Available"}
+            {status === "taken" && "That username is taken"}
+            {status === "invalid" && `${USERNAME_MIN}-${USERNAME_MAX} characters: letters, numbers, underscores only`}
+          </p>
+          {usernameError && <p className="text-xs text-red-400 -mt-2">{usernameError}</p>}
+        </div>
 
         <button
           onClick={() => onSignOut()}
@@ -182,7 +213,7 @@ function SignedOutAccount() {
       <h1 className="text-4xl text-center" style={{ fontFamily: "var(--font-display)" }}>
         ACCOUNT
       </h1>
-      <p className="text-center text-white/50 text-sm mt-2 mb-10">Sign in to save your profile and picks across devices.</p>
+      <p className="text-center text-white/50 text-sm mt-2 mb-10">Sign in to choose a username and save your picks across devices.</p>
 
       {loaded && (
         <div className="flex flex-col items-center gap-8">
@@ -209,18 +240,8 @@ function SignedOutAccount() {
             </button>
           </div>
 
-          <label className="w-full flex flex-col gap-2">
-            <span className="text-xs text-white/50 tracking-wide">DISPLAY NAME</span>
-            <input
-              value={profile.displayName}
-              onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
-              placeholder="Your name"
-              className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-white/40"
-            />
-          </label>
-
           <div className="w-full rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-center">
-            <p className="text-sm text-white/60">Signing in also saves your picks and syncs this profile to your account.</p>
+            <p className="text-sm text-white/60">Signing in lets you pick a username and syncs this profile to your account.</p>
             <button
               onClick={() => requestSignIn()}
               className="mt-3 rounded-full px-6 py-2.5 text-sm active:scale-95 transition-transform duration-150"

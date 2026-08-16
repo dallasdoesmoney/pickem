@@ -1,6 +1,6 @@
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { saveWeeklyPicks, saveSeasonPicks } from "@/lib/supabase/picks";
-import { updateProfile } from "@/lib/supabase/profile";
+import { updateAvatar } from "@/lib/supabase/profile";
 
 const WEEKLY_KEY_RE = /^pickem:picks:week-(\d+)$/;
 const SEASON_KEY_RE = /^pickem:season-predictor:([A-Z]{2,3})$/;
@@ -42,11 +42,8 @@ export async function migrateLocalDataToAccount(userId: string) {
     }
   }
 
-  const profile = safeParse<{ displayName?: string; avatarDataUrl?: string | null }>(localStorage.getItem(PROFILE_KEY));
-  if (profile && (profile.displayName || profile.avatarDataUrl)) {
-    await updateProfile(userId, {
-      displayName: profile.displayName || undefined,
-      avatarDataUrl: profile.avatarDataUrl || undefined,
-    });
+  const profile = safeParse<{ avatarDataUrl?: string | null }>(localStorage.getItem(PROFILE_KEY));
+  if (profile?.avatarDataUrl) {
+    await updateAvatar(userId, profile.avatarDataUrl);
   }
 }

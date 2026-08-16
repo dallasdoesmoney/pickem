@@ -5,30 +5,20 @@ const AVATAR_BUCKET = "avatars";
 // avatarDataUrl comes pre-cropped from the existing resizeToSquareDataUrl
 // logic in src/app/account/page.tsx - this only handles the upload + DB
 // write, so the crop math stays in one place.
-export async function updateProfile(userId: string, updates: { displayName?: string; avatarDataUrl?: string }) {
-  const patch: { display_name?: string; avatar_url?: string } = {};
+export async function updateAvatar(userId: string, avatarDataUrl: string) {
+  const blob = await (await fetch(avatarDataUrl)).blob();
+  const path = `${userId}/avatar.jpg`;
+  const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(path, blob, {
+    contentType: "image/jpeg",
+    upsert: true,
+  });
+  if (uploadError) throw uploadError;
 
-  if (updates.displayName !== undefined) {
-    patch.display_name = updates.displayName;
-  }
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  // Cache-bust so a re-uploaded avatar at the same path shows up immediately.
+  const avatarUrl = `${data.publicUrl}?t=${Date.now()}`;
 
-  if (updates.avatarDataUrl) {
-    const blob = await (await fetch(updates.avatarDataUrl)).blob();
-    const path = `${userId}/avatar.jpg`;
-    const { error: uploadError } = await supabase.storage.from(AVATAR_BUCKET).upload(path, blob, {
-      contentType: "image/jpeg",
-      upsert: true,
-    });
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-    // Cache-bust so a re-uploaded avatar at the same path shows up immediately.
-    patch.avatar_url = `${data.publicUrl}?t=${Date.now()}`;
-  }
-
-  if (Object.keys(patch).length === 0) return;
-
-  const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
+  const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("id", userId);
   if (error) throw error;
 }
 
@@ -46,7 +36,7 @@ export async function claimUsername(userId: string, username: string): Promise<{
   const { error } = await supabase.from("profiles").update({ username }).eq("id", userId);
   if (error) {
     if (error.code === "23505") return { error: "That username is already taken." };
-    if (error.code === "23514") return { error: "Usernames must be 3-20 characters: letters, numbers, underscores only." };
+    if (error.code === "23514") return { error: "That username isn't allowed." };
     return { error: "Couldn't save that username. Try again." };
   }
   return { error: null };

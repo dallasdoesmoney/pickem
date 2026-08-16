@@ -38,7 +38,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
     );
   }
 
-  const name = profile?.display_name || user.email || "Account";
+  const name = profile?.username || user.email || "Account";
   const initial = name.trim().charAt(0).toUpperCase() || "?";
 
   return (

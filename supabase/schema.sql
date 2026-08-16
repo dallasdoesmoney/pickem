@@ -13,8 +13,15 @@ create table public.profiles (
   updated_at timestamptz not null default now()
 );
 alter table public.profiles enable row level security;
+-- Format + a small server-side profanity backstop matching
+-- src/lib/usernamePolicy.ts's client-side list.
 alter table public.profiles add constraint profiles_username_format
-  check (username is null or username ~ '^[a-zA-Z0-9_]{3,20}$');
+  check (
+    username is null or (
+      username ~ '^[a-zA-Z0-9_]{4,20}$'
+      and username !~* '(fuck|shit|bitch|asshole|cunt|nigger|nigga|faggot|retard|whore|slut|rape|nazi|hitler|pussy)'
+    )
+  );
 create unique index profiles_username_lower_idx on public.profiles (lower(username));
 create policy "profiles_select_own" on public.profiles for select using (auth.uid() = id);
 create policy "profiles_insert_own" on public.profiles for insert with check (auth.uid() = id);
@@ -22,7 +29,7 @@ create policy "profiles_update_own" on public.profiles for update using (auth.ui
 
 -- Security-definer so username availability can be checked across all
 -- users without broadening profiles_select_own to expose other rows.
-create function public.is_username_available(check_username text)
+create or replace function public.is_username_available(check_username text)
 returns boolean
 language sql
 stable
