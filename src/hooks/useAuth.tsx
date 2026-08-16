@@ -5,6 +5,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { migrateLocalDataToAccount } from "@/lib/supabase/migration";
 import { claimReferral } from "@/lib/supabase/referrals";
+import { PENDING_REFERRAL_KEY } from "@/lib/referralStorage";
 
 export type Profile = {
   id: string;
@@ -15,8 +16,6 @@ export type Profile = {
   migrated_local_picks: boolean;
   referred_by: string | null;
 };
-
-const PENDING_REFERRAL_KEY = "pickem:pending-referral";
 
 type AuthContextValue = {
   user: User | null;

@@ -303,14 +303,17 @@ $$;
 grant execute on function public.sync_weekly_pickem_achievements() to authenticated;
 
 -- Attributes a new signup to whoever referred them (by username, doubling
--- as the referral code - no separate code system needed) and pays the
--- referrer a flat, deliberately large bonus. Security definer since
--- referred_by has no client update grant (see profiles above). Claimable
--- exactly once per account: a caller who already has referred_by set is a
--- no-op, which also makes this safe to call speculatively/repeatedly from
--- the client without double-crediting. No-ops on a bad username or a
--- self-referral rather than erroring, since this runs silently in the
--- background after signup - there's no UI waiting on its result.
+-- as the referral code - no separate code system needed) and pays BOTH
+-- sides a flat, deliberately large bonus - the referrer (source
+-- 'referral') and the new signup (source 'referral_signup', kept distinct
+-- so the two directions stay distinguishable in the ledger). Security
+-- definer since referred_by has no client update grant (see profiles
+-- above). Claimable exactly once per account: a caller who already has
+-- referred_by set is a no-op, which also makes this safe to call
+-- speculatively/repeatedly from the client without double-crediting.
+-- No-ops on a bad username or a self-referral rather than erroring, since
+-- this runs silently in the background after signup - there's no UI
+-- waiting on its result.
 create or replace function public.claim_referral(p_referrer_username text)
 returns void
 language plpgsql
@@ -332,7 +335,9 @@ begin
   update public.profiles set referred_by = v_referrer_id where id = auth.uid();
 
   insert into public.point_events (user_id, source, points, reference_id)
-  values (v_referrer_id, 'referral', 1000, auth.uid()::text)
+  values
+    (v_referrer_id, 'referral', 1000, auth.uid()::text),
+    (auth.uid(), 'referral_signup', 1000, v_referrer_id::text)
   on conflict (user_id, source, reference_id) do nothing;
 end;
 $$;

@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
+import { getPendingReferralCode } from "@/lib/referralStorage";
 
 type ModalState = { resolve: (ok: boolean) => void } | null;
 
@@ -39,9 +41,10 @@ export function useSignInModal() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [referrer, setReferrer] = useState<{ label: string } | null>(null);
 
   const requestSignIn = useCallback(() => {
-    setMode("signin");
+    setMode(getPendingReferralCode() ? "signup" : "signin");
     setEmail("");
     setPassword("");
     setError(null);
@@ -49,6 +52,21 @@ export function useSignInModal() {
       setState({ resolve });
     });
   }, []);
+
+  // Shown regardless of which button opened the modal (banner, Save &
+  // Submit, whatever) - anyone signing up with a pending referral code
+  // sees the context, not just people who came in through the banner.
+  useEffect(() => {
+    if (!state) {
+      setReferrer(null);
+      return;
+    }
+    const code = getPendingReferralCode();
+    if (!code) return;
+    fetchLeaderboardEntry(code)
+      .then((row) => setReferrer(row ? { label: row.display_name || row.username } : null))
+      .catch(() => setReferrer(null));
+  }, [state]);
 
   function close(ok: boolean) {
     state?.resolve(ok);
@@ -92,7 +110,17 @@ export function useSignInModal() {
         <h2 className="text-white text-lg" style={{ fontFamily: "var(--font-display)" }}>
           {mode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}
         </h2>
-        <p className="text-white/50 text-sm mt-1 mb-5">{mode === "signin" ? "Sign in to save your picks." : "Create an account to save your picks."}</p>
+        <p className="text-white/50 text-sm mt-1 mb-4">{mode === "signin" ? "Sign in to save your picks." : "Create an account to save your picks."}</p>
+
+        {referrer && mode === "signup" && (
+          <div className="flex items-start gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2.5 text-xs text-white/80 mb-4">
+            <span className="text-base leading-none shrink-0">🎉</span>
+            <span>
+              Invited by <span className="text-emerald-300 font-medium">{referrer.label}</span> &mdash; sign up and{" "}
+              <span className="text-emerald-300 font-medium">you&rsquo;ll both earn 1,000 points</span>.
+            </span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input

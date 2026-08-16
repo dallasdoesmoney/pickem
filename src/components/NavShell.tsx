@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { PickemMenu } from "@/components/PickemMenu";
 import { AccountMenu } from "@/components/AccountMenu";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
+import { ReferralBanner } from "@/components/ReferralBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchPendingRequestCount } from "@/lib/supabase/friends";
 import { fetchMyLeaderboardEntry } from "@/lib/supabase/leaderboard";
@@ -283,6 +284,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
             <AccountMenu open={accountMenuOpen} onOpenChange={setAccountMenuOpen} />
           </div>
         </div>
+        <ReferralBanner />
         {children}
       </div>
       <LevelsAchievementsModal open={achievementsOpen} initialTab="achievements" currentLevel={currentLevel} onClose={() => setAchievementsOpen(false)} />
