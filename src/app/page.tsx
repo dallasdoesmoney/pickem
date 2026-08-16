@@ -17,6 +17,7 @@ import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
 import { TeamAbbr } from "@/data/teams";
+import { buildReferralLink } from "@/lib/referralStorage";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -260,10 +261,11 @@ export default function Home() {
 
       if (canShareFiles) {
         try {
+          const summary = hasResults ? `My Week ${activeWeek} record: ${correctCount}-${gradedCount - correctCount}` : `My Week ${activeWeek} picks`;
           await navigator.share({
             files: [file],
             title: "NFL Pick'em",
-            text: hasResults ? `My Week ${activeWeek} record: ${correctCount}-${gradedCount - correctCount}` : `My Week ${activeWeek} picks`,
+            text: `${summary}\n\n${buildReferralLink(profile?.username)}`,
           });
         } catch (shareErr) {
           if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();

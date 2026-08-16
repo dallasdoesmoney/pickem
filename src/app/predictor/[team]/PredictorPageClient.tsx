@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase/client";
 import { saveSeasonPicks, syncOpponentSeasonPicks } from "@/lib/supabase/picks";
 import { syncPredictorAchievements } from "@/lib/supabase/achievements";
 import { renderPredictorShareImage } from "@/lib/predictorShareImage";
+import { buildReferralLink } from "@/lib/referralStorage";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -32,7 +33,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const nextTeam = TEAMS_SORTED[(teamIndex + 1) % TEAMS_SORTED.length];
   const { picks, setPick, resetPicks, loaded } = useSeasonPicks(trackedTeam);
   const { confirm, dialog } = useConfirmDialog();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
   const [sharing, setSharing] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -138,7 +139,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
           await navigator.share({
             files: [file],
             title: "Record Predictor",
-            text: `I think the ${team.name} will win ${wins} games!\n\nSidelinebrew.com`,
+            text: `I think the ${team.name} will win ${wins} games!\n\n${buildReferralLink(profile?.username)}`,
           });
         } catch (shareErr) {
           if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();
