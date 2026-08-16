@@ -1,14 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
+import { fetchMyFriendIds } from "@/lib/supabase/friends";
 import { errorMessage } from "@/lib/errorMessage";
+
+type View = "global" | "friends";
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
+  const [friendIds, setFriendIds] = useState<Set<string> | null>(null);
+  const [view, setView] = useState<View>("global");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,6 +21,23 @@ export default function LeaderboardPage() {
       .then(setRows)
       .catch((err) => setError(errorMessage(err)));
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setFriendIds(null);
+      if (view === "friends") setView("global");
+      return;
+    }
+    fetchMyFriendIds(user.id)
+      .then(setFriendIds)
+      .catch((err) => setError(errorMessage(err)));
+  }, [user]);
+
+  const visibleRows = useMemo(() => {
+    if (!rows) return null;
+    if (view === "global" || !user) return rows;
+    return rows.filter((r) => r.user_id === user.id || friendIds?.has(r.user_id));
+  }, [rows, view, user, friendIds]);
 
   return (
     <main className="flex-1 px-4 pb-16 pt-10 max-w-2xl w-full mx-auto">
@@ -27,20 +49,42 @@ export default function LeaderboardPage() {
         <p className="text-white/50 text-sm mt-3">Ranked by total correct picks across every published week.</p>
       </div>
 
+      {user && (
+        <div className="flex justify-center mb-6">
+          <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1">
+            {(["global", "friends"] as View[]).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={`rounded-full px-4 py-1.5 text-sm capitalize transition-colors ${
+                  view === v ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"
+                }`}
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-400 text-center mb-4">{error}</p>}
 
-      {!rows ? (
+      {!visibleRows ? (
         <div className="flex justify-center py-10">
           <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
         </div>
-      ) : rows.length === 0 ? (
+      ) : visibleRows.length === 0 ? (
         <div className="text-center py-16 text-white/50">
           <div className="text-4xl mb-3">🏈</div>
-          <p className="text-sm">No records yet — check back once a week&rsquo;s results are published.</p>
+          <p className="text-sm">
+            {view === "friends" ? "No friends yet — add some from their profile page." : "No records yet — check back once a week’s results are published."}
+          </p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {rows.map((row, i) => {
+          {visibleRows.map((row, i) => {
             const isMe = row.user_id === user?.id;
             const label = row.display_name || row.username;
             return (

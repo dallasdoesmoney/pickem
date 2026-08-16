@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { fetchLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { errorMessage } from "@/lib/errorMessage";
+import { useAuth } from "@/hooks/useAuth";
+import { FriendButton } from "@/components/FriendButton";
 
 // A client page (not the server-component-plus-notFound() pattern used by
 // /predictor/[team], which validates against a fixed, known team list) -
@@ -12,6 +14,7 @@ import { errorMessage } from "@/lib/errorMessage";
 // has to be a real query, not a static param check.
 export default function PlayerPage() {
   const params = useParams<{ username: string }>();
+  const { user } = useAuth();
   const [row, setRow] = useState<LeaderboardRow | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,6 +64,12 @@ export default function PlayerPage() {
             </div>
             <div className="text-[11px] text-white/55 mt-1.5 tracking-wide">SEASON RECORD</div>
           </div>
+
+          {user && user.id !== row.user_id && (
+            <div className="mt-6">
+              <FriendButton myId={user.id} otherId={row.user_id} />
+            </div>
+          )}
         </div>
       ) : null}
     </main>

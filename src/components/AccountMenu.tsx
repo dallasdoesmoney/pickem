@@ -2,8 +2,10 @@
 
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
+import { fetchPendingRequestCount } from "@/lib/supabase/friends";
 
 const PANEL_WIDTH = 200;
 
@@ -24,6 +26,17 @@ function AccountIcon({ className }: { className?: string }) {
 export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { user, profile, signOut } = useAuth();
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setPendingCount(0);
+      return;
+    }
+    fetchPendingRequestCount(user.id)
+      .then(setPendingCount)
+      .catch(() => {});
+  }, [user, open]);
 
   if (!user) {
     return (
@@ -52,11 +65,16 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
         className="flex items-center gap-2 rounded-full pl-1 pr-3 py-1 text-sm text-white/80 hover:text-white hover:bg-white/5 transition-colors"
         style={{ fontFamily: "var(--font-display)" }}
       >
-        {profile?.avatar_url ? (
-          <img src={profile.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover" />
-        ) : (
-          <span className="h-7 w-7 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{initial}</span>
-        )}
+        <span className="relative shrink-0">
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover" />
+          ) : (
+            <span className="h-7 w-7 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{initial}</span>
+          )}
+          {pendingCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-[#0e1b33]" />
+          )}
+        </span>
         <span className="max-w-[120px] truncate">{name}</span>
       </button>
 
@@ -77,6 +95,18 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
               style={{ fontFamily: "var(--font-display)" }}
             >
               Account
+            </Link>
+            <Link
+              href="/notifications"
+              role="menuitem"
+              onClick={() => onOpenChange(false)}
+              className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Notifications
+              {pendingCount > 0 && (
+                <span className="h-2 w-2 rounded-full bg-red-500" />
+              )}
             </Link>
             {profile?.is_admin && (
               <Link

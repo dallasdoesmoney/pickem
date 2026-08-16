@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PickemMenu } from "@/components/PickemMenu";
 import { AccountMenu } from "@/components/AccountMenu";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchPendingRequestCount } from "@/lib/supabase/friends";
 
 type NavItem = {
   href: string;
@@ -70,6 +71,15 @@ function LeaderboardIcon({ className }: { className?: string }) {
   );
 }
 
+function NotificationsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
 function AccountIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
@@ -121,6 +131,17 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pickemMenuOpen, setPickemMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setPendingCount(0);
+      return;
+    }
+    fetchPendingRequestCount(user.id)
+      .then(setPendingCount)
+      .catch(() => {});
+  }, [user, mobileOpen]);
 
   return (
     <div className="flex min-h-full">
@@ -165,6 +186,15 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                         <AccountIcon className="h-5 w-5 shrink-0" />
                       )}
                       <span className="text-sm truncate">{profile?.username || user.email}</span>
+                    </Link>
+                    <Link
+                      href="/notifications"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                      <NotificationsIcon className="h-5 w-5 shrink-0" />
+                      <span className="text-sm flex-1">Notifications</span>
+                      {pendingCount > 0 && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
                     </Link>
                     {profile?.is_admin && (
                       <Link
