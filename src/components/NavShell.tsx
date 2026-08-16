@@ -34,7 +34,7 @@ const MOBILE_NAV_SECTIONS: NavSection[] = [
   },
 ];
 
-const MOBILE_STANDALONE_ITEMS: NavItem[] = [{ href: "/account", label: "Account", icon: AccountIcon, matchPrefix: "/account" }];
+const MOBILE_STANDALONE_ITEMS: NavItem[] = [{ href: "/account", label: "Profile", icon: AccountIcon, matchPrefix: "/account" }];
 
 function PicksIcon({ className }: { className?: string }) {
   return (

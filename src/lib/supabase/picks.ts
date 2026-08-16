@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 import { TeamAbbr } from "@/data/teams";
+import { TeamScheduleRow } from "@/lib/teamSchedule";
 
 export async function fetchWeeklyPicks(userId: string, week: number): Promise<Record<string, TeamAbbr>> {
   const { data, error } = await supabase.from("weekly_picks").select("game_id, team_abbr").eq("user_id", userId).eq("week", week);
@@ -55,4 +56,26 @@ export async function saveSeasonPicks(userId: string, trackedTeam: TeamAbbr, pic
 
   const { error: insertError } = await supabase.from("season_picks").insert(rows);
   if (insertError) throw insertError;
+}
+
+// A week's game belongs to two teams' schedules at once, so a pick made
+// on one team's predictor should show up on the other team's predictor
+// too - nobody should have to remember what they already predicted from
+// the other side. Upsert (not delete-then-insert) and additive only: a
+// week left blank here is just skipped, never used to delete the
+// opponent's row, since that team may have saved that same week
+// independently and there's no way to tell "never picked" apart from
+// "intentionally cleared."
+export async function syncOpponentSeasonPicks(userId: string, trackedTeam: TeamAbbr, picks: Record<number, TeamAbbr>, schedule: TeamScheduleRow[]) {
+  const rows = schedule.flatMap((row) => {
+    if ("bye" in row) return [];
+    const winner = picks[row.week];
+    if (!winner) return [];
+    const opponent = row.away === trackedTeam ? row.home : row.away;
+    return [{ user_id: userId, tracked_team: opponent, week: row.week, predicted_winner: winner }];
+  });
+  if (rows.length === 0) return;
+
+  const { error } = await supabase.from("season_picks").upsert(rows, { onConflict: "user_id,tracked_team,week" });
+  if (error) throw error;
 }

@@ -46,7 +46,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
         style={{ fontFamily: "var(--font-display)" }}
       >
         <AccountIcon className="h-5 w-5" />
-        Account
+        Profile
       </Link>
     );
   }
@@ -94,7 +94,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
               className="block rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
               style={{ fontFamily: "var(--font-display)" }}
             >
-              Account
+              Profile
             </Link>
             <Link
               href="/notifications"
