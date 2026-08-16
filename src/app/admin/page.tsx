@@ -161,32 +161,38 @@ function AdminDashboard() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={handleToggleOpen}
-                  disabled={savingWeek}
-                  className="rounded-full px-5 py-2 text-xs disabled:opacity-50 transition-colors"
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    background: currentWeekRow.is_open ? "linear-gradient(135deg, #4ade80, #22c55e)" : "transparent",
-                    color: currentWeekRow.is_open ? "#0e1b33" : "rgba(255,255,255,0.7)",
-                    border: currentWeekRow.is_open ? "none" : "1px solid rgba(255,255,255,0.15)",
-                  }}
-                >
-                  {currentWeekRow.is_open ? "OPEN FOR PICKING" : "CLOSED"}
-                </button>
-                <button
-                  onClick={handleTogglePublished}
-                  disabled={savingWeek}
-                  className="rounded-full px-5 py-2 text-xs disabled:opacity-50 transition-colors"
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    background: currentWeekRow.results_published ? "linear-gradient(135deg, #38bdf8, #0ea5e9)" : "transparent",
-                    color: currentWeekRow.results_published ? "#0e1b33" : "rgba(255,255,255,0.7)",
-                    border: currentWeekRow.results_published ? "none" : "1px solid rgba(255,255,255,0.15)",
-                  }}
-                >
-                  {currentWeekRow.results_published ? "RESULTS PUBLISHED" : "PUBLISH RESULTS"}
-                </button>
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="text-[10px] text-white/40 tracking-wide">{currentWeekRow.is_open ? "OPEN FOR PICKING" : "CLOSED TO PICKS"}</span>
+                  <button
+                    onClick={handleToggleOpen}
+                    disabled={savingWeek}
+                    className="rounded-full px-5 py-2 text-xs disabled:opacity-50 transition-colors"
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      background: currentWeekRow.is_open ? "linear-gradient(135deg, #4ade80, #22c55e)" : "transparent",
+                      color: currentWeekRow.is_open ? "#0e1b33" : "rgba(255,255,255,0.7)",
+                      border: currentWeekRow.is_open ? "none" : "1px solid rgba(255,255,255,0.15)",
+                    }}
+                  >
+                    {currentWeekRow.is_open ? "CLOSE WEEK" : "OPEN WEEK"}
+                  </button>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="text-[10px] text-white/40 tracking-wide">{currentWeekRow.results_published ? "RESULTS PUBLISHED" : "RESULTS NOT PUBLISHED"}</span>
+                  <button
+                    onClick={handleTogglePublished}
+                    disabled={savingWeek}
+                    className="rounded-full px-5 py-2 text-xs disabled:opacity-50 transition-colors"
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      background: currentWeekRow.results_published ? "linear-gradient(135deg, #38bdf8, #0ea5e9)" : "transparent",
+                      color: currentWeekRow.results_published ? "#0e1b33" : "rgba(255,255,255,0.7)",
+                      border: currentWeekRow.results_published ? "none" : "1px solid rgba(255,255,255,0.15)",
+                    }}
+                  >
+                    {currentWeekRow.results_published ? "UNPUBLISH" : "PUBLISH RESULTS"}
+                  </button>
+                </div>
               </div>
             </div>
           )}

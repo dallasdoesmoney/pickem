@@ -9,12 +9,24 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { supabase } from "@/lib/supabase/client";
 import { saveWeeklyPicks } from "@/lib/supabase/picks";
-import { fetchActiveWeek } from "@/lib/supabase/admin";
+import { fetchWeeks, fetchGameResults, WeekRow } from "@/lib/supabase/admin";
+import { WeekSwitcher } from "@/components/WeekSwitcher";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
+import { TeamAbbr } from "@/data/teams";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
+
+// A closed week is enforced at the database level (see
+// weekly_picks_insert_own's RLS policy), so a save attempt after the
+// admin closes a week mid-click surfaces as a row-level-security error -
+// worth a specific message instead of a generic one.
+function describeSaveError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (message.toLowerCase().includes("row-level security")) return "This week is closed for picking.";
+  return "Couldn't save your picks. Try again.";
+}
 
 function PillTexture() {
   return (
@@ -76,17 +88,42 @@ function StatPills({ stats }: { stats: PickStats }) {
 }
 
 export default function Home() {
-  // CURRENT_WEEK is the fallback shown until the admin-controlled active
-  // week loads (or if nothing's ever been opened) - keeps the homepage
+  // CURRENT_WEEK is the fallback shown until the admin-controlled weeks
+  // load (or if nothing's ever been opened) - keeps the homepage
   // rendering immediately instead of blocking on a network round-trip.
+  // activeWeek is which week is currently being VIEWED - defaults to the
+  // open week once known, but the switcher can point it at any week that's
+  // open or has published results.
+  const [weeks, setWeeks] = useState<WeekRow[]>([]);
   const [activeWeek, setActiveWeek] = useState(CURRENT_WEEK);
+  const [weekSwitcherOpen, setWeekSwitcherOpen] = useState(false);
+  const [results, setResults] = useState<Record<string, TeamAbbr>>({});
+
   useEffect(() => {
-    fetchActiveWeek()
-      .then((week) => {
-        if (week !== null) setActiveWeek(week);
+    fetchWeeks()
+      .then((rows) => {
+        setWeeks(rows);
+        const openWeeks = rows.filter((w) => w.is_open).map((w) => w.week);
+        if (openWeeks.length > 0) setActiveWeek(Math.max(...openWeeks));
       })
       .catch(() => {});
   }, []);
+
+  const currentWeekRow = weeks.find((w) => w.week === activeWeek);
+  // Before weeks finish loading, default to editable so the page behaves
+  // exactly as it always has rather than briefly locking every control.
+  const isEditable = weeks.length === 0 || currentWeekRow?.is_open === true;
+
+  useEffect(() => {
+    if (currentWeekRow?.results_published) {
+      fetchGameResults(activeWeek)
+        .then(setResults)
+        .catch(() => setResults({}));
+    } else {
+      setResults({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWeek, currentWeekRow?.results_published]);
 
   const games = GAMES_BY_WEEK[activeWeek];
   const { picks, setPick, resetPicks, loaded } = usePicks(activeWeek);
@@ -94,6 +131,9 @@ export default function Home() {
   const { user } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
   const pickedCount = Object.keys(picks).length;
+  const gradedCount = games.filter((g) => results[g.id]).length;
+  const correctCount = games.filter((g) => results[g.id] && picks[g.id] === results[g.id]).length;
+  const hasResults = gradedCount > 0;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
   const tags = computePickTags(games, picks);
@@ -126,7 +166,7 @@ export default function Home() {
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       console.error("Save failed", err);
-      setSaveError("Couldn't save your picks. Try again.");
+      setSaveError(describeSaveError(err));
     } finally {
       setSaving(false);
     }
@@ -143,7 +183,7 @@ export default function Home() {
       })
       .catch((err) => {
         console.error("Save failed", err);
-        setSaveError("Couldn't save your picks. Try again.");
+        setSaveError(describeSaveError(err));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loaded]);
@@ -215,6 +255,8 @@ export default function Home() {
           picked={picks[item.game.id]}
           onPick={(team) => setPick(item.game.id, team)}
           tag={tags[item.game.id]}
+          result={results[item.game.id]}
+          locked={!isEditable}
         />
       </div>
     ) : null;
@@ -242,6 +284,8 @@ export default function Home() {
         picked={picks[item.game.id]}
         onPick={(team) => setPick(item.game.id, team)}
         tag={tags[item.game.id]}
+        result={results[item.game.id]}
+        locked={!isEditable}
       />
     );
   };
@@ -251,13 +295,20 @@ export default function Home() {
       <header className="px-4 pt-6 pb-8 max-w-4xl w-full mx-auto relative">
         <div className="flex flex-col items-center">
           <div className="text-center">
-            <span className="relative inline-block text-xl text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
+            <span className="relative inline-flex items-center gap-2 text-xl text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
               WEEK {activeWeek}
+              <WeekSwitcher
+                weeks={weeks}
+                currentWeek={activeWeek}
+                onSelectWeek={setActiveWeek}
+                open={weekSwitcherOpen}
+                onOpenChange={setWeekSwitcherOpen}
+              />
               <span
                 className="absolute top-1/2 -right-4 translate-x-full -translate-y-1/2 whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
                 style={{ fontFamily: "var(--font-display)", background: "#1b2947", boxShadow: "2.5px 2.5px 0 rgba(0,0,0,0.45)" }}
               >
-                🏈 {pickedCount}/{games.length}
+                {hasResults ? `✅ ${correctCount}/${gradedCount}` : `🏈 ${pickedCount}/${games.length}`}
               </span>
             </span>
             <div className="w-10 h-[2px] bg-white/25 mx-auto mb-3" />
@@ -318,56 +369,64 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="flex flex-col items-center mt-3">
-              <button
-                aria-label="Save and submit your picks"
-                onClick={handleSaveAndSubmit}
-                disabled={saving}
-                className="flex items-center gap-2 rounded-full px-6 py-3 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  background: "linear-gradient(135deg, #34d399, #059669)",
-                  color: "#ffffff",
-                }}
-              >
-                {saving ? (
-                  <>
-                    <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                    SAVING&hellip;
-                  </>
-                ) : saved ? (
-                  <>
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                    SAVED
-                  </>
-                ) : (
-                  <>
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-                      <path d="M17 21v-8H7v8" />
-                      <path d="M7 3v5h8" />
-                    </svg>
-                    SAVE &amp; SUBMIT PICKS
-                  </>
-                )}
-              </button>
-              {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
-            </div>
+            {isEditable ? (
+              <>
+                <div className="flex flex-col items-center mt-3">
+                  <button
+                    aria-label="Save and submit your picks"
+                    onClick={handleSaveAndSubmit}
+                    disabled={saving}
+                    className="flex items-center gap-2 rounded-full px-6 py-3 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      background: "linear-gradient(135deg, #34d399, #059669)",
+                      color: "#ffffff",
+                    }}
+                  >
+                    {saving ? (
+                      <>
+                        <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                        SAVING&hellip;
+                      </>
+                    ) : saved ? (
+                      <>
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                        SAVED
+                      </>
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                          <path d="M17 21v-8H7v8" />
+                          <path d="M7 3v5h8" />
+                        </svg>
+                        SAVE &amp; SUBMIT PICKS
+                      </>
+                    )}
+                  </button>
+                  {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
+                </div>
 
-            <div className="flex justify-center mt-3">
-              <button
-                aria-label="Reset your picks"
-                onClick={async () => {
-                  if (await confirm("Reset all your picks for this week?")) resetPicks();
-                }}
-                className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                RESET
-              </button>
-            </div>
+                <div className="flex justify-center mt-3">
+                  <button
+                    aria-label="Reset your picks"
+                    onClick={async () => {
+                      if (await confirm("Reset all your picks for this week?")) resetPicks();
+                    }}
+                    className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors"
+                    style={{ fontFamily: "var(--font-display)" }}
+                  >
+                    RESET
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-center text-xs text-white/40 mt-5" style={{ fontFamily: "var(--font-display)" }}>
+                {hasResults ? "RESULTS ARE IN FOR THIS WEEK" : "THIS WEEK IS CLOSED"}
+              </p>
+            )}
           </>
         )}
       </main>

@@ -41,6 +41,7 @@ export function TeamHalfPill({
   onClick,
   footer,
   badge,
+  disabled,
 }: {
   team: (typeof TEAMS)[TeamAbbr];
   side: "left" | "right";
@@ -49,6 +50,7 @@ export function TeamHalfPill({
   onClick: () => void;
   footer?: React.ReactNode;
   badge?: React.ReactNode;
+  disabled?: boolean;
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
@@ -67,7 +69,11 @@ export function TeamHalfPill({
     // border stays a continuous unbroken ring; a faded half's border dims
     // to a solid gray in step with its fill/logo.
     <div className="relative flex-1" style={{ height: PILL_HEIGHT }}>
-      <button onClick={onClick} className="absolute inset-0 h-full w-full cursor-pointer active:scale-95 transition-transform duration-150">
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={`absolute inset-0 h-full w-full transition-transform duration-150 ${disabled ? "cursor-default" : "cursor-pointer active:scale-95"}`}
+      >
         <div className={`absolute inset-0 ${radius} overflow-hidden`} style={{ backgroundColor: team.color, filter: fadedFilter }}>
           <div className="absolute inset-x-0 top-0 flex items-center justify-center" style={{ height: LOGO_AREA_HEIGHT }}>
             <img

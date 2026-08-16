@@ -131,9 +131,14 @@ create table public.weekly_picks (
 create index weekly_picks_user_week_idx on public.weekly_picks (user_id, week);
 alter table public.weekly_picks enable row level security;
 create policy "weekly_picks_select_own" on public.weekly_picks for select using (auth.uid() = user_id);
-create policy "weekly_picks_insert_own" on public.weekly_picks for insert with check (auth.uid() = user_id);
-create policy "weekly_picks_update_own" on public.weekly_picks for update using (auth.uid() = user_id);
-create policy "weekly_picks_delete_own" on public.weekly_picks for delete using (auth.uid() = user_id);
+-- Insert/update/delete additionally require the week to be open - a
+-- closed week can't be written to even by someone bypassing the app's UI.
+create policy "weekly_picks_insert_own" on public.weekly_picks for insert
+  with check (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true));
+create policy "weekly_picks_update_own" on public.weekly_picks for update
+  using (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true));
+create policy "weekly_picks_delete_own" on public.weekly_picks for delete
+  using (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true));
 create trigger weekly_picks_set_updated_at
   before update on public.weekly_picks for each row execute function public.set_updated_at();
 

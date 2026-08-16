@@ -38,10 +38,3 @@ export async function clearGameResult(gameId: string) {
   const { error } = await supabase.from("game_results").delete().eq("game_id", gameId);
   if (error) throw error;
 }
-
-// Public (non-admin) read used to pick which week the homepage shows.
-export async function fetchActiveWeek(): Promise<number | null> {
-  const { data, error } = await supabase.from("weeks").select("week").eq("is_open", true).order("week", { ascending: false }).limit(1);
-  if (error || !data || data.length === 0) return null;
-  return data[0].week;
-}
