@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Bungee } from "next/font/google";
 import { NavShell } from "@/components/NavShell";
+import { UsernameGate } from "@/components/UsernameGate";
 import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
 
@@ -60,6 +61,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </svg>
         <AuthProvider>
           <NavShell>{children}</NavShell>
+          <UsernameGate />
         </AuthProvider>
       </body>
     </html>

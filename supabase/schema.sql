@@ -7,14 +7,33 @@ create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null default '',
   avatar_url text,
+  username text,
   migrated_local_picks boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 alter table public.profiles enable row level security;
+alter table public.profiles add constraint profiles_username_format
+  check (username is null or username ~ '^[a-zA-Z0-9_]{3,20}$');
+create unique index profiles_username_lower_idx on public.profiles (lower(username));
 create policy "profiles_select_own" on public.profiles for select using (auth.uid() = id);
 create policy "profiles_insert_own" on public.profiles for insert with check (auth.uid() = id);
 create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id);
+
+-- Security-definer so username availability can be checked across all
+-- users without broadening profiles_select_own to expose other rows.
+create function public.is_username_available(check_username text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select not exists (
+    select 1 from public.profiles where lower(username) = lower(check_username)
+  );
+$$;
+grant execute on function public.is_username_available(text) to anon, authenticated;
 
 create function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$

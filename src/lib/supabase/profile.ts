@@ -31,3 +31,23 @@ export async function updateProfile(userId: string, updates: { displayName?: str
   const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
   if (error) throw error;
 }
+
+// Runs through a security-definer RPC (see supabase/schema.sql) rather
+// than a plain select, since the profiles_select_own RLS policy only
+// lets someone read their OWN row - checking whether a name is taken
+// needs to see across all users without broadening that policy.
+export async function checkUsernameAvailable(username: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("is_username_available", { check_username: username });
+  if (error) throw error;
+  return data as boolean;
+}
+
+export async function claimUsername(userId: string, username: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("profiles").update({ username }).eq("id", userId);
+  if (error) {
+    if (error.code === "23505") return { error: "That username is already taken." };
+    if (error.code === "23514") return { error: "Usernames must be 3-20 characters: letters, numbers, underscores only." };
+    return { error: "Couldn't save that username. Try again." };
+  }
+  return { error: null };
+}
