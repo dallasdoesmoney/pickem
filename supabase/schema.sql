@@ -146,19 +146,28 @@ create trigger weekly_picks_set_updated_at
 -- aggregated view instead of a scalar - runs as the view owner, so it can
 -- read every user's weekly_picks without broadening
 -- weekly_picks_select_own, and only ever exposes the 5 columns below.
+-- Left join from profiles (not an inner join starting at weekly_picks) so
+-- every signed-up user with a username appears, tied at 0-0, even before
+-- any results are published.
 create view public.leaderboard as
 select
   p.id as user_id,
   p.username,
   p.avatar_url,
-  count(*) filter (where wp.team_abbr = gr.winner)::int as correct,
-  count(*)::int as graded
-from public.weekly_picks wp
-join public.weeks w on w.week = wp.week and w.results_published = true
-join public.game_results gr on gr.game_id = wp.game_id
-join public.profiles p on p.id = wp.user_id
-where p.username is not null
-group by p.id, p.username, p.avatar_url;
+  coalesce(agg.correct, 0) as correct,
+  coalesce(agg.graded, 0) as graded
+from public.profiles p
+left join (
+  select
+    wp.user_id,
+    count(*) filter (where wp.team_abbr = gr.winner)::int as correct,
+    count(*)::int as graded
+  from public.weekly_picks wp
+  join public.weeks w on w.week = wp.week and w.results_published = true
+  join public.game_results gr on gr.game_id = wp.game_id
+  group by wp.user_id
+) agg on agg.user_id = p.id
+where p.username is not null;
 grant select on public.leaderboard to anon, authenticated;
 
 -- season_picks (team predictor)

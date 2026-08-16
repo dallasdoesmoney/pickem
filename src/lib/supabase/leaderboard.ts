@@ -13,7 +13,8 @@ export async function fetchLeaderboard(): Promise<LeaderboardRow[]> {
     .from("leaderboard")
     .select("user_id, username, avatar_url, correct, graded")
     .order("correct", { ascending: false })
-    .order("graded", { ascending: true });
+    .order("graded", { ascending: true })
+    .order("username", { ascending: true });
   if (error) throw error;
   return data as LeaderboardRow[];
 }
