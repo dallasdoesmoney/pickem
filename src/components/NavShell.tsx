@@ -31,7 +31,7 @@ const MOBILE_NAV_SECTIONS: NavSection[] = [
   {
     label: "Pick’em",
     items: [
-      { href: "/", label: "Weekly Pick’em", icon: PicksIcon, matchPrefix: "/", exact: true },
+      { href: "/weekly", label: "Weekly Pick’em", icon: PicksIcon, matchPrefix: "/weekly" },
       { href: "/predictor", label: "Team Pick’em", icon: PredictorIcon, matchPrefix: "/predictor" },
       { href: "/leaderboard", label: "Leaderboard", icon: LeaderboardIcon, matchPrefix: "/leaderboard" },
     ],

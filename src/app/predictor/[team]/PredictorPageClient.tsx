@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { WIN_TOTALS } from "@/data/winTotals";
@@ -91,6 +91,41 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loaded]);
+
+  // Auto-save while signed in, same debounced/hydration-guard pattern as
+  // the weekly picks page. skipNextAutoSaveRef resets whenever loaded goes
+  // false, which useSeasonPicks already does at the start of every fetch
+  // cycle - including switching teams via TeamSwitcher/prev-next, since
+  // that hook keys its effect on `team`. Driven off `loaded`'s value
+  // rather than component lifecycle, so it's correct whether or not
+  // switching teams happens to remount this component.
+  const skipNextAutoSaveRef = useRef(true);
+  useEffect(() => {
+    if (!loaded) {
+      skipNextAutoSaveRef.current = true;
+      return;
+    }
+    if (skipNextAutoSaveRef.current) {
+      skipNextAutoSaveRef.current = false;
+      return;
+    }
+    if (!user) return;
+    const timeout = setTimeout(() => {
+      saveSeasonPicks(user.id, trackedTeam, picks)
+        .then(() => {
+          syncOpponentSeasonPicks(user.id, trackedTeam, picks, schedule).catch((err) => console.error("Opponent sync failed", err));
+          syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err));
+          setSaved(true);
+          setTimeout(() => setSaved(false), 2500);
+        })
+        .catch((err) => {
+          console.error("Auto-save failed", err);
+          setSaveError("Couldn't save your picks. Try again.");
+        });
+    }, 1000);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picks, loaded, user]);
 
   // Desktop's two columns should read top-to-bottom then wrap (weeks 1-9,
   // then 10-18), not interleave left/right like CSS grid's default

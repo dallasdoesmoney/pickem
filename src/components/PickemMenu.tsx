@@ -8,7 +8,7 @@ import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 const PANEL_WIDTH = 220;
 
 const ITEMS = [
-  { href: "/", label: "Weekly Pick’em", matchPrefix: "/", exact: true },
+  { href: "/weekly", label: "Weekly Pick’em", matchPrefix: "/weekly", exact: false },
   { href: "/predictor", label: "Team Pick’em", matchPrefix: "/predictor", exact: false },
   { href: "/leaderboard", label: "Leaderboard", matchPrefix: "/leaderboard", exact: false },
 ];
@@ -16,7 +16,7 @@ const ITEMS = [
 export function PickemMenu({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const pathname = usePathname();
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
-  const isActive = pathname === "/" || pathname.startsWith("/predictor") || pathname.startsWith("/leaderboard");
+  const isActive = pathname.startsWith("/weekly") || pathname.startsWith("/predictor") || pathname.startsWith("/leaderboard");
 
   return (
     <div className="relative">

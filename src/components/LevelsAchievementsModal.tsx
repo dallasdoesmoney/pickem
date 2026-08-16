@@ -171,7 +171,7 @@ export function LevelsAchievementsModal({
                         return available ? (
                           <Link
                             key={week}
-                            href="/"
+                            href="/weekly"
                             onClick={onClose}
                             className={`flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2.5 transition-colors ${
                               done ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5 hover:border-white/25"
