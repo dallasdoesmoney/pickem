@@ -1,5 +1,5 @@
 import { GAMES_BY_WEEK } from "@/data/games";
-import { TeamAbbr } from "@/data/teams";
+import { TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 
 export type TeamScheduleRow = { week: number; away: TeamAbbr; home: TeamAbbr } | { week: number; bye: true };
 
@@ -15,4 +15,13 @@ export function getTeamSchedule(team: TeamAbbr): TeamScheduleRow[] {
     const game = GAMES_BY_WEEK[week].find((g) => g.away === team || g.home === team);
     return game ? { week, away: game.away, home: game.home } : { week, bye: true };
   });
+}
+
+// Non-bye weeks per team - "fully predicted" means a pick for every one of
+// these. Computed once from static schedule data and shared by anywhere
+// that needs to know a team's predictor completion (achievements modal,
+// the team picker landing page).
+export const REQUIRED_PREDICTOR_WEEKS: Partial<Record<TeamAbbr, number>> = {};
+for (const team of TEAMS_SORTED) {
+  REQUIRED_PREDICTOR_WEEKS[team.abbr] = getTeamSchedule(team.abbr).filter((row) => !("bye" in row)).length;
 }

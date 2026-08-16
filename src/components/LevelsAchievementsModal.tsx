@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ACHIEVEMENTS } from "@/data/achievements";
 import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { GAMES_BY_WEEK } from "@/data/games";
-import { getTeamSchedule } from "@/lib/teamSchedule";
+import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
 import { fetchPredictorProgress, syncPredictorAchievements, fetchWeeklyPickemProgress, syncWeeklyPickemAchievements } from "@/lib/supabase/achievements";
 import { fetchReferralCount } from "@/lib/supabase/referrals";
 import { fetchWeeks, WeekRow } from "@/lib/supabase/admin";
@@ -14,11 +14,6 @@ import { errorMessage } from "@/lib/errorMessage";
 import { AchievementCard } from "@/components/AchievementCard";
 import { LevelLadder } from "@/components/LevelLadder";
 import { InviteFriendsCard } from "@/components/InviteFriendsCard";
-
-const REQUIRED_PREDICTOR_WEEKS: Partial<Record<TeamAbbr, number>> = {};
-for (const team of TEAMS_SORTED) {
-  REQUIRED_PREDICTOR_WEEKS[team.abbr] = getTeamSchedule(team.abbr).filter((row) => !("bye" in row)).length;
-}
 
 const ALL_WEEKS = Object.keys(GAMES_BY_WEEK)
   .map(Number)
