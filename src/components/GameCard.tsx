@@ -44,17 +44,25 @@ export function GameCard({
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
-  const hasPick = !!picked;
   const hasResult = !!result;
 
-  // Only the side you picked ever gets a verdict - green W if it matches
-  // the real result, red L if it doesn't. Same pattern as the team
-  // predictor's tracked-team highlight, just pointed at "were you right"
-  // instead of "who are you rooting for."
+  // Whichever side matters visually - your pick if you made one, or the
+  // real winner if you didn't (e.g. viewing results signed out) - stays
+  // full brightness; the other side dims. Only the picked team ever gets
+  // a personal verdict (green W if it matches the result, red L if not,
+  // same pattern as the team predictor's tracked-team highlight); with
+  // no pick to judge, it falls back to plainly marking who won.
+  const highlighted = picked ?? (hasResult ? result : undefined);
+
   function outcomeFor(team: TeamAbbr): "win" | "loss" | null {
-    if (team !== picked) return null;
-    if (hasResult) return picked === result ? "win" : "loss";
-    return "win";
+    if (team !== highlighted) return null;
+    if (!hasResult) return "win";
+    if (!picked) return "win";
+    return picked === result ? "win" : "loss";
+  }
+
+  function isFadedFor(team: TeamAbbr): boolean {
+    return highlighted !== undefined && team !== highlighted;
   }
 
   const awaySpread =
@@ -82,7 +90,7 @@ export function GameCard({
         team={away}
         side="left"
         outcome={outcomeFor(away.abbr)}
-        isFaded={hasPick && picked !== away.abbr}
+        isFaded={isFadedFor(away.abbr)}
         onClick={() => onPick(away.abbr)}
         disabled={locked}
         badge={picked === away.abbr && tag ? <TagBadge side="left" tag={tag} /> : undefined}
@@ -101,7 +109,7 @@ export function GameCard({
         team={home}
         side="right"
         outcome={outcomeFor(home.abbr)}
-        isFaded={hasPick && picked !== home.abbr}
+        isFaded={isFadedFor(home.abbr)}
         onClick={() => onPick(home.abbr)}
         disabled={locked}
         badge={picked === home.abbr && tag ? <TagBadge side="right" tag={tag} /> : undefined}

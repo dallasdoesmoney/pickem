@@ -87,6 +87,39 @@ function StatPills({ stats }: { stats: PickStats }) {
   );
 }
 
+// Shown instead of StatPills once results are in - the point of this
+// screen is now "how'd I do," so it's a single, bigger, shareable record
+// pill (mirrors the team predictor's "My Prediction" pill) rather than
+// three small pre-game stats that no longer matter as much.
+function ResultsPill({ correct, total, avatarUrl }: { correct: number; total: number; avatarUrl?: string | null }) {
+  const wrong = total - correct;
+  return (
+    <div className="flex justify-center">
+      <div
+        className="relative shrink-0 rounded-full border-2 border-emerald-400 text-center flex items-center gap-3 sm:gap-4 pl-3 pr-7 sm:pl-5 sm:pr-10 h-[64px] sm:h-[100px]"
+        style={PILL_STYLE}
+      >
+        <PillTexture />
+        <span className="absolute -top-3 -left-2 z-10 rotate-[-14deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)]">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-9 w-9 sm:h-[52px] sm:w-[52px] rounded-full object-cover border-2 border-white" />
+          ) : (
+            <span className="h-9 w-9 sm:h-[52px] sm:w-[52px] rounded-full bg-[#1b2947] border-2 border-white flex items-center justify-center text-lg sm:text-2xl">
+              🏈
+            </span>
+          )}
+        </span>
+        <div className="relative z-10 text-left ml-4 sm:ml-6">
+          <div className="text-2xl sm:text-4xl leading-none text-white" style={{ fontFamily: "var(--font-display)" }}>
+            {correct}-{wrong}
+          </div>
+          <div className="text-[9px] sm:text-[11px] text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">MY RECORD</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   // CURRENT_WEEK is the fallback shown until the admin-controlled weeks
   // load (or if nothing's ever been opened) - keeps the homepage
@@ -128,7 +161,7 @@ export default function Home() {
   const games = GAMES_BY_WEEK[activeWeek];
   const { picks, setPick, resetPicks, loaded } = usePicks(activeWeek);
   const { confirm, dialog } = useConfirmDialog();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
   const pickedCount = Object.keys(picks).length;
   const gradedCount = games.filter((g) => results[g.id]).length;
@@ -192,8 +225,8 @@ export default function Home() {
     if (sharing) return;
     setSharing(true);
     try {
-      const blob = await renderShareImage({ games, groups, picks, week: activeWeek });
-      const filename = `pickem-week-${activeWeek}.png`;
+      const blob = await renderShareImage({ games, groups, picks, week: activeWeek, results, avatarUrl: profile?.avatar_url });
+      const filename = hasResults ? `pickem-week-${activeWeek}-results.png` : `pickem-week-${activeWeek}.png`;
       const file = new File([blob], filename, { type: "image/png" });
 
       function download() {
@@ -218,7 +251,7 @@ export default function Home() {
           await navigator.share({
             files: [file],
             title: "NFL Pick'em",
-            text: `My Week ${activeWeek} picks`,
+            text: hasResults ? `My Week ${activeWeek} record: ${correctCount}-${gradedCount - correctCount}` : `My Week ${activeWeek} picks`,
           });
         } catch (shareErr) {
           if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();
@@ -336,12 +369,12 @@ export default function Home() {
             </div>
 
             <div className="mt-8">
-              <StatPills stats={stats} />
+              {hasResults ? <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} /> : <StatPills stats={stats} />}
             </div>
 
             <div className="flex justify-center mt-5">
               <button
-                aria-label="Share your picks"
+                aria-label={hasResults ? "Share your results" : "Share your picks"}
                 onClick={handleShare}
                 disabled={sharing}
                 className="flex items-center gap-2 rounded-full px-7 py-3.5 text-lg shadow-[0_4px_20px_rgba(74,222,128,0.35)] active:scale-95 transition-transform duration-150 disabled:opacity-60"
@@ -363,7 +396,7 @@ export default function Home() {
                       <path d="M7 8l5-5 5 5" />
                       <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
                     </svg>
-                    SHARE MY PICKS 🏈
+                    {hasResults ? "SHARE MY RESULTS 🏈" : "SHARE MY PICKS 🏈"}
                   </>
                 )}
               </button>

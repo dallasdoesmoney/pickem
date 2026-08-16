@@ -86,6 +86,84 @@ function drawStatPill(
   }
 }
 
+// Same stacked-text centering + rotated corner-tag pattern already proven
+// on the predictor's share image (its own copy, kept separate rather than
+// shared - small, stable, self-contained, low risk either way).
+const PILL_LABEL_FONT_PX = 14;
+const PILL_LINE_GAP = 8;
+
+function drawPillStackedText(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  cx: number,
+  y: number,
+  h: number,
+  valueFontPx: number,
+  value: string,
+  valueColor: string,
+  label: string,
+  labelColor: string
+) {
+  const stackH = valueFontPx + PILL_LINE_GAP + PILL_LABEL_FONT_PX;
+  const stackTop = y + (h - stackH) / 2;
+  const valueCenterY = stackTop + valueFontPx / 2;
+  const labelCenterY = stackTop + valueFontPx + PILL_LINE_GAP + PILL_LABEL_FONT_PX / 2;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `${valueFontPx}px ${displayFont}`;
+  ctx.fillStyle = valueColor;
+  ctx.fillText(value, cx, valueCenterY);
+  ctx.font = `${PILL_LABEL_FONT_PX}px system-ui, sans-serif`;
+  ctx.fillStyle = labelColor;
+  ctx.fillText(label, cx, labelCenterY);
+}
+
+function drawPillImageTag(ctx: CanvasRenderingContext2D, img: HTMLImageElement | null, pillX: number, pillY: number) {
+  if (!img) return;
+  const h = 50;
+  const w = (img.naturalWidth / img.naturalHeight) * h;
+  ctx.save();
+  ctx.translate(pillX + 10, pillY + 2);
+  ctx.rotate((-18 * Math.PI) / 180);
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 4;
+  // Avatars are usually square already, but a circular clip keeps a
+  // non-square upload from looking wrong sitting next to team logos.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, h / 2, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+// The results record pill - filled (not just bordered) so it outranks
+// whatever else is on the row, with the avatar as a rotated corner tag
+// mirroring the team predictor's "My Prediction" pill treatment.
+function drawResultsRecordPill(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  value: string,
+  avatar: HTMLImageElement | null
+) {
+  roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
+  ctx.fillStyle = "#22c55e";
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  drawPillStackedText(ctx, displayFont, x + w / 2, y, h, 44, value, "#ffffff", "MY RECORD", "rgba(255,255,255,0.8)");
+
+  drawPillImageTag(ctx, avatar, x, y);
+}
+
 function rowHeight(a: FlowItem | undefined, b: FlowItem | undefined) {
   const h = (item: FlowItem | undefined) => (item?.type === "game" ? PILL_H : item?.type === "header" ? HEADER_ROW_H : 0);
   return Math.max(h(a), h(b));
@@ -163,10 +241,15 @@ export type ShareImageParams = {
   groups: DayGroup[];
   picks: Record<string, TeamAbbr>;
   week: number;
+  results?: Record<string, TeamAbbr>;
+  avatarUrl?: string | null;
 };
 
 export async function renderShareImage(params: ShareImageParams): Promise<Blob> {
-  const { games, groups, picks, week } = params;
+  const { games, groups, picks, week, results, avatarUrl } = params;
+  const hasResults = !!results && games.some((g) => results[g.id]);
+  const gradedCount = hasResults ? games.filter((g) => results![g.id]).length : 0;
+  const correctCount = hasResults ? games.filter((g) => results![g.id] && picks[g.id] === results![g.id]).length : 0;
   const stats: PickStats = computePickStats(games, picks);
   const tags = computePickTags(games, picks);
   const { col1, col2 } = splitIntoColumns(groups);
@@ -188,9 +271,10 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     logoUrls.add(TEAMS[g.home].logo);
   });
   if (stats.boldestTeam) logoUrls.add(stats.boldestTeam.logo);
-  const [logoEntries, brandLogo] = await Promise.all([
+  const [logoEntries, brandLogo, avatarImg] = await Promise.all([
     Promise.all(Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)),
     loadImage(BRAND_LOGO_SRC),
+    hasResults && avatarUrl ? loadImage(avatarUrl) : Promise.resolve(null),
   ]);
   const logos = new Map(logoEntries);
 
@@ -239,27 +323,33 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   ctx.fillText("NFL PICK’EM", WIDTH / 2, cursorY + 58);
   cursorY += 66 + 8;
 
-  const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeEmoji?: string }> = [
-    { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeEmoji: "\u{1F436}" },
-    {
-      w: 250,
-      borderColor: "#4ade80",
-      valueColor: "#4ade80",
-      value: stats.boldestTeam ? `+${stats.boldestSpread}` : "-",
-      label: "BOLDEST PICK",
-      logo: stats.boldestTeam ? logos.get(stats.boldestTeam.logo) : undefined,
-      badgeEmoji: "\u{1F48E}",
-    },
-    { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: stats.chalkPct !== null ? `${stats.chalkPct}%` : "-", label: "CHALK" },
-  ];
-  const pillGap = 24;
   const pillH = 88;
   cursorY += 24;
-  const totalPillsW = pillDefs.reduce((s, p) => s + p.w, 0) + pillGap * (pillDefs.length - 1);
-  let pillX = WIDTH / 2 - totalPillsW / 2;
-  for (const p of pillDefs) {
-    drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeEmoji);
-    pillX += p.w + pillGap;
+
+  if (hasResults) {
+    const recordW = 260;
+    drawResultsRecordPill(ctx, displayFont, WIDTH / 2 - recordW / 2, cursorY, recordW, pillH, `${correctCount}-${gradedCount - correctCount}`, avatarImg);
+  } else {
+    const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeEmoji?: string }> = [
+      { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeEmoji: "\u{1F436}" },
+      {
+        w: 250,
+        borderColor: "#4ade80",
+        valueColor: "#4ade80",
+        value: stats.boldestTeam ? `+${stats.boldestSpread}` : "-",
+        label: "BOLDEST PICK",
+        logo: stats.boldestTeam ? logos.get(stats.boldestTeam.logo) : undefined,
+        badgeEmoji: "\u{1F48E}",
+      },
+      { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: stats.chalkPct !== null ? `${stats.chalkPct}%` : "-", label: "CHALK" },
+    ];
+    const pillGap = 24;
+    const totalPillsW = pillDefs.reduce((s, p) => s + p.w, 0) + pillGap * (pillDefs.length - 1);
+    let pillX = WIDTH / 2 - totalPillsW / 2;
+    for (const p of pillDefs) {
+      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeEmoji);
+      pillX += p.w + pillGap;
+    }
   }
   cursorY += pillH + 24;
 
@@ -281,9 +371,24 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       const away = TEAMS[game.away];
       const home = TEAMS[game.home];
       const picked = picks[game.id];
-      const hasPick = !!picked;
+      const result = results?.[game.id];
       const tag = tags[game.id];
       const halfW = PILL_W / 2;
+
+      // Same highlight logic as the live GameCard: your pick if you made
+      // one, otherwise the real winner (e.g. sharing before making a pick
+      // isn't possible, but this keeps the two renderers identical in
+      // spirit). Only the highlighted side ever shows an outcome letter.
+      const highlighted = picked ?? (result ? result : undefined);
+      function outcomeForTeam(team: TeamAbbr): "win" | "loss" | null {
+        if (team !== highlighted) return null;
+        if (!result) return "win";
+        if (!picked) return "win";
+        return picked === result ? "win" : "loss";
+      }
+      function isFadedForTeam(team: TeamAbbr): boolean {
+        return highlighted !== undefined && team !== highlighted;
+      }
 
       const awaySpread =
         game.favorite && game.spread !== undefined
@@ -305,8 +410,8 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         h: PILL_H,
         side: "left",
         team: away,
-        outcome: picked === away.abbr ? "win" : null,
-        isFaded: hasPick && picked !== away.abbr,
+        outcome: outcomeForTeam(away.abbr),
+        isFaded: isFadedForTeam(away.abbr),
         tag: picked === away.abbr ? tag : undefined,
         spreadLabel: awaySpread,
         record: game.awayRecord ?? "0-0",
@@ -319,8 +424,8 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         h: PILL_H,
         side: "right",
         team: home,
-        outcome: picked === home.abbr ? "win" : null,
-        isFaded: hasPick && picked !== home.abbr,
+        outcome: outcomeForTeam(home.abbr),
+        isFaded: isFadedForTeam(home.abbr),
         tag: picked === home.abbr ? tag : undefined,
         spreadLabel: homeSpread,
         record: game.homeRecord ?? "0-0",
