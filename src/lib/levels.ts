@@ -9,9 +9,9 @@ export type RankTier = { name: string; color: string; emoji: string };
 // badge reads as "further along" at a glance even before you notice the
 // number.
 export const RANKS: RankTier[] = [
-  { name: "Rookie", color: "#94a3b8", emoji: "🐣" },
-  { name: "Practice Squad", color: "#38bdf8", emoji: "🎽" },
-  { name: "Special Teams", color: "#22d3ee", emoji: "🎯" },
+  { name: "Practice Squad", color: "#94a3b8", emoji: "🎽" },
+  { name: "Rookie", color: "#38bdf8", emoji: "🐣" },
+  { name: "Role Player", color: "#22d3ee", emoji: "🧩" },
   { name: "Starter", color: "#34d399", emoji: "🏈" },
   { name: "Team Captain", color: "#4ade80", emoji: "🧢" },
   { name: "Pro Bowler", color: "#facc15", emoji: "🌟" },
@@ -21,15 +21,20 @@ export const RANKS: RankTier[] = [
   { name: "GOAT", color: "#f472b6", emoji: "🐐" },
 ];
 
-const LEVELS_PER_RANK = 5;
+export const LEVELS_PER_RANK = 5;
 export const MAX_LEVEL = RANKS.length * LEVELS_PER_RANK;
-const BASE_POINTS = 1500;
+const BASE_POINTS = 150;
 
-// Triangular-number curve: level L costs 1,500*L points on top of the last
-// one, so cumulative cost grows quadratically. Level 1 lands exactly on
-// the ~1,500 points available from an early feature like filling out a
-// team's schedule predictor; level 50 costs just under 2M cumulative -
-// a season-plus of sustained play, not a weekend.
+// Triangular-number curve: level L costs 150*L points on top of the last
+// one, so cumulative cost grows quadratically - levels 26-50 alone account
+// for ~75% of the total climb to GOAT. Calibrated against a future
+// year-round daily-games economy (up to 500 pts/day): GOAT (191,250 pts)
+// takes roughly a year for someone who hits the daily max every single
+// day, and more like 2+ years for a realistic dedicated player accounting
+// for a quieter off-season - hard, not impossible. Early levels still
+// clear fast off one-time achievements (predictor + weekly pick'em +
+// onboarding bonus), which is the point - fast early payoff, brutal climb
+// at the top.
 function cumulativeForLevel(level: number): number {
   return (BASE_POINTS * (level * (level + 1))) / 2;
 }
