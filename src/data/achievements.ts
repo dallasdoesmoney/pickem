@@ -29,4 +29,12 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     pointsEach: 100,
     unitLabel: "weeks",
   },
+  {
+    key: "referral",
+    label: "Invite Friends",
+    description: "Get a friend to sign up using your invite link.",
+    icon: "🎉",
+    pointsEach: 1000,
+    unitLabel: "referrals",
+  },
 ];

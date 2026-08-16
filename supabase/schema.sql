@@ -10,6 +10,7 @@ create table public.profiles (
   username text,
   is_admin boolean not null default false,
   migrated_local_picks boolean not null default false,
+  referred_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -17,7 +18,10 @@ alter table public.profiles enable row level security;
 -- Column-level lockdown: RLS policies below are row-level only (auth.uid()
 -- = id), which would otherwise let anyone grant themselves admin via
 -- `update profiles set is_admin = true` on their own row. is_admin can
--- only ever be set from the SQL Editor.
+-- only ever be set from the SQL Editor. referred_by is excluded for the
+-- same reason as is_admin - it's only ever set by claim_referral() below,
+-- never a direct client update, so nobody can backdate/reassign who
+-- referred them to farm points for a friend after the fact.
 revoke insert on public.profiles from authenticated;
 revoke update on public.profiles from authenticated;
 grant update (display_name, avatar_url, username, migrated_local_picks) on public.profiles to authenticated;
@@ -297,6 +301,42 @@ begin
 end;
 $$;
 grant execute on function public.sync_weekly_pickem_achievements() to authenticated;
+
+-- Attributes a new signup to whoever referred them (by username, doubling
+-- as the referral code - no separate code system needed) and pays the
+-- referrer a flat, deliberately large bonus. Security definer since
+-- referred_by has no client update grant (see profiles above). Claimable
+-- exactly once per account: a caller who already has referred_by set is a
+-- no-op, which also makes this safe to call speculatively/repeatedly from
+-- the client without double-crediting. No-ops on a bad username or a
+-- self-referral rather than erroring, since this runs silently in the
+-- background after signup - there's no UI waiting on its result.
+create or replace function public.claim_referral(p_referrer_username text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_referrer_id uuid;
+begin
+  if exists (select 1 from public.profiles where id = auth.uid() and referred_by is not null) then
+    return;
+  end if;
+
+  select id into v_referrer_id from public.profiles where lower(username) = lower(p_referrer_username);
+  if v_referrer_id is null or v_referrer_id = auth.uid() then
+    return;
+  end if;
+
+  update public.profiles set referred_by = v_referrer_id where id = auth.uid();
+
+  insert into public.point_events (user_id, source, points, reference_id)
+  values (v_referrer_id, 'referral', 1000, auth.uid()::text)
+  on conflict (user_id, source, reference_id) do nothing;
+end;
+$$;
+grant execute on function public.claim_referral(text) to authenticated;
 
 -- friends: symmetric, request/accept (not the asymmetric "follow"
 -- planned for later). Unique index on the unordered pair stops A->B and

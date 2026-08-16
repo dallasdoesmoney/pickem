@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { migrateLocalDataToAccount } from "@/lib/supabase/migration";
+import { claimReferral } from "@/lib/supabase/referrals";
 
 export type Profile = {
   id: string;
@@ -12,7 +13,10 @@ export type Profile = {
   username: string | null;
   is_admin: boolean;
   migrated_local_picks: boolean;
+  referred_by: string | null;
 };
+
+const PENDING_REFERRAL_KEY = "pickem:pending-referral";
 
 type AuthContextValue = {
   user: User | null;
@@ -42,6 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // initial getSession() and an immediate onAuthStateChange both resolving
   // to the same signed-in user) before the flag flip round-trips.
   const migratingRef = useRef(false);
+  const claimingReferralRef = useRef(false);
+
+  // Captured on first load (not just the signup page - a shared link can
+  // land anywhere) and kept until claimed, so someone who clicks an invite
+  // link and signs up days later still gets attributed correctly.
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) localStorage.setItem(PENDING_REFERRAL_KEY, ref);
+  }, []);
 
   const resolveSession = useCallback(async (session: Session | null) => {
     const nextUser = session?.user ?? null;
@@ -65,6 +78,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile((prev) => (prev ? { ...prev, migrated_local_picks: true } : prev));
       } finally {
         migratingRef.current = false;
+      }
+    }
+
+    if (nextProfile && !nextProfile.referred_by && !claimingReferralRef.current) {
+      const pendingCode = localStorage.getItem(PENDING_REFERRAL_KEY);
+      if (pendingCode) {
+        claimingReferralRef.current = true;
+        try {
+          await claimReferral(pendingCode);
+          localStorage.removeItem(PENDING_REFERRAL_KEY);
+          setProfile((prev) => (prev ? { ...prev, referred_by: "claimed" } : prev));
+        } catch (err) {
+          console.error("Referral claim failed", err);
+        } finally {
+          claimingReferralRef.current = false;
+        }
       }
     }
   }, []);

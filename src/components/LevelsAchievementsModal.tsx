@@ -8,10 +8,12 @@ import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { GAMES_BY_WEEK } from "@/data/games";
 import { getTeamSchedule } from "@/lib/teamSchedule";
 import { fetchPredictorProgress, syncPredictorAchievements, fetchWeeklyPickemProgress, syncWeeklyPickemAchievements } from "@/lib/supabase/achievements";
+import { fetchReferralCount } from "@/lib/supabase/referrals";
 import { fetchWeeks, WeekRow } from "@/lib/supabase/admin";
 import { errorMessage } from "@/lib/errorMessage";
 import { AchievementCard } from "@/components/AchievementCard";
 import { LevelLadder } from "@/components/LevelLadder";
+import { InviteFriendsCard } from "@/components/InviteFriendsCard";
 
 const REQUIRED_PREDICTOR_WEEKS: Partial<Record<TeamAbbr, number>> = {};
 for (const team of TEAMS_SORTED) {
@@ -40,11 +42,12 @@ export function LevelsAchievementsModal({
   currentLevel?: number;
   onClose: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [predictorProgress, setPredictorProgress] = useState<Partial<Record<TeamAbbr, number>> | null>(null);
   const [weeklyProgress, setWeeklyProgress] = useState<Partial<Record<number, number>> | null>(null);
   const [weeks, setWeeks] = useState<WeekRow[]>([]);
+  const [referralCount, setReferralCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +58,7 @@ export function LevelsAchievementsModal({
     if (!open || !user) return;
     setPredictorProgress(null);
     setWeeklyProgress(null);
+    setReferralCount(null);
     setError(null);
     Promise.all([syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)), syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err))]).finally(
       () => {
@@ -67,6 +71,9 @@ export function LevelsAchievementsModal({
         fetchWeeks()
           .then(setWeeks)
           .catch(() => {});
+        fetchReferralCount(user.id)
+          .then(setReferralCount)
+          .catch((err) => setError(errorMessage(err)));
       }
     );
   }, [open, user]);
@@ -75,6 +82,7 @@ export function LevelsAchievementsModal({
 
   const predictorDef = ACHIEVEMENTS.find((a) => a.key === "predictor_team_complete")!;
   const weeklyDef = ACHIEVEMENTS.find((a) => a.key === "weekly_pickem_complete")!;
+  const referralDef = ACHIEVEMENTS.find((a) => a.key === "referral")!;
 
   const completedTeams = predictorProgress
     ? TEAMS_SORTED.filter((t) => (predictorProgress[t.abbr] ?? 0) >= (REQUIRED_PREDICTOR_WEEKS[t.abbr] ?? Infinity))
@@ -83,7 +91,7 @@ export function LevelsAchievementsModal({
   const completedWeeks = weeklyProgress ? ALL_WEEKS.filter((w) => (weeklyProgress[w] ?? 0) >= GAMES_BY_WEEK[w].length) : [];
   const weeksById = new Map(weeks.map((w) => [w.week, w]));
 
-  const achievementsLoaded = predictorProgress !== null && weeklyProgress !== null;
+  const achievementsLoaded = predictorProgress !== null && weeklyProgress !== null && referralCount !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
@@ -135,6 +143,8 @@ export function LevelsAchievementsModal({
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
+                  <InviteFriendsCard def={referralDef} username={profile?.username ?? null} referralCount={referralCount!} />
+
                   <AchievementCard
                     icon={weeklyDef.icon}
                     label={weeklyDef.label}

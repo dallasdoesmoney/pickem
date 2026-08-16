@@ -12,6 +12,7 @@ export function AchievementCard({
   label,
   description,
   pointsEach,
+  pointsLabel = "PTS EACH",
   unitLabel,
   doneCount,
   totalCount,
@@ -21,12 +22,14 @@ export function AchievementCard({
   label: string;
   description: string;
   pointsEach: number;
+  pointsLabel?: string;
   unitLabel: string;
   doneCount: number;
-  totalCount: number;
+  totalCount?: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const uncapped = totalCount === undefined;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
@@ -38,7 +41,7 @@ export function AchievementCard({
               {label}
             </h2>
             <span className="text-[10px] text-emerald-400" style={{ fontFamily: "var(--font-display)" }}>
-              {pointsEach} PTS EACH
+              {pointsEach} {pointsLabel}
             </span>
           </div>
           <p className="text-xs text-white/50 mt-0.5">{description}</p>
@@ -46,13 +49,15 @@ export function AchievementCard({
           <div className="mt-2.5">
             <div className="flex items-center justify-between text-xs text-white/50 mb-1">
               <span>
-                {doneCount} / {totalCount} {unitLabel}
+                {uncapped ? `${doneCount} ${unitLabel}` : `${doneCount} / ${totalCount} ${unitLabel}`}
               </span>
               <span style={{ fontFamily: "var(--font-display)" }}>{doneCount * pointsEach} pts</span>
             </div>
-            <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <div className="h-full rounded-full bg-emerald-400" style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%` }} />
-            </div>
+            {!uncapped && (
+              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full rounded-full bg-emerald-400" style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%` }} />
+              </div>
+            )}
           </div>
         </div>
         <svg
