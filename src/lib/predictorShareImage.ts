@@ -174,16 +174,49 @@ function drawPillTag(ctx: CanvasRenderingContext2D, img: HTMLImageElement | null
   ctx.restore();
 }
 
-// Matches the weekly share image's stat pills exactly (same height,
-// value/label font sizes, centered text) now that the icon moved from
-// inline content to a corner tag - value/label vertical fractions
-// (0.42 / 0.8 of h) are the same ones used there.
-function measurePillContentWidth(ctx: CanvasRenderingContext2D, displayFont: string, value: string, label: string, padX: number) {
-  ctx.font = `32px ${displayFont}`;
+// Matches the weekly share image's stat pills (same height, centered
+// text) now that the icon moved from inline content to a corner tag.
+// Label font/gap are fixed; valueFont varies per pill (the record pill's
+// is bigger) - always pass through drawPillStackedText below so the
+// value+label block re-centers as a unit no matter how big the value
+// font is, instead of the fixed 0.42h/0.8h fractions this used to use,
+// which only centered correctly for one specific font size and let
+// bigger value text creep up into the pill's top border.
+const PILL_LABEL_FONT_PX = 14;
+const PILL_LINE_GAP = 8;
+
+function measurePillContentWidth(ctx: CanvasRenderingContext2D, displayFont: string, value: string, label: string, padX: number, valueFont = 32) {
+  ctx.font = `${valueFont}px ${displayFont}`;
   const valueW = ctx.measureText(value).width;
-  ctx.font = "14px system-ui, sans-serif";
+  ctx.font = `${PILL_LABEL_FONT_PX}px system-ui, sans-serif`;
   const labelW = ctx.measureText(label).width;
   return Math.max(valueW, labelW) + padX * 2;
+}
+
+function drawPillStackedText(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  cx: number,
+  y: number,
+  h: number,
+  valueFont: number,
+  value: string,
+  valueColor: string,
+  label: string,
+  labelColor: string
+) {
+  const stackH = valueFont + PILL_LINE_GAP + PILL_LABEL_FONT_PX;
+  const stackTop = y + (h - stackH) / 2;
+  const valueCenterY = stackTop + valueFont / 2;
+  const labelCenterY = stackTop + valueFont + PILL_LINE_GAP + PILL_LABEL_FONT_PX / 2;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `${valueFont}px ${displayFont}`;
+  ctx.fillStyle = valueColor;
+  ctx.fillText(value, cx, valueCenterY);
+  ctx.font = `${PILL_LABEL_FONT_PX}px system-ui, sans-serif`;
+  ctx.fillStyle = labelColor;
+  ctx.fillText(label, cx, labelCenterY);
 }
 
 function drawNeutralPill(
@@ -204,23 +237,18 @@ function drawNeutralPill(
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  const cx = x + w / 2;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `32px ${displayFont}`;
-  ctx.fillStyle = valueColor;
-  ctx.fillText(value, cx, y + h * 0.42);
-  ctx.font = "14px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.fillText(label, cx, y + h * 0.8);
+  drawPillStackedText(ctx, displayFont, x + w / 2, y, h, 32, value, valueColor, label, "rgba(255,255,255,0.55)");
 
   if (tag) drawPillTag(ctx, tag, x, y);
 }
 
 // The record is the headline stat - it keeps the team's own color as its
 // fill (same as a game pill) so it visually outranks the neutral
-// Suspicious/Vegas pills next to it, but is otherwise sized and laid out
-// identically to them now that its logo moved to a corner tag too.
+// Suspicious/Vegas pills next to it, and its value text runs bigger
+// (44px vs the other two's 32px) so it reads as the focal number, not
+// just a wider pill.
+const RECORD_VALUE_FONT_PX = 44;
+
 function drawRecordPill(
   ctx: CanvasRenderingContext2D,
   displayFont: string,
@@ -240,15 +268,7 @@ function drawRecordPill(
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  const cx = x + w / 2;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.font = `32px ${displayFont}`;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(value, cx, y + h * 0.42);
-  ctx.font = "14px system-ui, sans-serif";
-  ctx.fillStyle = "rgba(255,255,255,0.75)";
-  ctx.fillText(label, cx, y + h * 0.8);
+  drawPillStackedText(ctx, displayFont, x + w / 2, y, h, RECORD_VALUE_FONT_PX, value, "#ffffff", label, "rgba(255,255,255,0.75)");
 
   drawPillTag(ctx, logo, x, y);
 }
@@ -382,7 +402,10 @@ export async function renderPredictorShareImage(params: PredictorShareParams): P
   // Guaranteed wider than the bookend pills (not just content-fit) so it
   // reads as the most prominent of the three regardless of how short its
   // own value/label happen to measure.
-  const recordW = Math.max(measurePillContentWidth(ctx, displayFont, `${wins}-${losses}`, "MY PREDICTION", 30), bookendW * 1.25);
+  const recordW = Math.max(
+    measurePillContentWidth(ctx, displayFont, `${wins}-${losses}`, "MY PREDICTION", 30, RECORD_VALUE_FONT_PX),
+    bookendW * 1.25
+  );
   const pillsW = bookendW + STAT_PILL_GAP + recordW + (winTotal !== undefined ? STAT_PILL_GAP + bookendW : 0);
   let pillX = WIDTH / 2 - pillsW / 2;
   drawNeutralPill(ctx, displayFont, pillX, cursorY, bookendW, "#ffffff", "#ffffff", `${suspiciousCount}`, suspiciousLabel, suspiciousDog);
