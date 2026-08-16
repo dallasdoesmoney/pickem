@@ -10,6 +10,7 @@ import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelListModal } from "@/components/LevelListModal";
+import { AchievementsModal } from "@/components/AchievementsModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 
@@ -56,6 +57,7 @@ function SignedInAccount({
   }, [userId]);
 
   const [levelModalOpen, setLevelModalOpen] = useState(false);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
   const label = authProfile?.display_name || authProfile?.username || "Your Profile";
@@ -123,9 +125,10 @@ function SignedInAccount({
       {myRecord && (
         <div className="flex flex-col gap-3 mt-6">
           <LevelSummaryCard totalPoints={myRecord.total_points} onOpenLevels={() => setLevelModalOpen(true)} />
-          <Link
-            href="/achievements"
-            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 hover:border-white/20 transition-colors"
+          <button
+            type="button"
+            onClick={() => setAchievementsOpen(true)}
+            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors"
           >
             <span className="text-2xl shrink-0">🏆</span>
             <div className="flex-1 min-w-0">
@@ -134,7 +137,7 @@ function SignedInAccount({
               </div>
               <div className="text-[11px] text-white/45 mt-0.5">Earn points here to level up &rarr;</div>
             </div>
-          </Link>
+          </button>
         </div>
       )}
 
@@ -165,6 +168,7 @@ function SignedInAccount({
         />
       )}
       <LevelListModal open={levelModalOpen} currentLevel={myRecord ? getLevelInfo(myRecord.total_points).level : undefined} onClose={() => setLevelModalOpen(false)} />
+      <AchievementsModal open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
     </main>
   );
 }

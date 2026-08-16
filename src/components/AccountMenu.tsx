@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 import { fetchPendingRequestCount } from "@/lib/supabase/friends";
+import { AchievementsModal } from "@/components/AchievementsModal";
 
 const PANEL_WIDTH = 200;
 
@@ -27,6 +28,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
   const { user, profile, signOut } = useAuth();
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
   const [pendingCount, setPendingCount] = useState(0);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -108,15 +110,18 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
                 <span className="h-2 w-2 rounded-full bg-red-500" />
               )}
             </Link>
-            <Link
-              href="/achievements"
+            <button
+              type="button"
               role="menuitem"
-              onClick={() => onOpenChange(false)}
-              className="block rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              onClick={() => {
+                onOpenChange(false);
+                setAchievementsOpen(true);
+              }}
+              className="w-full text-left block rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Achievements
-            </Link>
+            </button>
             {profile?.is_admin && (
               <Link
                 href="/admin"
@@ -143,6 +148,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
           </div>,
           document.body
         )}
+      <AchievementsModal open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
     </div>
   );
 }

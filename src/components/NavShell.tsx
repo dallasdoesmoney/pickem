@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PickemMenu } from "@/components/PickemMenu";
 import { AccountMenu } from "@/components/AccountMenu";
+import { AchievementsModal } from "@/components/AchievementsModal";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchPendingRequestCount } from "@/lib/supabase/friends";
 
@@ -141,6 +142,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   const [pickemMenuOpen, setPickemMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -205,14 +207,17 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                       <span className="text-sm flex-1">Notifications</span>
                       {pendingCount > 0 && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
                     </Link>
-                    <Link
-                      href="/achievements"
-                      onClick={() => setMobileOpen(false)}
-                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white hover:bg-white/5 transition-colors"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        setAchievementsOpen(true);
+                      }}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white hover:bg-white/5 transition-colors text-left"
                     >
                       <AchievementsIcon className="h-5 w-5 shrink-0" />
                       <span className="text-sm">Achievements</span>
-                    </Link>
+                    </button>
                     {profile?.is_admin && (
                       <Link
                         href="/admin"
@@ -267,6 +272,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
         </div>
         {children}
       </div>
+      <AchievementsModal open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
     </div>
   );
 }
