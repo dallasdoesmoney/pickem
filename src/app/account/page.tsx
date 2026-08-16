@@ -9,8 +9,7 @@ import { fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderbo
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
-import { LevelListModal } from "@/components/LevelListModal";
-import { AchievementsModal } from "@/components/AchievementsModal";
+import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 
@@ -56,8 +55,8 @@ function SignedInAccount({
       .catch(() => setMyRecord(null));
   }, [userId]);
 
-  const [levelModalOpen, setLevelModalOpen] = useState(false);
-  const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
+  const [progressModalTab, setProgressModalTab] = useState<"levels" | "achievements">("levels");
   const [editOpen, setEditOpen] = useState(false);
 
   const label = authProfile?.display_name || authProfile?.username || "Your Profile";
@@ -124,10 +123,19 @@ function SignedInAccount({
           one connected system instead of three unrelated widgets. */}
       {myRecord && (
         <div className="flex flex-col gap-3 mt-6">
-          <LevelSummaryCard totalPoints={myRecord.total_points} onOpenLevels={() => setLevelModalOpen(true)} />
+          <LevelSummaryCard
+            totalPoints={myRecord.total_points}
+            onOpenLevels={() => {
+              setProgressModalTab("levels");
+              setProgressModalOpen(true);
+            }}
+          />
           <button
             type="button"
-            onClick={() => setAchievementsOpen(true)}
+            onClick={() => {
+              setProgressModalTab("achievements");
+              setProgressModalOpen(true);
+            }}
             className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors"
           >
             <span className="text-2xl shrink-0">🏆</span>
@@ -167,8 +175,12 @@ function SignedInAccount({
           onProfileChange={onProfileChange}
         />
       )}
-      <LevelListModal open={levelModalOpen} currentLevel={myRecord ? getLevelInfo(myRecord.total_points).level : undefined} onClose={() => setLevelModalOpen(false)} />
-      <AchievementsModal open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
+      <LevelsAchievementsModal
+        open={progressModalOpen}
+        initialTab={progressModalTab}
+        currentLevel={myRecord ? getLevelInfo(myRecord.total_points).level : undefined}
+        onClose={() => setProgressModalOpen(false)}
+      />
     </main>
   );
 }
@@ -207,9 +219,12 @@ function LevelSummaryCard({ totalPoints, onOpenLevels }: { totalPoints: number; 
         </svg>
       </div>
 
-      <div className="mt-3">
-        <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-          <div className="h-full rounded-full" style={{ width: `${Math.min(info.progress, 1) * 100}%`, background: info.rankColor }} />
+      <div className="mt-3.5">
+        <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
+          <div
+            className="h-full rounded-full"
+            style={{ width: `${Math.min(info.progress, 1) * 100}%`, background: "linear-gradient(90deg, #4ade80, #22c55e)" }}
+          />
         </div>
         <p className="text-[11px] text-white/45 mt-1.5">{info.isUnranked ? `${totalPoints} / 150 pts to Level 1` : nextLabel}</p>
       </div>

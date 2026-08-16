@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 import { fetchPendingRequestCount } from "@/lib/supabase/friends";
-import { AchievementsModal } from "@/components/AchievementsModal";
+import { fetchMyLeaderboardEntry } from "@/lib/supabase/leaderboard";
+import { getLevelInfo } from "@/lib/levels";
+import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 
 const PANEL_WIDTH = 200;
 
@@ -29,6 +31,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
   const [pendingCount, setPendingCount] = useState(0);
   const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [currentLevel, setCurrentLevel] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (!user) {
@@ -39,6 +42,16 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
       .then(setPendingCount)
       .catch(() => {});
   }, [user, open]);
+
+  useEffect(() => {
+    if (!user) {
+      setCurrentLevel(undefined);
+      return;
+    }
+    fetchMyLeaderboardEntry(user.id)
+      .then((row) => setCurrentLevel(row ? getLevelInfo(row.total_points).level : undefined))
+      .catch(() => {});
+  }, [user]);
 
   if (!user) {
     return (
@@ -148,7 +161,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
           </div>,
           document.body
         )}
-      <AchievementsModal open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
+      <LevelsAchievementsModal open={achievementsOpen} initialTab="achievements" currentLevel={currentLevel} onClose={() => setAchievementsOpen(false)} />
     </div>
   );
 }

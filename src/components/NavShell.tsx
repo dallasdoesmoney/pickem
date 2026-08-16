@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PickemMenu } from "@/components/PickemMenu";
 import { AccountMenu } from "@/components/AccountMenu";
-import { AchievementsModal } from "@/components/AchievementsModal";
+import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchPendingRequestCount } from "@/lib/supabase/friends";
+import { fetchMyLeaderboardEntry } from "@/lib/supabase/leaderboard";
+import { getLevelInfo } from "@/lib/levels";
 
 type NavItem = {
   href: string;
@@ -143,6 +145,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [currentLevel, setCurrentLevel] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (!user) {
@@ -153,6 +156,16 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       .then(setPendingCount)
       .catch(() => {});
   }, [user, mobileOpen]);
+
+  useEffect(() => {
+    if (!user) {
+      setCurrentLevel(undefined);
+      return;
+    }
+    fetchMyLeaderboardEntry(user.id)
+      .then((row) => setCurrentLevel(row ? getLevelInfo(row.total_points).level : undefined))
+      .catch(() => {});
+  }, [user]);
 
   return (
     <div className="flex min-h-full">
@@ -272,7 +285,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
         </div>
         {children}
       </div>
-      <AchievementsModal open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
+      <LevelsAchievementsModal open={achievementsOpen} initialTab="achievements" currentLevel={currentLevel} onClose={() => setAchievementsOpen(false)} />
     </div>
   );
 }
