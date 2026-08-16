@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { supabase } from "@/lib/supabase/client";
 import { saveWeeklyPicks } from "@/lib/supabase/picks";
+import { syncWeeklyPickemAchievements } from "@/lib/supabase/achievements";
 import { fetchWeeks, fetchGameResults, WeekRow } from "@/lib/supabase/admin";
 import { errorMessage } from "@/lib/errorMessage";
 import { WeekSwitcher } from "@/components/WeekSwitcher";
@@ -196,6 +197,7 @@ export default function Home() {
       // with a session, so there's nothing more to do in this click.
       if (!userId) return;
       await saveWeeklyPicks(userId, activeWeek, picks);
+      syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
@@ -212,6 +214,7 @@ export default function Home() {
     sessionStorage.removeItem(PENDING_SAVE_KEY);
     saveWeeklyPicks(user.id, activeWeek, picks)
       .then(() => {
+        syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
       })

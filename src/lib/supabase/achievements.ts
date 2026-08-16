@@ -26,3 +26,26 @@ export async function syncPredictorAchievements(): Promise<void> {
   const { error } = await supabase.rpc("sync_predictor_achievements");
   if (error) throw error;
 }
+
+// week -> number of distinct games picked that week - fetched in one
+// query across every week rather than one call per week.
+export async function fetchWeeklyPickemProgress(userId: string): Promise<Partial<Record<number, number>>> {
+  const { data, error } = await supabase.from("weekly_picks").select("week, game_id").eq("user_id", userId);
+  if (error) throw error;
+
+  const gamesByWeek = new Map<number, Set<string>>();
+  for (const row of data as { week: number; game_id: string }[]) {
+    if (!gamesByWeek.has(row.week)) gamesByWeek.set(row.week, new Set());
+    gamesByWeek.get(row.week)!.add(row.game_id);
+  }
+
+  const result: Partial<Record<number, number>> = {};
+  for (const [week, games] of gamesByWeek) result[week] = games.size;
+  return result;
+}
+
+// Idempotent, same reasoning as syncPredictorAchievements.
+export async function syncWeeklyPickemAchievements(): Promise<void> {
+  const { error } = await supabase.rpc("sync_weekly_pickem_achievements");
+  if (error) throw error;
+}

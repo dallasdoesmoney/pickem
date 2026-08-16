@@ -1,14 +1,15 @@
-// Catalog of achievements - what earns points and how much. Only one
-// exists for real right now (season predictor completion); more get
-// appended here as new point sources ship, each with its own
-// server-side award logic (see supabase/migrations for the SQL side of
-// this one).
+// Catalog of achievements - what earns points and how much. Each has its
+// own server-side award logic (see supabase/schema.sql's sync_* functions)
+// and its own instance renderer on the achievements page, since a "team"
+// instance (predictor) and a "week" instance (weekly pick'em) need
+// different progress UI.
 export type AchievementDef = {
   key: string;
   label: string;
   description: string;
   icon: string;
   pointsEach: number;
+  unitLabel: string;
 };
 
 export const ACHIEVEMENTS: AchievementDef[] = [
@@ -18,5 +19,14 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     description: "Predict the outcome of every game on a team's schedule.",
     icon: "📋",
     pointsEach: 50,
+    unitLabel: "teams",
+  },
+  {
+    key: "weekly_pickem_complete",
+    label: "Weekly Pick'em",
+    description: "Make a pick for every game in a week.",
+    icon: "🏈",
+    pointsEach: 100,
+    unitLabel: "weeks",
   },
 ];
