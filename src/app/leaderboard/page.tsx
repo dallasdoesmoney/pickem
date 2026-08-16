@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { errorMessage } from "@/lib/errorMessage";
@@ -41,11 +42,13 @@ export default function LeaderboardPage() {
         <div className="flex flex-col gap-2">
           {rows.map((row, i) => {
             const isMe = row.user_id === user?.id;
+            const label = row.display_name || row.username;
             return (
-              <div
+              <Link
                 key={row.user_id}
-                className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${
-                  isMe ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5"
+                href={`/leaderboard/${row.username}`}
+                className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+                  isMe ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
                 }`}
               >
                 <span className="w-6 text-center text-sm text-white/40" style={{ fontFamily: "var(--font-display)" }}>
@@ -55,17 +58,17 @@ export default function LeaderboardPage() {
                   <img src={row.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />
                 ) : (
                   <span className="h-8 w-8 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">
-                    {row.username.charAt(0).toUpperCase()}
+                    {label.charAt(0).toUpperCase()}
                   </span>
                 )}
                 <span className="flex-1 text-sm truncate">
-                  {row.username}
+                  {label}
                   {isMe && <span className="text-white/40"> (you)</span>}
                 </span>
                 <span className="text-sm shrink-0" style={{ fontFamily: "var(--font-display)" }}>
                   {row.correct}-{row.graded - row.correct}
                 </span>
-              </div>
+              </Link>
             );
           })}
         </div>

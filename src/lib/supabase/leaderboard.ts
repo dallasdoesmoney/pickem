@@ -3,18 +3,27 @@ import { supabase } from "@/lib/supabase/client";
 export type LeaderboardRow = {
   user_id: string;
   username: string;
+  display_name: string;
   avatar_url: string | null;
   correct: number;
   graded: number;
 };
 
+const COLUMNS = "user_id, username, display_name, avatar_url, correct, graded";
+
 export async function fetchLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase
     .from("leaderboard")
-    .select("user_id, username, avatar_url, correct, graded")
+    .select(COLUMNS)
     .order("correct", { ascending: false })
     .order("graded", { ascending: true })
     .order("username", { ascending: true });
   if (error) throw error;
   return data as LeaderboardRow[];
+}
+
+export async function fetchLeaderboardEntry(username: string): Promise<LeaderboardRow | null> {
+  const { data, error } = await supabase.from("leaderboard").select(COLUMNS).eq("username", username).maybeSingle();
+  if (error) throw error;
+  return data as LeaderboardRow | null;
 }

@@ -41,3 +41,14 @@ export async function claimUsername(userId: string, username: string): Promise<{
   }
   return { error: null };
 }
+
+// Unlike username, not unique - so there's no 23505 conflict case to
+// handle, just the profanity/length constraint.
+export async function updateDisplayName(userId: string, displayName: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("profiles").update({ display_name: displayName }).eq("id", userId);
+  if (error) {
+    if (error.code === "23514") return { error: "That name isn't allowed." };
+    return { error: "Couldn't save that name. Try again." };
+  }
+  return { error: null };
+}

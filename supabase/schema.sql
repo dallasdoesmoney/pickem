@@ -31,6 +31,15 @@ alter table public.profiles add constraint profiles_username_format
     )
   );
 create unique index profiles_username_lower_idx on public.profiles (lower(username));
+-- display_name isn't unique (unlike username) - just a length cap and the
+-- same profanity backstop, matching src/lib/displayNamePolicy.ts.
+alter table public.profiles add constraint profiles_display_name_format
+  check (
+    display_name = '' or (
+      char_length(display_name) <= 30
+      and display_name !~* '(fuck|shit|bitch|asshole|cunt|nigger|nigga|faggot|retard|whore|slut|rape|nazi|hitler|pussy)'
+    )
+  );
 create policy "profiles_select_own" on public.profiles for select using (auth.uid() = id);
 create policy "profiles_insert_own" on public.profiles for insert with check (auth.uid() = id);
 create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id);
@@ -153,6 +162,7 @@ create view public.leaderboard as
 select
   p.id as user_id,
   p.username,
+  p.display_name,
   p.avatar_url,
   coalesce(agg.correct, 0) as correct,
   coalesce(agg.graded, 0) as graded
