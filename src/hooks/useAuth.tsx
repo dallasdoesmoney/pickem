@@ -10,6 +10,7 @@ export type Profile = {
   display_name: string;
   avatar_url: string | null;
   username: string | null;
+  is_admin: boolean;
   migrated_local_picks: boolean;
 };
 

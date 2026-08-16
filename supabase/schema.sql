@@ -8,11 +8,19 @@ create table public.profiles (
   display_name text not null default '',
   avatar_url text,
   username text,
+  is_admin boolean not null default false,
   migrated_local_picks boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 alter table public.profiles enable row level security;
+-- Column-level lockdown: RLS policies below are row-level only (auth.uid()
+-- = id), which would otherwise let anyone grant themselves admin via
+-- `update profiles set is_admin = true` on their own row. is_admin can
+-- only ever be set from the SQL Editor.
+revoke insert on public.profiles from authenticated;
+revoke update on public.profiles from authenticated;
+grant update (display_name, avatar_url, username, migrated_local_picks) on public.profiles to authenticated;
 -- Format + a small server-side profanity backstop matching
 -- src/lib/usernamePolicy.ts's client-side list.
 alter table public.profiles add constraint profiles_username_format
@@ -59,6 +67,55 @@ begin new.updated_at = now(); return new; end;
 $$;
 create trigger profiles_set_updated_at
   before update on public.profiles for each row execute function public.set_updated_at();
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
+$$;
+
+-- weeks: which week is open for picking on the public site, and whether
+-- that week's results have been published (the future trigger point for
+-- a "results are in" email).
+create table public.weeks (
+  week integer primary key,
+  is_open boolean not null default false,
+  results_published boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+insert into public.weeks (week) select generate_series(1, 18);
+alter table public.weeks enable row level security;
+create policy "weeks_select_all" on public.weeks for select using (true);
+create policy "weeks_insert_admin" on public.weeks for insert with check (public.is_admin());
+create policy "weeks_update_admin" on public.weeks for update using (public.is_admin());
+create policy "weeks_delete_admin" on public.weeks for delete using (public.is_admin());
+create trigger weeks_set_updated_at before update on public.weeks
+  for each row execute function public.set_updated_at();
+
+-- game_results: one row per game (game_id matches Game.id from src/data/games.ts).
+create table public.game_results (
+  game_id text primary key,
+  week integer not null,
+  winner text not null,
+  updated_at timestamptz not null default now()
+);
+create index game_results_week_idx on public.game_results (week);
+alter table public.game_results enable row level security;
+create policy "game_results_select_all" on public.game_results for select using (true);
+create policy "game_results_insert_admin" on public.game_results for insert with check (public.is_admin());
+create policy "game_results_update_admin" on public.game_results for update using (public.is_admin());
+create policy "game_results_delete_admin" on public.game_results for delete using (public.is_admin());
+create trigger game_results_set_updated_at before update on public.game_results
+  for each row execute function public.set_updated_at();
+
+-- Run once with your real email to make your account the admin - nobody
+-- else can grant this to themselves; it's only settable from here.
+-- update public.profiles set is_admin = true
+--   where id = (select id from auth.users where email = 'you@example.com');
 
 -- weekly_picks (one row per pick, not a JSON blob - needed for a future leaderboard)
 create table public.weekly_picks (

@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { supabase } from "@/lib/supabase/client";
 import { saveWeeklyPicks } from "@/lib/supabase/picks";
+import { fetchActiveWeek } from "@/lib/supabase/admin";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
@@ -75,8 +76,20 @@ function StatPills({ stats }: { stats: PickStats }) {
 }
 
 export default function Home() {
-  const games = GAMES_BY_WEEK[CURRENT_WEEK];
-  const { picks, setPick, resetPicks, loaded } = usePicks(CURRENT_WEEK);
+  // CURRENT_WEEK is the fallback shown until the admin-controlled active
+  // week loads (or if nothing's ever been opened) - keeps the homepage
+  // rendering immediately instead of blocking on a network round-trip.
+  const [activeWeek, setActiveWeek] = useState(CURRENT_WEEK);
+  useEffect(() => {
+    fetchActiveWeek()
+      .then((week) => {
+        if (week !== null) setActiveWeek(week);
+      })
+      .catch(() => {});
+  }, []);
+
+  const games = GAMES_BY_WEEK[activeWeek];
+  const { picks, setPick, resetPicks, loaded } = usePicks(activeWeek);
   const { confirm, dialog } = useConfirmDialog();
   const { user } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
@@ -108,7 +121,7 @@ export default function Home() {
       // pending-save effect below picks it back up once the page reloads
       // with a session, so there's nothing more to do in this click.
       if (!userId) return;
-      await saveWeeklyPicks(userId, CURRENT_WEEK, picks);
+      await saveWeeklyPicks(userId, activeWeek, picks);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
@@ -123,7 +136,7 @@ export default function Home() {
     if (!user || !loaded) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
-    saveWeeklyPicks(user.id, CURRENT_WEEK, picks)
+    saveWeeklyPicks(user.id, activeWeek, picks)
       .then(() => {
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
@@ -139,8 +152,8 @@ export default function Home() {
     if (sharing) return;
     setSharing(true);
     try {
-      const blob = await renderShareImage({ games, groups, picks, week: CURRENT_WEEK });
-      const filename = `pickem-week-${CURRENT_WEEK}.png`;
+      const blob = await renderShareImage({ games, groups, picks, week: activeWeek });
+      const filename = `pickem-week-${activeWeek}.png`;
       const file = new File([blob], filename, { type: "image/png" });
 
       function download() {
@@ -165,7 +178,7 @@ export default function Home() {
           await navigator.share({
             files: [file],
             title: "NFL Pick'em",
-            text: `My Week ${CURRENT_WEEK} picks`,
+            text: `My Week ${activeWeek} picks`,
           });
         } catch (shareErr) {
           if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();
@@ -239,7 +252,7 @@ export default function Home() {
         <div className="flex flex-col items-center">
           <div className="text-center">
             <span className="relative inline-block text-xl text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
-              WEEK {CURRENT_WEEK}
+              WEEK {activeWeek}
               <span
                 className="absolute top-1/2 -right-4 translate-x-full -translate-y-1/2 whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
                 style={{ fontFamily: "var(--font-display)", background: "#1b2947", boxShadow: "2.5px 2.5px 0 rgba(0,0,0,0.45)" }}

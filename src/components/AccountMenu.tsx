@@ -78,6 +78,17 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
             >
               Account
             </Link>
+            {profile?.is_admin && (
+              <Link
+                href="/admin"
+                role="menuitem"
+                onClick={() => onOpenChange(false)}
+                className="block rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Admin
+              </Link>
+            )}
             <button
               type="button"
               role="menuitem"

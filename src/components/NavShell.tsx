@@ -153,6 +153,15 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                       )}
                       <span className="text-sm truncate">{profile?.username || user.email}</span>
                     </Link>
+                    {profile?.is_admin && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <span className="text-sm">Admin</span>
+                      </Link>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
