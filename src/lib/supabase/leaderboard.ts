@@ -7,9 +7,10 @@ export type LeaderboardRow = {
   avatar_url: string | null;
   correct: number;
   graded: number;
+  total_points: number;
 };
 
-const COLUMNS = "user_id, username, display_name, avatar_url, correct, graded";
+const COLUMNS = "user_id, username, display_name, avatar_url, correct, graded, total_points";
 
 export async function fetchLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase

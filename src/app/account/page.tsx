@@ -12,6 +12,9 @@ import { validateDisplayName, DISPLAY_NAME_MAX } from "@/lib/displayNamePolicy";
 import { fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { errorMessage } from "@/lib/errorMessage";
+import { LevelBadge } from "@/components/LevelBadge";
+import { PlayerBadges } from "@/components/PlayerBadges";
+import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 
 const AVATAR_SIZE = 200;
 
@@ -178,7 +181,10 @@ function SignedInAccount({
         </div>
 
         {myRecord && (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center gap-2">
+              <LevelBadge totalPoints={myRecord.total_points} size="lg" />
+            </div>
             <div
               className="rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center w-[140px] h-[88px]"
               style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
@@ -188,6 +194,8 @@ function SignedInAccount({
               </div>
               <div className="text-[11px] text-white/55 mt-1.5 tracking-wide">SEASON RECORD</div>
             </div>
+            <PlayerBadges userId={userId} />
+            <LevelProgress totalPoints={myRecord.total_points} />
             {myRecord.username && (
               <Link href={`/leaderboard/${myRecord.username}`} className="text-xs text-white/40 hover:text-white/70 transition-colors">
                 View your public profile &rarr;
@@ -260,6 +268,30 @@ function SignedInAccount({
 
       {cropFile && <AvatarCropModal file={cropFile} outputSize={AVATAR_SIZE} onCancel={() => setCropFile(null)} onConfirm={handleCropConfirm} />}
     </main>
+  );
+}
+
+// Own-account-only, not shown on the public profile - a nudge toward the
+// next level is personal motivation, not something worth surfacing about
+// someone else.
+function LevelProgress({ totalPoints }: { totalPoints: number }) {
+  const info = getLevelInfo(totalPoints);
+  const nextLabel = info.isMaxLevel
+    ? "Max level reached"
+    : `${info.pointsForNextLevel! - info.pointsIntoLevel} pts to Level ${info.level + 1}`;
+
+  return (
+    <div className="w-full max-w-[220px] flex flex-col items-center gap-1.5">
+      <p className="text-[11px] text-white/45 tracking-wide">
+        {info.isUnranked ? `${totalPoints} / 1,500 pts to Level 1` : `${info.rankName} ${subLevelRoman(info.subLevel)} · ${nextLabel}`}
+      </p>
+      <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${Math.min(info.progress, 1) * 100}%`, background: info.isUnranked ? "#94a3b8" : info.rankColor }}
+        />
+      </div>
+    </div>
   );
 }
 

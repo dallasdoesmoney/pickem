@@ -7,6 +7,8 @@ import { fetchLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboar
 import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/hooks/useAuth";
 import { FriendButton } from "@/components/FriendButton";
+import { LevelBadge } from "@/components/LevelBadge";
+import { PlayerBadges } from "@/components/PlayerBadges";
 
 // A client page (not the server-component-plus-notFound() pattern used by
 // /predictor/[team], which validates against a fixed, known team list) -
@@ -50,10 +52,14 @@ export default function PlayerPage() {
               {(row.display_name || row.username).charAt(0).toUpperCase()}
             </span>
           )}
-          <h1 className="text-3xl mt-4 text-center" style={{ fontFamily: "var(--font-display)" }}>
-            {row.display_name || row.username}
-          </h1>
+          <div className="flex items-center gap-2 mt-4">
+            <h1 className="text-3xl text-center" style={{ fontFamily: "var(--font-display)" }}>
+              {row.display_name || row.username}
+            </h1>
+            <LevelBadge totalPoints={row.total_points} size="lg" />
+          </div>
           <p className="text-white/45 text-sm mt-1">@{row.username}</p>
+          <PlayerBadges userId={row.user_id} />
 
           <div
             className="mt-8 rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center w-[160px] h-[100px]"

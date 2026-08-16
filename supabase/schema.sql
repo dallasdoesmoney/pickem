@@ -151,13 +151,46 @@ create policy "weekly_picks_delete_own" on public.weekly_picks for delete
 create trigger weekly_picks_set_updated_at
   before update on public.weekly_picks for each row execute function public.set_updated_at();
 
+-- point_events: append-only ledger of every point-earning action (see
+-- src/lib/levels.ts - level is computed from the sum, never stored, so the
+-- curve stays free to retune with zero migration). No insert policy for
+-- authenticated - every point source ships as its own reviewed feature,
+-- not a generic "add points" call any signed-in user could hit directly.
+create table public.point_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  source text not null,
+  points integer not null,
+  reference_id text,
+  created_at timestamptz not null default now(),
+  unique (user_id, source, reference_id)
+);
+create index point_events_user_idx on public.point_events (user_id);
+alter table public.point_events enable row level security;
+create policy "point_events_select_own" on public.point_events for select using (auth.uid() = user_id);
+
+-- user_badges: non-level badges (streak, YouTube member, etc.) - need real
+-- state or manual granting, unlike the computed level badge. Public
+-- select (same reasoning as the leaderboard view); writes are admin/SQL
+-- Editor only for now, same bootstrapping as profiles.is_admin.
+create table public.user_badges (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  badge_key text not null,
+  awarded_at timestamptz not null default now(),
+  unique (user_id, badge_key)
+);
+alter table public.user_badges enable row level security;
+create policy "user_badges_select_all" on public.user_badges for select using (true);
+grant select on public.user_badges to anon, authenticated;
+
 -- leaderboard: same pattern as is_username_available but for a whole
 -- aggregated view instead of a scalar - runs as the view owner, so it can
--- read every user's weekly_picks without broadening
--- weekly_picks_select_own, and only ever exposes the 5 columns below.
--- Left join from profiles (not an inner join starting at weekly_picks) so
--- every signed-up user with a username appears, tied at 0-0, even before
--- any results are published.
+-- read every user's weekly_picks/point_events without broadening their
+-- own-row-only RLS, and only ever exposes the columns below. Left join
+-- from profiles (not an inner join starting at weekly_picks) so every
+-- signed-up user with a username appears, tied at 0-0, even before any
+-- results are published or any points exist.
 create view public.leaderboard as
 select
   p.id as user_id,
@@ -165,7 +198,8 @@ select
   p.display_name,
   p.avatar_url,
   coalesce(agg.correct, 0) as correct,
-  coalesce(agg.graded, 0) as graded
+  coalesce(agg.graded, 0) as graded,
+  coalesce(pts.total_points, 0) as total_points
 from public.profiles p
 left join (
   select
@@ -177,6 +211,11 @@ left join (
   join public.game_results gr on gr.game_id = wp.game_id
   group by wp.user_id
 ) agg on agg.user_id = p.id
+left join (
+  select user_id, sum(points)::int as total_points
+  from public.point_events
+  group by user_id
+) pts on pts.user_id = p.id
 where p.username is not null;
 grant select on public.leaderboard to anon, authenticated;
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { fetchMyFriendIds } from "@/lib/supabase/friends";
 import { errorMessage } from "@/lib/errorMessage";
+import { PlayerProfileModal } from "@/components/PlayerProfileModal";
+import { LevelBadge } from "@/components/LevelBadge";
 
 type View = "global" | "friends";
 
@@ -15,6 +16,7 @@ export default function LeaderboardPage() {
   const [friendIds, setFriendIds] = useState<Set<string> | null>(null);
   const [view, setView] = useState<View>("global");
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<LeaderboardRow | null>(null);
 
   useEffect(() => {
     fetchLeaderboard()
@@ -22,16 +24,21 @@ export default function LeaderboardPage() {
       .catch((err) => setError(errorMessage(err)));
   }, []);
 
+  const reloadFriends = useCallback(() => {
+    if (!user) return;
+    fetchMyFriendIds(user.id)
+      .then(setFriendIds)
+      .catch((err) => setError(errorMessage(err)));
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       setFriendIds(null);
       if (view === "friends") setView("global");
       return;
     }
-    fetchMyFriendIds(user.id)
-      .then(setFriendIds)
-      .catch((err) => setError(errorMessage(err)));
-  }, [user]);
+    reloadFriends();
+  }, [user, reloadFriends]);
 
   const visibleRows = useMemo(() => {
     if (!rows) return null;
@@ -88,10 +95,11 @@ export default function LeaderboardPage() {
             const isMe = row.user_id === user?.id;
             const label = row.display_name || row.username;
             return (
-              <Link
+              <button
                 key={row.user_id}
-                href={`/leaderboard/${row.username}`}
-                className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+                type="button"
+                onClick={() => setSelected(row)}
+                className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors text-left ${
                   isMe ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
                 }`}
               >
@@ -105,18 +113,23 @@ export default function LeaderboardPage() {
                     {label.charAt(0).toUpperCase()}
                   </span>
                 )}
-                <span className="flex-1 text-sm truncate">
-                  {label}
-                  {isMe && <span className="text-white/40"> (you)</span>}
+                <span className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="text-sm truncate">
+                    {label}
+                    {isMe && <span className="text-white/40"> (you)</span>}
+                  </span>
+                  <LevelBadge totalPoints={row.total_points} />
                 </span>
                 <span className="text-sm shrink-0" style={{ fontFamily: "var(--font-display)" }}>
                   {row.correct}-{row.graded - row.correct}
                 </span>
-              </Link>
+              </button>
             );
           })}
         </div>
       )}
+
+      <PlayerProfileModal row={selected} myId={user?.id} onClose={() => setSelected(null)} onFriendshipChange={reloadFriends} />
     </main>
   );
 }
