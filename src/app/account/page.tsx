@@ -8,6 +8,7 @@ import { useUsernameField } from "@/hooks/useUsernameField";
 import { updateAvatar, claimUsername } from "@/lib/supabase/profile";
 import { USERNAME_MIN, USERNAME_MAX } from "@/lib/usernamePolicy";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
+import { errorMessage } from "@/lib/errorMessage";
 
 const AVATAR_SIZE = 200;
 
@@ -76,7 +77,7 @@ function SignedInAccount({
       await onProfileChange();
     } catch (err) {
       console.error("Avatar upload failed", err);
-      const detail = err instanceof Error ? err.message : String(err);
+      const detail = errorMessage(err);
       setAvatarError(`Couldn't upload that photo: ${detail}`);
     } finally {
       setUploading(false);

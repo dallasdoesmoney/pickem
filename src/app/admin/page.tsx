@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { GAMES_BY_WEEK } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { fetchWeeks, setWeekOpen, setWeekResultsPublished, fetchGameResults, setGameResult, clearGameResult, WeekRow } from "@/lib/supabase/admin";
+import { errorMessage } from "@/lib/errorMessage";
 
 export default function AdminPage() {
   const { user, profile, loading } = useAuth();
@@ -43,7 +44,7 @@ function AdminDashboard() {
   useEffect(() => {
     fetchWeeks()
       .then(setWeeks)
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => setError(errorMessage(err)));
   }, []);
 
   useEffect(() => {
@@ -53,7 +54,7 @@ function AdminDashboard() {
         setResults(map);
         setResultsLoaded(true);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => setError(errorMessage(err)));
   }, [selectedWeek]);
 
   const currentWeekRow = weeks?.find((w) => w.week === selectedWeek);
@@ -68,7 +69,7 @@ function AdminDashboard() {
       await setWeekOpen(selectedWeek, nextOpen);
       setWeeks((prev) => prev?.map((w) => (w.week === selectedWeek ? { ...w, is_open: nextOpen } : w)) ?? prev);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setSavingWeek(false);
     }
@@ -83,7 +84,7 @@ function AdminDashboard() {
       await setWeekResultsPublished(selectedWeek, next);
       setWeeks((prev) => prev?.map((w) => (w.week === selectedWeek ? { ...w, results_published: next } : w)) ?? prev);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setSavingWeek(false);
     }
@@ -106,7 +107,7 @@ function AdminDashboard() {
         setResults((prev) => ({ ...prev, [gameId]: team }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setSavingGameId(null);
     }

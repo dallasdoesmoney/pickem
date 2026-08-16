@@ -142,6 +142,25 @@ create policy "weekly_picks_delete_own" on public.weekly_picks for delete
 create trigger weekly_picks_set_updated_at
   before update on public.weekly_picks for each row execute function public.set_updated_at();
 
+-- leaderboard: same pattern as is_username_available but for a whole
+-- aggregated view instead of a scalar - runs as the view owner, so it can
+-- read every user's weekly_picks without broadening
+-- weekly_picks_select_own, and only ever exposes the 5 columns below.
+create view public.leaderboard as
+select
+  p.id as user_id,
+  p.username,
+  p.avatar_url,
+  count(*) filter (where wp.team_abbr = gr.winner)::int as correct,
+  count(*)::int as graded
+from public.weekly_picks wp
+join public.weeks w on w.week = wp.week and w.results_published = true
+join public.game_results gr on gr.game_id = wp.game_id
+join public.profiles p on p.id = wp.user_id
+where p.username is not null
+group by p.id, p.username, p.avatar_url;
+grant select on public.leaderboard to anon, authenticated;
+
 -- season_picks (team predictor)
 create table public.season_picks (
   id uuid primary key default gen_random_uuid(),

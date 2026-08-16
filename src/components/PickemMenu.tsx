@@ -10,12 +10,13 @@ const PANEL_WIDTH = 220;
 const ITEMS = [
   { href: "/", label: "Weekly Pick’em", matchPrefix: "/", exact: true },
   { href: "/predictor", label: "Team Pick’em", matchPrefix: "/predictor", exact: false },
+  { href: "/leaderboard", label: "Leaderboard", matchPrefix: "/leaderboard", exact: false },
 ];
 
 export function PickemMenu({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const pathname = usePathname();
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
-  const isActive = pathname === "/" || pathname.startsWith("/predictor");
+  const isActive = pathname === "/" || pathname.startsWith("/predictor") || pathname.startsWith("/leaderboard");
 
   return (
     <div className="relative">

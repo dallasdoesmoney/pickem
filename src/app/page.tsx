@@ -10,6 +10,7 @@ import { useSignInModal } from "@/hooks/useSignInModal";
 import { supabase } from "@/lib/supabase/client";
 import { saveWeeklyPicks } from "@/lib/supabase/picks";
 import { fetchWeeks, fetchGameResults, WeekRow } from "@/lib/supabase/admin";
+import { errorMessage } from "@/lib/errorMessage";
 import { WeekSwitcher } from "@/components/WeekSwitcher";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
@@ -23,7 +24,7 @@ const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 // admin closes a week mid-click surfaces as a row-level-security error -
 // worth a specific message instead of a generic one.
 function describeSaveError(err: unknown): string {
-  const message = err instanceof Error ? err.message : String(err);
+  const message = errorMessage(err);
   if (message.toLowerCase().includes("row-level security")) return "This week is closed for picking.";
   return "Couldn't save your picks. Try again.";
 }
