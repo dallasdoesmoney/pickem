@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TEAMS, TeamAbbr } from "@/data/teams";
+import Link from "next/link";
+import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { WIN_TOTALS } from "@/data/winTotals";
 import { isSuspiciousPick } from "@/data/powerRankings";
 import { SeasonGameCard, SeasonByeCard } from "@/components/SeasonGameCard";
@@ -22,6 +23,13 @@ const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 export default function PredictorPageClient({ trackedTeam }: { trackedTeam: TeamAbbr }) {
   const team = TEAMS[trackedTeam];
   const schedule = getTeamSchedule(trackedTeam);
+
+  // Same order as the team picker and switcher dropdown, so "next" here
+  // matches what you'd expect from those - wraps around at both ends
+  // rather than dead-ending on Washington/Arizona.
+  const teamIndex = TEAMS_SORTED.findIndex((t) => t.abbr === trackedTeam);
+  const prevTeam = TEAMS_SORTED[(teamIndex - 1 + TEAMS_SORTED.length) % TEAMS_SORTED.length];
+  const nextTeam = TEAMS_SORTED[(teamIndex + 1) % TEAMS_SORTED.length];
   const { picks, setPick, resetPicks, loaded } = useSeasonPicks(trackedTeam);
   const { confirm, dialog } = useConfirmDialog();
   const { user } = useAuth();
@@ -398,6 +406,33 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             >
               RESET
             </button>
+
+            <div className="flex items-center justify-between w-full max-w-xs mt-6 gap-3">
+              <Link
+                href={`/predictor/${prevTeam.abbr.toLowerCase()}`}
+                aria-label={`Previous team: ${prevTeam.city} ${prevTeam.name}`}
+                className="flex items-center gap-1.5 rounded-full pl-2.5 pr-3.5 py-1.5 text-xs border border-white/15 hover:border-white/30 text-white/70 hover:text-white transition-colors"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 6l-6 6 6 6" />
+                </svg>
+                <img src={prevTeam.logo} alt="" className="h-4 w-4 object-contain shrink-0" crossOrigin="anonymous" />
+                {prevTeam.abbr}
+              </Link>
+              <Link
+                href={`/predictor/${nextTeam.abbr.toLowerCase()}`}
+                aria-label={`Next team: ${nextTeam.city} ${nextTeam.name}`}
+                className="flex items-center gap-1.5 rounded-full pl-3.5 pr-2.5 py-1.5 text-xs border border-white/15 hover:border-white/30 text-white/70 hover:text-white transition-colors"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {nextTeam.abbr}
+                <img src={nextTeam.logo} alt="" className="h-4 w-4 object-contain shrink-0" crossOrigin="anonymous" />
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 6l6 6-6 6" />
+                </svg>
+              </Link>
+            </div>
           </div>
         </>
       )}
