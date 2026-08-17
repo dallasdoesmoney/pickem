@@ -23,6 +23,8 @@ const LOSS_COLOR_RGB = "239,68,68";
 // translucent stroke lets the fill show through the border itself, which
 // reads as a rendering bug rather than a muted color).
 export const FADED_BORDER_COLOR = "#8c8c8c";
+export const LOCK_COLOR = "#f59e0b";
+const LOCK_COLOR_RGB = "245,158,11";
 
 export function darkenColor(hex: string, factor: number, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -42,6 +44,7 @@ export function TeamHalfPill({
   footer,
   badge,
   disabled,
+  isLockPick,
 }: {
   team: (typeof TEAMS)[TeamAbbr];
   side: "left" | "right";
@@ -51,14 +54,24 @@ export function TeamHalfPill({
   footer?: React.ReactNode;
   badge?: React.ReactNode;
   disabled?: boolean;
+  // Full gold wash + "LOCK" stamp, same visual slot as the win/loss
+  // tint+letter below. The caller (GameCard) only ever passes this as
+  // true pre-results - outcome alone can't tell "genuinely graded win"
+  // apart from "just picked, no result yet" (outcomeFor() returns "win"
+  // for the highlighted team either way, as the plain pre-game "this is
+  // your pick" indicator), so GameCard pre-filters this to !hasResult and
+  // this component just trusts it and gives it priority over outcome.
+  isLockPick?: boolean;
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
   const innerBorderSide = side === "left" ? "borderRight" : "borderLeft";
   const outcomeColor = outcome === "win" ? WIN_COLOR : outcome === "loss" ? LOSS_COLOR : null;
   const outcomeColorRgb = outcome === "win" ? WIN_COLOR_RGB : outcome === "loss" ? LOSS_COLOR_RGB : null;
-  const borderColor = outcomeColor ?? (isFaded ? FADED_BORDER_COLOR : "white");
-  const borderWidth = outcomeColor ? OUTCOME_BORDER_WIDTH : BORDER_WIDTH;
+  const showLockTreatment = !!isLockPick;
+  const showOutcomeTreatment = !!outcomeColor && !showLockTreatment;
+  const borderColor = showLockTreatment ? LOCK_COLOR : (outcomeColor ?? (isFaded ? FADED_BORDER_COLOR : "white"));
+  const borderWidth = showOutcomeTreatment || showLockTreatment ? OUTCOME_BORDER_WIDTH : BORDER_WIDTH;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
 
   return (
@@ -91,10 +104,10 @@ export function TeamHalfPill({
           >
             {footer}
           </div>
-          {outcomeColor && (
+          {showOutcomeTreatment && (
             <div className="pointer-events-none absolute inset-0" style={{ backgroundColor: `rgba(${outcomeColorRgb},0.34)` }} />
           )}
-          {outcomeColor && (
+          {showOutcomeTreatment && (
             <span
               className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl"
               style={{
@@ -108,6 +121,23 @@ export function TeamHalfPill({
               {outcome === "win" ? "W" : "L"}
             </span>
           )}
+          {showLockTreatment && (
+            <div className="pointer-events-none absolute inset-0" style={{ backgroundColor: `rgba(${LOCK_COLOR_RGB},0.38)` }} />
+          )}
+          {showLockTreatment && (
+            <span
+              className="pointer-events-none absolute inset-0 flex items-center justify-center text-3xl whitespace-nowrap"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: LOCK_COLOR,
+                transform: "rotate(-12deg)",
+                textShadow:
+                  "-1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff, 0 3px 5px rgba(0,0,0,0.4)",
+              }}
+            >
+              LOCK
+            </span>
+          )}
         </div>
       </button>
       <div
@@ -116,8 +146,12 @@ export function TeamHalfPill({
           borderTop: `${borderWidth}px solid ${borderColor}`,
           borderBottom: `${borderWidth}px solid ${borderColor}`,
           [outerBorderSide]: `${borderWidth}px solid ${borderColor}`,
-          [innerBorderSide]: outcomeColor ? `${borderWidth}px solid ${borderColor}` : undefined,
-          boxShadow: outcomeColor ? `0 0 6px 1px rgba(${outcomeColorRgb},0.6)` : undefined,
+          [innerBorderSide]: showOutcomeTreatment || showLockTreatment ? `${borderWidth}px solid ${borderColor}` : undefined,
+          boxShadow: showLockTreatment
+            ? `0 0 6px 1px rgba(${LOCK_COLOR_RGB},0.6)`
+            : showOutcomeTreatment
+              ? `0 0 6px 1px rgba(${outcomeColorRgb},0.6)`
+              : undefined,
         }}
       />
       {badge}

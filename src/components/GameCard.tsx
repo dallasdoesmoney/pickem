@@ -59,7 +59,7 @@ function LockBadge({
         className="h-full w-full object-contain"
         style={{
           filter: isLocked
-            ? "drop-shadow(0 0 7px rgba(74,222,128,0.9)) drop-shadow(0 2px 3px rgba(0,0,0,0.6))"
+            ? "drop-shadow(0 0 7px rgba(245,158,11,0.9)) drop-shadow(0 2px 3px rgba(0,0,0,0.6))"
             : "grayscale(1) drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
           opacity: isLocked ? 1 : 0.45,
         }}
@@ -148,6 +148,7 @@ export function GameCard({
         isFaded={isFadedFor(away.abbr)}
         onClick={() => onPick(away.abbr)}
         disabled={locked}
+        isLockPick={picked === away.abbr && isLockPick && !hasResult}
         badge={
           picked === away.abbr ? (
             <>
@@ -174,6 +175,7 @@ export function GameCard({
         isFaded={isFadedFor(home.abbr)}
         onClick={() => onPick(home.abbr)}
         disabled={locked}
+        isLockPick={picked === home.abbr && isLockPick && !hasResult}
         badge={
           picked === home.abbr ? (
             <>

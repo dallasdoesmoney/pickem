@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase/client";
 import { saveWeeklyPicks } from "@/lib/supabase/picks";
 import { syncWeeklyPickemAchievements, syncLockBonus } from "@/lib/supabase/achievements";
 import { fetchWeeks, fetchGameResults, WeekRow } from "@/lib/supabase/admin";
+import { fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { errorMessage } from "@/lib/errorMessage";
 import { WeekSwitcher } from "@/components/WeekSwitcher";
 import { groupGamesByDay } from "@/lib/groupGames";
@@ -105,6 +106,52 @@ function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeo
   );
 }
 
+// Sits between the page title and the first matchup, signed-in only -
+// three colored segments (not just plain text) so it reads as a small
+// dashboard readout rather than a plain stat line, matching the app's
+// existing emoji-icon convention (achievements, stat pills) for the
+// per-segment flourish.
+function WeeklyRecordPill({
+  weeklyCorrect,
+  weeklyGraded,
+  gamesRemaining,
+  seasonCorrect,
+  seasonGraded,
+}: {
+  weeklyCorrect: number;
+  weeklyGraded: number;
+  gamesRemaining: number;
+  seasonCorrect: number;
+  seasonGraded: number;
+}) {
+  const segments = [
+    { icon: "🏈", value: `${weeklyCorrect}-${weeklyGraded - weeklyCorrect}`, label: "WEEKLY RECORD", color: "#4ade80" },
+    { icon: "⏳", value: String(gamesRemaining), label: "GAMES REMAINING", color: "#38bdf8" },
+    { icon: "🏆", value: `${seasonCorrect}-${seasonGraded - seasonCorrect}`, label: "SEASON RECORD", color: "#c084fc" },
+  ];
+
+  return (
+    <div className="flex justify-center mb-6">
+      <div className="flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2 py-2 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]">
+        {segments.map((seg, i) => (
+          <div key={seg.label} className="flex items-center">
+            {i > 0 && <div className="w-px self-stretch bg-white/10 mx-3 sm:mx-5" />}
+            <div className="flex flex-col items-center gap-0.5 px-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm sm:text-base leading-none">{seg.icon}</span>
+                <span className="text-lg sm:text-xl leading-none" style={{ fontFamily: "var(--font-display)", color: seg.color }}>
+                  {seg.value}
+                </span>
+              </div>
+              <span className="text-[8px] sm:text-[9px] text-white/50 tracking-wide whitespace-nowrap">{seg.label}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Shown instead of StatPills once results are in - the point of this
 // screen is now "how'd I do," so it's a single, bigger, shareable record
 // pill (mirrors the team predictor's "My Prediction" pill) rather than
@@ -183,6 +230,19 @@ export default function Home() {
   const { confirm, dialog } = useConfirmDialog();
   const { user, profile } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
+  // Season-wide record (across every published week), for the record
+  // pill's third segment - same query the profile page and leaderboard
+  // already use, just scoped to whoever's signed in here.
+  const [myRecord, setMyRecord] = useState<LeaderboardRow | null>(null);
+  useEffect(() => {
+    if (!user) {
+      setMyRecord(null);
+      return;
+    }
+    fetchMyLeaderboardEntry(user.id)
+      .then(setMyRecord)
+      .catch(() => setMyRecord(null));
+  }, [user]);
   const pickedCount = Object.keys(picks).length;
   const gradedCount = games.filter((g) => results[g.id]).length;
   const correctCount = games.filter((g) => results[g.id] && picks[g.id] === results[g.id]).length;
@@ -422,6 +482,15 @@ export default function Home() {
       <main className="flex-1 px-4 pb-10 max-w-4xl w-full mx-auto">
         {loaded && (
           <>
+            {myRecord && (
+              <WeeklyRecordPill
+                weeklyCorrect={correctCount}
+                weeklyGraded={gradedCount}
+                gamesRemaining={games.length - gradedCount}
+                seasonCorrect={myRecord.correct}
+                seasonGraded={myRecord.graded}
+              />
+            )}
             <div className="flex flex-col lg:hidden">
               {items.map((item, i) => renderMobileItem(item, i === 0))}
             </div>

@@ -232,6 +232,48 @@ function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts, ic
 // Bottom corner (drawTeamHalfBadge above owns the top corner), mirroring
 // the live app's LockBadge - ghost/dim when this pick isn't the lock,
 // full opacity with a green glow when it is.
+// Canvas counterpart to TeamHalfPill's showLockTreatment - full gold
+// wash + "LOCK" stamp + gold ring, only pre-results (once a result comes
+// in, drawPillHalfFill's own win/loss tint+letter takes over instead).
+// Drawn as a separate overlay pass rather than teaching the shared
+// drawPillHalfBorder (canvasShare.ts, also used by the season predictor,
+// which has no lock concept) about lock state - this must run AFTER
+// drawPillBordersOutcomeLast so the gold ring wins over the plain white
+// border underneath it.
+function drawLockFill(ctx: CanvasRenderingContext2D, displayFont: string, opts: TeamHalfOpts) {
+  const { x, y, w, h, side, outcome, isLockPick } = opts;
+  if (!isLockPick || outcome) return;
+  const radius = h / 2;
+  const r: Radii = side === "left" ? { tl: radius, bl: radius, tr: 0, br: 0 } : { tr: radius, br: radius, tl: 0, bl: 0 };
+
+  ctx.save();
+  roundRectPath(ctx, x, y, w, h, r);
+  ctx.clip();
+  ctx.fillStyle = "rgba(245,158,11,0.38)";
+  ctx.fillRect(x, y, w, h);
+
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.rotate((-12 * Math.PI) / 180);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `30px ${displayFont}`;
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "#ffffff";
+  ctx.strokeText("LOCK", 0, 4);
+  ctx.fillStyle = "#f59e0b";
+  ctx.fillText("LOCK", 0, 4);
+  ctx.restore();
+
+  roundRectPath(ctx, x, y, w, h, r);
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "#f59e0b";
+  ctx.shadowColor = "rgba(245,158,11,0.6)";
+  ctx.shadowBlur = 6;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
 function drawLockBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts, icon: HTMLImageElement | null | undefined) {
   const { x, y, w, h, side, isLockPick } = opts;
   if (!icon) return;
@@ -244,7 +286,7 @@ function drawLockBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts, icon: 
   ctx.translate(centerX, centerY);
   ctx.rotate(((side === "left" ? -18 : 18) * Math.PI) / 180);
   if (isLockPick) {
-    ctx.shadowColor = "rgba(74,222,128,0.9)";
+    ctx.shadowColor = "rgba(245,158,11,0.9)";
     ctx.shadowBlur = 9;
   } else {
     ctx.filter = "grayscale(1)";
@@ -409,6 +451,11 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       const highlighted = picked ?? (result ? result : undefined);
       function outcomeForTeam(team: TeamAbbr): "win" | "loss" | null {
         if (team !== highlighted) return null;
+        // A pre-game lock owns this half's tint+stamp instead (drawn
+        // separately by drawLockFill, after the borders) - returning null
+        // here stops drawPillHalfFill's own win/loss treatment from also
+        // firing and showing through underneath it.
+        if (picked === team && game.id === lockedGameId && !result) return null;
         if (!result) return "win";
         if (!picked) return "win";
         return picked === result ? "win" : "loss";
@@ -468,6 +515,8 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       drawPillHalfFill(ctx, displayFont, awayOpts, (c, midY) => drawGameFooterContent(c, displayFont, awayOpts.x, awayOpts.w, midY, awayOpts.spreadLabel, awayOpts.record));
       drawPillHalfFill(ctx, displayFont, homeOpts, (c, midY) => drawGameFooterContent(c, displayFont, homeOpts.x, homeOpts.w, midY, homeOpts.spreadLabel, homeOpts.record));
       drawPillBordersOutcomeLast(ctx, awayOpts, homeOpts);
+      drawLockFill(ctx, displayFont, awayOpts);
+      drawLockFill(ctx, displayFont, homeOpts);
       drawTeamHalfBadge(ctx, awayOpts, awayOpts.tag ? tagIcons.get(awayOpts.tag.icon) : undefined);
       drawTeamHalfBadge(ctx, homeOpts, homeOpts.tag ? tagIcons.get(homeOpts.tag.icon) : undefined);
       if (awayOpts.isLockPick) drawLockBadge(ctx, awayOpts, lockIcon);
