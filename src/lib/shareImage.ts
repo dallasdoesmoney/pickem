@@ -36,7 +36,11 @@ function drawStatPill(
   value: string,
   label: string,
   logo?: HTMLImageElement | null,
-  badgeIcon?: HTMLImageElement | null
+  badgeIcon?: HTMLImageElement | null,
+  // Boldest Pick moved into a narrower pill than it used to have (the old
+  // Chalk slot), which left its logo+text value crowding the corner badge
+  // - narrower pills pass a smaller logo so there's room for both.
+  logoH = 66
 ) {
   roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
   ctx.strokeStyle = borderColor;
@@ -49,7 +53,6 @@ function drawStatPill(
   const valueY = y + h * 0.42;
 
   if (logo && value) {
-    const logoH = 66;
     const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
     const valueWidth = ctx.measureText(value).width;
     const totalW = logoW + 8 + valueWidth;
@@ -59,7 +62,6 @@ function drawStatPill(
     ctx.fillText(value, startX + logoW + 8, valueY);
     ctx.textAlign = "center";
   } else if (logo) {
-    const logoH = 66;
     const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
     ctx.drawImage(logo, x + w / 2 - logoW / 2, valueY - logoH * 0.72, logoW, logoH);
   } else {
@@ -71,10 +73,19 @@ function drawStatPill(
   ctx.fillText(label, x + w / 2, y + h * 0.8);
 
   if (badgeIcon) {
-    const badgeH = 54;
-    const badgeW = (badgeIcon.naturalWidth / badgeIcon.naturalHeight) * badgeH;
+    // Capped by whichever dimension is larger (all three current badge
+    // icons are taller than wide, so this caps height today, but stays
+    // correct if a future icon is landscape instead) - shrunk from the
+    // original 54 and nudged further toward the outside corner (translate
+    // x+6,y-4 instead of x+10,y+2) so it has less reach into the pill's
+    // interior, where Boldest Pick's logo+value now sits closer to the
+    // edge than it used to in its old, wider slot.
+    const target = 46;
+    const aspect = badgeIcon.naturalWidth / badgeIcon.naturalHeight;
+    const badgeW = aspect >= 1 ? target : target * aspect;
+    const badgeH = aspect >= 1 ? target / aspect : target;
     ctx.save();
-    ctx.translate(x + 10, y + 2);
+    ctx.translate(x + 6, y - 4);
     ctx.rotate((-18 * Math.PI) / 180);
     ctx.shadowColor = "rgba(0,0,0,0.6)";
     ctx.shadowBlur = 4;
@@ -407,7 +418,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     // Matches the live StatPills order: Lock of the Week took over the
     // prominent center slot (it's the more important tag), Boldest Pick
     // moved into the slot Chalk used to occupy, Chalk was removed.
-    const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeIcon?: HTMLImageElement | null }> = [
+    const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeIcon?: HTMLImageElement | null; logoH?: number }> = [
       { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeIcon: underdogIcon },
       {
         w: 250,
@@ -426,13 +437,17 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         label: "BOLDEST PICK",
         logo: stats.boldestTeam ? logos.get(stats.boldestTeam.logo) : undefined,
         badgeIcon: boldestIcon,
+        // Narrower pill than this content used to have (the old 250px
+        // center slot, now Lock's) - smaller logo keeps it clear of the
+        // corner badge instead of crowding it.
+        logoH: 48,
       },
     ];
     const pillGap = 24;
     const totalPillsW = pillDefs.reduce((s, p) => s + p.w, 0) + pillGap * (pillDefs.length - 1);
     let pillX = WIDTH / 2 - totalPillsW / 2;
     for (const p of pillDefs) {
-      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeIcon);
+      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeIcon, p.logoH);
       pillX += p.w + pillGap;
     }
   }
