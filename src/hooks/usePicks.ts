@@ -10,7 +10,9 @@ type Picks = Record<string, TeamAbbr>;
 export function usePicks(week: number) {
   const { user, loading: authLoading } = useAuth();
   const picksKey = `pickem:picks:week-${week}`;
+  const lockKey = `pickem:lock:week-${week}`;
   const [picks, setPicks] = useState<Picks>({});
+  const [lockedGameId, setLockedGameId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -28,10 +30,13 @@ export function usePicks(week: number) {
         // too. Local storage is kept in sync as a fast local cache, not
         // as the source of truth.
         try {
-          const dbPicks = await fetchWeeklyPicks(user.id, week);
+          const { picks: dbPicks, lockedGameId: dbLock } = await fetchWeeklyPicks(user.id, week);
           if (cancelled) return;
           setPicks(dbPicks);
+          setLockedGameId(dbLock);
           localStorage.setItem(picksKey, JSON.stringify(dbPicks));
+          if (dbLock) localStorage.setItem(lockKey, dbLock);
+          else localStorage.removeItem(lockKey);
           setLoaded(true);
           return;
         } catch (err) {
@@ -47,6 +52,7 @@ export function usePicks(week: number) {
       } catch {
         if (!cancelled) setPicks({});
       }
+      if (!cancelled) setLockedGameId(localStorage.getItem(lockKey));
       if (!cancelled) setLoaded(true);
     }
 
@@ -54,12 +60,26 @@ export function usePicks(week: number) {
     return () => {
       cancelled = true;
     };
-  }, [picksKey, week, user, authLoading]);
+  }, [picksKey, lockKey, week, user, authLoading]);
 
   useEffect(() => {
     if (!loaded) return;
     localStorage.setItem(picksKey, JSON.stringify(picks));
   }, [picks, loaded, picksKey]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (lockedGameId) localStorage.setItem(lockKey, lockedGameId);
+    else localStorage.removeItem(lockKey);
+  }, [lockedGameId, loaded, lockKey]);
+
+  // A locked game that's no longer picked (fully unpicked, not just
+  // switched to the other team) can't stay the lock - keeps the two
+  // pieces of state honest without every call site remembering to clear
+  // it manually.
+  useEffect(() => {
+    if (lockedGameId && !picks[lockedGameId]) setLockedGameId(null);
+  }, [picks, lockedGameId]);
 
   function setPick(gameId: string, team: TeamAbbr) {
     setPicks((prev) => {
@@ -72,9 +92,14 @@ export function usePicks(week: number) {
     });
   }
 
-  function resetPicks() {
-    setPicks({});
+  function toggleLock(gameId: string) {
+    setLockedGameId((prev) => (prev === gameId ? null : gameId));
   }
 
-  return { picks, setPick, resetPicks, loaded };
+  function resetPicks() {
+    setPicks({});
+    setLockedGameId(null);
+  }
+
+  return { picks, setPick, resetPicks, loaded, lockedGameId, toggleLock };
 }

@@ -7,7 +7,14 @@ import { ACHIEVEMENTS } from "@/data/achievements";
 import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { GAMES_BY_WEEK } from "@/data/games";
 import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
-import { fetchPredictorProgress, syncPredictorAchievements, fetchWeeklyPickemProgress, syncWeeklyPickemAchievements } from "@/lib/supabase/achievements";
+import {
+  fetchPredictorProgress,
+  syncPredictorAchievements,
+  fetchWeeklyPickemProgress,
+  syncWeeklyPickemAchievements,
+  fetchLockBonusCount,
+  syncLockBonus,
+} from "@/lib/supabase/achievements";
 import { fetchReferralCount } from "@/lib/supabase/referrals";
 import { fetchWeeks, WeekRow } from "@/lib/supabase/admin";
 import { errorMessage } from "@/lib/errorMessage";
@@ -43,6 +50,7 @@ export function LevelsAchievementsModal({
   const [weeklyProgress, setWeeklyProgress] = useState<Partial<Record<number, number>> | null>(null);
   const [weeks, setWeeks] = useState<WeekRow[]>([]);
   const [referralCount, setReferralCount] = useState<number | null>(null);
+  const [lockBonusCount, setLockBonusCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -54,23 +62,29 @@ export function LevelsAchievementsModal({
     setPredictorProgress(null);
     setWeeklyProgress(null);
     setReferralCount(null);
+    setLockBonusCount(null);
     setError(null);
-    Promise.all([syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)), syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err))]).finally(
-      () => {
-        fetchPredictorProgress(user.id)
-          .then(setPredictorProgress)
-          .catch((err) => setError(errorMessage(err)));
-        fetchWeeklyPickemProgress(user.id)
-          .then(setWeeklyProgress)
-          .catch((err) => setError(errorMessage(err)));
-        fetchWeeks()
-          .then(setWeeks)
-          .catch(() => {});
-        fetchReferralCount(user.id)
-          .then(setReferralCount)
-          .catch((err) => setError(errorMessage(err)));
-      }
-    );
+    Promise.all([
+      syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)),
+      syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err)),
+      syncLockBonus().catch((err) => console.error("Achievement sync failed", err)),
+    ]).finally(() => {
+      fetchPredictorProgress(user.id)
+        .then(setPredictorProgress)
+        .catch((err) => setError(errorMessage(err)));
+      fetchWeeklyPickemProgress(user.id)
+        .then(setWeeklyProgress)
+        .catch((err) => setError(errorMessage(err)));
+      fetchWeeks()
+        .then(setWeeks)
+        .catch(() => {});
+      fetchReferralCount(user.id)
+        .then(setReferralCount)
+        .catch((err) => setError(errorMessage(err)));
+      fetchLockBonusCount(user.id)
+        .then(setLockBonusCount)
+        .catch((err) => setError(errorMessage(err)));
+    });
   }, [open, user]);
 
   if (!open) return null;
@@ -78,6 +92,7 @@ export function LevelsAchievementsModal({
   const predictorDef = ACHIEVEMENTS.find((a) => a.key === "predictor_team_complete")!;
   const weeklyDef = ACHIEVEMENTS.find((a) => a.key === "weekly_pickem_complete")!;
   const referralDef = ACHIEVEMENTS.find((a) => a.key === "referral")!;
+  const lockDef = ACHIEVEMENTS.find((a) => a.key === "lock_correct")!;
 
   const completedTeams = predictorProgress
     ? TEAMS_SORTED.filter((t) => (predictorProgress[t.abbr] ?? 0) >= (REQUIRED_PREDICTOR_WEEKS[t.abbr] ?? Infinity))
@@ -86,7 +101,7 @@ export function LevelsAchievementsModal({
   const completedWeeks = weeklyProgress ? ALL_WEEKS.filter((w) => (weeklyProgress[w] ?? 0) >= GAMES_BY_WEEK[w].length) : [];
   const weeksById = new Map(weeks.map((w) => [w.week, w]));
 
-  const achievementsLoaded = predictorProgress !== null && weeklyProgress !== null && referralCount !== null;
+  const achievementsLoaded = predictorProgress !== null && weeklyProgress !== null && referralCount !== null && lockBonusCount !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
@@ -186,6 +201,20 @@ export function LevelsAchievementsModal({
                         );
                       })}
                     </div>
+                  </AchievementCard>
+
+                  <AchievementCard
+                    icon={lockDef.icon}
+                    label={lockDef.label}
+                    description={lockDef.description}
+                    pointsEach={lockDef.pointsEach}
+                    pointsLabel="PTS PER CORRECT LOCK"
+                    unitLabel={lockDef.unitLabel}
+                    doneCount={lockBonusCount!}
+                  >
+                    <p className="text-xs text-white/50 mt-1">
+                      Tap the lock icon on one of your Weekly Pick'em picks to mark it as your Lock of the Week. Get it right and you'll earn a bonus once results are published.
+                    </p>
                   </AchievementCard>
 
                   <AchievementCard

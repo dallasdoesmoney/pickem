@@ -49,3 +49,16 @@ export async function syncWeeklyPickemAchievements(): Promise<void> {
   const { error } = await supabase.rpc("sync_weekly_pickem_achievements");
   if (error) throw error;
 }
+
+// Idempotent - pays out any newly-graded correct locks. Safe to call any
+// time results might have just become available; no-ops otherwise.
+export async function syncLockBonus(): Promise<void> {
+  const { error } = await supabase.rpc("sync_lock_bonus");
+  if (error) throw error;
+}
+
+export async function fetchLockBonusCount(userId: string): Promise<number> {
+  const { count, error } = await supabase.from("point_events").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("source", "lock_correct");
+  if (error) throw error;
+  return count ?? 0;
+}

@@ -5,6 +5,7 @@ import { updateAvatar } from "@/lib/supabase/profile";
 const WEEKLY_KEY_RE = /^pickem:picks:week-(\d+)$/;
 const SEASON_KEY_RE = /^pickem:season-predictor:([A-Z]{2,3})$/;
 const PROFILE_KEY = "pickem:profile";
+const lockKeyFor = (week: number) => `pickem:lock:week-${week}`;
 
 function safeParse<T>(raw: string | null): T | null {
   if (!raw) return null;
@@ -25,7 +26,9 @@ export async function migrateLocalDataToAccount(userId: string) {
     if (weeklyMatch) {
       const picks = safeParse<Record<string, TeamAbbr>>(localStorage.getItem(key));
       if (picks && Object.keys(picks).length > 0) {
-        await saveWeeklyPicks(userId, Number(weeklyMatch[1]), picks);
+        const week = Number(weeklyMatch[1]);
+        const lockedGameId = localStorage.getItem(lockKeyFor(week));
+        await saveWeeklyPicks(userId, week, picks, lockedGameId && picks[lockedGameId] ? lockedGameId : null);
       }
       continue;
     }

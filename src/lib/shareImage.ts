@@ -175,6 +175,7 @@ type TeamHalfOpts = PillHalfOpts & {
   tag?: PickTag;
   spreadLabel?: string;
   record: string;
+  isLockPick?: boolean;
 };
 
 // This game's own footer content (spread + record) - drawn inside the
@@ -227,6 +228,31 @@ function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts, ic
   ctx.restore();
 }
 
+// Bottom corner (drawTeamHalfBadge above owns the top corner), mirroring
+// the live app's LockBadge - ghost/dim when this pick isn't the lock,
+// full opacity with a green glow when it is.
+function drawLockBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts, icon: HTMLImageElement | null | undefined) {
+  const { x, y, w, h, side, isLockPick } = opts;
+  if (!icon) return;
+  const protrusion = 12;
+  const centerX = side === "left" ? x - protrusion + 19 : x + w + protrusion - 19;
+  const centerY = y + h + 8 - 19;
+  const badgeH = 34;
+  const badgeW = (icon.naturalWidth / icon.naturalHeight) * badgeH;
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(((side === "left" ? -18 : 18) * Math.PI) / 180);
+  if (isLockPick) {
+    ctx.shadowColor = "rgba(74,222,128,0.9)";
+    ctx.shadowBlur = 9;
+  } else {
+    ctx.filter = "grayscale(1)";
+    ctx.globalAlpha = 0.45;
+  }
+  ctx.drawImage(icon, -badgeW / 2, -badgeH / 2, badgeW, badgeH);
+  ctx.restore();
+}
+
 const BRAND_FOOTER_H = 12 + 104 + 10 + 18 + 10;
 
 export type ShareImageParams = {
@@ -236,10 +262,13 @@ export type ShareImageParams = {
   week: number;
   results?: Record<string, TeamAbbr>;
   avatarUrl?: string | null;
+  lockedGameId?: string | null;
 };
 
+const LOCK_ICON = "/lock-of-week.png";
+
 export async function renderShareImage(params: ShareImageParams): Promise<Blob> {
-  const { games, groups, picks, week, results, avatarUrl } = params;
+  const { games, groups, picks, week, results, avatarUrl, lockedGameId } = params;
   const hasResults = !!results && games.some((g) => results[g.id]);
   const gradedCount = hasResults ? games.filter((g) => results![g.id]).length : 0;
   const correctCount = hasResults ? games.filter((g) => results![g.id] && picks[g.id] === results![g.id]).length : 0;
@@ -264,12 +293,13 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     logoUrls.add(TEAMS[g.home].logo);
   });
   if (stats.boldestTeam) logoUrls.add(stats.boldestTeam.logo);
-  const [logoEntries, brandLogo, avatarImg, underdogIcon, boldestIcon] = await Promise.all([
+  const [logoEntries, brandLogo, avatarImg, underdogIcon, boldestIcon, lockIcon] = await Promise.all([
     Promise.all(Array.from(logoUrls).map(async (url) => [url, await loadImage(url)] as const)),
     loadImage(BRAND_LOGO_SRC),
     hasResults && avatarUrl ? loadImage(avatarUrl) : Promise.resolve(null),
     loadImage(UNDERDOG_ICON),
     loadImage(BOLDEST_PICK_ICON),
+    lockedGameId ? loadImage(LOCK_ICON) : Promise.resolve(null),
   ]);
   const logos = new Map(logoEntries);
   const tagIcons = new Map([[UNDERDOG_ICON, underdogIcon], [BOLDEST_PICK_ICON, boldestIcon]]);
@@ -412,6 +442,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         spreadLabel: awaySpread,
         record: game.awayRecord ?? "0-0",
         logo: logos.get(away.logo) ?? null,
+        isLockPick: picked === away.abbr && game.id === lockedGameId,
       };
       const homeOpts: TeamHalfOpts = {
         x: x + halfW,
@@ -426,6 +457,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         spreadLabel: homeSpread,
         record: game.homeRecord ?? "0-0",
         logo: logos.get(home.logo) ?? null,
+        isLockPick: picked === home.abbr && game.id === lockedGameId,
       };
 
       // Fills first for both halves, then borders for both halves - a
@@ -437,6 +469,8 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       drawPillBordersOutcomeLast(ctx, awayOpts, homeOpts);
       drawTeamHalfBadge(ctx, awayOpts, awayOpts.tag ? tagIcons.get(awayOpts.tag.icon) : undefined);
       drawTeamHalfBadge(ctx, homeOpts, homeOpts.tag ? tagIcons.get(homeOpts.tag.icon) : undefined);
+      if (awayOpts.isLockPick) drawLockBadge(ctx, awayOpts, lockIcon);
+      if (homeOpts.isLockPick) drawLockBadge(ctx, homeOpts, lockIcon);
     });
     cursorY += h + GAP_Y;
   }

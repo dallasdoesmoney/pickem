@@ -25,6 +25,49 @@ function TagBadge({ side, tag }: { side: "left" | "right"; tag: PickTag }) {
   );
 }
 
+// Bottom corner (TagBadge already owns the top corner) so an underdog/
+// boldest-pick sticker and a lock can both show on the same pick. Ghost
+// (dim + grayscale) on any pick that isn't locked yet - same spot every
+// time, so it's a discoverable, always-visible tap target rather than
+// something that only appears once you've already used it. Filled in
+// with a green glow once it is the lock.
+function LockBadge({
+  side,
+  isLocked,
+  onToggle,
+  disabled,
+}: {
+  side: "left" | "right";
+  isLocked: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+}) {
+  const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-label={isLocked ? "Remove Lock of the Week" : "Mark as Lock of the Week"}
+      aria-pressed={isLocked}
+      className={`absolute -bottom-2.5 z-40 h-[40px] w-[40px] p-0 border-0 bg-transparent ${disabled ? "cursor-default" : "cursor-pointer"}`}
+      style={{ ...positionStyle, transform: `rotate(${side === "left" ? "-18deg" : "18deg"})` }}
+    >
+      <img
+        src="/lock-of-week.png"
+        alt=""
+        className="h-full w-full object-contain"
+        style={{
+          filter: isLocked
+            ? "drop-shadow(0 0 7px rgba(74,222,128,0.9)) drop-shadow(0 2px 3px rgba(0,0,0,0.6))"
+            : "grayscale(1) drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
+          opacity: isLocked ? 1 : 0.45,
+        }}
+      />
+    </button>
+  );
+}
+
 export function GameCard({
   game,
   picked,
@@ -32,6 +75,8 @@ export function GameCard({
   tag,
   result,
   locked,
+  isLockPick,
+  onToggleLock,
 }: {
   game: Game;
   picked?: TeamAbbr;
@@ -39,6 +84,11 @@ export function GameCard({
   tag?: PickTag;
   result?: TeamAbbr;
   locked?: boolean;
+  // "Lock of the Week" (your one confident pick) - unrelated to `locked`
+  // above (that one means "the week is closed for editing"). Both left
+  // undefined on pages that don't have this feature (the predictor).
+  isLockPick?: boolean;
+  onToggleLock?: () => void;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
@@ -91,7 +141,14 @@ export function GameCard({
         isFaded={isFadedFor(away.abbr)}
         onClick={() => onPick(away.abbr)}
         disabled={locked}
-        badge={picked === away.abbr && tag ? <TagBadge side="left" tag={tag} /> : undefined}
+        badge={
+          picked === away.abbr ? (
+            <>
+              {tag && <TagBadge side="left" tag={tag} />}
+              {onToggleLock && <LockBadge side="left" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} />}
+            </>
+          ) : undefined
+        }
         footer={
           <>
             {awaySpread && (
@@ -110,7 +167,14 @@ export function GameCard({
         isFaded={isFadedFor(home.abbr)}
         onClick={() => onPick(home.abbr)}
         disabled={locked}
-        badge={picked === home.abbr && tag ? <TagBadge side="right" tag={tag} /> : undefined}
+        badge={
+          picked === home.abbr ? (
+            <>
+              {tag && <TagBadge side="right" tag={tag} />}
+              {onToggleLock && <LockBadge side="right" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} />}
+            </>
+          ) : undefined
+        }
         footer={
           <>
             {homeSpread && (

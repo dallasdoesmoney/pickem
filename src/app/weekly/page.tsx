@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { supabase } from "@/lib/supabase/client";
 import { saveWeeklyPicks } from "@/lib/supabase/picks";
-import { syncWeeklyPickemAchievements } from "@/lib/supabase/achievements";
+import { syncWeeklyPickemAchievements, syncLockBonus } from "@/lib/supabase/achievements";
 import { fetchWeeks, fetchGameResults, WeekRow } from "@/lib/supabase/admin";
 import { errorMessage } from "@/lib/errorMessage";
 import { WeekSwitcher } from "@/components/WeekSwitcher";
@@ -157,20 +157,22 @@ export default function Home() {
   // Before weeks finish loading, default to editable so the page behaves
   // exactly as it always has rather than briefly locking every control.
   const isEditable = weeks.length === 0 || currentWeekRow?.is_open === true;
+  const { user: authUser } = useAuth();
 
   useEffect(() => {
     if (currentWeekRow?.results_published) {
       fetchGameResults(activeWeek)
         .then(setResults)
         .catch(() => setResults({}));
+      if (authUser) syncLockBonus().catch((err) => console.error("Lock bonus sync failed", err));
     } else {
       setResults({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWeek, currentWeekRow?.results_published]);
+  }, [activeWeek, currentWeekRow?.results_published, authUser]);
 
   const games = GAMES_BY_WEEK[activeWeek];
-  const { picks, setPick, resetPicks, loaded } = usePicks(activeWeek);
+  const { picks, setPick, resetPicks, loaded, lockedGameId, toggleLock } = usePicks(activeWeek);
   const { confirm, dialog } = useConfirmDialog();
   const { user, profile } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
@@ -205,7 +207,7 @@ export default function Home() {
       // pending-save effect below picks it back up once the page reloads
       // with a session, so there's nothing more to do in this click.
       if (!userId) return;
-      await saveWeeklyPicks(userId, activeWeek, picks);
+      await saveWeeklyPicks(userId, activeWeek, picks, lockedGameId);
       syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -221,7 +223,7 @@ export default function Home() {
     if (!user || !loaded) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
-    saveWeeklyPicks(user.id, activeWeek, picks)
+    saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId)
       .then(() => {
         syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
         setSaved(true);
@@ -253,7 +255,7 @@ export default function Home() {
     }
     if (!user) return;
     const timeout = setTimeout(() => {
-      saveWeeklyPicks(user.id, activeWeek, picks)
+      saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId)
         .then(() => {
           syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
           setSaved(true);
@@ -266,13 +268,13 @@ export default function Home() {
     }, 1000);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picks, loaded, user, activeWeek]);
+  }, [picks, lockedGameId, loaded, user, activeWeek]);
 
   async function handleShare() {
     if (sharing) return;
     setSharing(true);
     try {
-      const blob = await renderShareImage({ games, groups, picks, week: activeWeek, results, avatarUrl: profile?.avatar_url });
+      const blob = await renderShareImage({ games, groups, picks, week: activeWeek, results, avatarUrl: profile?.avatar_url, lockedGameId });
       const filename = hasResults ? `pickem-week-${activeWeek}-results.png` : `pickem-week-${activeWeek}.png`;
       const file = new File([blob], filename, { type: "image/png" });
 
@@ -338,6 +340,8 @@ export default function Home() {
           tag={tags[item.game.id]}
           result={results[item.game.id]}
           locked={!isEditable}
+          isLockPick={lockedGameId === item.game.id}
+          onToggleLock={() => toggleLock(item.game.id)}
         />
       </div>
     ) : null;
@@ -367,6 +371,8 @@ export default function Home() {
         tag={tags[item.game.id]}
         result={results[item.game.id]}
         locked={!isEditable}
+        isLockPick={lockedGameId === item.game.id}
+        onToggleLock={() => toggleLock(item.game.id)}
       />
     );
   };

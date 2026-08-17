@@ -37,4 +37,12 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     pointsEach: 1000,
     unitLabel: "referrals",
   },
+  {
+    key: "lock_correct",
+    label: "Lock of the Week",
+    description: "Mark one weekly pick as your lock and get it right.",
+    icon: "🔒",
+    pointsEach: 250,
+    unitLabel: "correct locks",
+  },
 ];

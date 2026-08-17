@@ -137,11 +137,15 @@ create table public.weekly_picks (
   week integer not null,
   game_id text not null,       -- matches Game.id from src/data/games.ts
   team_abbr text not null,     -- matches TeamAbbr
+  is_lock boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, week, game_id)
 );
 create index weekly_picks_user_week_idx on public.weekly_picks (user_id, week);
+-- One lock per user per week - the partial index is what actually
+-- enforces "at most one," not application code.
+create unique index weekly_picks_one_lock_per_week on public.weekly_picks (user_id, week) where is_lock;
 alter table public.weekly_picks enable row level security;
 create policy "weekly_picks_select_own" on public.weekly_picks for select using (auth.uid() = user_id);
 -- Insert/update/delete additionally require the week to be open - a
@@ -301,6 +305,33 @@ begin
 end;
 $$;
 grant execute on function public.sync_weekly_pickem_achievements() to authenticated;
+
+-- Awards a bonus for each lock that hit, once results are published.
+-- Distinct from sync_weekly_pickem_achievements above (that one rewards
+-- completion regardless of correctness; this one only pays out when the
+-- locked pick was actually right). Security definer, idempotent via
+-- point_events' unique constraint, scans all of the caller's locks each
+-- call rather than one week at a time - cheap at this scale and means it
+-- doesn't matter which week's results just got published.
+create or replace function public.sync_lock_bonus()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.point_events (user_id, source, points, reference_id)
+  select wp.user_id, 'lock_correct', 250, wp.week::text || ':' || wp.game_id
+  from public.weekly_picks wp
+  join public.weeks w on w.week = wp.week and w.results_published = true
+  join public.game_results gr on gr.game_id = wp.game_id
+  where wp.user_id = auth.uid()
+    and wp.is_lock = true
+    and wp.team_abbr = gr.winner
+  on conflict (user_id, source, reference_id) do nothing;
+end;
+$$;
+grant execute on function public.sync_lock_bonus() to authenticated;
 
 -- Attributes a new signup to whoever referred them (by username, doubling
 -- as the referral code - no separate code system needed) and pays BOTH

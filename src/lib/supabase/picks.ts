@@ -2,21 +2,25 @@ import { supabase } from "@/lib/supabase/client";
 import { TeamAbbr } from "@/data/teams";
 import { TeamScheduleRow } from "@/lib/teamSchedule";
 
-export async function fetchWeeklyPicks(userId: string, week: number): Promise<Record<string, TeamAbbr>> {
-  const { data, error } = await supabase.from("weekly_picks").select("game_id, team_abbr").eq("user_id", userId).eq("week", week);
+export type WeeklyPicksResult = { picks: Record<string, TeamAbbr>; lockedGameId: string | null };
+
+export async function fetchWeeklyPicks(userId: string, week: number): Promise<WeeklyPicksResult> {
+  const { data, error } = await supabase.from("weekly_picks").select("game_id, team_abbr, is_lock").eq("user_id", userId).eq("week", week);
   if (error) throw error;
   const picks: Record<string, TeamAbbr> = {};
-  for (const row of data as { game_id: string; team_abbr: TeamAbbr }[]) {
+  let lockedGameId: string | null = null;
+  for (const row of data as { game_id: string; team_abbr: TeamAbbr; is_lock: boolean }[]) {
     picks[row.game_id] = row.team_abbr;
+    if (row.is_lock) lockedGameId = row.game_id;
   }
-  return picks;
+  return { picks, lockedGameId };
 }
 
 // Delete-then-insert for the given scope rather than a diff/upsert - "Save
 // & Submit" means "persist exactly what's on screen right now," including
 // picks the user toggled back off, which a pure upsert would leave behind
 // as stale rows.
-export async function saveWeeklyPicks(userId: string, week: number, picks: Record<string, TeamAbbr>) {
+export async function saveWeeklyPicks(userId: string, week: number, picks: Record<string, TeamAbbr>, lockedGameId: string | null) {
   const { error: deleteError } = await supabase.from("weekly_picks").delete().eq("user_id", userId).eq("week", week);
   if (deleteError) throw deleteError;
 
@@ -25,6 +29,7 @@ export async function saveWeeklyPicks(userId: string, week: number, picks: Recor
     week,
     game_id: gameId,
     team_abbr: teamAbbr,
+    is_lock: gameId === lockedGameId,
   }));
   if (rows.length === 0) return;
 
