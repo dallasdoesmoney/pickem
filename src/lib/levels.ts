@@ -11,9 +11,9 @@ export type RankTier = { name: string; color: string; emoji: string };
 export const RANKS: RankTier[] = [
   { name: "Practice Squad", color: "#94a3b8", emoji: "🎽" },
   { name: "Rookie", color: "#38bdf8", emoji: "🐣" },
-  { name: "Role Player", color: "#22d3ee", emoji: "🧩" },
-  { name: "Starter", color: "#34d399", emoji: "🏈" },
-  { name: "Team Captain", color: "#4ade80", emoji: "🧢" },
+  { name: "Role Player", color: "#2dd4bf", emoji: "🧩" },
+  { name: "Starter", color: "#4ade80", emoji: "🏈" },
+  { name: "Team Captain", color: "#a3e635", emoji: "🧢" },
   { name: "Pro Bowler", color: "#facc15", emoji: "🌟" },
   { name: "All-Pro", color: "#fb923c", emoji: "🥇" },
   { name: "MVP", color: "#f87171", emoji: "🏆" },
