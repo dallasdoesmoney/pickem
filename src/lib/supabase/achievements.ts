@@ -89,6 +89,18 @@ export async function fetchLockBonusCount(userId: string): Promise<number> {
   return count ?? 0;
 }
 
+// Total weeks a lock was ever SET (correct or not, graded or not) - the
+// denominator for the achievements tab's "X/Y locks correct" display.
+// weekly_picks' own partial unique index caps this at one per week, so
+// it's equivalently "how many weeks you've used your lock." Own-row read,
+// no security-definer wrapper needed (weekly_picks_select_own already
+// covers it).
+export async function fetchLockAttemptCount(userId: string): Promise<number> {
+  const { count, error } = await supabase.from("weekly_picks").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_lock", true);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 // Works for ANY user_id via the public_lock_bonus_count RPC (point_events
 // is locked to "select own").
 export async function fetchPublicLockBonusCount(userId: string): Promise<number> {

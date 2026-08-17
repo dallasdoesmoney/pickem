@@ -13,6 +13,7 @@ import {
   fetchWeeklyPickemProgress,
   syncWeeklyPickemAchievements,
   fetchLockBonusCount,
+  fetchLockAttemptCount,
   syncLockBonus,
 } from "@/lib/supabase/achievements";
 import { fetchReferralCount } from "@/lib/supabase/referrals";
@@ -51,6 +52,7 @@ export function LevelsAchievementsModal({
   const [weeks, setWeeks] = useState<WeekRow[]>([]);
   const [referralCount, setReferralCount] = useState<number | null>(null);
   const [lockBonusCount, setLockBonusCount] = useState<number | null>(null);
+  const [lockAttemptCount, setLockAttemptCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export function LevelsAchievementsModal({
     setWeeklyProgress(null);
     setReferralCount(null);
     setLockBonusCount(null);
+    setLockAttemptCount(null);
     setError(null);
     Promise.all([
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)),
@@ -84,6 +87,9 @@ export function LevelsAchievementsModal({
       fetchLockBonusCount(user.id)
         .then(setLockBonusCount)
         .catch((err) => setError(errorMessage(err)));
+      fetchLockAttemptCount(user.id)
+        .then(setLockAttemptCount)
+        .catch((err) => setError(errorMessage(err)));
     });
   }, [open, user]);
 
@@ -101,7 +107,8 @@ export function LevelsAchievementsModal({
   const completedWeeks = weeklyProgress ? ALL_WEEKS.filter((w) => (weeklyProgress[w] ?? 0) >= GAMES_BY_WEEK[w].length) : [];
   const weeksById = new Map(weeks.map((w) => [w.week, w]));
 
-  const achievementsLoaded = predictorProgress !== null && weeklyProgress !== null && referralCount !== null && lockBonusCount !== null;
+  const achievementsLoaded =
+    predictorProgress !== null && weeklyProgress !== null && referralCount !== null && lockBonusCount !== null && lockAttemptCount !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
@@ -109,7 +116,7 @@ export function LevelsAchievementsModal({
       <div className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1730] shadow-2xl shadow-black/50 flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <h2 className="text-xl" style={{ fontFamily: "var(--font-display)" }}>
-            {tab === "levels" ? "ALL LEVELS" : "ACHIEVEMENTS"}
+            {tab === "levels" ? "ALL LEVELS" : "CHALLENGES"}
           </h2>
           <button
             aria-label="Close"
@@ -130,12 +137,12 @@ export function LevelsAchievementsModal({
                 key={t}
                 type="button"
                 onClick={() => setTab(t)}
-                className={`flex-1 rounded-full py-1.5 text-sm capitalize transition-colors ${
+                className={`flex-1 rounded-full py-1.5 text-sm transition-colors ${
                   tab === t ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"
                 }`}
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                {t}
+                {t === "levels" ? "Levels" : "Challenges"}
               </button>
             ))}
           </div>
@@ -233,6 +240,8 @@ export function LevelsAchievementsModal({
                             pointsLabel="PTS PER CORRECT LOCK"
                             unitLabel={lockDef.unitLabel}
                             doneCount={lockBonusCount!}
+                            totalCount={lockAttemptCount!}
+                            neverComplete
                           >
                             <p className="text-xs text-white/50 mt-1">
                               Tap the lock icon on one of your Weekly Pick'em picks to mark it as your Lock of the Week. Get it right and you'll earn a bonus once results are published.
@@ -250,6 +259,7 @@ export function LevelsAchievementsModal({
                             label={predictorDef.label}
                             description={predictorDef.description}
                             pointsEach={predictorDef.pointsEach}
+                            headlineValue={predictorDef.pointsEach * TEAMS_SORTED.length}
                             unitLabel={predictorDef.unitLabel}
                             doneCount={completedTeams.length}
                             totalCount={TEAMS_SORTED.length}

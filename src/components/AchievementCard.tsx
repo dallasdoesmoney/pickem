@@ -9,24 +9,38 @@ import { useState } from "react";
 // instance renderer.
 //
 // Collapsed state is deliberately lean: label, a thin progress bar, and
-// points earned - the description and per-unit rate (mostly restating
-// what the label already implies) live in the expanded body instead,
-// since that's one tap away and doesn't need to cost height on every
-// card just to be visible up front.
+// a points figure - the description and the "how much have I actually
+// earned" detail (mostly restating what the label already implies) live
+// in the expanded body instead, since that's one tap away and doesn't
+// need to cost height on every card just to be visible up front.
+//
+// The collapsed points figure is the goal, not a running total - what
+// you'd earn from one completion (pointsEach), or for a fixed-size
+// achievement you could realistically finish in one sitting (Season
+// Predictor's 32 teams), the full potential reward (headlineValue). A
+// cumulative "doneCount * pointsEach" total there read as a stat that
+// changed meaning depending on how far along you were, rather than a
+// fixed goal to aim at - that total still shows up in the expanded body.
 //
 // "Complete" (done >= total, capped achievements only) is derived here
 // from doneCount/totalCount rather than passed in - callers that also
 // need to know completeness for list ordering compute the same
 // comparison themselves rather than threading a prop back out.
+// neverComplete opts a capped-looking achievement (Lock of the Week's
+// "X/Y locks this season" isn't a fixed ceiling - Y grows every week)
+// out of the checkmark/dim/sort-to-bottom treatment despite having a
+// totalCount, since it can never be permanently "done."
 export function AchievementCard({
   icon,
   label,
   description,
   pointsEach,
   pointsLabel = "PTS EACH",
+  headlineValue,
   unitLabel,
   doneCount,
   totalCount,
+  neverComplete = false,
   children,
 }: {
   icon: string;
@@ -34,15 +48,18 @@ export function AchievementCard({
   description: string;
   pointsEach: number;
   pointsLabel?: string;
+  headlineValue?: number;
   unitLabel: string;
   doneCount: number;
   totalCount?: number;
+  neverComplete?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const uncapped = totalCount === undefined;
-  const complete = !uncapped && totalCount > 0 && doneCount >= totalCount;
+  const complete = !uncapped && !neverComplete && totalCount > 0 && doneCount >= totalCount;
   const pct = !uncapped && totalCount > 0 ? Math.min((doneCount / totalCount) * 100, 100) : 0;
+  const headline = headlineValue ?? pointsEach;
 
   return (
     <div
@@ -65,7 +82,7 @@ export function AchievementCard({
               )}
             </div>
             <span className="text-xs shrink-0 text-emerald-400 tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
-              {doneCount * pointsEach} pts
+              {headline.toLocaleString()} pts
             </span>
           </div>
           <div className="flex items-center gap-2 mt-1.5">
@@ -100,7 +117,10 @@ export function AchievementCard({
       {open && (
         <div className="px-3.5 pb-3.5">
           <p className="text-xs text-white/50">
-            {description} <span className="text-white/35">&middot; {pointsEach} {pointsLabel.toLowerCase()}</span>
+            {description}{" "}
+            <span className="text-white/35">
+              &middot; {pointsEach} {pointsLabel.toLowerCase()} &middot; {(doneCount * pointsEach).toLocaleString()} pts earned so far
+            </span>
           </p>
           <div className="mt-2">{children}</div>
         </div>
