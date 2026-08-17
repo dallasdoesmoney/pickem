@@ -11,13 +11,21 @@ export function MyReferralsModal({ open, onClose }: { open: boolean; onClose: ()
   const [referrals, setReferrals] = useState<ReferralRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  function load() {
     setReferrals(null);
     setError(null);
     fetchMyReferrals()
       .then(setReferrals)
-      .catch((err) => setError(errorMessage(err)));
+      .catch((err) => {
+        console.error("Failed to load referrals", errorMessage(err));
+        setError("Couldn't load your referrals.");
+      });
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!open || !user) return null;
@@ -43,9 +51,18 @@ export function MyReferralsModal({ open, onClose }: { open: boolean; onClose: ()
         </div>
 
         <div className="overflow-y-auto px-5 pb-5 flex flex-col gap-3">
-          {error && <p className="text-sm text-red-400 text-center mb-2">{error}</p>}
-
-          {!referrals ? (
+          {error ? (
+            <div className="text-center py-10">
+              <p className="text-sm text-red-400 mb-3">{error}</p>
+              <button
+                type="button"
+                onClick={load}
+                className="rounded-full border border-white/15 px-4 py-2 text-xs text-white/70 hover:text-white hover:border-white/30 transition-colors"
+              >
+                Try again
+              </button>
+            </div>
+          ) : !referrals ? (
             <div className="flex justify-center py-10">
               <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
             </div>

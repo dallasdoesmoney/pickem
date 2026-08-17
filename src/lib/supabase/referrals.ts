@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { withRetry } from "@/lib/withRetry";
 
 // Idempotent (see claim_referral in supabase/schema.sql) - safe to call
 // speculatively any time a pending code is found, no risk of double
@@ -26,7 +27,9 @@ export type ReferralRow = {
 // definer function) rather than the leaderboard view, since a brand-new
 // referee likely hasn't set a username yet - the view would exclude them.
 export async function fetchMyReferrals(): Promise<ReferralRow[]> {
-  const { data, error } = await supabase.rpc("fetch_my_referrals");
-  if (error) throw error;
-  return data as ReferralRow[];
+  return withRetry(async () => {
+    const { data, error } = await supabase.rpc("fetch_my_referrals");
+    if (error) throw error;
+    return data as ReferralRow[];
+  });
 }
