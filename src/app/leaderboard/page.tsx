@@ -7,6 +7,7 @@ import { fetchMyFriendIds } from "@/lib/supabase/friends";
 import { errorMessage } from "@/lib/errorMessage";
 import { PlayerProfileModal } from "@/components/PlayerProfileModal";
 import { LevelBadge } from "@/components/LevelBadge";
+import { getLevelInfo } from "@/lib/levels";
 
 type View = "global" | "friends";
 
@@ -94,32 +95,41 @@ export default function LeaderboardPage() {
           {visibleRows.map((row, i) => {
             const isMe = row.user_id === user?.id;
             const label = row.display_name || row.username;
+            const rankColor = getLevelInfo(row.total_points).rankColor;
             return (
               <button
                 key={row.user_id}
                 type="button"
                 onClick={() => setSelected(row)}
                 className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors text-left ${
-                  isMe ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
+                  isMe ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-[#101f3d] hover:bg-[#152546] hover:border-white/20"
                 }`}
               >
                 <span className="w-6 text-center text-sm text-white/40" style={{ fontFamily: "var(--font-display)" }}>
                   {i + 1}
                 </span>
                 {row.avatar_url ? (
-                  <img src={row.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover shrink-0" />
+                  <img
+                    src={row.avatar_url}
+                    alt=""
+                    className="h-9 w-9 rounded-full object-cover shrink-0"
+                    style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 8px -2px ${rankColor}` }}
+                  />
                 ) : (
-                  <span className="h-8 w-8 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">
+                  <span
+                    className="h-9 w-9 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs"
+                    style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 8px -2px ${rankColor}` }}
+                  >
                     {label.charAt(0).toUpperCase()}
                   </span>
                 )}
-                <span className="flex-1 min-w-0 flex items-center gap-1.5">
-                  <span className="text-sm truncate">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm truncate">
                     {label}
                     {isMe && <span className="text-white/40"> (you)</span>}
-                  </span>
+                  </div>
                   <LevelBadge totalPoints={row.total_points} />
-                </span>
+                </div>
                 <span className="text-sm shrink-0" style={{ fontFamily: "var(--font-display)" }}>
                   {row.correct}-{row.graded - row.correct}
                 </span>

@@ -36,12 +36,12 @@ type Tab = "levels" | "achievements";
 export function LevelsAchievementsModal({
   open,
   initialTab = "levels",
-  currentLevel,
+  totalPoints,
   onClose,
 }: {
   open: boolean;
   initialTab?: Tab;
-  currentLevel?: number;
+  totalPoints?: number;
   onClose: () => void;
 }) {
   const { user, profile } = useAuth();
@@ -143,7 +143,7 @@ export function LevelsAchievementsModal({
 
         <div className="overflow-y-auto px-5 pb-5 flex flex-col gap-4">
           {tab === "levels" ? (
-            <LevelLadder currentLevel={currentLevel} />
+            <LevelLadder totalPoints={totalPoints} />
           ) : (
             <>
               {error && <p className="text-sm text-red-400 text-center mb-4">{error}</p>}

@@ -10,7 +10,6 @@ import { FriendButton } from "@/components/FriendButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelListModal } from "@/components/LevelListModal";
-import { getLevelInfo } from "@/lib/levels";
 
 // A client page (not the server-component-plus-notFound() pattern used by
 // /predictor/[team], which validates against a fixed, known team list) -
@@ -85,7 +84,7 @@ export default function PlayerPage() {
         </div>
       ) : null}
 
-      {row && <LevelListModal open={levelModalOpen} currentLevel={getLevelInfo(row.total_points).level} onClose={() => setLevelModalOpen(false)} />}
+      {row && <LevelListModal open={levelModalOpen} totalPoints={row.total_points} onClose={() => setLevelModalOpen(false)} />}
     </main>
   );
 }

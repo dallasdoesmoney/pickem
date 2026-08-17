@@ -6,17 +6,17 @@ export function LevelBadge({ totalPoints, size = "sm" }: { totalPoints: number; 
   const info = getLevelInfo(totalPoints);
   if (info.isUnranked) return null;
 
-  const dims = size === "sm" ? "text-[11px] px-1.5 py-0.5" : "text-sm px-2.5 py-1";
+  const dims = size === "sm" ? "text-[11px] px-2 py-1 mt-0.5" : "text-sm px-2.5 py-1";
 
   return (
     <span
       title={`${info.rankName} ${subLevelRoman(info.subLevel)} · Level ${info.level}`}
-      className={`inline-flex items-center gap-1 rounded-full border shrink-0 ${dims}`}
+      className={`inline-flex items-center gap-1 rounded-full font-semibold shrink-0 ${dims}`}
       style={{
         fontFamily: "var(--font-display)",
-        color: info.rankColor,
-        borderColor: `${info.rankColor}55`,
-        background: `${info.rankColor}1a`,
+        background: info.rankColor,
+        color: "#06121f",
+        boxShadow: `0 0 10px -3px ${info.rankColor}`,
       }}
     >
       <span>{info.rankEmoji}</span>

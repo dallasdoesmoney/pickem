@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ALL_LEVELS, RANKS, LEVELS_PER_RANK, subLevelRoman } from "@/lib/levels";
+import { ALL_LEVELS, RANKS, LEVELS_PER_RANK, subLevelRoman, getLevelInfo } from "@/lib/levels";
 
 // 10 chunks of 5 - one per rank, in RANKS order.
 const RANK_GROUPS = RANKS.map((_, i) => ALL_LEVELS.slice(i * LEVELS_PER_RANK, (i + 1) * LEVELS_PER_RANK));
@@ -30,8 +30,10 @@ function LockIcon({ className }: { className?: string }) {
 // pips (not 50 flat rows) - achieved pips fill solid, the current one
 // glows, future ones sit dim behind a lock, so the whole thing reads as a
 // track you're climbing rather than a price list.
-export function LevelLadder({ currentLevel }: { currentLevel?: number }) {
+export function LevelLadder({ totalPoints }: { totalPoints?: number }) {
   const currentRankRef = useRef<HTMLDivElement>(null);
+  const info = totalPoints !== undefined ? getLevelInfo(totalPoints) : undefined;
+  const currentLevel = info?.level;
   const hasProgress = currentLevel !== undefined && currentLevel > 0;
   const currentEntry = hasProgress ? ALL_LEVELS[currentLevel! - 1] : undefined;
 
@@ -52,7 +54,7 @@ export function LevelLadder({ currentLevel }: { currentLevel?: number }) {
           >
             {currentEntry.rankEmoji}
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-[10px] text-white/45 tracking-wide">CURRENT RANK</div>
             <div className="text-lg truncate" style={{ color: currentEntry.rankColor, fontFamily: "var(--font-display)" }}>
               {currentEntry.rankName} {subLevelRoman(currentEntry.subLevel)}
@@ -61,6 +63,16 @@ export function LevelLadder({ currentLevel }: { currentLevel?: number }) {
               Level {currentEntry.level} of {ALL_LEVELS.length}
             </div>
           </div>
+          {info && (
+            <div className="text-right shrink-0">
+              <div className="text-lg tabular-nums" style={{ color: currentEntry.rankColor, fontFamily: "var(--font-display)" }}>
+                {info.totalPoints.toLocaleString()}
+              </div>
+              <div className="text-[10px] text-white/40 tracking-wide">
+                {info.isMaxLevel ? "MAX LEVEL" : `${(info.pointsForNextLevel! - info.pointsIntoLevel).toLocaleString()} TO NEXT`}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

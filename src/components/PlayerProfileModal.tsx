@@ -7,7 +7,6 @@ import { FriendButton } from "@/components/FriendButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelListModal } from "@/components/LevelListModal";
-import { getLevelInfo } from "@/lib/levels";
 
 // Same overlay/panel styling as useConfirmDialog, reused here so a
 // leaderboard click surfaces a player's record without leaving the
@@ -84,7 +83,7 @@ export function PlayerProfileModal({
         </Link>
       </div>
 
-      <LevelListModal open={levelModalOpen} currentLevel={getLevelInfo(row.total_points).level} onClose={() => setLevelModalOpen(false)} />
+      <LevelListModal open={levelModalOpen} totalPoints={row.total_points} onClose={() => setLevelModalOpen(false)} />
     </div>
   );
 }

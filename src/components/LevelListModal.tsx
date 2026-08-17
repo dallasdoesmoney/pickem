@@ -6,7 +6,7 @@ import { LevelLadder } from "@/components/LevelLadder";
 // page) - no achievements toggle here, since achievements are private to
 // your own account. See LevelsAchievementsModal for the "my own profile"
 // version with that toggle.
-export function LevelListModal({ open, currentLevel, onClose }: { open: boolean; currentLevel?: number; onClose: () => void }) {
+export function LevelListModal({ open, totalPoints, onClose }: { open: boolean; totalPoints?: number; onClose: () => void }) {
   if (!open) return null;
 
   return (
@@ -30,7 +30,7 @@ export function LevelListModal({ open, currentLevel, onClose }: { open: boolean;
         </div>
 
         <div className="overflow-y-auto px-5 pb-5 flex flex-col gap-4">
-          <LevelLadder currentLevel={currentLevel} />
+          <LevelLadder totalPoints={totalPoints} />
         </div>
       </div>
     </div>

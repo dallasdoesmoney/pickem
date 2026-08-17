@@ -178,7 +178,7 @@ function SignedInAccount({
       <LevelsAchievementsModal
         open={progressModalOpen}
         initialTab={progressModalTab}
-        currentLevel={myRecord ? getLevelInfo(myRecord.total_points).level : undefined}
+        totalPoints={myRecord?.total_points}
         onClose={() => setProgressModalOpen(false)}
       />
     </main>
@@ -213,6 +213,12 @@ function LevelSummaryCard({ totalPoints, onOpenLevels }: { totalPoints: number; 
           <div className="text-base truncate" style={{ color: info.rankColor, fontFamily: "var(--font-display)" }}>
             {info.isUnranked ? "Unranked" : `${info.rankName} ${subLevelRoman(info.subLevel)} · Level ${info.level}`}
           </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-base tabular-nums" style={{ color: info.rankColor, fontFamily: "var(--font-display)" }}>
+            {totalPoints.toLocaleString()}
+          </div>
+          <div className="text-[9px] text-white/40 tracking-wide">PTS</div>
         </div>
         <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-white/30" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 6l6 6-6 6" />
