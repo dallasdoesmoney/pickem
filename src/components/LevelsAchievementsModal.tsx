@@ -153,101 +153,135 @@ export function LevelsAchievementsModal({
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <InviteFriendsCard def={referralDef} username={profile?.username ?? null} referralCount={referralCount!} />
-
-                  <AchievementCard
-                    icon={weeklyDef.icon}
-                    label={weeklyDef.label}
-                    description={weeklyDef.description}
-                    pointsEach={weeklyDef.pointsEach}
-                    unitLabel={weeklyDef.unitLabel}
-                    doneCount={completedWeeks.length}
-                    totalCount={ALL_WEEKS.length}
-                  >
-                    <div className="grid grid-cols-3 gap-2 mt-1">
-                      {ALL_WEEKS.map((week) => {
-                        const required = GAMES_BY_WEEK[week].length;
-                        const picked = weeklyProgress![week] ?? 0;
-                        const done = picked >= required;
-                        const weekRow = weeksById.get(week);
-                        const available = weekRow ? weekRow.is_open || weekRow.results_published : false;
-
-                        const cell = (
-                          <>
-                            <span className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
-                              WEEK {week}
-                            </span>
-                            <span className="text-[10px] text-white/40 mt-0.5">
-                              {done ? "Complete" : available ? `${picked}/${required}` : "Locked"}
-                            </span>
-                          </>
-                        );
-
-                        return available ? (
-                          <Link
-                            key={week}
-                            href="/weekly"
-                            onClick={onClose}
-                            className={`flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2.5 transition-colors ${
-                              done ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5 hover:border-white/25"
-                            }`}
+                  {/* Fully completed cards (done >= total) sink to the
+                      bottom, dimmed - same "complete >= 0 ? after" stable
+                      sort AchievementCard itself uses to decide dimming, so
+                      the two never disagree. Referral and lock bonus are
+                      uncapped (never "complete" in this sense) and always
+                      sort as if incomplete, keeping their normal position. */}
+                  {(
+                    [
+                      {
+                        key: "referral",
+                        complete: false,
+                        node: <InviteFriendsCard key="referral" def={referralDef} username={profile?.username ?? null} referralCount={referralCount!} />,
+                      },
+                      {
+                        key: "weekly",
+                        complete: ALL_WEEKS.length > 0 && completedWeeks.length >= ALL_WEEKS.length,
+                        node: (
+                          <AchievementCard
+                            key="weekly"
+                            icon={weeklyDef.icon}
+                            label={weeklyDef.label}
+                            description={weeklyDef.description}
+                            pointsEach={weeklyDef.pointsEach}
+                            unitLabel={weeklyDef.unitLabel}
+                            doneCount={completedWeeks.length}
+                            totalCount={ALL_WEEKS.length}
                           >
-                            {cell}
-                          </Link>
-                        ) : (
-                          <span key={week} className="flex flex-col items-center gap-0.5 rounded-xl border border-white/5 bg-white/[0.02] px-1 py-2.5 opacity-40">
-                            {cell}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </AchievementCard>
+                            <div className="grid grid-cols-3 gap-2 mt-1">
+                              {ALL_WEEKS.map((week) => {
+                                const required = GAMES_BY_WEEK[week].length;
+                                const picked = weeklyProgress![week] ?? 0;
+                                const done = picked >= required;
+                                const weekRow = weeksById.get(week);
+                                const available = weekRow ? weekRow.is_open || weekRow.results_published : false;
 
-                  <AchievementCard
-                    icon={lockDef.icon}
-                    label={lockDef.label}
-                    description={lockDef.description}
-                    pointsEach={lockDef.pointsEach}
-                    pointsLabel="PTS PER CORRECT LOCK"
-                    unitLabel={lockDef.unitLabel}
-                    doneCount={lockBonusCount!}
-                  >
-                    <p className="text-xs text-white/50 mt-1">
-                      Tap the lock icon on one of your Weekly Pick'em picks to mark it as your Lock of the Week. Get it right and you'll earn a bonus once results are published.
-                    </p>
-                  </AchievementCard>
+                                const cell = (
+                                  <>
+                                    <span className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+                                      WEEK {week}
+                                    </span>
+                                    <span className="text-[10px] text-white/40 mt-0.5">
+                                      {done ? "Complete" : available ? `${picked}/${required}` : "Locked"}
+                                    </span>
+                                  </>
+                                );
 
-                  <AchievementCard
-                    icon={predictorDef.icon}
-                    label={predictorDef.label}
-                    description={predictorDef.description}
-                    pointsEach={predictorDef.pointsEach}
-                    unitLabel={predictorDef.unitLabel}
-                    doneCount={completedTeams.length}
-                    totalCount={TEAMS_SORTED.length}
-                  >
-                    <div className="grid grid-cols-4 gap-2 mt-1">
-                      {TEAMS_SORTED.map((team) => {
-                        const done = completedTeams.some((t) => t.abbr === team.abbr);
-                        const filled = predictorProgress![team.abbr] ?? 0;
-                        const required = REQUIRED_PREDICTOR_WEEKS[team.abbr] ?? 0;
-                        return (
-                          <Link
-                            key={team.abbr}
-                            href={`/predictor/${team.abbr}`}
-                            onClick={onClose}
-                            title={done ? `${team.city} ${team.name} — complete` : `${team.city} ${team.name} — ${filled}/${required}`}
-                            className={`flex flex-col items-center gap-1 rounded-xl border px-1 py-2 transition-colors ${
-                              done ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5 hover:border-white/25"
-                            }`}
+                                return available ? (
+                                  <Link
+                                    key={week}
+                                    href="/weekly"
+                                    onClick={onClose}
+                                    className={`flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2.5 transition-colors ${
+                                      done ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5 hover:border-white/25"
+                                    }`}
+                                  >
+                                    {cell}
+                                  </Link>
+                                ) : (
+                                  <span key={week} className="flex flex-col items-center gap-0.5 rounded-xl border border-white/5 bg-white/[0.02] px-1 py-2.5 opacity-40">
+                                    {cell}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </AchievementCard>
+                        ),
+                      },
+                      {
+                        key: "lock",
+                        complete: false,
+                        node: (
+                          <AchievementCard
+                            key="lock"
+                            icon={lockDef.icon}
+                            label={lockDef.label}
+                            description={lockDef.description}
+                            pointsEach={lockDef.pointsEach}
+                            pointsLabel="PTS PER CORRECT LOCK"
+                            unitLabel={lockDef.unitLabel}
+                            doneCount={lockBonusCount!}
                           >
-                            <img src={TEAMS[team.abbr].logo} alt="" className={`h-6 w-6 object-contain ${done ? "" : "opacity-40"}`} />
-                            <span className={`text-[9px] ${done ? "text-emerald-300" : "text-white/40"}`}>{team.abbr}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </AchievementCard>
+                            <p className="text-xs text-white/50 mt-1">
+                              Tap the lock icon on one of your Weekly Pick'em picks to mark it as your Lock of the Week. Get it right and you'll earn a bonus once results are published.
+                            </p>
+                          </AchievementCard>
+                        ),
+                      },
+                      {
+                        key: "predictor",
+                        complete: completedTeams.length >= TEAMS_SORTED.length,
+                        node: (
+                          <AchievementCard
+                            key="predictor"
+                            icon={predictorDef.icon}
+                            label={predictorDef.label}
+                            description={predictorDef.description}
+                            pointsEach={predictorDef.pointsEach}
+                            unitLabel={predictorDef.unitLabel}
+                            doneCount={completedTeams.length}
+                            totalCount={TEAMS_SORTED.length}
+                          >
+                            <div className="grid grid-cols-4 gap-2 mt-1">
+                              {TEAMS_SORTED.map((team) => {
+                                const done = completedTeams.some((t) => t.abbr === team.abbr);
+                                const filled = predictorProgress![team.abbr] ?? 0;
+                                const required = REQUIRED_PREDICTOR_WEEKS[team.abbr] ?? 0;
+                                return (
+                                  <Link
+                                    key={team.abbr}
+                                    href={`/predictor/${team.abbr}`}
+                                    onClick={onClose}
+                                    title={done ? `${team.city} ${team.name} — complete` : `${team.city} ${team.name} — ${filled}/${required}`}
+                                    className={`flex flex-col items-center gap-1 rounded-xl border px-1 py-2 transition-colors ${
+                                      done ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/5 hover:border-white/25"
+                                    }`}
+                                  >
+                                    <img src={TEAMS[team.abbr].logo} alt="" className={`h-6 w-6 object-contain ${done ? "" : "opacity-40"}`} />
+                                    <span className={`text-[9px] ${done ? "text-emerald-300" : "text-white/40"}`}>{team.abbr}</span>
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          </AchievementCard>
+                        ),
+                      },
+                    ] as { key: string; complete: boolean; node: React.ReactNode }[]
+                  )
+                    .sort((a, b) => Number(a.complete) - Number(b.complete))
+                    .map((item) => item.node)}
                 </div>
               )}
             </>

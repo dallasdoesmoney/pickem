@@ -7,6 +7,17 @@ import { useState } from "react";
 // needs) is passed in as children rather than made generic here - the
 // instances differ too much category to category to be worth one shared
 // instance renderer.
+//
+// Collapsed state is deliberately lean: label, a thin progress bar, and
+// points earned - the description and per-unit rate (mostly restating
+// what the label already implies) live in the expanded body instead,
+// since that's one tap away and doesn't need to cost height on every
+// card just to be visible up front.
+//
+// "Complete" (done >= total, capped achievements only) is derived here
+// from doneCount/totalCount rather than passed in - callers that also
+// need to know completeness for list ordering compute the same
+// comparison themselves rather than threading a prop back out.
 export function AchievementCard({
   icon,
   label,
@@ -30,39 +41,53 @@ export function AchievementCard({
 }) {
   const [open, setOpen] = useState(false);
   const uncapped = totalCount === undefined;
+  const complete = !uncapped && totalCount > 0 && doneCount >= totalCount;
+  const pct = !uncapped && totalCount > 0 ? Math.min((doneCount / totalCount) * 100, 100) : 0;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-start gap-3 p-4 text-left">
-        <span className="text-3xl shrink-0">{icon}</span>
+    <div
+      className={`rounded-2xl border overflow-hidden transition-opacity ${
+        complete ? "border-white/5 bg-white/[0.03] opacity-60" : "border-white/10 bg-white/5"
+      }`}
+    >
+      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-2.5 p-3 text-left">
+        <span className="text-xl shrink-0">{icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg" style={{ fontFamily: "var(--font-display)" }}>
-              {label}
-            </h2>
-            <span className="text-[10px] text-emerald-400" style={{ fontFamily: "var(--font-display)" }}>
-              {pointsEach} {pointsLabel}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h2 className="text-sm truncate" style={{ fontFamily: "var(--font-display)" }}>
+                {label}
+              </h2>
+              {complete && (
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              )}
+            </div>
+            <span className="text-xs shrink-0 text-emerald-400 tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
+              {doneCount * pointsEach} pts
             </span>
           </div>
-          <p className="text-xs text-white/50 mt-0.5">{description}</p>
-
-          <div className="mt-2.5">
-            <div className="flex items-center justify-between text-xs text-white/50 mb-1">
-              <span>
-                {uncapped ? `${doneCount} ${unitLabel}` : `${doneCount} / ${totalCount} ${unitLabel}`}
+          <div className="flex items-center gap-2 mt-1.5">
+            {!uncapped ? (
+              <>
+                <div className="flex-1 h-1 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-400" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-[10px] text-white/40 shrink-0 tabular-nums whitespace-nowrap">
+                  {doneCount}/{totalCount} {unitLabel}
+                </span>
+              </>
+            ) : (
+              <span className="text-[10px] text-white/40 tabular-nums">
+                {doneCount} {unitLabel}
               </span>
-              <span style={{ fontFamily: "var(--font-display)" }}>{doneCount * pointsEach} pts</span>
-            </div>
-            {!uncapped && (
-              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-400" style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%` }} />
-              </div>
             )}
           </div>
         </div>
         <svg
           viewBox="0 0 24 24"
-          className={`h-4 w-4 shrink-0 mt-1.5 text-white/40 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-white/40 transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           strokeWidth={2.2}
@@ -72,7 +97,14 @@ export function AchievementCard({
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      {open && <div className="px-4 pb-4">{children}</div>}
+      {open && (
+        <div className="px-3.5 pb-3.5">
+          <p className="text-xs text-white/50">
+            {description} <span className="text-white/35">&middot; {pointsEach} {pointsLabel.toLowerCase()}</span>
+          </p>
+          <div className="mt-2">{children}</div>
+        </div>
+      )}
     </div>
   );
 }
