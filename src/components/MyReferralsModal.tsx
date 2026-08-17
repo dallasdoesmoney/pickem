@@ -1,15 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import posthog from "posthog-js";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchMyReferrals, ReferralRow } from "@/lib/supabase/referrals";
+import { buildReferralLink } from "@/lib/referralStorage";
 import { errorMessage } from "@/lib/errorMessage";
 import { FriendButton } from "@/components/FriendButton";
 
 export function MyReferralsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [referrals, setReferrals] = useState<ReferralRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const link = profile?.username ? buildReferralLink(profile.username) : null;
+
+  async function handleCopy() {
+    if (!link) return;
+    await navigator.clipboard.writeText(link);
+    posthog.capture("referral_link_copied");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleShare() {
+    if (!link) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Join me on Sideline Brew", text: "Come make some picks with me on Sideline Brew!", url: link });
+        posthog.capture("referral_link_shared", { share_method: "native_share" });
+      } catch {
+        // User canceled or share failed - nothing to recover, same as elsewhere this pattern is used.
+      }
+    } else {
+      handleCopy();
+    }
+  }
 
   function load() {
     setReferrals(null);
@@ -51,6 +77,29 @@ export function MyReferralsModal({ open, onClose }: { open: boolean; onClose: ()
         </div>
 
         <div className="overflow-y-auto px-5 pb-5 flex flex-col gap-3">
+          {link && (
+            <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-3 shrink-0">
+              <div className="text-xs text-white/60 truncate">{link}</div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="flex-1 rounded-full px-4 py-2 text-xs border border-white/15 hover:border-white/30 text-white/80 hover:text-white transition-colors"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {copied ? "COPIED" : "COPY LINK"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="flex-1 rounded-full px-4 py-2 text-xs active:scale-95 transition-transform duration-150"
+                  style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
+                >
+                  SHARE
+                </button>
+              </div>
+            </div>
+          )}
           {error ? (
             <div className="text-center py-10">
               <p className="text-sm text-red-400 mb-3">{error}</p>
