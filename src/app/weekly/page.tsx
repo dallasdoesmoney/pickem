@@ -16,7 +16,7 @@ import { WeekSwitcher } from "@/components/WeekSwitcher";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
-import { TeamAbbr } from "@/data/teams";
+import { TeamAbbr, TEAMS } from "@/data/teams";
 import { buildReferralLink } from "@/lib/referralStorage";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
@@ -42,7 +42,7 @@ function PillTexture() {
 
 const PILL_STYLE = { background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" };
 
-function StatPills({ stats }: { stats: PickStats }) {
+function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeof TEAMS)[TeamAbbr] | null }) {
   return (
     <div className="flex gap-2 lg:gap-5 justify-center flex-wrap">
       <div
@@ -60,13 +60,17 @@ function StatPills({ stats }: { stats: PickStats }) {
         </div>
         <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">UNDERDOGS</div>
       </div>
+      {/* Center slot - the most prominent pill (widest, emerald border),
+          previously Boldest Pick. Lock of the Week took over this spot
+          since it's the more important tag; Boldest Pick moved to the
+          slot Chalk used to occupy below. */}
       <div
         className="relative shrink-0 rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center w-[144px] h-[56px] lg:w-[250px] lg:h-[88px]"
         style={PILL_STYLE}
       >
         <PillTexture />
         <img
-          src="/boldest-pick-alarm.png"
+          src="/lock-of-week.png"
           alt=""
           className="absolute -top-2 -left-1 lg:-top-3 lg:-left-1.5 h-8 lg:h-16 w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
         />
@@ -74,25 +78,28 @@ function StatPills({ stats }: { stats: PickStats }) {
           className="relative z-10 text-base lg:text-2xl flex items-center justify-center gap-1 lg:gap-1.5"
           style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}
         >
-          {stats.boldestTeam ? (
-            <>
-              <img src={stats.boldestTeam.logo} alt="" crossOrigin="anonymous" className="h-8 lg:h-[64px] w-auto" />+{stats.boldestSpread}
-            </>
-          ) : (
-            "-"
-          )}
+          {lockedTeam ? <img src={lockedTeam.logo} alt="" crossOrigin="anonymous" className="h-8 lg:h-[64px] w-auto" /> : "-"}
         </div>
-        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">BOLDEST PICK</div>
+        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">LOCK OF THE WEEK</div>
       </div>
       <div
         className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center w-[88px] h-[56px] lg:w-[172px] lg:h-[88px]"
         style={PILL_STYLE}
       >
         <PillTexture />
-        <div className="relative z-10 text-base lg:text-2xl" style={{ fontFamily: "var(--font-display)" }}>
-          {stats.chalkPct !== null ? `${stats.chalkPct}%` : "-"}
+        <div
+          className="relative z-10 text-sm lg:text-xl flex items-center justify-center gap-1"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {stats.boldestTeam ? (
+            <>
+              <img src={stats.boldestTeam.logo} alt="" crossOrigin="anonymous" className="h-6 lg:h-10 w-auto" />+{stats.boldestSpread}
+            </>
+          ) : (
+            "-"
+          )}
         </div>
-        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">CHALK</div>
+        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">BOLDEST PICK</div>
       </div>
     </div>
   );
@@ -182,6 +189,7 @@ export default function Home() {
   const hasResults = gradedCount > 0;
   const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
+  const lockedTeam = lockedGameId && picks[lockedGameId] ? TEAMS[picks[lockedGameId]] : null;
   const tags = computePickTags(games, picks);
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -341,6 +349,7 @@ export default function Home() {
           result={results[item.game.id]}
           locked={!isEditable}
           isLockPick={lockedGameId === item.game.id}
+          hasLock={lockedGameId !== null}
           onToggleLock={() => toggleLock(item.game.id)}
         />
       </div>
@@ -372,6 +381,7 @@ export default function Home() {
         result={results[item.game.id]}
         locked={!isEditable}
         isLockPick={lockedGameId === item.game.id}
+        hasLock={lockedGameId !== null}
         onToggleLock={() => toggleLock(item.game.id)}
       />
     );
@@ -415,7 +425,17 @@ export default function Home() {
             <div className="flex flex-col lg:hidden">
               {items.map((item, i) => renderMobileItem(item, i === 0))}
             </div>
-            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 lg:items-stretch">
+            {/* Fixed-px pill sizing (TeamHalfPill.tsx) was tuned for a
+                single mobile column, not a dense 2-column desktop grid -
+                this gets streamed, so every matchup has to be visible on
+                one screen without the browser needing to zoom out. zoom
+                (not transform:scale, which doesn't shrink layout
+                footprint) uniformly shrinks the whole grid - fonts,
+                badges, borders, everything - without touching any of
+                GameCard/TeamHalfPill's internals. Chrome-only, which is
+                fine here since this is specifically the desktop/streaming
+                view. */}
+            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 lg:items-stretch" style={{ zoom: 0.6 }}>
               {Array.from({ length: rowCount }).flatMap((_, i) => [
                 renderGridCell(col1[i]),
                 renderGridCell(col2[i]),
@@ -423,7 +443,7 @@ export default function Home() {
             </div>
 
             <div className="mt-8">
-              {hasResults ? <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} /> : <StatPills stats={stats} />}
+              {hasResults ? <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} /> : <StatPills stats={stats} lockedTeam={lockedTeam} />}
             </div>
 
             <div className="flex justify-center mt-5">

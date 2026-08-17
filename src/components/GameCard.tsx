@@ -15,7 +15,7 @@ function TagBadge({ side, tag }: { side: "left" | "right"; tag: PickTag }) {
     <img
       src={tag.icon}
       alt={tag.label}
-      className="absolute -top-2.5 z-40 h-[42px] w-auto pointer-events-none"
+      className="absolute -top-2.5 z-40 h-[50px] w-auto pointer-events-none"
       style={{
         ...positionStyle,
         transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
@@ -76,6 +76,7 @@ export function GameCard({
   result,
   locked,
   isLockPick,
+  hasLock,
   onToggleLock,
 }: {
   game: Game;
@@ -88,6 +89,12 @@ export function GameCard({
   // above (that one means "the week is closed for editing"). Both left
   // undefined on pages that don't have this feature (the predictor).
   isLockPick?: boolean;
+  // Whether ANY game this week is currently locked (not just this one) -
+  // the discoverable ghost badge only makes sense before a lock exists;
+  // once one is set, every other game's ghost badge disappears rather
+  // than staying visible-but-pointless, and comes back the moment the
+  // lock is cleared.
+  hasLock?: boolean;
   onToggleLock?: () => void;
 }) {
   const away = TEAMS[game.away];
@@ -145,7 +152,7 @@ export function GameCard({
           picked === away.abbr ? (
             <>
               {tag && <TagBadge side="left" tag={tag} />}
-              {onToggleLock && <LockBadge side="left" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} />}
+              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="left" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} />}
             </>
           ) : undefined
         }
@@ -171,7 +178,7 @@ export function GameCard({
           picked === home.abbr ? (
             <>
               {tag && <TagBadge side="right" tag={tag} />}
-              {onToggleLock && <LockBadge side="right" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} />}
+              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="right" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} />}
             </>
           ) : undefined
         }

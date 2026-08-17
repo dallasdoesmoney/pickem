@@ -215,9 +215,10 @@ function drawTeamHalfBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts, ic
   // let it protrude ~12px past the pill edge - GAP_X between columns is
   // 32px, and a wider protrusion bleeds into the neighboring pill.
   const protrusion = 12;
-  const centerX = side === "left" ? x - protrusion + 19 : x + w + protrusion - 19;
-  const centerY = y - 8 + 19;
-  const badgeH = 38;
+  const badgeH = 46; // matches the live UI's TagBadge, sized 20% larger than the original 38/42px
+  const half = badgeH / 2;
+  const centerX = side === "left" ? x - protrusion + half : x + w + protrusion - half;
+  const centerY = y - 8 + half;
   const badgeW = (icon.naturalWidth / icon.naturalHeight) * badgeH;
   ctx.save();
   ctx.translate(centerX, centerY);
