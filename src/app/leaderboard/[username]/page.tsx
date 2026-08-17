@@ -4,70 +4,36 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { fetchLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
-import { fetchPublicReferralCount } from "@/lib/supabase/referrals";
-import { fetchPublicPredictorProgress } from "@/lib/supabase/achievements";
-import { TEAMS_SORTED, TeamAbbr } from "@/data/teams";
-import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
+import { usePlayerStats } from "@/hooks/usePlayerStats";
+import { TEAMS_SORTED } from "@/data/teams";
 import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/hooks/useAuth";
 import { FriendButton } from "@/components/FriendButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelListModal } from "@/components/LevelListModal";
-
-// One tile per stat - a plain grid instead of one dominant pill, so
-// season record reads as ONE piece of the site instead of the whole
-// point. New stats (weekly completion, lock bonuses, whatever ships
-// next) are just another entry in the STATS array below, not a
-// restructure.
-function StatTile({ icon, value, label, accentColor }: { icon: string; value: string; label: string; accentColor: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 flex items-center gap-3">
-      <span className="text-2xl shrink-0">{icon}</span>
-      <div className="min-w-0">
-        <div className="text-lg leading-none tabular-nums" style={{ fontFamily: "var(--font-display)", color: accentColor }}>
-          {value}
-        </div>
-        <div className="text-[10px] text-white/45 tracking-wide mt-1">{label}</div>
-      </div>
-    </div>
-  );
-}
+import { StatTile, StatDetailRow } from "@/components/StatTile";
 
 // A client page (not the server-component-plus-notFound() pattern used by
 // /predictor/[team], which validates against a fixed, known team list) -
 // usernames are arbitrary and change over time, so "does this one exist"
-// has to be a real query, not a static param check.
+// has to be a real query, not a static param check. Kept around as a
+// direct/shareable URL (notifications, sharing a profile link outside the
+// app) - browsing from the leaderboard itself uses PlayerProfileModal's
+// popup instead, same content, no page navigation.
 export default function PlayerPage() {
   const params = useParams<{ username: string }>();
   const { user } = useAuth();
   const [row, setRow] = useState<LeaderboardRow | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [levelModalOpen, setLevelModalOpen] = useState(false);
-  const [referralCount, setReferralCount] = useState<number | null>(null);
-  const [predictorProgress, setPredictorProgress] = useState<Partial<Record<TeamAbbr, number>> | null>(null);
+  const stats = usePlayerStats(row?.user_id);
 
   useEffect(() => {
     fetchLeaderboardEntry(params.username)
       .then(setRow)
       .catch((err) => setError(errorMessage(err)));
   }, [params.username]);
-
-  useEffect(() => {
-    if (!row) return;
-    setReferralCount(null);
-    setPredictorProgress(null);
-    fetchPublicReferralCount(row.user_id)
-      .then(setReferralCount)
-      .catch(() => setReferralCount(0));
-    fetchPublicPredictorProgress(row.user_id)
-      .then(setPredictorProgress)
-      .catch(() => setPredictorProgress({}));
-  }, [row]);
-
-  const completedTeamCount = predictorProgress
-    ? TEAMS_SORTED.filter((t) => (predictorProgress[t.abbr] ?? 0) >= (REQUIRED_PREDICTOR_WEEKS[t.abbr] ?? Infinity)).length
-    : null;
 
   return (
     <main className="flex-1 px-4 pb-16 pt-10 max-w-md w-full mx-auto">
@@ -107,17 +73,18 @@ export default function PlayerPage() {
           <p className="text-white/45 text-sm mt-1">@{row.username}</p>
           <PlayerBadges userId={row.user_id} />
 
-          <div className="w-full mt-8">
-            <div className="text-[11px] text-white/45 tracking-[0.15em] mb-2.5">PICK&rsquo;EM</div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <StatTile icon="🏆" value={`${row.correct}-${row.graded - row.correct}`} label="SEASON RECORD" accentColor="#4ade80" />
-              <StatTile icon="🔗" value={referralCount !== null ? String(referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" />
-              <StatTile
-                icon="🏈"
-                value={completedTeamCount !== null ? `${completedTeamCount}/${TEAMS_SORTED.length}` : "–"}
-                label="TEAMS PREDICTED"
-                accentColor="#38bdf8"
-              />
+          <div className="w-full mt-8 grid grid-cols-3 gap-2.5">
+            <StatTile icon="🔗" value={stats ? String(stats.referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" />
+            <StatTile icon="🔥" value="–" label="STREAK SOON" accentColor="rgba(255,255,255,0.35)" />
+            <StatTile icon="🏆" value={`${row.correct}-${row.graded - row.correct}`} label="SEASON" accentColor="#4ade80" />
+          </div>
+
+          <div className="w-full mt-5">
+            <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
+            <div className="flex flex-col gap-1.5">
+              <StatDetailRow icon="🏈" label="Teams predicted" value={stats ? `${stats.completedTeamCount} / ${TEAMS_SORTED.length}` : "–"} />
+              <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} />
+              <StatDetailRow icon="📅" label="Weeks completed" value={stats ? String(stats.completedWeekCount) : "–"} />
             </div>
           </div>
 

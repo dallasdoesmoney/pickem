@@ -64,6 +64,18 @@ export async function syncWeeklyPickemAchievements(): Promise<void> {
   if (error) throw error;
 }
 
+// Same shape as fetchWeeklyPickemProgress above, but works for ANY
+// user_id via the public_weekly_pickem_progress RPC (weekly_picks is
+// locked to "select own").
+export async function fetchPublicWeeklyPickemProgress(userId: string): Promise<Partial<Record<number, number>>> {
+  const { data, error } = await supabase.rpc("public_weekly_pickem_progress", { p_user_id: userId });
+  if (error) throw error;
+
+  const result: Partial<Record<number, number>> = {};
+  for (const row of data as { week: number; games_picked: number }[]) result[row.week] = row.games_picked;
+  return result;
+}
+
 // Idempotent - pays out any newly-graded correct locks. Safe to call any
 // time results might have just become available; no-ops otherwise.
 export async function syncLockBonus(): Promise<void> {
@@ -75,4 +87,12 @@ export async function fetchLockBonusCount(userId: string): Promise<number> {
   const { count, error } = await supabase.from("point_events").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("source", "lock_correct");
   if (error) throw error;
   return count ?? 0;
+}
+
+// Works for ANY user_id via the public_lock_bonus_count RPC (point_events
+// is locked to "select own").
+export async function fetchPublicLockBonusCount(userId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("public_lock_bonus_count", { p_user_id: userId });
+  if (error) throw error;
+  return (data as number) ?? 0;
 }
