@@ -112,17 +112,11 @@ function SignedInAccount({
         </button>
       </div>
 
+      {/* Season record used to headline here as its own pill, but it's
+          just the SEASON tile in the stats grid below now - showing it
+          twice was redundant. */}
       {myRecord && (
-        <div className="flex flex-col items-center gap-3 mt-8">
-          <div
-            className="rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center w-[140px] h-[88px]"
-            style={{ background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
-          >
-            <div className="text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
-              {myRecord.correct}-{myRecord.graded - myRecord.correct}
-            </div>
-            <div className="text-[11px] text-white/55 mt-1.5 tracking-wide">SEASON RECORD</div>
-          </div>
+        <div className="flex flex-col items-center mt-8">
           <PlayerBadges userId={userId} />
         </div>
       )}
