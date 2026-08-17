@@ -48,7 +48,7 @@ function drawStatPill(
   ctx.font = `32px ${displayFont}`;
   const valueY = y + h * 0.42;
 
-  if (logo) {
+  if (logo && value) {
     const logoH = 66;
     const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
     const valueWidth = ctx.measureText(value).width;
@@ -58,6 +58,10 @@ function drawStatPill(
     ctx.textAlign = "left";
     ctx.fillText(value, startX + logoW + 8, valueY);
     ctx.textAlign = "center";
+  } else if (logo) {
+    const logoH = 66;
+    const logoW = (logo.naturalWidth / logo.naturalHeight) * logoH;
+    ctx.drawImage(logo, x + w / 2 - logoW / 2, valueY - logoH * 0.72, logoW, logoH);
   } else {
     ctx.fillText(value, x + w / 2, valueY);
   }
@@ -316,6 +320,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   const gradedCount = hasResults ? games.filter((g) => results![g.id]).length : 0;
   const correctCount = hasResults ? games.filter((g) => results![g.id] && picks[g.id] === results![g.id]).length : 0;
   const stats: PickStats = computePickStats(games, picks);
+  const lockedTeam = lockedGameId && picks[lockedGameId] ? TEAMS[picks[lockedGameId]] : null;
   const tags = computePickTags(games, picks);
   const { col1, col2 } = splitIntoColumns(groups);
   const rowCount = Math.max(col1.length, col2.length);
@@ -399,18 +404,29 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     const recordW = 260;
     drawResultsRecordPill(ctx, displayFont, WIDTH / 2 - recordW / 2, cursorY, recordW, pillH, `${correctCount}-${gradedCount - correctCount}`, avatarImg);
   } else {
+    // Matches the live StatPills order: Lock of the Week took over the
+    // prominent center slot (it's the more important tag), Boldest Pick
+    // moved into the slot Chalk used to occupy, Chalk was removed.
     const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeIcon?: HTMLImageElement | null }> = [
       { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeIcon: underdogIcon },
       {
         w: 250,
         borderColor: "#4ade80",
         valueColor: "#4ade80",
+        value: lockedTeam ? "" : "-",
+        label: "LOCK OF THE WEEK",
+        logo: lockedTeam ? logos.get(lockedTeam.logo) : undefined,
+        badgeIcon: lockIcon,
+      },
+      {
+        w: 172,
+        borderColor: "#ffffff",
+        valueColor: "#ffffff",
         value: stats.boldestTeam ? `+${stats.boldestSpread}` : "-",
         label: "BOLDEST PICK",
         logo: stats.boldestTeam ? logos.get(stats.boldestTeam.logo) : undefined,
         badgeIcon: boldestIcon,
       },
-      { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: stats.chalkPct !== null ? `${stats.chalkPct}%` : "-", label: "CHALK" },
     ];
     const pillGap = 24;
     const totalPillsW = pillDefs.reduce((s, p) => s + p.w, 0) + pillGap * (pillDefs.length - 1);

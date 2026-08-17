@@ -88,6 +88,11 @@ function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeo
         style={PILL_STYLE}
       >
         <PillTexture />
+        <img
+          src="/boldest-pick-alarm.png"
+          alt=""
+          className="absolute -top-2 -left-1 lg:-top-3 lg:-left-1.5 h-8 lg:h-16 w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
+        />
         <div
           className="relative z-10 text-sm lg:text-xl flex items-center justify-center gap-1"
           style={{ fontFamily: "var(--font-display)" }}
