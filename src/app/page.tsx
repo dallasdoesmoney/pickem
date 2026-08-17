@@ -139,13 +139,13 @@ export default function HomePage() {
       .catch(() => setWeeklyRecord(null));
   }, [user, activeWeek]);
 
-  // Signed-in: room for your own row is reserved below the top 2 if you're
-  // not already in it. Signed-out: one extra row of real names instead,
-  // since the leaderboard itself is the sign-up pitch here.
-  const topCount = user ? 2 : 3;
-  const topRows = rows ? rows.slice(0, topCount) : [];
+  // Always exactly 4 rows. Signed in and already in the top 4: those 4
+  // rows include you, nothing extra. Signed in and outside it: top 3 plus
+  // your own row pinned as the 4th. Signed out (or your position hasn't
+  // loaded yet): just the real top 4 - no placeholder, no nudge to sign up.
   const myIndex = user && rows ? rows.findIndex((r) => r.user_id === user.id) : -1;
-  const showMyRowSeparately = !!user && !!myRow && myIndex >= topCount;
+  const showMyRowSeparately = !!user && !!myRow && myIndex >= 4;
+  const topRows = rows ? rows.slice(0, showMyRowSeparately ? 3 : 4) : [];
 
   async function handleSignInCta() {
     setSigningIn(true);
@@ -159,13 +159,21 @@ export default function HomePage() {
   const rankValue = user && myIndex >= 0 ? `#${myIndex + 1}` : "–";
 
   return (
-    <main className="flex-1 px-4 pb-16 pt-10 max-w-lg w-full mx-auto flex flex-col gap-6">
+    <main className="flex-1 px-4 pb-16 pt-10 max-w-lg w-full mx-auto flex flex-col gap-10">
       <div className="text-center">
         <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SIDELINE BREW</div>
         <h1 className="text-[clamp(2rem,8vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
           PICK&rsquo;EM
         </h1>
       </div>
+
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-2xl leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+            Weekly Pick&rsquo;em
+          </h2>
+          <p className="text-white/50 text-sm mt-1.5">Your record, the season leaderboard, and this week&rsquo;s matchups.</p>
+        </div>
 
       <div className="rounded-3xl border border-white/10 overflow-hidden" style={{ background: CARD_BG }}>
         <div className="p-5 flex flex-col gap-4">
@@ -224,17 +232,6 @@ export default function HomePage() {
                   <LeaderboardRowCard key={row.user_id} row={row} position={i + 1} isMe={row.user_id === user?.id} />
                 ))}
                 {showMyRowSeparately && myRow && <LeaderboardRowCard row={myRow} position={myIndex + 1} isMe />}
-                {!user && (
-                  <button
-                    type="button"
-                    onClick={handleSignInCta}
-                    disabled={signingIn}
-                    className="flex items-center gap-2.5 rounded-xl border border-dashed border-amber-300/30 px-3 py-2.5 text-left text-amber-300/90 hover:text-amber-300 hover:border-amber-300/50 transition-colors disabled:opacity-60"
-                  >
-                    <span className="w-5 text-center text-base leading-none">+</span>
-                    <span className="text-sm">{signingIn ? "Signing in…" : "Sign up to claim your spot"}</span>
-                  </button>
-                )}
               </div>
             )}
 
@@ -250,12 +247,18 @@ export default function HomePage() {
         >
           Make Week {activeWeek} Picks &rarr;
         </Link>
+        </div>
       </div>
 
+      <div className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-2xl leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+            Team Pick&rsquo;em
+          </h2>
+          <p className="text-white/50 text-sm mt-1.5">Schedule predictors &mdash; pick your team&rsquo;s record for the 2026 season, game by game.</p>
+        </div>
+
       <div className="rounded-3xl border border-white/10 p-5" style={{ background: CARD_BG }}>
-        <h2 className="text-xs tracking-[0.15em] text-white/50 mb-4" style={{ fontFamily: "var(--font-display)" }}>
-          TEAM PICK&rsquo;EM
-        </h2>
         <div className="flex items-center justify-center gap-4 mb-4">
           {PREVIEW_TEAMS.map((team) => (
             <Link
@@ -285,6 +288,7 @@ export default function HomePage() {
         >
           View All 32 Teams &rarr;
         </Link>
+        </div>
       </div>
 
       {signInModal}

@@ -16,8 +16,12 @@ export async function fetchLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase
     .from("leaderboard")
     .select(COLUMNS)
+    // Ranked by record first; ties broken by level - total_points is a
+    // safe proxy for level here since getLevelInfo's curve is monotonic
+    // (more points never means a lower level), so ordering by it directly
+    // sorts by level without needing to compute getLevelInfo per row.
     .order("correct", { ascending: false })
-    .order("graded", { ascending: true })
+    .order("total_points", { ascending: false })
     .order("username", { ascending: true });
   if (error) throw error;
   return data as LeaderboardRow[];
