@@ -41,7 +41,7 @@ export function useSignInModal() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [referrer, setReferrer] = useState<{ label: string } | null>(null);
+  const [referrer, setReferrer] = useState<{ label: string; avatarUrl: string | null } | null>(null);
 
   const requestSignIn = useCallback(() => {
     setMode(getPendingReferralCode() ? "signup" : "signin");
@@ -64,7 +64,7 @@ export function useSignInModal() {
     const code = getPendingReferralCode();
     if (!code) return;
     fetchLeaderboardEntry(code)
-      .then((row) => setReferrer(row ? { label: row.display_name || row.username } : null))
+      .then((row) => setReferrer(row ? { label: row.display_name || row.username, avatarUrl: row.avatar_url } : null))
       .catch(() => setReferrer(null));
   }, [state]);
 
@@ -113,10 +113,19 @@ export function useSignInModal() {
         <p className="text-white/50 text-sm mt-1 mb-4">{mode === "signin" ? "Sign in to save your picks." : "Create an account to save your picks."}</p>
 
         {referrer && mode === "signup" && (
-          <div className="flex items-start gap-2 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2.5 text-xs text-white/80 mb-4">
-            <span className="text-base leading-none shrink-0">🎉</span>
+          <div className="flex items-center gap-2.5 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2.5 text-xs text-white/80 mb-4">
+            {referrer.avatarUrl ? (
+              <img src={referrer.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover shrink-0 border border-emerald-400/30" />
+            ) : (
+              <span
+                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
+                style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
+              >
+                {referrer.label.charAt(0).toUpperCase()}
+              </span>
+            )}
             <span>
-              Invited by <span className="text-emerald-300 font-medium">{referrer.label}</span> &mdash; sign up and{" "}
+              <span className="text-emerald-300 font-medium">{referrer.label}</span> invited you &mdash; sign up and{" "}
               <span className="text-emerald-300 font-medium">you&rsquo;ll both earn 1,000 points</span>.
             </span>
           </div>
