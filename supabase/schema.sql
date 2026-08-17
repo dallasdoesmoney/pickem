@@ -635,3 +635,20 @@ as $$
   select count(*)::integer from public.point_events where user_id = p_user_id and source = 'lock_correct';
 $$;
 grant execute on function public.public_lock_bonus_count(uuid) to anon, authenticated;
+
+-- friendships is locked to "select own" (requester or addressee), so the
+-- player profile popup needs a security-definer RPC for an arbitrary
+-- user_id's friend count.
+create or replace function public.public_friend_count(p_user_id uuid)
+returns integer
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select count(*)::integer
+  from public.friendships
+  where status = 'accepted'
+    and (requester_id = p_user_id or addressee_id = p_user_id);
+$$;
+grant execute on function public.public_friend_count(uuid) to anon, authenticated;

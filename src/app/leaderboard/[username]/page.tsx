@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { fetchLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
-import { TEAMS_SORTED } from "@/data/teams";
 import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/hooks/useAuth";
 import { FriendButton } from "@/components/FriendButton";
@@ -13,6 +12,7 @@ import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelListModal } from "@/components/LevelListModal";
 import { StatTile, StatDetailRow } from "@/components/StatTile";
+import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
 
 // A client page (not the server-component-plus-notFound() pattern used by
 // /predictor/[team], which validates against a fixed, known team list) -
@@ -65,11 +65,10 @@ export default function PlayerPage() {
             <h1 className="text-3xl text-center" style={{ fontFamily: "var(--font-display)" }}>
               {row.display_name || row.username}
             </h1>
-            <LevelBadge totalPoints={row.total_points} size="lg" />
+            <button type="button" onClick={() => setLevelModalOpen(true)} aria-label="View all levels" className="active:scale-95 transition-transform">
+              <LevelBadge totalPoints={row.total_points} size="lg" />
+            </button>
           </div>
-          <button type="button" onClick={() => setLevelModalOpen(true)} className="text-[11px] text-white/35 hover:text-white/60 transition-colors">
-            View all levels &rarr;
-          </button>
           <p className="text-white/45 text-sm mt-1">@{row.username}</p>
           <PlayerBadges userId={row.user_id} />
 
@@ -82,7 +81,8 @@ export default function PlayerPage() {
           <div className="w-full mt-5">
             <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
             <div className="flex flex-col gap-1.5">
-              <StatDetailRow icon="🏈" label="Teams predicted" value={stats ? `${stats.completedTeamCount} / ${TEAMS_SORTED.length}` : "–"} />
+              <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} />
+              <TeamsPredictedRow completedCount={stats?.completedTeamCount} completedAbbrs={stats?.completedTeamAbbrs} />
               <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} />
               <StatDetailRow icon="📅" label="Weeks completed" value={stats ? String(stats.completedWeekCount) : "–"} />
             </div>

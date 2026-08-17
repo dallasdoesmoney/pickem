@@ -11,7 +11,11 @@ import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 import { MyReferralsModal } from "@/components/MyReferralsModal";
+import { FriendsListModal } from "@/components/FriendsListModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
+import { StatTile, StatDetailRow } from "@/components/StatTile";
+import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
+import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 
 export default function AccountPage() {
@@ -59,6 +63,8 @@ function SignedInAccount({
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [referralsOpen, setReferralsOpen] = useState(false);
+  const [friendsOpen, setFriendsOpen] = useState(false);
+  const stats = usePlayerStats(userId);
 
   const label = authProfile?.display_name || authProfile?.username || "Your Profile";
 
@@ -77,7 +83,11 @@ function SignedInAccount({
           <h1 className="text-3xl text-center" style={{ fontFamily: "var(--font-display)" }}>
             {label}
           </h1>
-          {myRecord && <LevelBadge totalPoints={myRecord.total_points} size="lg" />}
+          {myRecord && (
+            <button type="button" onClick={() => setProgressModalOpen(true)} aria-label="View all levels" className="active:scale-95 transition-transform">
+              <LevelBadge totalPoints={myRecord.total_points} size="lg" />
+            </button>
+          )}
         </div>
 
         {authProfile?.username ? (
@@ -132,25 +142,34 @@ function SignedInAccount({
         </div>
       )}
 
-      {/* Gated on being signed in only, not myRecord (which requires a
-          username via the leaderboard view) - fetch_my_referrals() has no
-          such dependency, so this should show up even before someone's
-          set a username. */}
-      <div className="mt-3">
-        <button
-          type="button"
-          onClick={() => setReferralsOpen(true)}
-          className="w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors"
-        >
-          <span className="text-2xl shrink-0">🔗</span>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
-              MY REFERRALS
-            </div>
-            <div className="text-[11px] text-white/45 mt-0.5">See who joined with your invite link &rarr;</div>
+      {/* Every stat here is a real navigation target for your own
+          profile (tap Referrals to see who joined, Friends to browse and
+          search them, Season/Teams Predicted/etc. to jump to the page
+          behind that number) - the public profile popup shows the same
+          stats but leaves them inert, since there's nowhere useful to
+          send a viewer looking at someone else's data. This also
+          replaces the old standalone "MY REFERRALS" card - the
+          Referrals tile below is the one entry point into that list now. */}
+      {myRecord && (
+        <div className="mt-6 flex flex-col gap-3">
+          <div className="text-[10px] text-white/45 tracking-[0.15em] mb-1">PICK&rsquo;EM</div>
+          <div className="grid grid-cols-3 gap-2">
+            <StatTile icon="🔗" value={stats ? String(stats.referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" onClick={() => setReferralsOpen(true)} />
+            <StatTile icon="🔥" value="–" label="STREAK SOON" accentColor="rgba(255,255,255,0.35)" />
+            <StatTile icon="🏆" value={`${myRecord.correct}-${myRecord.graded - myRecord.correct}`} label="SEASON" accentColor="#4ade80" href="/weekly" />
           </div>
-        </button>
-      </div>
+
+          <div className="mt-2">
+            <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
+            <div className="flex flex-col gap-1.5">
+              <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} onClick={() => setFriendsOpen(true)} />
+              <TeamsPredictedRow completedCount={stats?.completedTeamCount} href="/predictor" />
+              <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} href="/weekly" />
+              <StatDetailRow icon="📅" label="Weeks completed" value={stats ? String(stats.completedWeekCount) : "–"} href="/weekly" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {myRecord?.username && (
         <div className="text-center mt-6">
@@ -185,6 +204,7 @@ function SignedInAccount({
         onClose={() => setProgressModalOpen(false)}
       />
       <MyReferralsModal open={referralsOpen} onClose={() => setReferralsOpen(false)} />
+      <FriendsListModal userId={userId} open={friendsOpen} onClose={() => setFriendsOpen(false)} />
     </main>
   );
 }

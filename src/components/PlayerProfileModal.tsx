@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
-import { TEAMS_SORTED } from "@/data/teams";
 import { FriendButton } from "@/components/FriendButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelListModal } from "@/components/LevelListModal";
 import { StatTile, StatDetailRow } from "@/components/StatTile";
+import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
 
 // The whole profile in one scrollable popup - no more "view full profile
 // page" hop to a separate route. The standalone /leaderboard/[username]
@@ -59,11 +59,10 @@ export function PlayerProfileModal({
             <h2 className="text-2xl text-center" style={{ fontFamily: "var(--font-display)" }}>
               {label}
             </h2>
-            <LevelBadge totalPoints={row.total_points} size="lg" />
+            <button type="button" onClick={() => setLevelModalOpen(true)} aria-label="View all levels" className="active:scale-95 transition-transform">
+              <LevelBadge totalPoints={row.total_points} size="lg" />
+            </button>
           </div>
-          <button type="button" onClick={() => setLevelModalOpen(true)} className="text-[11px] text-white/35 hover:text-white/60 transition-colors">
-            View all levels &rarr;
-          </button>
           <p className="text-white/45 text-sm mt-1">@{row.username}</p>
           <PlayerBadges userId={row.user_id} />
 
@@ -76,7 +75,8 @@ export function PlayerProfileModal({
           <div className="w-full mt-5">
             <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
             <div className="flex flex-col gap-1.5">
-              <StatDetailRow icon="🏈" label="Teams predicted" value={stats ? `${stats.completedTeamCount} / ${TEAMS_SORTED.length}` : "–"} />
+              <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} />
+              <TeamsPredictedRow completedCount={stats?.completedTeamCount} completedAbbrs={stats?.completedTeamAbbrs} />
               <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} />
               <StatDetailRow icon="📅" label="Weeks completed" value={stats ? String(stats.completedWeekCount) : "–"} />
             </div>

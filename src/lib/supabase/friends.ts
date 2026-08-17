@@ -99,3 +99,36 @@ export async function fetchMyFriendIds(myId: string): Promise<Set<string>> {
   }
   return ids;
 }
+
+// Works for ANY user_id via the public_friend_count RPC (friendships is
+// locked to "select own").
+export async function fetchPublicFriendCount(userId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("public_friend_count", { p_user_id: userId });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+export type FriendRow = {
+  user_id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+};
+
+// Same join-through-the-public-leaderboard-view approach as
+// fetchIncomingRequests - friendships_select_own already lets me read
+// rows I'm a party to, but not the other person's profile directly.
+export async function fetchMyFriends(myId: string): Promise<FriendRow[]> {
+  const { data: rows, error } = await supabase
+    .from("friendships")
+    .select("requester_id, addressee_id")
+    .eq("status", "accepted")
+    .or(`requester_id.eq.${myId},addressee_id.eq.${myId}`);
+  if (error) throw error;
+  const ids = (rows ?? []).map((r) => (r.requester_id === myId ? r.addressee_id : r.requester_id));
+  if (ids.length === 0) return [];
+
+  const { data: profiles, error: profilesError } = await supabase.from("leaderboard").select("user_id, username, display_name, avatar_url").in("user_id", ids);
+  if (profilesError) throw profilesError;
+  return (profiles ?? []) as FriendRow[];
+}
