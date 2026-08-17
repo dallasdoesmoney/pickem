@@ -324,7 +324,6 @@ export default function Home() {
   const tags = computePickTags(games, picks);
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
 
@@ -358,8 +357,6 @@ export default function Home() {
     saveWeeklyPicks(userId, activeWeek, picks, lockedGameId)
       .then(() => {
         syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
       })
       .catch((err) => {
         console.error("Save failed", err);
@@ -388,8 +385,6 @@ export default function Home() {
       if (!userId) return;
       await saveWeeklyPicks(userId, activeWeek, picks, lockedGameId);
       syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       console.error("Save failed", err);
       setSaveError(describeSaveError(err));
@@ -405,8 +400,6 @@ export default function Home() {
     saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId)
       .then(() => {
         syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
       })
       .catch((err) => {
         console.error("Save failed", err);
@@ -437,8 +430,6 @@ export default function Home() {
       saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId)
         .then(() => {
           syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
-          setSaved(true);
-          setTimeout(() => setSaved(false), 2500);
         })
         .catch((err) => {
           console.error("Auto-save failed", err);
@@ -711,7 +702,11 @@ export default function Home() {
                         <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
                         SAVING&hellip;
                       </>
-                    ) : saved ? (
+                    ) : user ? (
+                      // Signed in means auto-save has this covered - the
+                      // button reads SAVED at rest (not just briefly after a
+                      // save) instead of reverting to "Save & Submit" a few
+                      // seconds later, which read as "did that not save?"
                       <>
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20 6L9 17l-5-5" />

@@ -38,7 +38,6 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const [sharing, setSharing] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const winTotal = WIN_TOTALS[trackedTeam];
 
@@ -64,8 +63,6 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       await saveSeasonPicks(userId, trackedTeam, picks);
       syncOpponentSeasonPicks(userId, trackedTeam, picks, schedule).catch((err) => console.error("Opponent sync failed", err));
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err));
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       console.error("Save failed", err);
       setSaveError("Couldn't save your picks. Try again.");
@@ -82,8 +79,6 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       .then(() => {
         syncOpponentSeasonPicks(user.id, trackedTeam, picks, schedule).catch((err) => console.error("Opponent sync failed", err));
         syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err));
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
       })
       .catch((err) => {
         console.error("Save failed", err);
@@ -115,8 +110,6 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
         .then(() => {
           syncOpponentSeasonPicks(user.id, trackedTeam, picks, schedule).catch((err) => console.error("Opponent sync failed", err));
           syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err));
-          setSaved(true);
-          setTimeout(() => setSaved(false), 2500);
         })
         .catch((err) => {
           console.error("Auto-save failed", err);
@@ -422,7 +415,11 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
                   <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
                   SAVING&hellip;
                 </>
-              ) : saved ? (
+              ) : user ? (
+                // Signed in means auto-save has this covered - the button
+                // reads SAVED at rest instead of reverting to "Save &
+                // Submit" a few seconds later, which read as "did that not
+                // save?"
                 <>
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6L9 17l-5-5" />
