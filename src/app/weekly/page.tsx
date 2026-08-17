@@ -14,6 +14,7 @@ import { fetchWeeks, fetchGameResults, WeekRow } from "@/lib/supabase/admin";
 import { fetchLeaderboard, fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { errorMessage } from "@/lib/errorMessage";
 import { WeekSwitcher } from "@/components/WeekSwitcher";
+import { LeaderboardBoard } from "@/components/LeaderboardBoard";
 import { groupGamesByDay } from "@/lib/groupGames";
 import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
@@ -246,6 +247,11 @@ export default function Home() {
   // open or has published results.
   const [weeks, setWeeks] = useState<WeekRow[]>([]);
   const [activeWeek, setActiveWeek] = useState(CURRENT_WEEK);
+  // Toggles the whole page between making picks and the season
+  // leaderboard, so getting the full season picture doesn't require
+  // leaving this page - the leaderboard content itself is the exact same
+  // shared component the standalone /leaderboard page renders.
+  const [pageTab, setPageTab] = useState<"picks" | "leaderboard">("picks");
   const [weekSwitcherOpen, setWeekSwitcherOpen] = useState(false);
   const [results, setResults] = useState<Record<string, TeamAbbr>>({});
 
@@ -514,36 +520,69 @@ export default function Home() {
     <div className="flex flex-col flex-1">
       <header className="px-4 pt-6 pb-8 max-w-4xl w-full mx-auto relative">
         <div className="flex flex-col items-center">
-          <div className="text-center">
-            <span className="relative inline-flex items-center gap-2 text-xl text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
-              WEEK {activeWeek}
-              <WeekSwitcher
-                weeks={weeks}
-                currentWeek={activeWeek}
-                onSelectWeek={setActiveWeek}
-                open={weekSwitcherOpen}
-                onOpenChange={setWeekSwitcherOpen}
-              />
-              <span
-                className="absolute top-1/2 -right-4 translate-x-full -translate-y-1/2 whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
-                style={{ fontFamily: "var(--font-display)", background: "#1b2947", boxShadow: "2.5px 2.5px 0 rgba(0,0,0,0.45)" }}
-              >
-                {hasResults ? `✅ ${correctCount}/${gradedCount}` : `🏈 ${pickedCount}/${games.length}`}
-              </span>
-            </span>
-            <div className="w-10 h-[2px] bg-white/25 mx-auto mb-3" />
-            <h1
-              className="text-[clamp(2.25rem,9vw,3.5rem)] leading-none tracking-wide"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              NFL PICK&rsquo;EM
-            </h1>
+          <div className="flex justify-center mb-5">
+            <div className="inline-flex rounded-full border border-white/15 bg-[#1b2947] p-1">
+              {(["picks", "leaderboard"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setPageTab(tab)}
+                  className={`rounded-full px-5 py-1.5 text-sm capitalize transition-colors ${
+                    pageTab === tab ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"
+                  }`}
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {pageTab === "picks" ? (
+            <div className="text-center">
+              <span className="relative inline-flex items-center gap-2 text-xl text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
+                WEEK {activeWeek}
+                <WeekSwitcher
+                  weeks={weeks}
+                  currentWeek={activeWeek}
+                  onSelectWeek={setActiveWeek}
+                  open={weekSwitcherOpen}
+                  onOpenChange={setWeekSwitcherOpen}
+                />
+                <span
+                  className="absolute top-1/2 -right-4 translate-x-full -translate-y-1/2 whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
+                  style={{ fontFamily: "var(--font-display)", background: "#1b2947", boxShadow: "2.5px 2.5px 0 rgba(0,0,0,0.45)" }}
+                >
+                  {hasResults ? `✅ ${correctCount}/${gradedCount}` : `🏈 ${pickedCount}/${games.length}`}
+                </span>
+              </span>
+              <div className="w-10 h-[2px] bg-white/25 mx-auto mb-3" />
+              <h1
+                className="text-[clamp(2.25rem,9vw,3.5rem)] leading-none tracking-wide"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                NFL PICK&rsquo;EM
+              </h1>
+            </div>
+          ) : (
+            <div className="text-center">
+              <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SEASON STANDINGS</div>
+              <h1 className="text-[clamp(2.25rem,9vw,3.5rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+                LEADERBOARD
+              </h1>
+              <p className="text-white/50 text-sm mt-3">Ranked by total correct picks across every published week.</p>
+            </div>
+          )}
         </div>
       </header>
 
       <main className="flex-1 px-4 pb-10 max-w-4xl w-full mx-auto">
-        {loaded && (
+        {pageTab === "leaderboard" && (
+          <div className="max-w-2xl mx-auto w-full">
+            <LeaderboardBoard />
+          </div>
+        )}
+        {pageTab === "picks" && loaded && (
           <>
             <WeeklyRecordPill
               seasonCorrect={myRecord?.correct ?? 0}
