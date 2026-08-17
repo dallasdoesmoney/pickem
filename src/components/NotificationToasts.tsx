@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreadNotifications, markNotificationRead, syncLevelUpNotifications, NotificationRow } from "@/lib/supabase/notifications";
 import { fetchIncomingRequests, FriendRequest } from "@/lib/supabase/friends";
@@ -81,6 +82,7 @@ function buildToastContent(n: NotificationRow, requests: FriendRequest[], referr
 // isn't missed until the next load.
 export function NotificationToasts() {
   const { user, profile } = useAuth();
+  const router = useRouter();
   const [queue, setQueue] = useState<NotificationRow[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
@@ -128,10 +130,21 @@ export function NotificationToasts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
-  function dismiss() {
+  function dismiss(e?: React.MouseEvent | React.KeyboardEvent) {
+    e?.stopPropagation();
     if (!current) return;
     markNotificationRead(current.id).catch((err) => console.error("Failed to mark notification read", err));
     setCurrent(null);
+  }
+
+  // Tapping anywhere on the toast (besides the dismiss button) takes you
+  // to the notifications/activity page - same "mark read" as a plain
+  // dismiss, just followed by navigating there instead of staying put.
+  function handleOpen() {
+    if (!current) return;
+    markNotificationRead(current.id).catch((err) => console.error("Failed to mark notification read", err));
+    setCurrent(null);
+    router.push("/notifications");
   }
 
   if (!current) return null;
@@ -141,7 +154,16 @@ export function NotificationToasts() {
   return (
     <div className="fixed top-[84px] left-1/2 -translate-x-1/2 z-[70] w-full max-w-sm px-4">
       <div
-        className="flex items-center gap-3 rounded-2xl border px-3.5 py-3 shadow-2xl shadow-black/40"
+        role="button"
+        tabIndex={0}
+        onClick={handleOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleOpen();
+          }
+        }}
+        className="flex items-center gap-3 rounded-2xl border px-3.5 py-3 shadow-2xl shadow-black/40 cursor-pointer transition-[filter] hover:brightness-110"
         style={{ background: "#0b1730", borderColor: `${content.accentColor}55` }}
       >
         {content.avatarUrl ? (
