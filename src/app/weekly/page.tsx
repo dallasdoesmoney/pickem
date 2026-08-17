@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase/client";
 import { saveWeeklyPicks } from "@/lib/supabase/picks";
 import { syncWeeklyPickemAchievements, syncLockBonus } from "@/lib/supabase/achievements";
 import { fetchWeeks, fetchGameResults, WeekRow } from "@/lib/supabase/admin";
-import { fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
+import { fetchLeaderboard, fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { errorMessage } from "@/lib/errorMessage";
 import { WeekSwitcher } from "@/components/WeekSwitcher";
 import { groupGamesByDay } from "@/lib/groupGames";
@@ -111,32 +111,79 @@ function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeo
   );
 }
 
-// Sits between the page title and the first matchup, signed-in only -
-// three colored segments (not just plain text) so it reads as a small
-// dashboard readout rather than a plain stat line, matching the app's
-// existing emoji-icon convention (achievements, stat pills) for the
-// per-segment flourish.
+// Avatar to the left of the record pill - a placeholder "?" when signed
+// out (clicking it opens sign-in) rather than hiding entirely, so this
+// whole readout doubles as a sign-up pitch instead of only appearing
+// once you already have an account.
+function ProfileAvatar({
+  url,
+  initial,
+  signedIn,
+  onClick,
+}: {
+  url?: string | null;
+  initial: string;
+  signedIn: boolean;
+  onClick?: () => void;
+}) {
+  const dims = "h-11 w-11 sm:h-14 sm:w-14 shrink-0 rounded-full flex items-center justify-center text-base sm:text-lg";
+  if (!signedIn) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label="Sign in to track your record"
+        className={`${dims} bg-white/5 border border-dashed border-white/25 text-white/40 hover:border-white/40 transition-colors`}
+      >
+        ?
+      </button>
+    );
+  }
+  return url ? (
+    <img src={url} alt="" className={`${dims} object-cover border-2 border-white/20`} />
+  ) : (
+    <span className={`${dims} bg-white/10 border-2 border-white/20`}>{initial}</span>
+  );
+}
+
+// Sits between the page title and the first matchup - three colored
+// segments (not just plain text) so it reads as a small dashboard
+// readout, matching the app's existing emoji-icon convention
+// (achievements, stat pills) for the per-segment flourish. Same three
+// KPIs (and avatar) as the pick'em hub's own stat pill, so the two read
+// as one consistent "your account" readout wherever it shows up.
 function WeeklyRecordPill({
-  weeklyCorrect,
-  weeklyGraded,
-  gamesRemaining,
   seasonCorrect,
   seasonGraded,
+  weeklyCorrect,
+  weeklyGraded,
+  week,
+  rank,
+  avatarUrl,
+  initial,
+  signedIn,
+  onAvatarClick,
 }: {
-  weeklyCorrect: number;
-  weeklyGraded: number;
-  gamesRemaining: number;
   seasonCorrect: number;
   seasonGraded: number;
+  weeklyCorrect: number;
+  weeklyGraded: number;
+  week: number;
+  rank: number | null;
+  avatarUrl?: string | null;
+  initial: string;
+  signedIn: boolean;
+  onAvatarClick?: () => void;
 }) {
   const segments = [
-    { icon: "🏈", value: `${weeklyCorrect}-${weeklyGraded - weeklyCorrect}`, label: "WEEKLY RECORD", color: "#4ade80" },
-    { icon: "⏳", value: String(gamesRemaining), label: "GAMES REMAINING", color: "#38bdf8" },
     { icon: "🏆", value: `${seasonCorrect}-${seasonGraded - seasonCorrect}`, label: "SEASON RECORD", color: "#c084fc" },
+    { icon: "🏈", value: `${weeklyCorrect}-${weeklyGraded - weeklyCorrect}`, label: `WEEK ${week}`, color: "#4ade80" },
+    { icon: "🌟", value: rank ? `#${rank}` : "–", label: "GLOBAL RANK", color: "#f59e0b" },
   ];
 
   return (
-    <div className="flex justify-center mb-6">
+    <div className="flex justify-center items-center gap-3 mb-6">
+      <ProfileAvatar url={avatarUrl} initial={initial} signedIn={signedIn} onClick={onAvatarClick} />
       <div className="flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2 py-2 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]">
         {segments.map((seg, i) => (
           <div key={seg.label} className="flex items-center">
@@ -236,7 +283,7 @@ export default function Home() {
   const { user, profile } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
   // Season-wide record (across every published week), for the record
-  // pill's third segment - same query the profile page and leaderboard
+  // pill's first segment - same query the profile page and leaderboard
   // already use, just scoped to whoever's signed in here.
   const [myRecord, setMyRecord] = useState<LeaderboardRow | null>(null);
   useEffect(() => {
@@ -248,6 +295,16 @@ export default function Home() {
       .then(setMyRecord)
       .catch(() => setMyRecord(null));
   }, [user]);
+  // Full board, fetched regardless of auth - there's no rank column in
+  // the DB (see leaderboard.ts), so your position has to be found by
+  // index in the same sorted array the leaderboard page itself renders.
+  const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardRow[] | null>(null);
+  useEffect(() => {
+    fetchLeaderboard()
+      .then(setLeaderboardRows)
+      .catch(() => setLeaderboardRows([]));
+  }, []);
+  const myRank = user && leaderboardRows ? leaderboardRows.findIndex((r) => r.user_id === user.id) : -1;
   const pickedCount = Object.keys(picks).length;
   const gradedCount = games.filter((g) => results[g.id]).length;
   const correctCount = games.filter((g) => results[g.id] && picks[g.id] === results[g.id]).length;
@@ -488,15 +545,18 @@ export default function Home() {
       <main className="flex-1 px-4 pb-10 max-w-4xl w-full mx-auto">
         {loaded && (
           <>
-            {myRecord && (
-              <WeeklyRecordPill
-                weeklyCorrect={correctCount}
-                weeklyGraded={gradedCount}
-                gamesRemaining={games.length - gradedCount}
-                seasonCorrect={myRecord.correct}
-                seasonGraded={myRecord.graded}
-              />
-            )}
+            <WeeklyRecordPill
+              seasonCorrect={myRecord?.correct ?? 0}
+              seasonGraded={myRecord?.graded ?? 0}
+              weeklyCorrect={correctCount}
+              weeklyGraded={gradedCount}
+              week={activeWeek}
+              rank={user && myRank >= 0 ? myRank + 1 : null}
+              avatarUrl={profile?.avatar_url}
+              initial={(profile?.display_name || profile?.username || "?").charAt(0).toUpperCase()}
+              signedIn={!!user}
+              onAvatarClick={!user ? () => requestSignIn() : undefined}
+            />
             <div className="flex flex-col lg:hidden">
               {items.map((item, i) => renderMobileItem(item, i === 0))}
             </div>
