@@ -19,6 +19,20 @@ export async function fetchPredictorProgress(userId: string): Promise<Partial<Re
   return result;
 }
 
+// Same return shape as fetchPredictorProgress above, but works for ANY
+// user_id - season_picks is locked to "select own," so a public profile
+// page needs the security-definer public_predictor_progress RPC instead.
+// Reuses the same client-side completion logic (REQUIRED_PREDICTOR_WEEKS)
+// as the achievements tab rather than duplicating that threshold in SQL.
+export async function fetchPublicPredictorProgress(userId: string): Promise<Partial<Record<TeamAbbr, number>>> {
+  const { data, error } = await supabase.rpc("public_predictor_progress", { p_user_id: userId });
+  if (error) throw error;
+
+  const result: Partial<Record<TeamAbbr, number>> = {};
+  for (const row of data as { tracked_team: TeamAbbr; weeks_picked: number }[]) result[row.tracked_team] = row.weeks_picked;
+  return result;
+}
+
 // Idempotent - safe to call any time (page load, after a save) to grant
 // credit for any team that's now fully filled in and wasn't already paid
 // out. See supabase/schema.sql for the actual award logic.

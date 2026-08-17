@@ -15,6 +15,15 @@ export async function fetchReferralCount(userId: string): Promise<number> {
   return count ?? 0;
 }
 
+// Unlike fetchReferralCount above, works for ANY user_id, not just your
+// own - point_events is locked to "select own," so a public profile page
+// needs the security-definer public_referral_count RPC instead.
+export async function fetchPublicReferralCount(userId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("public_referral_count", { p_user_id: userId });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
 export type ReferralRow = {
   user_id: string;
   username: string | null;
