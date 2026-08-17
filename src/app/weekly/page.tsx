@@ -494,17 +494,7 @@ export default function Home() {
             <div className="flex flex-col lg:hidden">
               {items.map((item, i) => renderMobileItem(item, i === 0))}
             </div>
-            {/* Fixed-px pill sizing (TeamHalfPill.tsx) was tuned for a
-                single mobile column, not a dense 2-column desktop grid -
-                this gets streamed, so every matchup has to be visible on
-                one screen without the browser needing to zoom out. zoom
-                (not transform:scale, which doesn't shrink layout
-                footprint) uniformly shrinks the whole grid - fonts,
-                badges, borders, everything - without touching any of
-                GameCard/TeamHalfPill's internals. Chrome-only, which is
-                fine here since this is specifically the desktop/streaming
-                view. */}
-            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 lg:items-stretch" style={{ zoom: 0.6 }}>
+            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 lg:items-stretch">
               {Array.from({ length: rowCount }).flatMap((_, i) => [
                 renderGridCell(col1[i]),
                 renderGridCell(col2[i]),
