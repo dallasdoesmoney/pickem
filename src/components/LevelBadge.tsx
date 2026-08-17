@@ -2,16 +2,18 @@ import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 
 // Hidden entirely below level 1 (under 1,500 points) - nothing to show
 // off yet, and it doubles as the incentive to cross that first threshold.
-export function LevelBadge({ totalPoints, size = "sm" }: { totalPoints: number; size?: "sm" | "lg" }) {
+export function LevelBadge({ totalPoints, size = "sm" }: { totalPoints: number; size?: "xs" | "sm" | "lg" }) {
   const info = getLevelInfo(totalPoints);
   if (info.isUnranked) return null;
 
-  const dims = size === "sm" ? "text-[11px] px-2 py-1" : "text-sm px-2.5 py-1";
+  // xs: compact leaderboard previews (hub, weekly KPI pill) where rows are
+  // ~17px tall - sm/lg are both too tall to sit inline without bloating them.
+  const dims = size === "xs" ? "text-[7px] px-1 py-[1px] gap-0.5" : size === "sm" ? "text-[11px] px-2 py-1 gap-1" : "text-sm px-2.5 py-1 gap-1";
 
   return (
     <span
       title={`${info.rankName} ${subLevelRoman(info.subLevel)} · Level ${info.level}`}
-      className={`inline-flex items-center gap-1 rounded-full font-semibold shrink-0 ${dims}`}
+      className={`inline-flex items-center rounded-full font-semibold shrink-0 ${dims}`}
       style={{
         fontFamily: "var(--font-display)",
         background: info.rankColor,

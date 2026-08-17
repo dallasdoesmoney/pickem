@@ -112,33 +112,15 @@ function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeo
   );
 }
 
-// Avatar to the left of the record pill - a placeholder "?" when signed
-// out (clicking it opens sign-in) rather than hiding entirely, so this
-// whole readout doubles as a sign-up pitch instead of only appearing
-// once you already have an account.
-function ProfileAvatar({
-  url,
-  initial,
-  signedIn,
-  onClick,
-}: {
-  url?: string | null;
-  initial: string;
-  signedIn: boolean;
-  onClick?: () => void;
-}) {
+// Plain visual glyph now - no click handling of its own. A placeholder
+// "?" when signed out rather than hiding entirely, so this whole readout
+// doubles as a sign-up pitch instead of only appearing once you already
+// have an account. Lives inside WeeklyRecordPill's own bordered pill (see
+// below) rather than sitting next to it as a separate circle.
+function ProfileAvatar({ url, initial, signedIn }: { url?: string | null; initial: string; signedIn: boolean }) {
   const dims = "h-11 w-11 sm:h-14 sm:w-14 shrink-0 rounded-full flex items-center justify-center text-base sm:text-lg";
   if (!signedIn) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label="Sign in to track your record"
-        className={`${dims} bg-white/5 border border-dashed border-white/25 text-white/40 hover:border-white/40 transition-colors`}
-      >
-        ?
-      </button>
-    );
+    return <span className={`${dims} bg-white/5 border border-dashed border-white/25 text-white/40`}>?</span>;
   }
   return url ? (
     <img src={url} alt="" className={`${dims} object-cover border-2 border-white/20`} />
@@ -152,7 +134,10 @@ function ProfileAvatar({
 // readout, matching the app's existing emoji-icon convention
 // (achievements, stat pills) for the per-segment flourish. Same three
 // KPIs (and avatar) as the pick'em hub's own stat pill, so the two read
-// as one consistent "your account" readout wherever it shows up.
+// as one consistent "your account" readout wherever it shows up. Avatar
+// lives inside this same pill (not a separate circle next to it) - when
+// signed out, the whole pill is one button into sign-in, not just the
+// avatar corner of it.
 function WeeklyRecordPill({
   seasonCorrect,
   seasonGraded,
@@ -163,7 +148,7 @@ function WeeklyRecordPill({
   avatarUrl,
   initial,
   signedIn,
-  onAvatarClick,
+  onActivate,
 }: {
   seasonCorrect: number;
   seasonGraded: number;
@@ -174,7 +159,7 @@ function WeeklyRecordPill({
   avatarUrl?: string | null;
   initial: string;
   signedIn: boolean;
-  onAvatarClick?: () => void;
+  onActivate?: () => void;
 }) {
   const segments = [
     { icon: "🏆", value: `${seasonCorrect}-${seasonGraded - seasonCorrect}`, label: "SEASON RECORD", color: "#c084fc" },
@@ -182,25 +167,43 @@ function WeeklyRecordPill({
     { icon: "🌟", value: rank ? `#${rank}` : "–", label: "GLOBAL RANK", color: "#f59e0b" },
   ];
 
-  return (
-    <div className="flex justify-center items-center gap-3 mb-6">
-      <ProfileAvatar url={avatarUrl} initial={initial} signedIn={signedIn} onClick={onAvatarClick} />
-      <div className="flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2 py-2 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]">
-        {segments.map((seg, i) => (
-          <div key={seg.label} className="flex items-center">
-            {i > 0 && <div className="w-px self-stretch bg-white/10 mx-3 sm:mx-5" />}
-            <div className="flex flex-col items-center gap-0.5 px-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm sm:text-base leading-none">{seg.icon}</span>
-                <span className="text-lg sm:text-xl leading-none" style={{ fontFamily: "var(--font-display)", color: seg.color }}>
-                  {seg.value}
-                </span>
-              </div>
-              <span className="text-[8px] sm:text-[9px] text-white/50 tracking-wide whitespace-nowrap">{seg.label}</span>
+  const inner = (
+    <>
+      <ProfileAvatar url={avatarUrl} initial={initial} signedIn={signedIn} />
+      <div className="w-px self-stretch bg-white/10 mx-1 sm:mx-2" />
+      {segments.map((seg, i) => (
+        <div key={seg.label} className="flex items-center">
+          {i > 0 && <div className="w-px self-stretch bg-white/10 mx-3 sm:mx-5" />}
+          <div className="flex flex-col items-center gap-0.5 px-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm sm:text-base leading-none">{seg.icon}</span>
+              <span className="text-lg sm:text-xl leading-none" style={{ fontFamily: "var(--font-display)", color: seg.color }}>
+                {seg.value}
+              </span>
             </div>
+            <span className="text-[8px] sm:text-[9px] text-white/50 tracking-wide whitespace-nowrap">{seg.label}</span>
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
+    </>
+  );
+
+  const pillClass = "flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2 py-2 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]";
+
+  return (
+    <div className="flex justify-center mb-6">
+      {signedIn ? (
+        <div className={pillClass}>{inner}</div>
+      ) : (
+        <button
+          type="button"
+          onClick={onActivate}
+          aria-label="Sign in to track your record"
+          className={`${pillClass} hover:border-white/30 transition-colors cursor-pointer`}
+        >
+          {inner}
+        </button>
+      )}
     </div>
   );
 }
@@ -323,6 +326,42 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
+
+  // Nudges a signed-out visitor to sign up once they're clearly invested -
+  // halfway through picking a week's games - rather than only pitching it
+  // passively via the KPI pill. Keyed per-week in localStorage so it fires
+  // once per week, not on every page load once you're past the threshold.
+  useEffect(() => {
+    if (user || !loaded || games.length === 0) return;
+    if (pickedCount / games.length < 0.5) return;
+    const key = `pickem:save-prompt-seen-w${activeWeek}`;
+    if (localStorage.getItem(key) === "1") return;
+    localStorage.setItem(key, "1");
+    setShowSavePrompt(true);
+  }, [user, loaded, pickedCount, games.length, activeWeek]);
+
+  async function handleSavePromptSignUp() {
+    const signedIn = await requestSignIn();
+    setShowSavePrompt(false);
+    if (!signedIn) return;
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user.id;
+    // No userId here means the sign-in was a Google redirect - the
+    // pending-save effect below picks it back up once the page reloads
+    // with a session.
+    if (!userId) return;
+    saveWeeklyPicks(userId, activeWeek, picks, lockedGameId)
+      .then(() => {
+        syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      })
+      .catch((err) => {
+        console.error("Save failed", err);
+        setSaveError(describeSaveError(err));
+      });
+  }
 
   async function handleSaveAndSubmit() {
     if (saving) return;
@@ -594,7 +633,7 @@ export default function Home() {
               avatarUrl={profile?.avatar_url}
               initial={(profile?.display_name || profile?.username || "?").charAt(0).toUpperCase()}
               signedIn={!!user}
-              onAvatarClick={!user ? () => requestSignIn() : undefined}
+              onActivate={!user ? () => requestSignIn() : undefined}
             />
             <div className="flex flex-col lg:hidden">
               {items.map((item, i) => renderMobileItem(item, i === 0))}
@@ -712,6 +751,46 @@ export default function Home() {
       </main>
       {dialog}
       {signInModal}
+      {showSavePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSavePrompt(false)} />
+          <div className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1730] p-6 shadow-2xl shadow-black/50 text-center">
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setShowSavePrompt(false)}
+              className="absolute top-4 right-4 h-7 w-7 rounded-full border border-white/15 text-white/50 hover:text-white flex items-center justify-center transition-colors"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 6l12 12" />
+                <path d="M18 6L6 18" />
+              </svg>
+            </button>
+            <div className="text-3xl mb-2">🏈</div>
+            <h2 className="text-white text-lg" style={{ fontFamily: "var(--font-display)" }}>
+              WANT TO SAVE THESE PICKS?
+            </h2>
+            <p className="text-white/55 text-sm mt-2 mb-5">
+              You&rsquo;re halfway through Week {activeWeek} &mdash; sign up free to save your picks and start tracking your record.
+            </p>
+            <button
+              type="button"
+              onClick={handleSavePromptSignUp}
+              className="w-full rounded-full px-5 py-2.5 text-sm active:scale-95 transition-transform duration-150"
+              style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
+            >
+              SIGN UP FREE
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSavePrompt(false)}
+              className="w-full text-center text-xs text-white/45 hover:text-white/70 mt-3 transition-colors"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { fetchLeaderboard, fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib
 import { fetchWeeks, fetchGameResults, WeekRow } from "@/lib/supabase/admin";
 import { fetchWeeklyPicks } from "@/lib/supabase/picks";
 import { getLevelInfo } from "@/lib/levels";
+import { LevelBadge } from "@/components/LevelBadge";
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { TEAMS_SORTED } from "@/data/teams";
 
@@ -76,7 +77,10 @@ function MiniLeaderboardRow({ row, position, isMe }: { row: LeaderboardRow; posi
         {position}
       </span>
       <Avatar url={row.avatar_url} label={label} size={17} />
-      <span className="flex-1 min-w-0 truncate">{isMe ? "You" : label}</span>
+      <span className="flex-1 min-w-0 flex items-center gap-1">
+        <span className="truncate">{isMe ? "You" : label}</span>
+        <LevelBadge totalPoints={row.total_points} size="xs" />
+      </span>
       <span className={isMe ? "text-emerald-400" : "text-white/55"} style={{ fontFamily: "var(--font-display)" }}>
         {row.correct}-{row.graded - row.correct}
       </span>
@@ -200,10 +204,7 @@ export default function HomePage() {
             <span className="h-[34px] w-[34px] shrink-0 rounded-full border border-dashed border-white/25 bg-white/5 flex items-center justify-center text-[11px] text-white/40">
               ?
             </span>
-            <div>
-              <div className="text-xs font-bold text-white/70">Your Profile</div>
-              <div className="text-[9.5px] text-white/35">Sign up to save it</div>
-            </div>
+            <div className="text-xs font-bold text-white/70">Your Profile</div>
           </div>
         )}
 
