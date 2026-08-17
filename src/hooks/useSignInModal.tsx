@@ -113,21 +113,38 @@ export function useSignInModal() {
         <p className="text-white/50 text-sm mt-1 mb-4">{mode === "signin" ? "Sign in to save your picks." : "Create an account to save your picks."}</p>
 
         {referrer && mode === "signup" && (
-          <div className="flex items-center gap-2.5 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2.5 text-xs text-white/80 mb-4">
+          <div className="flex flex-col items-center gap-1.5 text-center mb-4">
             {referrer.avatarUrl ? (
-              <img src={referrer.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover shrink-0 border border-emerald-400/30" />
+              <img src={referrer.avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover border border-white/15" />
             ) : (
               <span
-                className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
+                className="h-12 w-12 rounded-full flex items-center justify-center text-base font-semibold text-white"
                 style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
               >
                 {referrer.label.charAt(0).toUpperCase()}
               </span>
             )}
-            <span>
-              <span className="text-emerald-300 font-medium">{referrer.label}</span> invited you &mdash; sign up and{" "}
-              <span className="text-emerald-300 font-medium">you&rsquo;ll both earn 1,000 points</span>.
+            <span className="text-xs text-white/70">
+              Invited by <span className="text-white font-medium">{referrer.label}</span>
             </span>
+
+            <div className="grid grid-cols-3 gap-2 w-full mt-2.5">
+              <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
+                <span className="text-base leading-none">🏆</span>
+                <span className="text-[10px] font-semibold mt-0.5">1,000 PTS</span>
+                <span className="text-[8.5px] text-white/40">You both earn</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
+                <span className="text-base leading-none">💾</span>
+                <span className="text-[10px] font-semibold mt-0.5">SAVE PICKS</span>
+                <span className="text-[8.5px] text-white/40">Any device</span>
+              </div>
+              <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
+                <span className="text-base leading-none">👥</span>
+                <span className="text-[10px] font-semibold mt-0.5">COMPARE</span>
+                <span className="text-[8.5px] text-white/40">With friends</span>
+              </div>
+            </div>
           </div>
         )}
 
