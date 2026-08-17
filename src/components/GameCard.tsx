@@ -7,17 +7,26 @@ import { PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
 
 export { PILL_WIDTH, PILL_HEIGHT } from "@/components/TeamHalfPill";
 
+// Shared with the desktop grid's own track sizing (weekly/page.tsx) -
+// CSS Grid's `1fr` columns don't shrink just because the content inside
+// them does, so the grid needs to compute its own track width from this
+// same constant rather than relying on the card shrinking "naturally."
+export const COMPACT_SCALE = 0.85;
+
 // Auto-computed tags (underdog/boldest pick) - purely informational, no
 // interaction, so this is just a badge rather than a button.
-function TagBadge({ side, tag }: { side: "left" | "right"; tag: PickTag }) {
-  const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
+function TagBadge({ side, tag, scale = 1 }: { side: "left" | "right"; tag: PickTag; scale?: number }) {
+  const offset = 10 * scale;
+  const positionStyle = { [side === "left" ? "left" : "right"]: `-${offset}px` } as const;
   return (
     <img
       src={tag.icon}
       alt={tag.label}
-      className="absolute -top-2.5 z-40 h-[50px] w-auto pointer-events-none"
+      className="absolute z-40 w-auto pointer-events-none"
       style={{
         ...positionStyle,
+        top: `-${offset}px`,
+        height: 50 * scale,
         transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
         filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
       }}
@@ -36,13 +45,17 @@ function LockBadge({
   isLocked,
   onToggle,
   disabled,
+  scale = 1,
 }: {
   side: "left" | "right";
   isLocked: boolean;
   onToggle: () => void;
   disabled?: boolean;
+  scale?: number;
 }) {
-  const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
+  const offset = 10 * scale;
+  const size = 40 * scale;
+  const positionStyle = { [side === "left" ? "left" : "right"]: `-${offset}px` } as const;
   return (
     <button
       type="button"
@@ -50,8 +63,8 @@ function LockBadge({
       disabled={disabled}
       aria-label={isLocked ? "Remove Lock of the Week" : "Mark as Lock of the Week"}
       aria-pressed={isLocked}
-      className={`absolute -bottom-2.5 z-40 h-[40px] w-[40px] p-0 border-0 bg-transparent ${disabled ? "cursor-default" : "cursor-pointer"}`}
-      style={{ ...positionStyle, transform: `rotate(${side === "left" ? "-18deg" : "18deg"})` }}
+      className={`absolute z-40 p-0 border-0 bg-transparent ${disabled ? "cursor-default" : "cursor-pointer"}`}
+      style={{ ...positionStyle, bottom: `-${offset}px`, height: size, width: size, transform: `rotate(${side === "left" ? "-18deg" : "18deg"})` }}
     >
       <img
         src="/lock-of-week.png"
@@ -78,6 +91,7 @@ export function GameCard({
   isLockPick,
   hasLock,
   onToggleLock,
+  compact = false,
 }: {
   game: Game;
   picked?: TeamAbbr;
@@ -96,10 +110,15 @@ export function GameCard({
   // lock is cleared.
   hasLock?: boolean;
   onToggleLock?: () => void;
+  // Shrinks the whole card 15% - desktop's 2-column grid only
+  // (renderGridCell in weekly/page.tsx), never the single mobile column
+  // (renderMobileItem), which stays full size.
+  compact?: boolean;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
   const hasResult = !!result;
+  const scale = compact ? COMPACT_SCALE : 1;
 
   // Whichever side matters visually - your pick if you made one, or the
   // real winner if you didn't (e.g. viewing results signed out) - stays
@@ -140,7 +159,7 @@ export function GameCard({
     // context. That's safe now that the sticky header (NavShell) sits at
     // z-50, above every in-card z-index (badge z-40, border z-30, label
     // z-20) - see NavShell.tsx for the other half of this.
-    <div className="relative flex items-center mx-auto shrink-0" style={{ width: PILL_WIDTH }}>
+    <div className="relative flex items-center mx-auto shrink-0" style={{ width: PILL_WIDTH * scale }}>
       <TeamHalfPill
         team={away}
         side="left"
@@ -149,22 +168,23 @@ export function GameCard({
         onClick={() => onPick(away.abbr)}
         disabled={locked}
         isLockPick={picked === away.abbr && isLockPick && !hasResult}
+        scale={scale}
         badge={
           picked === away.abbr ? (
             <>
-              {tag && <TagBadge side="left" tag={tag} />}
-              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="left" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} />}
+              {tag && <TagBadge side="left" tag={tag} scale={scale} />}
+              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="left" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} scale={scale} />}
             </>
           ) : undefined
         }
         footer={
           <>
             {awaySpread && (
-              <span className="text-sm text-white" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="text-white" style={{ fontFamily: "var(--font-display)", fontSize: 14 * scale }}>
                 {awaySpread}
               </span>
             )}
-            <span className="text-[10px] text-white/70">{game.awayRecord ?? "0-0"}</span>
+            <span className="text-white/70" style={{ fontSize: 10 * scale }}>{game.awayRecord ?? "0-0"}</span>
           </>
         }
       />
@@ -176,22 +196,23 @@ export function GameCard({
         onClick={() => onPick(home.abbr)}
         disabled={locked}
         isLockPick={picked === home.abbr && isLockPick && !hasResult}
+        scale={scale}
         badge={
           picked === home.abbr ? (
             <>
-              {tag && <TagBadge side="right" tag={tag} />}
-              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="right" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} />}
+              {tag && <TagBadge side="right" tag={tag} scale={scale} />}
+              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="right" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} scale={scale} />}
             </>
           ) : undefined
         }
         footer={
           <>
             {homeSpread && (
-              <span className="text-sm text-white" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="text-white" style={{ fontFamily: "var(--font-display)", fontSize: 14 * scale }}>
                 {homeSpread}
               </span>
             )}
-            <span className="text-[10px] text-white/70">{game.homeRecord ?? "0-0"}</span>
+            <span className="text-white/70" style={{ fontSize: 10 * scale }}>{game.homeRecord ?? "0-0"}</span>
           </>
         }
       />

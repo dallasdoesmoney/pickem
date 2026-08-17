@@ -45,6 +45,7 @@ export function TeamHalfPill({
   badge,
   disabled,
   isLockPick,
+  scale = 1,
 }: {
   team: (typeof TEAMS)[TeamAbbr];
   side: "left" | "right";
@@ -62,6 +63,14 @@ export function TeamHalfPill({
   // your pick" indicator), so GameCard pre-filters this to !hasResult and
   // this component just trusts it and gives it priority over outcome.
   isLockPick?: boolean;
+  // Uniform shrink for GameCard's desktop-grid "compact" mode - every
+  // size below multiplies by this. Tailwind can't pick up dynamically
+  // computed arbitrary values (e.g. `h-[${x}px]`) since its scanner only
+  // sees literal class strings in source, so anything that needs to scale
+  // is an inline style here instead of a fixed utility class. Every other
+  // caller (predictor's SeasonGameCard) omits this and stays at the
+  // original fixed size.
+  scale?: number;
 }) {
   const radius = side === "left" ? "rounded-l-full" : "rounded-r-full";
   const outerBorderSide = side === "left" ? "borderLeft" : "borderRight";
@@ -71,8 +80,14 @@ export function TeamHalfPill({
   const showLockTreatment = !!isLockPick;
   const showOutcomeTreatment = !!outcomeColor && !showLockTreatment;
   const borderColor = showLockTreatment ? LOCK_COLOR : (outcomeColor ?? (isFaded ? FADED_BORDER_COLOR : "white"));
-  const borderWidth = showOutcomeTreatment || showLockTreatment ? OUTCOME_BORDER_WIDTH : BORDER_WIDTH;
+  const borderWidth = (showOutcomeTreatment || showLockTreatment ? OUTCOME_BORDER_WIDTH : BORDER_WIDTH) * scale;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
+  const height = PILL_HEIGHT * scale;
+  const footerHeight = FOOTER_HEIGHT * scale;
+  const logoAreaHeight = height - footerHeight;
+  const logoHeightPx = 117 * scale;
+  const outcomeFontPx = 60 * scale;
+  const lockFontPx = 30 * scale;
 
   return (
     // Content (fill/logo/footer/letter) always stays at the base stacking
@@ -81,26 +96,26 @@ export function TeamHalfPill({
     // of everything - always fully opaque so a picked half's colored
     // border stays a continuous unbroken ring; a faded half's border dims
     // to a solid gray in step with its fill/logo.
-    <div className="relative flex-1" style={{ height: PILL_HEIGHT }}>
+    <div className="relative flex-1" style={{ height }}>
       <button
         onClick={onClick}
         disabled={disabled}
         className={`absolute inset-0 h-full w-full transition-transform duration-150 ${disabled ? "cursor-default" : "cursor-pointer active:scale-95"}`}
       >
         <div className={`absolute inset-0 ${radius} overflow-hidden`} style={{ backgroundColor: team.color, filter: fadedFilter }}>
-          <div className="absolute inset-x-0 top-0 flex items-center justify-center" style={{ height: LOGO_AREA_HEIGHT }}>
+          <div className="absolute inset-x-0 top-0 flex items-center justify-center" style={{ height: logoAreaHeight }}>
             <img
               src={team.logo}
               alt={team.name}
               draggable={false}
               crossOrigin="anonymous"
-              className="h-[117px] w-auto max-w-none select-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
-              style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+              className="w-auto max-w-none select-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]"
+              style={{ height: logoHeightPx, WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
             />
           </div>
           <div
             className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5"
-            style={{ height: FOOTER_HEIGHT, backgroundColor: isFaded ? team.color : darkenColor(team.color, 0.6, 0.93) }}
+            style={{ height: footerHeight, backgroundColor: isFaded ? team.color : darkenColor(team.color, 0.6, 0.93) }}
           >
             {footer}
           </div>
@@ -109,9 +124,10 @@ export function TeamHalfPill({
           )}
           {showOutcomeTreatment && (
             <span
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-6xl"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center whitespace-nowrap"
               style={{
                 fontFamily: "var(--font-display)",
+                fontSize: outcomeFontPx,
                 color: outcomeColor,
                 transform: "rotate(-12deg)",
                 textShadow:
@@ -126,9 +142,10 @@ export function TeamHalfPill({
           )}
           {showLockTreatment && (
             <span
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-3xl whitespace-nowrap"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center whitespace-nowrap"
               style={{
                 fontFamily: "var(--font-display)",
+                fontSize: lockFontPx,
                 color: LOCK_COLOR,
                 transform: "rotate(-12deg)",
                 textShadow:

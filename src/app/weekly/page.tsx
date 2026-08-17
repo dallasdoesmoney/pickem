@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
-import { GameCard } from "@/components/GameCard";
+import { GameCard, COMPACT_SCALE, PILL_WIDTH } from "@/components/GameCard";
 import { usePicks } from "@/hooks/usePicks";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -428,8 +428,8 @@ export default function Home() {
       return (
         <div key={item.key} className="h-full flex items-end justify-center pb-2">
           <h2
-            className="text-center whitespace-nowrap px-2 text-4xl"
-            style={{ fontFamily: "var(--font-display)" }}
+            className="text-center whitespace-nowrap px-2"
+            style={{ fontFamily: "var(--font-display)", fontSize: 36 * 0.85 }}
           >
             {item.label}
           </h2>
@@ -448,6 +448,7 @@ export default function Home() {
         isLockPick={lockedGameId === item.game.id}
         hasLock={lockedGameId !== null}
         onToggleLock={() => toggleLock(item.game.id)}
+        compact
       />
     );
   };
@@ -499,7 +500,16 @@ export default function Home() {
             <div className="flex flex-col lg:hidden">
               {items.map((item, i) => renderMobileItem(item, i === 0))}
             </div>
-            <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:gap-y-4 lg:items-stretch">
+            {/* Explicit track width (not lg:grid-cols-2's 1fr 1fr) - a 1fr
+                column doesn't shrink just because the card inside it does,
+                it just leaves dead space, which would visually read as a
+                far bigger gap between columns than the real gap-x-8. Track
+                width matches GameCard's own compact width exactly so the
+                column hugs the (now smaller) card again. */}
+            <div
+              className="hidden lg:grid lg:gap-x-8 lg:gap-y-4 lg:items-stretch lg:justify-center"
+              style={{ gridTemplateColumns: `repeat(2, ${PILL_WIDTH * COMPACT_SCALE}px)` }}
+            >
               {Array.from({ length: rowCount }).flatMap((_, i) => [
                 renderGridCell(col1[i]),
                 renderGridCell(col2[i]),

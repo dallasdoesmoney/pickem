@@ -5,7 +5,7 @@ import Link from "next/link";
 import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { WIN_TOTALS } from "@/data/winTotals";
 import { isSuspiciousPick } from "@/data/powerRankings";
-import { SeasonGameCard, SeasonByeCard } from "@/components/SeasonGameCard";
+import { SeasonGameCard, SeasonByeCard, SEASON_PILL_WIDTH, COMPACT_SCALE } from "@/components/SeasonGameCard";
 import { darkenColor } from "@/components/TeamHalfPill";
 import { TeamSwitcher } from "@/components/TeamSwitcher";
 import { getTeamSchedule } from "@/lib/teamSchedule";
@@ -275,11 +275,21 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               <SeasonRow key={row.week} row={row} trackedTeam={trackedTeam} picks={picks} setPick={setPick} />
             ))}
           </div>
-          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
+          {/* Explicit track width (not lg:grid-cols-2's 1fr 1fr) - same fix
+              as weekly/page.tsx's desktop grid. A 1fr column doesn't shrink
+              just because the (now-compact) cards inside it do; it stays
+              sized to the container and just re-centers the smaller column
+              content within it, which reads as a much bigger gap between
+              columns than gap-x-8. Track width matches SeasonGameCard's own
+              compact width exactly so the column hugs the smaller cards. */}
+          <div
+            className="hidden lg:grid lg:gap-x-8 lg:items-start lg:justify-center"
+            style={{ gridTemplateColumns: `repeat(2, ${SEASON_PILL_WIDTH * COMPACT_SCALE}px)` }}
+          >
             {[scheduleCol1, scheduleCol2].map((col, i) => (
               <div key={i} className="flex flex-col gap-4">
                 {col.map((row) => (
-                  <SeasonRow key={row.week} row={row} trackedTeam={trackedTeam} picks={picks} setPick={setPick} />
+                  <SeasonRow key={row.week} row={row} trackedTeam={trackedTeam} picks={picks} setPick={setPick} compact />
                 ))}
               </div>
             ))}
@@ -484,14 +494,18 @@ function SeasonRow({
   trackedTeam,
   picks,
   setPick,
+  compact = false,
 }: {
   row: ReturnType<typeof getTeamSchedule>[number];
   trackedTeam: TeamAbbr;
   picks: Record<number, TeamAbbr>;
   setPick: (week: number, winner: TeamAbbr) => void;
+  // Shrinks the whole row 15% - desktop's 2-column grid only, mirroring
+  // weekly/page.tsx's compact mode.
+  compact?: boolean;
 }) {
   return "bye" in row ? (
-    <SeasonByeCard team={trackedTeam} week={row.week} />
+    <SeasonByeCard team={trackedTeam} week={row.week} compact={compact} />
   ) : (
     <SeasonGameCard
       away={row.away}
@@ -500,6 +514,7 @@ function SeasonRow({
       week={row.week}
       picked={picks[row.week]}
       onPick={(winner) => setPick(row.week, winner)}
+      compact={compact}
     />
   );
 }

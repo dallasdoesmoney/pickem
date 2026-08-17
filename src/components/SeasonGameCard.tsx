@@ -2,7 +2,10 @@
 
 import { TeamAbbr, TEAMS } from "@/data/teams";
 import { FOOTER_HEIGHT, LOGO_AREA_HEIGHT, PILL_HEIGHT, PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
+import { COMPACT_SCALE } from "@/components/GameCard";
 import { isSuspiciousPick } from "@/data/powerRankings";
+
+export { COMPACT_SCALE } from "@/components/GameCard";
 
 // Pre-season prediction mode: sized and styled identically to the weekly
 // GameCard pill (shares TeamHalfPill, so they can't drift apart). The only
@@ -46,6 +49,7 @@ export function SeasonGameCard({
   week,
   picked,
   onPick,
+  compact = false,
 }: {
   away: TeamAbbr;
   home: TeamAbbr;
@@ -53,10 +57,14 @@ export function SeasonGameCard({
   week: number;
   picked?: TeamAbbr;
   onPick: (team: TeamAbbr) => void;
+  // Shrinks the whole card 15% - desktop's 2-column grid only, mirroring
+  // GameCard's own compact mode so the two pages scale identically.
+  compact?: boolean;
 }) {
   const awayTeam = TEAMS[away];
   const homeTeam = TEAMS[home];
   const hasPick = !!picked;
+  const scale = compact ? COMPACT_SCALE : 1;
 
   function outcomeFor(team: TeamAbbr): "win" | "loss" | null {
     if (!hasPick || team !== trackedTeam) return null;
@@ -79,7 +87,7 @@ export function SeasonGameCard({
     // safe now that the sticky header (NavShell) sits at z-50, above
     // every in-card z-index (badge z-40, border z-30, label z-20) - see
     // NavShell.tsx for the other half of this.
-    <div className="relative flex items-center mx-auto shrink-0" style={{ width: SEASON_PILL_WIDTH }}>
+    <div className="relative flex items-center mx-auto shrink-0" style={{ width: SEASON_PILL_WIDTH * scale }}>
       <TeamHalfPill
         team={awayTeam}
         side="left"
@@ -87,6 +95,7 @@ export function SeasonGameCard({
         isFaded={isFadedFor(away)}
         onClick={() => onPick(away)}
         badge={suspicious && picked === away ? <SuspiciousBadge side="left" /> : undefined}
+        scale={scale}
       />
       <TeamHalfPill
         team={homeTeam}
@@ -95,10 +104,11 @@ export function SeasonGameCard({
         isFaded={isFadedFor(home)}
         onClick={() => onPick(home)}
         badge={suspicious && picked === home ? <SuspiciousBadge side="right" /> : undefined}
+        scale={scale}
       />
       <span
-        className={`pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center text-xs tracking-wide z-20 ${hasPick ? "text-white/50" : "text-white"}`}
-        style={{ height: FOOTER_HEIGHT, fontFamily: "var(--font-display)" }}
+        className={`pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center tracking-wide z-20 ${hasPick ? "text-white/50" : "text-white"}`}
+        style={{ height: FOOTER_HEIGHT * scale, fontSize: 12 * scale, fontFamily: "var(--font-display)" }}
       >
         WEEK {week}
       </span>
@@ -109,22 +119,23 @@ export function SeasonGameCard({
 // Matches SeasonGameCard's footprint exactly so a bye week doesn't disrupt
 // the rhythm of the list - same width/height, just a single muted pill
 // instead of a pickable pair.
-export function SeasonByeCard({ team, week }: { team: TeamAbbr; week: number }) {
+export function SeasonByeCard({ team, week, compact = false }: { team: TeamAbbr; week: number; compact?: boolean }) {
   const t = TEAMS[team];
+  const scale = compact ? COMPACT_SCALE : 1;
   return (
     <div
       className="relative mx-auto shrink-0 rounded-full border-2 border-white/15 bg-white/[0.03] overflow-hidden"
-      style={{ width: SEASON_PILL_WIDTH, height: SEASON_PILL_HEIGHT }}
+      style={{ width: SEASON_PILL_WIDTH * scale, height: SEASON_PILL_HEIGHT * scale }}
     >
-      <div className="absolute inset-x-0 top-0 flex items-center justify-center" style={{ height: LOGO_AREA_HEIGHT }}>
-        <img src={t.logo} alt="" className="h-14 w-auto mr-4" crossOrigin="anonymous" />
-        <span className="text-white text-2xl tracking-[0.2em]" style={{ fontFamily: "var(--font-display)" }}>
+      <div className="absolute inset-x-0 top-0 flex items-center justify-center" style={{ height: LOGO_AREA_HEIGHT * scale }}>
+        <img src={t.logo} alt="" className="w-auto" style={{ height: 56 * scale, marginRight: 16 * scale }} crossOrigin="anonymous" />
+        <span className="text-white tracking-[0.2em]" style={{ fontSize: 24 * scale, fontFamily: "var(--font-display)" }}>
           BYE WEEK
         </span>
       </div>
       <div
-        className="absolute inset-x-0 bottom-0 flex items-center justify-center text-white/50 text-xs tracking-wide"
-        style={{ height: FOOTER_HEIGHT, fontFamily: "var(--font-display)" }}
+        className="absolute inset-x-0 bottom-0 flex items-center justify-center text-white/50 tracking-wide"
+        style={{ height: FOOTER_HEIGHT * scale, fontSize: 12 * scale, fontFamily: "var(--font-display)" }}
       >
         WEEK {week}
       </div>
