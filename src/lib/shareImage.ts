@@ -40,7 +40,15 @@ function drawStatPill(
   // Boldest Pick moved into a narrower pill than it used to have (the old
   // Chalk slot), which left its logo+text value crowding the corner badge
   // - narrower pills pass a smaller logo so there's room for both.
-  logoH = 66
+  logoH = 66,
+  // Boldest Pick's "+N.N" reads oversized next to its now-smaller logo,
+  // compared to how Underdogs/Lock look - lets that one pill turn it down
+  // without affecting the other two.
+  valueFontPx = 32,
+  // Lock of the Week's badge - see badgeIcon draw below, this pill leans
+  // into being an oversized "pin" instead of trying to tuck neatly into
+  // the corner.
+  badgeSize = 46
 ) {
   roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
   ctx.strokeStyle = borderColor;
@@ -49,7 +57,7 @@ function drawStatPill(
 
   ctx.textAlign = "center";
   ctx.fillStyle = valueColor;
-  ctx.font = `32px ${displayFont}`;
+  ctx.font = `${valueFontPx}px ${displayFont}`;
   const valueY = y + h * 0.42;
 
   if (logo && value) {
@@ -75,15 +83,10 @@ function drawStatPill(
   if (badgeIcon) {
     // Capped by whichever dimension is larger (all three current badge
     // icons are taller than wide, so this caps height today, but stays
-    // correct if a future icon is landscape instead) - shrunk from the
-    // original 54 and nudged further toward the outside corner (translate
-    // x+6,y-4 instead of x+10,y+2) so it has less reach into the pill's
-    // interior, where Boldest Pick's logo+value now sits closer to the
-    // edge than it used to in its old, wider slot.
-    const target = 46;
+    // correct if a future icon is landscape instead).
     const aspect = badgeIcon.naturalWidth / badgeIcon.naturalHeight;
-    const badgeW = aspect >= 1 ? target : target * aspect;
-    const badgeH = aspect >= 1 ? target / aspect : target;
+    const badgeW = aspect >= 1 ? badgeSize : badgeSize * aspect;
+    const badgeH = aspect >= 1 ? badgeSize / aspect : badgeSize;
     ctx.save();
     ctx.translate(x + 6, y - 4);
     ctx.rotate((-18 * Math.PI) / 180);
@@ -418,16 +421,33 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     // Matches the live StatPills order: Lock of the Week took over the
     // prominent center slot (it's the more important tag), Boldest Pick
     // moved into the slot Chalk used to occupy, Chalk was removed.
-    const pillDefs: Array<{ w: number; borderColor: string; valueColor: string; value: string; label: string; logo?: HTMLImageElement | null; badgeIcon?: HTMLImageElement | null; logoH?: number }> = [
+    const pillDefs: Array<{
+      w: number;
+      borderColor: string;
+      valueColor: string;
+      value: string;
+      label: string;
+      logo?: HTMLImageElement | null;
+      badgeIcon?: HTMLImageElement | null;
+      logoH?: number;
+      valueFontPx?: number;
+      badgeSize?: number;
+    }> = [
       { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeIcon: underdogIcon },
       {
         w: 250,
-        borderColor: "#4ade80",
-        valueColor: "#4ade80",
+        // Gold, matching the live matchup pill's own lock treatment,
+        // instead of the green every other "good" stat here uses.
+        borderColor: "#f59e0b",
+        valueColor: "#f59e0b",
         value: lockedTeam ? "" : "-",
         label: "LOCK OF THE WEEK",
         logo: lockedTeam ? logos.get(lockedTeam.logo) : undefined,
         badgeIcon: lockIcon,
+        // Bigger and left as a badge that sits astride the pill's corner
+        // on purpose - a "pin," not an attempt to tuck neatly inside it
+        // the way the other two badges do.
+        badgeSize: 68,
       },
       {
         w: 172,
@@ -441,13 +461,16 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         // center slot, now Lock's) - smaller logo keeps it clear of the
         // corner badge instead of crowding it.
         logoH: 48,
+        // The spread number read oversized next to that smaller logo,
+        // compared to how Underdogs/Lock look.
+        valueFontPx: 24,
       },
     ];
     const pillGap = 24;
     const totalPillsW = pillDefs.reduce((s, p) => s + p.w, 0) + pillGap * (pillDefs.length - 1);
     let pillX = WIDTH / 2 - totalPillsW / 2;
     for (const p of pillDefs) {
-      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeIcon, p.logoH);
+      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeIcon, p.logoH, p.valueFontPx, p.badgeSize);
       pillX += p.w + pillGap;
     }
   }
