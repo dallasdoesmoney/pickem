@@ -79,6 +79,15 @@ export function LevelLadder({ totalPoints }: { totalPoints?: number }) {
       {RANK_GROUPS.map((group, i) => {
         const rank = RANKS[i];
         const isCurrentRank = hasProgress && currentLevel! >= group[0].level && currentLevel! <= group[group.length - 1].level;
+        // cumulativePoints on a level is the threshold to ENTER it, not to
+        // clear it - using the last level's own cumulativePoints as this
+        // tier's upper bound left every level's own point span (entry
+        // threshold up to the next level's entry threshold) completely
+        // unaccounted for, which read as a gap between consecutive tiers.
+        // The real upper bound is one point short of the next tier's
+        // starting threshold - GOAT has no next tier, so it's open-ended.
+        const nextGroup = RANK_GROUPS[i + 1];
+        const upperBound = nextGroup ? nextGroup[0].cumulativePoints - 1 : null;
         return (
           <div key={rank.name} ref={isCurrentRank ? currentRankRef : undefined}>
             <div className="flex items-center gap-2.5 mb-2">
@@ -93,7 +102,9 @@ export function LevelLadder({ totalPoints }: { totalPoints?: number }) {
                   {rank.name}
                 </div>
                 <div className="text-[10px] text-white/35 tabular-nums">
-                  {group[0].cumulativePoints.toLocaleString()} – {group[group.length - 1].cumulativePoints.toLocaleString()} pts
+                  {upperBound !== null
+                    ? `${group[0].cumulativePoints.toLocaleString()} – ${upperBound.toLocaleString()} pts`
+                    : `${group[0].cumulativePoints.toLocaleString()}+ pts`}
                 </div>
               </div>
             </div>
