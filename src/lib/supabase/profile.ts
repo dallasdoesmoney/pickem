@@ -22,6 +22,20 @@ export async function updateAvatar(userId: string, avatarDataUrl: string) {
   if (error) throw error;
 }
 
+// A preset (currently: team logos) is just an existing public CDN URL -
+// no crop/upload step needed, unlike updateAvatar above.
+export async function setPresetAvatar(userId: string, avatarUrl: string): Promise<void> {
+  const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("id", userId);
+  if (error) throw error;
+}
+
+// Marks AvatarPromptGate as seen (kept/uploaded/preset-picked/skipped -
+// all four count as "done") so it never shows again for this account.
+export async function markAvatarPrompted(userId: string): Promise<void> {
+  const { error } = await supabase.from("profiles").update({ onboarding_avatar_prompted: true }).eq("id", userId);
+  if (error) throw error;
+}
+
 // Runs through a security-definer RPC (see supabase/schema.sql) rather
 // than a plain select, since the profiles_select_own RLS policy only
 // lets someone read their OWN row - checking whether a name is taken

@@ -16,6 +16,7 @@ export type Profile = {
   is_admin: boolean;
   migrated_local_picks: boolean;
   referred_by: string | null;
+  onboarding_avatar_prompted: boolean;
 };
 
 export type PendingReferrerSuggestion = { userId: string; label: string; avatarUrl: string | null };

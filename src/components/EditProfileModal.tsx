@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { type Profile } from "@/hooks/useAuth";
 import { useUsernameField } from "@/hooks/useUsernameField";
-import { updateAvatar, claimUsername, updateDisplayName } from "@/lib/supabase/profile";
+import { updateAvatar, setPresetAvatar, claimUsername, updateDisplayName } from "@/lib/supabase/profile";
 import { USERNAME_MIN, USERNAME_MAX } from "@/lib/usernamePolicy";
 import { validateDisplayName, DISPLAY_NAME_MAX } from "@/lib/displayNamePolicy";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
+import { TeamAvatarPicker } from "@/components/TeamAvatarPicker";
+import { Team } from "@/data/teams";
 import { errorMessage } from "@/lib/errorMessage";
 
 const AVATAR_SIZE = 200;
@@ -30,6 +32,7 @@ export function EditProfileModal({
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [presetOpen, setPresetOpen] = useState(false);
 
   const { username, setUsername, status } = useUsernameField(authProfile?.username);
   const [initializedUsername, setInitializedUsername] = useState(false);
@@ -97,6 +100,21 @@ export function EditProfileModal({
     }
   }
 
+  async function handleSelectPreset(team: Team) {
+    setUploading(true);
+    setAvatarError(null);
+    try {
+      await setPresetAvatar(userId, team.logo);
+      await onProfileChange();
+      setPresetOpen(false);
+    } catch (err) {
+      console.error("Preset avatar save failed", err);
+      setAvatarError(`Couldn't save that: ${errorMessage(err)}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function handleSaveUsername() {
     if (status !== "available" || savingUsername) return;
     setSavingUsername(true);
@@ -153,10 +171,21 @@ export function EditProfileModal({
               )}
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-            <button onClick={() => fileInputRef.current?.click()} className="text-xs text-white/50 hover:text-white">
-              {authProfile?.avatar_url ? "Change photo" : "Add photo"}
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button onClick={() => fileInputRef.current?.click()} className="text-xs text-white/50 hover:text-white">
+                {authProfile?.avatar_url ? "Change photo" : "Add photo"}
+              </button>
+              <span className="text-white/20 text-xs">&middot;</span>
+              <button onClick={() => setPresetOpen((v) => !v)} className="text-xs text-white/50 hover:text-white">
+                Choose team logo
+              </button>
+            </div>
             {avatarError && <p className="text-xs text-red-400 text-center max-w-xs">{avatarError}</p>}
+            {presetOpen && (
+              <div className="w-full pt-1">
+                <TeamAvatarPicker onSelect={handleSelectPreset} selectedLogo={authProfile?.avatar_url} />
+              </div>
+            )}
           </div>
 
           <div className="w-full flex flex-col gap-2">
