@@ -47,6 +47,23 @@ function TeamIcon({ className, style }: { className?: string; style?: React.CSSP
   );
 }
 
+// A burst of thin fading lines suggesting motion - used behind each hub
+// card's header so Weekly and Team Pick'em read as two distinct,
+// unmistakable modes instead of two rows of the same navy card.
+function SpeedLines({ color }: { color: string }) {
+  return (
+    <>
+      {Array.from({ length: 6 }, (_, i) => (
+        <div
+          key={i}
+          className="absolute w-[2px] h-[220px]"
+          style={{ left: -40 + i * 14, bottom: -40, background: color, opacity: 0.22 - i * 0.03, transform: "rotate(28deg)" }}
+        />
+      ))}
+    </>
+  );
+}
+
 function Avatar({ url, label, size }: { url: string | null | undefined; label: string; size: number }) {
   const dim = { height: size, width: size, fontSize: size * 0.4 };
   return url ? (
@@ -170,103 +187,111 @@ export default function HomePage() {
 
       <Link
         href="/weekly"
-        className="group relative flex flex-col gap-3 rounded-[22px] border border-white/10 bg-[#1b2947] hover:bg-[#212f52] transition-colors p-4"
+        className="group relative flex flex-col gap-3 rounded-[22px] overflow-hidden p-4 transition-all hover:brightness-110"
+        style={{ background: "linear-gradient(160deg, #16a34a, #0e2818)" }}
       >
-        <ChevronIcon className="absolute top-[18px] right-4 h-[18px] w-[18px] text-white/35 group-hover:text-white/55 transition-colors" />
-        <div className="flex items-center gap-2.5 pr-6">
-          <span className="h-[38px] w-[38px] shrink-0 rounded-xl flex items-center justify-center" style={{ background: "rgba(74,222,128,0.15)" }}>
-            <WeeklyIcon className="h-[19px] w-[19px]" style={{ color: "#4ade80" }} />
+        <SpeedLines color="#bbf7d0" />
+        <ChevronIcon className="absolute z-10 top-[18px] right-4 h-[18px] w-[18px] text-white/70 group-hover:text-white transition-colors" />
+        <div className="relative z-10 flex items-center gap-2.5 pr-6">
+          <span className="h-[38px] w-[38px] shrink-0 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,0,0,0.28)" }}>
+            <WeeklyIcon className="h-[19px] w-[19px]" style={{ color: "#fff" }} />
           </span>
           <div>
-            <div className="text-[17px]" style={{ fontFamily: "var(--font-display)" }}>
+            <div className="text-[23px] text-white" style={{ fontFamily: "var(--font-display)" }}>
               Weekly Pick&rsquo;em
             </div>
-            <div className="text-[10.5px] text-white/55 mt-0.5">Make your Week {activeWeek} picks</div>
+            <div className="text-[10.5px] text-white/80 mt-0.5">Make your Week {activeWeek} picks</div>
           </div>
         </div>
 
-        {user ? (
-          <div className="flex items-center gap-2.5">
-            <Avatar url={profile?.avatar_url} label={label} size={34} />
-            <div className="min-w-0">
-              <div className="text-xs font-bold truncate">{label}</div>
-              {rankInfo ? (
-                <div className="text-[9.5px] text-amber-400 truncate">
-                  {rankInfo.rankEmoji} {rankInfo.rankName} &middot; Lvl {rankInfo.level}
-                </div>
-              ) : (
-                <div className="text-[9.5px] text-white/40">Loading&hellip;</div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2.5">
-            <span className="h-[34px] w-[34px] shrink-0 rounded-full border border-dashed border-white/25 bg-white/5 flex items-center justify-center text-[11px] text-white/40">
-              ?
-            </span>
-            <div className="text-xs font-bold text-white/70">Your Profile</div>
-          </div>
-        )}
-
-        <div className="flex rounded-full border border-white/10 bg-[#16233f] p-[7px]">
-          <StatSegment value={seasonRecordValue} label="SEASON" color="#c084fc" />
-          <div className="w-px self-stretch bg-white/10" />
-          <StatSegment value={weeklyRecordValue} label={`WEEK ${activeWeek}`} color="#4ade80" />
-          <div className="w-px self-stretch bg-white/10" />
-          <StatSegment value={rankValue} label="RANK" color="#f59e0b" />
-        </div>
-
-        <div>
-          <div className="text-[8.5px] tracking-[0.12em] text-white/35 mb-0.5">SEASON LEADERBOARD PREVIEW</div>
-          {!rows ? (
-            <div className="flex justify-center py-3">
-              <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+        <div className="relative z-10 flex flex-col gap-3 rounded-2xl p-2.5" style={{ background: "rgba(6,18,31,0.55)" }}>
+          {user ? (
+            <div className="flex items-center gap-2.5">
+              <Avatar url={profile?.avatar_url} label={label} size={34} />
+              <div className="min-w-0">
+                <div className="text-xs font-bold truncate">{label}</div>
+                {rankInfo ? (
+                  <div className="text-[9.5px] text-amber-400 truncate">
+                    {rankInfo.rankEmoji} {rankInfo.rankName} &middot; Lvl {rankInfo.level}
+                  </div>
+                ) : (
+                  <div className="text-[9.5px] text-white/40">Loading&hellip;</div>
+                )}
+              </div>
             </div>
           ) : (
-            <>
-              {topRows.map((row, i) => (
-                <MiniLeaderboardRow key={row.user_id} row={row} position={i + 1} isMe={row.user_id === user?.id} />
-              ))}
-              {showMyRowSeparately && myRow && <MiniLeaderboardRow row={myRow} position={myIndex + 1} isMe />}
-            </>
+            <div className="flex items-center gap-2.5">
+              <span className="h-[34px] w-[34px] shrink-0 rounded-full border border-dashed border-white/25 bg-white/5 flex items-center justify-center text-[11px] text-white/40">
+                ?
+              </span>
+              <div className="text-xs font-bold text-white/70">Your Profile</div>
+            </div>
           )}
+
+          <div className="flex rounded-full border border-white/10 bg-black/20 p-[7px]">
+            <StatSegment value={seasonRecordValue} label="SEASON" color="#c084fc" />
+            <div className="w-px self-stretch bg-white/10" />
+            <StatSegment value={weeklyRecordValue} label={`WEEK ${activeWeek}`} color="#4ade80" />
+            <div className="w-px self-stretch bg-white/10" />
+            <StatSegment value={rankValue} label="RANK" color="#f59e0b" />
+          </div>
+
+          <div>
+            <div className="text-[8.5px] tracking-[0.12em] text-white/35 mb-0.5">SEASON LEADERBOARD PREVIEW</div>
+            {!rows ? (
+              <div className="flex justify-center py-3">
+                <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              </div>
+            ) : (
+              <>
+                {topRows.map((row, i) => (
+                  <MiniLeaderboardRow key={row.user_id} row={row} position={i + 1} isMe={row.user_id === user?.id} />
+                ))}
+                {showMyRowSeparately && myRow && <MiniLeaderboardRow row={myRow} position={myIndex + 1} isMe />}
+              </>
+            )}
+          </div>
         </div>
       </Link>
 
       <Link
         href="/predictor"
-        className="group relative flex flex-col gap-3 rounded-[22px] border border-white/10 bg-[#1b2947] hover:bg-[#212f52] transition-colors p-4"
+        className="group relative flex flex-col gap-3 rounded-[22px] overflow-hidden p-4 transition-all hover:brightness-110"
+        style={{ background: "linear-gradient(160deg, #0ea5e9, #0b2a3d)" }}
       >
-        <ChevronIcon className="absolute top-[18px] right-4 h-[18px] w-[18px] text-white/35 group-hover:text-white/55 transition-colors" />
-        <div className="flex items-center gap-2.5 pr-6">
-          <span className="h-[38px] w-[38px] shrink-0 rounded-xl flex items-center justify-center" style={{ background: "rgba(56,189,248,0.15)" }}>
-            <TeamIcon className="h-[19px] w-[19px]" style={{ color: "#38bdf8" }} />
+        <SpeedLines color="#bae6fd" />
+        <ChevronIcon className="absolute z-10 top-[18px] right-4 h-[18px] w-[18px] text-white/70 group-hover:text-white transition-colors" />
+        <div className="relative z-10 flex items-center gap-2.5 pr-6">
+          <span className="h-[38px] w-[38px] shrink-0 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,0,0,0.28)" }}>
+            <TeamIcon className="h-[19px] w-[19px]" style={{ color: "#fff" }} />
           </span>
           <div>
-            <div className="text-[17px]" style={{ fontFamily: "var(--font-display)" }}>
+            <div className="text-[23px] text-white" style={{ fontFamily: "var(--font-display)" }}>
               Team Pick&rsquo;em
             </div>
-            <div className="text-[10.5px] text-white/55 mt-0.5">Predict a team&rsquo;s 2026 season</div>
+            <div className="text-[10.5px] text-white/80 mt-0.5">Predict a team&rsquo;s 2026 season</div>
           </div>
         </div>
 
-        <div className="relative h-[140px] overflow-hidden rounded-xl bg-[#16233f]">
-          {MARQUEE_ROWS.map((teams, i) => (
-            <div key={i} className="absolute -left-5 -right-5 flex gap-2" style={{ top: 8 + i * 48, transform: "skewY(-6deg)" }}>
-              {teams.map((team) => (
-                <span
-                  key={team.abbr}
-                  className="h-10 w-10 shrink-0 rounded-[10px] flex items-center justify-center overflow-hidden"
-                  style={{ background: team.color }}
-                >
-                  <img src={team.logo} alt="" crossOrigin="anonymous" className="h-6 w-6 object-contain" />
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="text-center text-[10px] text-white/55 tracking-wide">
-          <span className="text-white font-semibold">32 teams</span> &middot; pick one, predict the season
+        <div className="relative z-10 rounded-2xl p-2.5" style={{ background: "rgba(6,18,31,0.55)" }}>
+          <div className="relative h-[140px] overflow-hidden rounded-xl bg-black/20">
+            {MARQUEE_ROWS.map((teams, i) => (
+              <div key={i} className="absolute -left-5 -right-5 flex gap-2" style={{ top: 8 + i * 48, transform: "skewY(-6deg)" }}>
+                {teams.map((team) => (
+                  <span
+                    key={team.abbr}
+                    className="h-10 w-10 shrink-0 rounded-[10px] flex items-center justify-center overflow-hidden"
+                    style={{ background: team.color }}
+                  >
+                    <img src={team.logo} alt="" crossOrigin="anonymous" className="h-6 w-6 object-contain" />
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="text-center text-[10px] text-white/70 tracking-wide mt-2">
+            <span className="text-white font-semibold">32 teams</span> &middot; pick one, predict the season
+          </div>
         </div>
       </Link>
     </main>
