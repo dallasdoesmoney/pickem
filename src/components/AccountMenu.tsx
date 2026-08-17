@@ -18,11 +18,13 @@ function AccountIcon({ className }: { className?: string }) {
   );
 }
 
-// Desktop-only account control in the header. Signed-out stays a plain
-// link to /account (same as before accounts existed); signed-in swaps to
-// an anchored dropdown (same portal pattern as PickemMenu/TeamSwitcher)
-// showing who's signed in plus a Sign Out action, so signing out doesn't
-// require a trip to the account page.
+// Account control in the header. Signed-out stays desktop-only (a plain
+// link to /account, same as before accounts existed - mobile already has
+// a "Profile" row in the hamburger drawer). Signed-in shows an anchored
+// dropdown (same portal pattern as PickemMenu/TeamSwitcher) on every
+// breakpoint - avatar only on mobile, avatar + name on desktop - so
+// signing out or jumping to the profile doesn't require opening the
+// hamburger menu first.
 export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { user, profile, signOut } = useAuth();
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
@@ -55,27 +57,30 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
   const initial = name.trim().charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="hidden lg:block relative">
+    <div className="relative">
       <button
         ref={buttonRef}
         type="button"
         aria-label="Account menu"
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
-        className="flex items-center gap-2 rounded-full pl-1 pr-3 py-1 text-sm text-white/80 hover:text-white hover:bg-white/5 transition-colors"
+        className="flex items-center gap-2 rounded-full lg:pl-1 lg:pr-3 py-1 text-sm text-white/80 hover:text-white hover:bg-white/5 transition-colors"
         style={{ fontFamily: "var(--font-display)" }}
       >
         <span className="relative shrink-0">
           {profile?.avatar_url ? (
-            <img src={profile.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover" />
+            <img src={profile.avatar_url} alt="" className="h-8 w-8 lg:h-7 lg:w-7 rounded-full object-cover" />
           ) : (
-            <span className="h-7 w-7 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{initial}</span>
+            <span className="h-8 w-8 lg:h-7 lg:w-7 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{initial}</span>
           )}
           {pendingCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-[#0e1b33]" />
           )}
         </span>
-        <span className="max-w-[120px] truncate">{name}</span>
+        {/* Name stays desktop-only - mobile's header is tight enough that
+            the avatar alone (tappable, same dropdown) is the whole point;
+            the hamburger drawer already spells the name out in full. */}
+        <span className="hidden lg:inline max-w-[120px] truncate">{name}</span>
       </button>
 
       {open &&
