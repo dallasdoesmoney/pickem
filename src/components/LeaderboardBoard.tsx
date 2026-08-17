@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useSignInModal } from "@/hooks/useSignInModal";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { fetchMyFriendIds } from "@/lib/supabase/friends";
 import { errorMessage } from "@/lib/errorMessage";
@@ -11,12 +12,51 @@ import { getLevelInfo } from "@/lib/levels";
 
 type BoardView = "global" | "friends";
 
+// Same "here's what you get" pitch shape as the sign-in modal's referral
+// preview (three benefit tiles under a headline) - shown in place of an
+// empty/inaccessible friends list rather than hiding the Friends tab
+// entirely, so tapping it is itself the pitch for creating a profile.
+function FriendsPreview({ onSignUp }: { onSignUp: () => void }) {
+  const tiles = [
+    { icon: "👥", label: "ADD FRIENDS", sub: "Find people you know" },
+    { icon: "📊", label: "COMPARE PICKS", sub: "See who's hotter" },
+    { icon: "🏆", label: "CLIMB TOGETHER", sub: "Track it all season" },
+  ];
+  return (
+    <div className="flex flex-col items-center text-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 px-6 py-8">
+      <span className="text-3xl mb-1">👥</span>
+      <p className="text-base text-white font-medium">Want to compare with friends?</p>
+      <p className="text-sm text-white/50 max-w-xs">Create a free profile to add friends and see how your picks stack up against theirs, every week.</p>
+      <div className="grid grid-cols-3 gap-2 w-full max-w-sm mt-4">
+        {tiles.map((t) => (
+          <div key={t.label} className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
+            <span className="text-base leading-none">{t.icon}</span>
+            <span className="text-[10px] font-semibold mt-0.5" style={{ fontFamily: "var(--font-display)" }}>
+              {t.label}
+            </span>
+            <span className="text-[8.5px] text-white/40">{t.sub}</span>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onSignUp}
+        className="mt-5 rounded-full px-6 py-2.5 text-sm active:scale-95 transition-transform duration-150"
+        style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
+      >
+        CREATE A PROFILE
+      </button>
+    </div>
+  );
+}
+
 // Global/friends leaderboard, self-contained (fetches its own data) so it
 // can drop into any page - the standalone /leaderboard page and the
 // weekly picks page's Leaderboard tab both render this exact component
 // rather than keeping two copies of the same list/toggle/modal in sync.
 export function LeaderboardBoard() {
   const { user } = useAuth();
+  const { requestSignIn, signInModal } = useSignInModal();
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [friendIds, setFriendIds] = useState<Set<string> | null>(null);
   const [view, setView] = useState<BoardView>("global");
@@ -45,6 +85,8 @@ export function LeaderboardBoard() {
     reloadFriends();
   }, [user, reloadFriends]);
 
+  const showFriendsPreview = !user && view === "friends";
+
   const visibleRows = useMemo(() => {
     if (!rows) return null;
     if (view === "global" || !user) return rows;
@@ -53,29 +95,29 @@ export function LeaderboardBoard() {
 
   return (
     <>
-      {user && (
-        <div className="flex justify-center mb-6">
-          <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1">
-            {(["global", "friends"] as BoardView[]).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                className={`rounded-full px-4 py-1.5 text-sm capitalize transition-colors ${
-                  view === v ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"
-                }`}
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
+      <div className="flex justify-center mb-6">
+        <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1">
+          {(["global", "friends"] as BoardView[]).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`rounded-full px-4 py-1.5 text-sm capitalize transition-colors ${
+                view === v ? "bg-white/15 text-white" : "text-white/50 hover:text-white/80"
+              }`}
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {v}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
       {error && <p className="text-sm text-red-400 text-center mb-4">{error}</p>}
 
-      {!visibleRows ? (
+      {showFriendsPreview ? (
+        <FriendsPreview onSignUp={() => requestSignIn()} />
+      ) : !visibleRows ? (
         <div className="flex justify-center py-10">
           <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
         </div>
@@ -136,6 +178,7 @@ export function LeaderboardBoard() {
       )}
 
       <PlayerProfileModal row={selected} myId={user?.id} onClose={() => setSelected(null)} onFriendshipChange={reloadFriends} />
+      {signInModal}
     </>
   );
 }
