@@ -43,8 +43,11 @@ export function useSignInModal() {
   const [submitting, setSubmitting] = useState(false);
   const [referrer, setReferrer] = useState<{ label: string; avatarUrl: string | null } | null>(null);
 
-  const requestSignIn = useCallback(() => {
-    setMode(getPendingReferralCode() ? "signup" : "signin");
+  // initialMode lets a caller force straight into "signup" (e.g. a "Sign
+  // Up Free" button shouldn't land on the sign-IN form) - defaults to the
+  // existing referral-code-aware behavior when omitted.
+  const requestSignIn = useCallback((initialMode?: "signin" | "signup") => {
+    setMode(initialMode ?? (getPendingReferralCode() ? "signup" : "signin"));
     setEmail("");
     setPassword("");
     setError(null);

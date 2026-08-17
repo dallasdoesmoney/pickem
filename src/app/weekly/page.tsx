@@ -342,8 +342,12 @@ export default function Home() {
   }, [user, loaded, pickedCount, games.length, activeWeek]);
 
   async function handleSavePromptSignUp() {
-    const signedIn = await requestSignIn();
+    // Close this popup before opening the real sign-in modal, not after -
+    // both are fixed/inset-0 overlays, so leaving this one mounted while
+    // the sign-in modal is also open stacked two overlays on top of each
+    // other (the reported "have to exit out" bug).
     setShowSavePrompt(false);
+    const signedIn = await requestSignIn("signup");
     if (!signedIn) return;
     const { data } = await supabase.auth.getSession();
     const userId = data.session?.user.id;
@@ -754,7 +758,11 @@ export default function Home() {
       {showSavePrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowSavePrompt(false)} />
-          <div className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1730] p-6 shadow-2xl shadow-black/50 text-center">
+          {/* Same chrome and "why sign up" tile grid as the sign-in modal's
+              own referral pitch (useSignInModal.tsx) - this is the same
+              sell, just triggered by picks progress instead of a referral
+              link. */}
+          <div className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1730] p-6 shadow-2xl shadow-black/50">
             <button
               type="button"
               aria-label="Close"
@@ -766,13 +774,40 @@ export default function Home() {
                 <path d="M18 6L6 18" />
               </svg>
             </button>
-            <div className="text-3xl mb-2">🏈</div>
+
             <h2 className="text-white text-lg" style={{ fontFamily: "var(--font-display)" }}>
               WANT TO SAVE THESE PICKS?
             </h2>
-            <p className="text-white/55 text-sm mt-2 mb-5">
-              You&rsquo;re halfway through Week {activeWeek} &mdash; sign up free to save your picks and start tracking your record.
-            </p>
+            <p className="text-white/50 text-sm mt-1 mb-4">You&rsquo;re halfway through Week {activeWeek} &mdash; sign up free to lock them in.</p>
+
+            <div className="flex flex-col items-center gap-1.5 text-center mb-4">
+              <span
+                className="h-12 w-12 rounded-full flex items-center justify-center text-xl"
+                style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
+              >
+                🏈
+              </span>
+              <span className="text-xs text-white/70">Create a free profile to keep them</span>
+
+              <div className="grid grid-cols-3 gap-2 w-full mt-2.5">
+                <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
+                  <span className="text-base leading-none">💾</span>
+                  <span className="text-[10px] font-semibold mt-0.5">SAVE PICKS</span>
+                  <span className="text-[8.5px] text-white/40">Any device</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
+                  <span className="text-base leading-none">🏆</span>
+                  <span className="text-[10px] font-semibold mt-0.5">TRACK RECORD</span>
+                  <span className="text-[8.5px] text-white/40">Every week</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
+                  <span className="text-base leading-none">👥</span>
+                  <span className="text-[10px] font-semibold mt-0.5">COMPARE</span>
+                  <span className="text-[8.5px] text-white/40">With friends</span>
+                </div>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={handleSavePromptSignUp}
