@@ -10,6 +10,7 @@ import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
+import { MyReferralsModal } from "@/components/MyReferralsModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 
@@ -58,6 +59,7 @@ function SignedInAccount({
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [progressModalTab, setProgressModalTab] = useState<"levels" | "achievements">("levels");
   const [editOpen, setEditOpen] = useState(false);
+  const [referralsOpen, setReferralsOpen] = useState(false);
 
   const label = authProfile?.display_name || authProfile?.username || "Your Profile";
 
@@ -149,6 +151,26 @@ function SignedInAccount({
         </div>
       )}
 
+      {/* Gated on being signed in only, not myRecord (which requires a
+          username via the leaderboard view) - fetch_my_referrals() has no
+          such dependency, so this should show up even before someone's
+          set a username. */}
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => setReferralsOpen(true)}
+          className="w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors"
+        >
+          <span className="text-2xl shrink-0">🔗</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+              MY REFERRALS
+            </div>
+            <div className="text-[11px] text-white/45 mt-0.5">See who joined with your invite link &rarr;</div>
+          </div>
+        </button>
+      </div>
+
       {myRecord?.username && (
         <div className="text-center mt-6">
           <Link href={`/leaderboard/${myRecord.username}`} className="text-xs text-white/40 hover:text-white/70 transition-colors">
@@ -181,6 +203,7 @@ function SignedInAccount({
         totalPoints={myRecord?.total_points}
         onClose={() => setProgressModalOpen(false)}
       />
+      <MyReferralsModal open={referralsOpen} onClose={() => setReferralsOpen(false)} />
     </main>
   );
 }

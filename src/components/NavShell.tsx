@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { PickemMenu } from "@/components/PickemMenu";
 import { AccountMenu } from "@/components/AccountMenu";
 import { ReferralBanner } from "@/components/ReferralBanner";
+import { NotificationToasts } from "@/components/NotificationToasts";
+import { ReferrerSuggestionCard } from "@/components/ReferrerSuggestionCard";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchPendingRequestCount } from "@/lib/supabase/friends";
 
@@ -250,6 +252,8 @@ export function NavShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <ReferralBanner />
+        <ReferrerSuggestionCard />
+        <NotificationToasts />
         {children}
       </div>
     </div>

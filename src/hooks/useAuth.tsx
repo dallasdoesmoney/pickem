@@ -5,6 +5,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import { migrateLocalDataToAccount } from "@/lib/supabase/migration";
 import { claimReferral } from "@/lib/supabase/referrals";
+import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
 import { PENDING_REFERRAL_KEY } from "@/lib/referralStorage";
 
 export type Profile = {
@@ -17,6 +18,8 @@ export type Profile = {
   referred_by: string | null;
 };
 
+export type PendingReferrerSuggestion = { userId: string; label: string; avatarUrl: string | null };
+
 type AuthContextValue = {
   user: User | null;
   profile: Profile | null;
@@ -26,6 +29,8 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  pendingReferrerSuggestion: PendingReferrerSuggestion | null;
+  clearPendingReferrerSuggestion: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -46,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // to the same signed-in user) before the flag flip round-trips.
   const migratingRef = useRef(false);
   const claimingReferralRef = useRef(false);
+  const [pendingReferrerSuggestion, setPendingReferrerSuggestion] = useState<PendingReferrerSuggestion | null>(null);
 
   // Captured on first load (not just the signup page - a shared link can
   // land anywhere) and kept until claimed, so someone who clicks an invite
@@ -88,6 +94,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await claimReferral(pendingCode);
           localStorage.removeItem(PENDING_REFERRAL_KEY);
           setProfile((prev) => (prev ? { ...prev, referred_by: "claimed" } : prev));
+          // Best-effort - if the referrer lookup fails, we just skip the
+          // suggestion prompt rather than blocking the claim itself,
+          // which has already succeeded by this point.
+          fetchLeaderboardEntry(pendingCode)
+            .then((row) => {
+              if (row) setPendingReferrerSuggestion({ userId: row.user_id, label: row.display_name || row.username, avatarUrl: row.avatar_url });
+            })
+            .catch(() => {});
         } catch (err) {
           console.error("Referral claim failed", err);
         } finally {
@@ -130,8 +144,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(await fetchProfile(user.id));
   }, [user]);
 
+  const clearPendingReferrerSuggestion = useCallback(() => setPendingReferrerSuggestion(null), []);
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signInWithPassword, signUpWithPassword, signInWithGoogle, signOut, refreshProfile }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        loading,
+        signInWithPassword,
+        signUpWithPassword,
+        signInWithGoogle,
+        signOut,
+        refreshProfile,
+        pendingReferrerSuggestion,
+        clearPendingReferrerSuggestion,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
