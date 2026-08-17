@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import { type Profile } from "@/hooks/useAuth";
 import { useUsernameField } from "@/hooks/useUsernameField";
 import { updateAvatar, setPresetAvatar, claimUsername, updateDisplayName } from "@/lib/supabase/profile";
@@ -73,6 +74,7 @@ export function EditProfileModal({
       return;
     }
     setDisplayNameSaved(true);
+    posthog.capture("profile_display_name_updated");
     setTimeout(() => setDisplayNameSaved(false), 2000);
     await onProfileChange();
   }
@@ -90,6 +92,7 @@ export function EditProfileModal({
     setUploading(true);
     try {
       await updateAvatar(userId, dataUrl);
+      posthog.capture("profile_avatar_updated", { avatar_source: "photo" });
       await onProfileChange();
     } catch (err) {
       console.error("Avatar upload failed", err);
@@ -105,6 +108,7 @@ export function EditProfileModal({
     setAvatarError(null);
     try {
       await setPresetAvatar(userId, team.logo);
+      posthog.capture("profile_avatar_updated", { avatar_source: "team_logo" });
       await onProfileChange();
       setPresetOpen(false);
     } catch (err) {
@@ -126,6 +130,7 @@ export function EditProfileModal({
       return;
     }
     setUsernameSaved(true);
+    posthog.capture("profile_username_claimed");
     setTimeout(() => setUsernameSaved(false), 2000);
     await onProfileChange();
   }

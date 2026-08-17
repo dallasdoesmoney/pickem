@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import posthog from "posthog-js";
 import {
   fetchFriendshipStatus,
   sendFriendRequest,
@@ -48,6 +49,7 @@ export function FriendButton({
       return;
     }
     reload();
+    posthog.capture("friend_request_sent");
     onChange?.();
   }
 
@@ -62,6 +64,7 @@ export function FriendButton({
       return;
     }
     reload();
+    posthog.capture("friend_request_accepted");
     onChange?.();
   }
 
@@ -76,6 +79,7 @@ export function FriendButton({
       return;
     }
     reload();
+    posthog.capture("friendship_removed", { previous_status: relationship.status });
     onChange?.();
   }
 

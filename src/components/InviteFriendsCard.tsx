@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import posthog from "posthog-js";
 import { AchievementDef } from "@/data/achievements";
 import { AchievementCard } from "@/components/AchievementCard";
 
@@ -15,6 +16,7 @@ export function InviteFriendsCard({ def, username, referralCount }: { def: Achie
   async function handleCopy() {
     if (!link) return;
     await navigator.clipboard.writeText(link);
+    posthog.capture("referral_link_copied");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -24,6 +26,7 @@ export function InviteFriendsCard({ def, username, referralCount }: { def: Achie
     if (navigator.share) {
       try {
         await navigator.share({ title: "Join me on Sideline Brew", text: "Come make some picks with me on Sideline Brew!", url: link });
+        posthog.capture("referral_link_shared", { share_method: "native_share" });
       } catch {
         // User canceled or share failed - nothing to recover, same as the picks share flow.
       }

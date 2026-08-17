@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import Link from "next/link";
 import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { WIN_TOTALS } from "@/data/winTotals";
@@ -61,6 +62,10 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       // with a session, so there's nothing more to do in this click.
       if (!userId) return;
       await saveSeasonPicks(userId, trackedTeam, picks);
+      posthog.capture("season_predictions_saved", {
+        team: trackedTeam,
+        picks_count: Object.keys(picks).length,
+      });
       syncOpponentSeasonPicks(userId, trackedTeam, picks, schedule).catch((err) => console.error("Opponent sync failed", err));
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err));
     } catch (err) {
@@ -157,6 +162,10 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
         link.download = filename;
         link.click();
         URL.revokeObjectURL(url);
+        posthog.capture("season_predictions_shared", {
+          team: trackedTeam,
+          share_method: "download",
+        });
       }
 
       const isTouchPrimary = window.matchMedia?.("(pointer: coarse)").matches ?? false;
@@ -168,6 +177,10 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             files: [file],
             title: "Record Predictor",
             text: `I think the ${team.name} will win ${wins} games!\n\n${buildReferralLink(profile?.username)}`,
+          });
+          posthog.capture("season_predictions_shared", {
+            team: trackedTeam,
+            share_method: "native_share",
           });
         } catch (shareErr) {
           if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();
@@ -442,7 +455,10 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             <button
               aria-label="Reset your predictions"
               onClick={async () => {
-                if (await confirm("Reset all your schedule predictions?")) resetPicks();
+                if (await confirm("Reset all your schedule predictions?")) {
+                  resetPicks();
+                  posthog.capture("season_predictions_reset", { team: trackedTeam });
+                }
               }}
               className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors mt-3"
               style={{ fontFamily: "var(--font-display)" }}

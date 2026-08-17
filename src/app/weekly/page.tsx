@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard, COMPACT_SCALE, PILL_WIDTH } from "@/components/GameCard";
 import { usePicks } from "@/hooks/usePicks";
@@ -384,6 +385,11 @@ export default function Home() {
       // with a session, so there's nothing more to do in this click.
       if (!userId) return;
       await saveWeeklyPicks(userId, activeWeek, picks, lockedGameId);
+      posthog.capture("weekly_picks_saved", {
+        week: activeWeek,
+        picks_count: Object.keys(picks).length,
+        has_lock_pick: lockedGameId !== null,
+      });
       syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
     } catch (err) {
       console.error("Save failed", err);
@@ -455,6 +461,11 @@ export default function Home() {
         link.download = filename;
         link.click();
         URL.revokeObjectURL(url);
+        posthog.capture("weekly_picks_shared", {
+          week: activeWeek,
+          includes_results: hasResults,
+          share_method: "download",
+        });
       }
 
       // Desktop Chrome (especially macOS) frequently advertises file
@@ -472,6 +483,11 @@ export default function Home() {
             files: [file],
             title: "NFL Pick'em",
             text: `${summary}\n\n${buildReferralLink(profile?.username)}`,
+          });
+          posthog.capture("weekly_picks_shared", {
+            week: activeWeek,
+            includes_results: hasResults,
+            share_method: "native_share",
           });
         } catch (shareErr) {
           if (!(shareErr instanceof Error && shareErr.name === "AbortError")) download();
@@ -731,7 +747,10 @@ export default function Home() {
                   <button
                     aria-label="Reset your picks"
                     onClick={async () => {
-                      if (await confirm("Reset all your picks for this week?")) resetPicks();
+                      if (await confirm("Reset all your picks for this week?")) {
+                        resetPicks();
+                        posthog.capture("weekly_picks_reset", { week: activeWeek });
+                      }
                     }}
                     className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors"
                     style={{ fontFamily: "var(--font-display)" }}

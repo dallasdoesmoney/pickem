@@ -2,10 +2,12 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import posthog from "posthog-js";
 import { supabase } from "@/lib/supabase/client";
 import { migrateLocalDataToAccount } from "@/lib/supabase/migration";
 import { claimReferral } from "@/lib/supabase/referrals";
 import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
+import { subscribeToNewsletter } from "@/lib/newsletter";
 import { PENDING_REFERRAL_KEY } from "@/lib/referralStorage";
 
 export type Profile = {
@@ -17,6 +19,7 @@ export type Profile = {
   migrated_local_picks: boolean;
   referred_by: string | null;
   onboarding_avatar_prompted: boolean;
+  newsletter_subscribed: boolean;
 };
 
 export type PendingReferrerSuggestion = { userId: string; label: string; avatarUrl: string | null };
@@ -51,7 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // initial getSession() and an immediate onAuthStateChange both resolving
   // to the same signed-in user) before the flag flip round-trips.
   const migratingRef = useRef(false);
+  const identifiedUserIdRef = useRef<string | null>(null);
   const claimingReferralRef = useRef(false);
+  const subscribingNewsletterRef = useRef(false);
   const [pendingReferrerSuggestion, setPendingReferrerSuggestion] = useState<PendingReferrerSuggestion | null>(null);
 
   // Captured on first load (not just the signup page - a shared link can
@@ -67,6 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(nextUser);
 
     if (!nextUser) {
+      if (identifiedUserIdRef.current) {
+        posthog.reset();
+        identifiedUserIdRef.current = null;
+      }
       setProfile(null);
       setLoading(false);
       return;
@@ -75,6 +84,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const nextProfile = await fetchProfile(nextUser.id);
     setProfile(nextProfile);
     setLoading(false);
+
+    if (identifiedUserIdRef.current !== nextUser.id) {
+      if (identifiedUserIdRef.current) posthog.reset();
+
+      posthog.identify(nextUser.id, {
+        email: nextUser.email,
+        username: nextProfile?.username,
+        display_name: nextProfile?.display_name,
+        is_admin: nextProfile?.is_admin,
+      });
+      identifiedUserIdRef.current = nextUser.id;
+    }
 
     if (nextProfile && !nextProfile.migrated_local_picks && !migratingRef.current) {
       migratingRef.current = true;
@@ -108,6 +129,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } finally {
           claimingReferralRef.current = false;
         }
+      }
+    }
+
+    // Left false on failure (missing Beehiiv config, network hiccup,
+    // etc.) so this naturally retries on the next session load rather
+    // than silently giving up - same "retry until it actually succeeds"
+    // approach as the referral claim above.
+    if (nextProfile && !nextProfile.newsletter_subscribed && !subscribingNewsletterRef.current) {
+      subscribingNewsletterRef.current = true;
+      try {
+        const { error } = await subscribeToNewsletter();
+        if (!error) {
+          await supabase.from("profiles").update({ newsletter_subscribed: true }).eq("id", nextUser.id);
+          setProfile((prev) => (prev ? { ...prev, newsletter_subscribed: true } : prev));
+        }
+      } finally {
+        subscribingNewsletterRef.current = false;
       }
     }
   }, []);
