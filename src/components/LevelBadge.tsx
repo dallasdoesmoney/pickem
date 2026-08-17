@@ -6,7 +6,7 @@ export function LevelBadge({ totalPoints, size = "sm" }: { totalPoints: number; 
   const info = getLevelInfo(totalPoints);
   if (info.isUnranked) return null;
 
-  const dims = size === "sm" ? "text-[11px] px-2 py-1 mt-0.5" : "text-sm px-2.5 py-1";
+  const dims = size === "sm" ? "text-[11px] px-2 py-1" : "text-sm px-2.5 py-1";
 
   return (
     <span

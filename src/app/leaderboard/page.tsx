@@ -123,13 +123,13 @@ export default function LeaderboardPage() {
                     {label.charAt(0).toUpperCase()}
                   </span>
                 )}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm truncate">
+                <span className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="text-sm truncate">
                     {label}
                     {isMe && <span className="text-white/40"> (you)</span>}
-                  </div>
+                  </span>
                   <LevelBadge totalPoints={row.total_points} />
-                </div>
+                </span>
                 <span className="text-sm shrink-0" style={{ fontFamily: "var(--font-display)" }}>
                   {row.correct}-{row.graded - row.correct}
                 </span>
