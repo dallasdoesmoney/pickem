@@ -57,7 +57,6 @@ function SignedInAccount({
   }, [userId]);
 
   const [progressModalOpen, setProgressModalOpen] = useState(false);
-  const [progressModalTab, setProgressModalTab] = useState<"levels" | "achievements">("levels");
   const [editOpen, setEditOpen] = useState(false);
   const [referralsOpen, setReferralsOpen] = useState(false);
 
@@ -123,31 +122,13 @@ function SignedInAccount({
           points" copy) so the chain - achievements earn points, points
           set your level, your level is the badge by your name - reads as
           one connected system instead of three unrelated widgets. */}
+      {/* Achievements used to have its own card here too, but
+          LevelsAchievementsModal already has an in-modal tab switcher
+          between Levels and Achievements - a second entry point into the
+          same modal was pure duplication. */}
       {myRecord && (
-        <div className="flex flex-col gap-3 mt-6">
-          <LevelSummaryCard
-            totalPoints={myRecord.total_points}
-            onOpenLevels={() => {
-              setProgressModalTab("levels");
-              setProgressModalOpen(true);
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setProgressModalTab("achievements");
-              setProgressModalOpen(true);
-            }}
-            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors"
-          >
-            <span className="text-2xl shrink-0">🏆</span>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
-                ACHIEVEMENTS
-              </div>
-              <div className="text-[11px] text-white/45 mt-0.5">Earn points here to level up &rarr;</div>
-            </div>
-          </button>
+        <div className="mt-6">
+          <LevelSummaryCard totalPoints={myRecord.total_points} onOpenLevels={() => setProgressModalOpen(true)} />
         </div>
       )}
 
@@ -199,7 +180,7 @@ function SignedInAccount({
       )}
       <LevelsAchievementsModal
         open={progressModalOpen}
-        initialTab={progressModalTab}
+        initialTab="levels"
         totalPoints={myRecord?.total_points}
         onClose={() => setProgressModalOpen(false)}
       />

@@ -436,7 +436,7 @@ create policy "avatar_read_public" on storage.objects for select
 create table public.notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  type text not null check (type in ('friend_request', 'referral_joined', 'level_up')),
+  type text not null check (type in ('friend_request', 'referral_joined', 'level_up', 'friend_accepted')),
   data jsonb not null default '{}'::jsonb,
   read_at timestamptz,
   created_at timestamptz not null default now()
@@ -471,6 +471,27 @@ $$;
 create trigger friendships_notify_request
   after insert on public.friendships
   for each row execute function public.notify_friend_request();
+
+-- Fires on the pending->accepted transition specifically and notifies the
+-- requester, not the accepter - the accepter already sees the result of
+-- their own action immediately in FriendButton's state.
+create or replace function public.notify_friend_accepted()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.status = 'pending' and new.status = 'accepted' then
+    insert into public.notifications (user_id, type, data)
+    values (new.requester_id, 'friend_accepted', jsonb_build_object('accepter_id', new.addressee_id, 'friendship_id', new.id));
+  end if;
+  return new;
+end;
+$$;
+create trigger friendships_notify_accepted
+  after update on public.friendships
+  for each row execute function public.notify_friend_accepted();
 
 -- last_notified_level: watermark for sync_level_up_notifications() below,
 -- separate from the level itself (never stored - see src/lib/levels.ts)

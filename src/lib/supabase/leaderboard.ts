@@ -40,3 +40,15 @@ export async function fetchMyLeaderboardEntry(userId: string): Promise<Leaderboa
   if (error) throw error;
   return data as LeaderboardRow | null;
 }
+
+// Batch identity lookup for a set of user_ids whose profiles aren't
+// otherwise available (e.g. resolving who's behind an activity feed
+// entry) - the leaderboard view is already public, same reasoning
+// fetchIncomingRequests relies on for requester identity.
+export async function fetchProfilesByIds(ids: string[]): Promise<Map<string, Pick<LeaderboardRow, "username" | "display_name" | "avatar_url">>> {
+  const uniqueIds = Array.from(new Set(ids));
+  if (uniqueIds.length === 0) return new Map();
+  const { data, error } = await supabase.from("leaderboard").select("user_id, username, display_name, avatar_url").in("user_id", uniqueIds);
+  if (error) throw error;
+  return new Map((data ?? []).map((p) => [p.user_id as string, p]));
+}

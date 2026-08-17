@@ -5,7 +5,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreadNotifications, markNotificationRead, syncLevelUpNotifications, NotificationRow } from "@/lib/supabase/notifications";
 import { fetchIncomingRequests, FriendRequest } from "@/lib/supabase/friends";
 import { fetchMyReferrals, ReferralRow } from "@/lib/supabase/referrals";
+import { fetchProfilesByIds, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { ALL_LEVELS, subLevelRoman } from "@/lib/levels";
+
+type Accepter = Pick<LeaderboardRow, "username" | "display_name" | "avatar_url">;
 
 const TOAST_DURATION_MS = 5000;
 
@@ -17,7 +20,19 @@ type ToastContent = {
   accentColor: string;
 };
 
-function buildToastContent(n: NotificationRow, requests: FriendRequest[], referrals: ReferralRow[]): ToastContent {
+function buildToastContent(n: NotificationRow, requests: FriendRequest[], referrals: ReferralRow[], accepters: Map<string, Accepter>): ToastContent {
+  if (n.type === "friend_accepted") {
+    const accepter = accepters.get(String(n.data.accepter_id));
+    const label = accepter?.display_name || accepter?.username || "Someone";
+    return {
+      avatarUrl: accepter?.avatar_url ?? null,
+      initial: label.charAt(0).toUpperCase(),
+      title: `${label} accepted your friend request`,
+      subtitle: "You're now friends",
+      accentColor: "#4ade80",
+    };
+  }
+
   if (n.type === "level_up") {
     const level = Number(n.data.level);
     const entry = ALL_LEVELS[level - 1];
@@ -69,6 +84,7 @@ export function NotificationToasts() {
   const [queue, setQueue] = useState<NotificationRow[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
+  const [accepters, setAccepters] = useState<Map<string, Accepter>>(new Map());
   const [current, setCurrent] = useState<NotificationRow | null>(null);
 
   useEffect(() => {
@@ -84,6 +100,12 @@ export function NotificationToasts() {
             setRequests(incoming);
             setReferrals(myReferrals);
             setQueue(notifications);
+            const accepterIds = notifications.filter((n) => n.type === "friend_accepted").map((n) => String(n.data.accepter_id));
+            if (accepterIds.length > 0) {
+              fetchProfilesByIds(accepterIds)
+                .then(setAccepters)
+                .catch((err) => console.error("Failed to resolve accepter profiles", err));
+            }
           }
         );
       });
@@ -114,7 +136,7 @@ export function NotificationToasts() {
 
   if (!current) return null;
 
-  const content = buildToastContent(current, requests, referrals);
+  const content = buildToastContent(current, requests, referrals, accepters);
 
   return (
     <div className="fixed top-[84px] left-1/2 -translate-x-1/2 z-[70] w-full max-w-sm px-4">
