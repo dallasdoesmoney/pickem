@@ -63,11 +63,18 @@ as $$
 $$;
 grant execute on function public.is_username_available(text) to anon, authenticated;
 
+-- avatar_url defaults from Google OAuth's profile photo (present in
+-- raw_user_meta_data as 'avatar_url' and/or 'picture') when available -
+-- EditProfileModal's upload flow can always overwrite it after.
 create function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, display_name)
-  values (new.id, coalesce(new.raw_user_meta_data->>'full_name', ''));
+  insert into public.profiles (id, display_name, avatar_url)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    coalesce(new.raw_user_meta_data->>'avatar_url', new.raw_user_meta_data->>'picture')
+  );
   return new;
 end;
 $$;
