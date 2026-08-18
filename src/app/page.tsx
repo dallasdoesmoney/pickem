@@ -237,7 +237,7 @@ export default function HomePage() {
           </div>
 
           <div>
-            <div className="text-[8.5px] tracking-[0.12em] text-white/35 mb-0.5">SEASON LEADERBOARD PREVIEW</div>
+            <div className="text-[8.5px] tracking-[0.12em] text-white/35 mb-0.5">STANDINGS PREVIEW</div>
             {!rows ? (
               <div className="flex justify-center py-3">
                 <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />

@@ -213,7 +213,7 @@ export function EditProfileModal({
               </button>
             </div>
             <p className="text-xs h-4" style={{ color: displayNameCheck && !displayNameCheck.valid ? "#f87171" : "rgba(255,255,255,0.4)" }}>
-              {displayNameCheck && !displayNameCheck.valid ? displayNameCheck.reason : "Shown on the leaderboard - doesn’t need to be unique."}
+              {displayNameCheck && !displayNameCheck.valid ? displayNameCheck.reason : "Shown in Standings - doesn’t need to be unique."}
             </p>
             {displayNameError && <p className="text-xs text-red-400 -mt-2">{displayNameError}</p>}
           </div>

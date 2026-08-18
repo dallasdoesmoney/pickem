@@ -84,7 +84,7 @@ export function FriendsListModal({ userId, open, onClose }: { userId: string; op
           ) : friends.length === 0 ? (
             <div className="text-center py-10 text-white/50">
               <div className="text-3xl mb-3">👥</div>
-              <p className="text-sm">No friends yet - add some from the leaderboard.</p>
+              <p className="text-sm">No friends yet - add some from standings.</p>
             </div>
           ) : filtered && filtered.length === 0 ? (
             <p className="text-center py-10 text-sm text-white/40">No friends match &ldquo;{query}&rdquo;.</p>

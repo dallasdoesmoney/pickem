@@ -28,7 +28,7 @@ const MOBILE_NAV_SECTIONS: NavSection[] = [
     label: "Pick’em",
     items: [
       { href: "/", label: "Pick’em Hub", icon: PicksIcon, matchPrefix: "/", exact: true },
-      { href: "/leaderboard", label: "Leaderboard", icon: LeaderboardIcon, matchPrefix: "/leaderboard" },
+      { href: "/leaderboard", label: "Standings", icon: LeaderboardIcon, matchPrefix: "/leaderboard" },
     ],
   },
 ];
@@ -95,7 +95,7 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
-// Plain pill link, not a dropdown - Pick'em and Leaderboard are both
+// Plain pill link, not a dropdown - Pick'em and Standings are both
 // single destinations now (weekly/team pick'em live inside the hub
 // itself), so neither needs the anchored-menu machinery PickemMenu used
 // to provide.
@@ -244,7 +244,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
 
           <div className="hidden lg:flex items-center gap-1 absolute left-6">
             <TopNavLink href="/" label="Pick’em" />
-            <TopNavLink href="/leaderboard" label="Leaderboard" />
+            <TopNavLink href="/leaderboard" label="Standings" />
           </div>
 
           <Link href="/" aria-label="Go to the homepage">
