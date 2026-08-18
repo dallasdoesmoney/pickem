@@ -38,7 +38,7 @@ export default function PlayerPage() {
   return (
     <main className="flex-1 px-4 pb-16 pt-10 max-w-md w-full mx-auto">
       <Link href="/leaderboard" className="text-xs text-white/40 hover:text-white/70 transition-colors">
-        &larr; Back to standings
+        &larr; Back to leaderboard
       </Link>
 
       {error && <p className="text-sm text-red-400 text-center mt-10">{error}</p>}

@@ -46,7 +46,7 @@ export function UsernameGate() {
         <h2 className="text-white text-lg" style={{ fontFamily: "var(--font-display)" }}>
           CLAIM YOUR USERNAME
         </h2>
-        <p className="text-white/50 text-sm mt-1 mb-5">This is how you&rsquo;ll show up in Standings. Pick something unique.</p>
+        <p className="text-white/50 text-sm mt-1 mb-5">This is how you&rsquo;ll show up on leaderboards. Pick something unique.</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-2">
           <input
