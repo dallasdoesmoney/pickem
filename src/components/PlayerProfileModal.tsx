@@ -6,6 +6,7 @@ import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { FollowButton } from "@/components/FollowButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
+import { CreatorLinks } from "@/components/CreatorLinks";
 import { LevelListModal } from "@/components/LevelListModal";
 import { StatTile, StatDetailRow } from "@/components/StatTile";
 import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
@@ -65,6 +66,7 @@ export function PlayerProfileModal({
           </div>
           <p className="text-white/45 text-sm mt-1">@{row.username}</p>
           <PlayerBadges userId={row.user_id} />
+          <CreatorLinks userId={row.user_id} />
 
           <div className="w-full mt-6 grid grid-cols-3 gap-2">
             <StatTile icon="🔗" value={stats ? String(stats.referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" />

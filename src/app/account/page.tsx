@@ -15,6 +15,7 @@ import { FriendsListModal } from "@/components/FriendsListModal";
 import { FollowersListModal } from "@/components/FollowersListModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
 import { CreatorRequestModal } from "@/components/CreatorRequestModal";
+import { SocialLinksModal } from "@/components/SocialLinksModal";
 import { StatTile, StatDetailRow } from "@/components/StatTile";
 import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
@@ -69,6 +70,7 @@ function SignedInAccount({
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [creatorRequestOpen, setCreatorRequestOpen] = useState(false);
+  const [socialLinksOpen, setSocialLinksOpen] = useState(false);
   const [isCreator, setIsCreator] = useState<boolean | null>(null);
   const stats = usePlayerStats(userId);
 
@@ -194,6 +196,22 @@ function SignedInAccount({
         </button>
       )}
 
+      {isCreator === true && (
+        <button
+          type="button"
+          onClick={() => setSocialLinksOpen(true)}
+          className="w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors mt-6"
+        >
+          <span className="text-2xl shrink-0">🔗</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+              SOCIAL LINKS
+            </div>
+            <div className="text-[11px] text-white/45 mt-0.5">Add your channels/socials to your public profile &rarr;</div>
+          </div>
+        </button>
+      )}
+
       {myRecord?.username && (
         <div className="text-center mt-6">
           <Link href={`/leaderboard/${myRecord.username}`} className="text-xs text-white/40 hover:text-white/70 transition-colors">
@@ -230,6 +248,7 @@ function SignedInAccount({
       <FriendsListModal userId={userId} open={friendsOpen} onClose={() => setFriendsOpen(false)} />
       <FollowersListModal userId={userId} open={followersOpen} onClose={() => setFollowersOpen(false)} />
       <CreatorRequestModal userId={userId} open={creatorRequestOpen} onClose={() => setCreatorRequestOpen(false)} />
+      <SocialLinksModal userId={userId} open={socialLinksOpen} onClose={() => setSocialLinksOpen(false)} />
     </main>
   );
 }
