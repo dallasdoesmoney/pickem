@@ -561,18 +561,31 @@ export default function Home() {
     if (!cell) return <div key={key} />;
     const { game, timeLabel } = cell;
     const tabPadX = 11.8 * gridScale;
+    // The visible (poked-up-above-the-pill) height stays exactly what it
+    // was tuned to be - that's the tab's actual "size." Font size has a
+    // floor (see above) that padding didn't previously account for, so at
+    // small gridScale the text ended up taller than the shrinking padding
+    // assumed, pushing it down toward the pill's border instead of
+    // sitting centered in that visible strip. Centering the text within
+    // tabVisibleHeight (not the whole padded box) fixes that at every
+    // scale; the extra tuck-behind-the-pill padding is a fixed amount,
+    // independent of scale, since it's just hidden depth, not size.
+    const tabVisibleHeight = 21.2 * gridScale;
+    const tabFontPx = Math.max(7.5, 10.6 * gridScale);
+    const tabTextHeight = tabFontPx * 1.15;
+    const tabPadCenter = Math.max(1, (tabVisibleHeight - tabTextHeight) / 2);
     return (
       <div key={key} className="relative">
         <div
           className="absolute left-1/2 -translate-x-1/2 rounded-t-md border border-b-0 border-white/15 bg-[#1b2947] tracking-wide text-white/55 whitespace-nowrap"
           style={{
             fontFamily: "var(--font-display)",
-            top: -21.2 * gridScale,
-            fontSize: Math.max(7.5, 10.6 * gridScale),
+            top: -tabVisibleHeight,
+            fontSize: tabFontPx,
             paddingLeft: tabPadX,
             paddingRight: tabPadX,
-            paddingTop: 4.7 * gridScale,
-            paddingBottom: 14.1 * gridScale,
+            paddingTop: tabPadCenter,
+            paddingBottom: tabPadCenter + 10,
           }}
         >
           {timeLabel}
@@ -632,7 +645,7 @@ export default function Home() {
                   className="self-center"
                 />
                 <span
-                  className="absolute top-0 -right-2 translate-x-full whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
+                  className="absolute top-1/2 -right-2 translate-x-full -translate-y-1/2 whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
                   style={{ fontFamily: "var(--font-display)", background: "#1b2947", boxShadow: "2.5px 2.5px 0 rgba(0,0,0,0.45)" }}
                 >
                   {hasResults ? `✅ ${correctCount}/${gradedCount}` : `🏈 ${pickedCount}/${games.length}`}
