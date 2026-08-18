@@ -19,10 +19,10 @@ const HEADER_TITLE_PX = 44;
 const HEADER_TITLE_GAP = 10;
 const HEADER_META_PX = 15;
 
-const RAIL_W = 92;
+const RAIL_W = 118;
 const ROW_GAP = 12;
 const ROW_PAD = 10;
-const CHIP_GAP = 8;
+const CHIP_GAP = 6;
 const ROW_RADIUS = 18;
 
 const BRAND_FOOTER_H = 12 + 104 + 10 + 18 + 10;
@@ -34,17 +34,14 @@ export type TierShareParams = {
   authorLabel?: string | null;
 };
 
-// Chip size is solved per-row from the widest row, so a 20-team S tier
-// still fits on one canvas instead of running off the edge. Rows with
-// fewer teams keep the same size so the grid stays visually regular.
-function solveChipSize(state: TierListState): number {
-  const widest = Math.max(1, ...state.tiers.map((t) => (state.placements[t.id] ?? []).length));
-  const available = WIDTH - PAD_X * 2 - RAIL_W - ROW_PAD * 2;
-  const fitted = Math.floor((available - (widest - 1) * CHIP_GAP) / widest);
-  // Floor keeps 32-in-one-tier legible; ceiling stops a 1-team tier from
-  // rendering an absurd 300px logo.
-  return Math.max(30, Math.min(64, fitted));
-}
+// Fixed to match the live board rather than solved from the widest row.
+// Solving meant a tier holding 20 teams squeezed all 20 onto one line and
+// every other tier inherited those tiny logos - the exported image looked
+// nothing like the page it came from. Now the marks are a constant size
+// and long tiers wrap, exactly like the site, so what you share is what
+// you built.
+const CHIP = 72;
+const PER_ROW = 8;
 
 function rowHeight(count: number, chip: number, perRow: number): number {
   const lines = Math.max(1, Math.ceil(count / perRow));
@@ -62,9 +59,8 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
     }
   }
 
-  const chip = solveChipSize(state);
-  const trackW = WIDTH - PAD_X * 2 - RAIL_W - ROW_PAD * 2;
-  const perRow = Math.max(1, Math.floor((trackW + CHIP_GAP) / (chip + CHIP_GAP)));
+  const chip = CHIP;
+  const perRow = PER_ROW;
 
   // Unranked teams are shown as a final muted strip rather than being
   // dropped - a half-finished list is still a statement - but only when
@@ -188,29 +184,41 @@ function drawRow(
   const w = WIDTH - PAD_X * 2;
   const r = { tl: ROW_RADIUS, tr: ROW_RADIUS, br: ROW_RADIUS, bl: ROW_RADIUS };
 
+  // Row well, matching the site's inset-on-panel treatment.
   roundRectPath(ctx, o.x, o.y, w, o.h, r);
-  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.03)" : `${o.accent}14`;
+  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.03)" : "#0c1830";
   ctx.fill();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = o.muted ? "rgba(255,255,255,0.10)" : `${o.accent}66`;
+  ctx.strokeStyle = o.muted ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.08)";
   ctx.stroke();
 
-  // Label rail, clipped to the row's left rounded corners.
+  // Chevron rail: solid accent, dark type, point on the right - the same
+  // shape the live rows use. Clipped to the row so the left corners stay
+  // rounded with it.
+  const point = RAIL_W * 0.84;
   ctx.save();
   roundRectPath(ctx, o.x, o.y, w, o.h, r);
   ctx.clip();
-  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.05)" : `${o.accent}30`;
-  ctx.fillRect(o.x, o.y, RAIL_W, o.h);
-  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.18)" : o.accent;
-  ctx.fillRect(o.x + RAIL_W - 2, o.y, 2, o.h);
+  ctx.beginPath();
+  ctx.moveTo(o.x, o.y);
+  ctx.lineTo(o.x + point, o.y);
+  ctx.lineTo(o.x + RAIL_W, o.y + o.h / 2);
+  ctx.lineTo(o.x + point, o.y + o.h);
+  ctx.lineTo(o.x, o.y + o.h);
+  ctx.closePath();
+  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.10)" : o.accent;
+  ctx.fill();
   ctx.restore();
 
-  const labelSize = o.label.length > 4 ? 16 : 30;
+  // Same banding as the live rail so a renamed tier reads identically in
+  // both places.
+  const n = o.label.length;
+  const labelSize = n <= 2 ? 34 : n <= 5 ? 21 : n <= 9 ? 16 : 13;
   ctx.font = `${labelSize}px ${displayFont}`;
-  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.35)" : o.accent;
+  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.45)" : "#0c1830";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(fitText(ctx, o.label, RAIL_W - 12), o.x + RAIL_W / 2, o.y + o.h / 2);
+  ctx.fillText(fitText(ctx, o.label, point - 14), o.x + point / 2, o.y + o.h / 2);
 
   ctx.textBaseline = "alphabetic";
   const startX = o.x + RAIL_W + ROW_PAD;

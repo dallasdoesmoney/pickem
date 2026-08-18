@@ -32,7 +32,6 @@ import { shareBlob } from "@/lib/shareBlob";
 import { buildReferralLink } from "@/lib/referralStorage";
 import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TierRow } from "@/components/tierList/TierRow";
-import { RankSheet } from "@/components/tierList/RankSheet";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
@@ -58,7 +57,6 @@ export default function TierListPageClient({
   const [viewportWidth, setViewportWidth] = useState(390);
   const [editing, setEditing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sheetItem, setSheetItem] = useState<TierItem | null>(null);
   const [landedId, setLandedId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Which container the drag is currently over. undefined = no drag,
@@ -122,13 +120,19 @@ export default function TierListPageClient({
     // The rail got wider to give tier names room, but a phone can't spare
     // it - a fixed 92 there would have cost the logos more than the label
     // gained.
-    const rail = viewportWidth < 768 ? 68 : 92;
-    const track = content - rail - 16;
+    const base = viewportWidth < 768 ? 78 : 118;
+    const track = content - base - 16;
     const perRow = viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : 8;
     const size = Math.floor((track - (perRow - 1) * 6) / perRow);
     // Desktop earns a bigger mark than the old 58px cap allowed - this
     // page IS the logos, so they should be what you actually look at.
-    return { chipSize: Math.max(34, Math.min(74, size)), railWidth: rail };
+    const chip = Math.max(34, Math.min(74, size));
+    // The chevron has to read as a landscape tab, not a square - a name
+    // like "SHOULD BE FIRED" needs horizontal room, and a rail narrower
+    // than the row is tall looks like a stub. Held wider than the row
+    // height whatever the chip size works out to be.
+    const rail = Math.max(base, Math.round((chip + 16) * 1.28));
+    return { chipSize: chip, railWidth: rail };
   }, [viewportWidth]);
 
   const sensors = useSensors(
@@ -236,14 +240,12 @@ export default function TierListPageClient({
     applyMove(String(active.id), String(over.id), true);
   }
 
+  // One interaction on every device: tap a team to arm it, then tap the
+  // tier you want it in. This replaced a mobile-only bottom sheet that
+  // listed the tiers as six letter buttons - picking the row you can
+  // already see beats picking its name off a list.
   function handleItemActivate(item: TierItem) {
     if (suppressClick.current) return;
-    if (isCompact) {
-      setSheetItem(item);
-      return;
-    }
-    // Desktop: click to select, click a tier to place. The keyboard- and
-    // mouse-accessible alternative to dragging.
     setSelectedId((cur) => (cur === item.id ? null : item.id));
   }
 
@@ -252,13 +254,6 @@ export default function TierListPageClient({
     dispatch({ type: "moveItem", itemId: selectedId, toTier: tierId, toIndex: null });
     if (tierId !== null) flashLanded(selectedId);
     setSelectedId(null);
-  }
-
-  function pickFromSheet(tierId: string) {
-    if (!sheetItem) return;
-    dispatch({ type: "moveItem", itemId: sheetItem.id, toTier: tierId, toIndex: null });
-    flashLanded(sheetItem.id);
-    setSheetItem(null);
   }
 
   async function handleDeleteTier(tierId: string, label: string) {
@@ -369,6 +364,14 @@ export default function TierListPageClient({
     return url;
   }
 
+  useEffect(() => {
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setSelectedId(null);
+    }
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, []);
+
   // Desktop undo/redo. Skipped while typing in a tier name or the title
   // so the browser's own text undo still works there.
   useEffect(() => {
@@ -419,6 +422,31 @@ export default function TierListPageClient({
           so making it editable again is only a matter of putting an input
           back. */}
 
+      {/* Sits with the board it acts on rather than down in the generic
+          control cluster - it changes what the rows look like, so it
+          belongs next to them. */}
+      <div className="flex items-center justify-between mb-2 px-0.5">
+        <span className="text-[11px] tracking-[0.18em] text-white/35" style={{ fontFamily: "var(--font-display)" }}>
+          {state.tiers.length} TIERS
+        </span>
+        <button
+          type="button"
+          onClick={() => setEditing((v) => !v)}
+          aria-pressed={editing}
+          className={`flex items-center gap-1.5 rounded-full pl-2.5 pr-3.5 py-1.5 text-[11px] border transition-colors ${
+            editing
+              ? "border-white/45 text-white bg-white/10"
+              : "border-white/15 hover:border-white/35 text-white/60 hover:text-white"
+          }`}
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+            {editing ? <path d="M20 6L9 17l-5-5" /> : <><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></>}
+          </svg>
+          {editing ? "DONE" : "EDIT TIERS"}
+        </button>
+      </div>
+
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -457,6 +485,7 @@ export default function TierListPageClient({
               canMoveDown={i < state.tiers.length - 1}
               canDelete={state.tiers.length > 1}
               onRename={(label) => dispatch({ type: "renameTier", tierId: tier.id, label })}
+              onCommitRename={() => setEditing(false)}
               onMove={(direction) => dispatch({ type: "moveTier", tierId: tier.id, direction })}
               onDelete={() => handleDeleteTier(tier.id, tierLabelFor(tier, i))}
               onItemActivate={handleItemActivate}
@@ -494,9 +523,9 @@ export default function TierListPageClient({
         </DragOverlay>
       </DndContext>
 
-      {selectedId && !isCompact && (
+      {selectedId && (
         <p className="text-center text-xs text-white/50 mt-3">
-          Now click a tier to drop <span className="text-white/80">{resolveItem(template, selectedId).label}</span> in — or press Esc to cancel.
+          Now tap a tier to drop <span className="text-white/80">{resolveItem(template, selectedId).label}</span> in — or tap it again to cancel.
         </p>
       )}
 
@@ -508,9 +537,6 @@ export default function TierListPageClient({
         </GhostButton>
         <GhostButton onClick={redo} disabled={!canRedo} label="Redo">
           REDO
-        </GhostButton>
-        <GhostButton onClick={() => setEditing((v) => !v)} label="Toggle tier editing" active={editing}>
-          {editing ? "DONE EDITING" : "EDIT TIERS"}
         </GhostButton>
         <GhostButton onClick={handleReset} label="Reset tier list">
           RESET
@@ -565,18 +591,6 @@ export default function TierListPageClient({
         {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
       </div>
 
-      <RankSheet
-        item={sheetItem}
-        tiers={state.tiers}
-        currentTierId={sheetItem ? findItemTier(state, sheetItem.id) : null}
-        onPick={pickFromSheet}
-        onUnrank={() => {
-          if (!sheetItem) return;
-          dispatch({ type: "moveItem", itemId: sheetItem.id, toTier: null, toIndex: null });
-          setSheetItem(null);
-        }}
-        onClose={() => setSheetItem(null)}
-      />
 
       <ShareDialog
         open={shareOpen}

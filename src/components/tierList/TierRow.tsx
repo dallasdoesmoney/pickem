@@ -22,6 +22,7 @@ export function TierRow({
   canMoveDown,
   canDelete,
   onRename,
+  onCommitRename,
   onMove,
   onDelete,
   onItemActivate,
@@ -45,6 +46,10 @@ export function TierRow({
   canMoveDown: boolean;
   canDelete: boolean;
   onRename: (label: string) => void;
+  // Enter in the rename field is a commit, not just a blur - it leaves
+  // edit mode entirely, which is what pressing Enter in a small inline
+  // field is universally taken to mean.
+  onCommitRename: () => void;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
   onItemActivate: (item: TierItem) => void;
@@ -96,6 +101,13 @@ export function TierRow({
             value={tier.label}
             onChange={(e) => onRename(e.target.value)}
             maxLength={MAX_TIER_LABEL}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.blur();
+                onCommitRename();
+              }
+            }}
             aria-label={`Rename ${tierLabelFor(tier, index)} tier`}
             className="w-full min-w-0 bg-black/35 rounded-md text-center text-white text-xs py-1 px-1 outline-none border border-black/25 focus:border-black/50"
             style={{ fontFamily: "var(--font-display)" }}
