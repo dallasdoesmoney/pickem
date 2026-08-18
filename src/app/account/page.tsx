@@ -9,6 +9,7 @@ import { fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderbo
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
+import { CreatorBadge } from "@/components/CreatorBadge";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 import { MyReferralsModal } from "@/components/MyReferralsModal";
 import { FriendsListModal } from "@/components/FriendsListModal";
@@ -98,9 +99,12 @@ function SignedInAccount({
             {label}
           </h1>
           {myRecord && (
-            <button type="button" onClick={() => setProgressModalOpen(true)} aria-label="View all levels" className="active:scale-95 transition-transform">
-              <LevelBadge totalPoints={myRecord.total_points} size="lg" />
-            </button>
+            <>
+              <button type="button" onClick={() => setProgressModalOpen(true)} aria-label="View all levels" className="active:scale-95 transition-transform">
+                <LevelBadge totalPoints={myRecord.total_points} size="lg" />
+              </button>
+              <CreatorBadge userId={userId} size="lg" />
+            </>
           )}
         </div>
 

@@ -175,7 +175,7 @@ export function LeaderboardBoard() {
                     {isMe && <span className="text-white/40"> (you)</span>}
                   </span>
                   <LevelBadge totalPoints={row.total_points} />
-                  {creatorIds.has(row.user_id) && <CreatorBadgeIcon className="h-4 w-4 text-[9px]" />}
+                  {creatorIds.has(row.user_id) && <CreatorBadgeIcon size="sm" />}
                 </span>
                 <span className="text-sm shrink-0" style={{ fontFamily: "var(--font-display)" }}>
                   {row.correct}-{row.graded - row.correct}
