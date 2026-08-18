@@ -1,6 +1,6 @@
 import { Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
-import { BOLDEST_PICK_ICON, DayGroup, FlowItem, PickStats, PickTag, UNDERDOG_ICON, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
+import { BOLDEST_PICK_ICON, DesktopRow, PickStats, PickTag, UNDERDOG_ICON, buildDesktopRows, computePickStats, computePickTags } from "@/lib/pickLayout";
 import {
   BRAND_LOGO_SRC,
   PILL_W,
@@ -20,8 +20,6 @@ const PAD_X = 48;
 const PAD_TOP = 40;
 const PAD_BOTTOM = 56;
 const GAP_X = 32;
-const GAP_Y = 16;
-const HEADER_ROW_H = 56;
 const BG = "#0e1b33";
 
 function drawStatPill(
@@ -48,9 +46,17 @@ function drawStatPill(
   // Lock of the Week's badge - see badgeIcon draw below, this pill leans
   // into being an oversized "pin" instead of trying to tuck neatly into
   // the corner.
-  badgeSize = 46
+  badgeSize = 46,
+  // Lock of the Week only - the locked team's own color, matching the
+  // live UI's pill background once a lock is set. Undefined for the
+  // other two pills, which stay flat/transparent over the canvas bg.
+  fillColor?: string
 ) {
   roundRectPath(ctx, x, y, w, h, { tl: h / 2, tr: h / 2, br: h / 2, bl: h / 2 });
+  if (fillColor) {
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+  }
   ctx.strokeStyle = borderColor;
   ctx.lineWidth = 3;
   ctx.stroke();
@@ -176,17 +182,35 @@ function drawResultsRecordPill(
   drawPillImageTag(ctx, avatar, x, y);
 }
 
-function rowHeight(a: FlowItem | undefined, b: FlowItem | undefined) {
-  const h = (item: FlowItem | undefined) => (item?.type === "game" ? PILL_H : item?.type === "header" ? HEADER_ROW_H : 0);
-  return Math.max(h(a), h(b));
-}
+// Canvas counterpart to the live grid's per-game tab (see weekly/page.tsx's
+// renderGridGame) - a small rounded-top label tucked behind the pill. Drawn
+// BEFORE the pill halves, same trick as the DOM version: whatever paints
+// later wins the overlapping pixels, so the pill's opaque fill naturally
+// covers the tab's lower portion without any clipping math.
+const TAB_VISIBLE_H = 30;
+const TAB_TUCK_H = 16;
+const TAB_FONT_PX = 15;
 
-function drawDayHeader(ctx: CanvasRenderingContext2D, displayFont: string, label: string, x: number, y: number, w: number, h: number) {
+function drawGameTab(ctx: CanvasRenderingContext2D, displayFont: string, label: string, centerX: number, pillTopY: number) {
+  ctx.font = `${TAB_FONT_PX}px ${displayFont}`;
+  const textW = ctx.measureText(label).width;
+  const padX = 16;
+  const w = textW + padX * 2;
+  const h = TAB_VISIBLE_H + TAB_TUCK_H;
+  const x = centerX - w / 2;
+  const y = pillTopY - TAB_VISIBLE_H;
+
+  roundRectPath(ctx, x, y, w, h, { tl: 12, tr: 12, br: 0, bl: 0 });
+  ctx.fillStyle = "#1b2947";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
   ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `28px ${displayFont}`;
-  ctx.fillText(label, x + w / 2, y + h - 10);
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.fillText(label, centerX, y + TAB_VISIBLE_H / 2);
 }
 
 type TeamHalfOpts = PillHalfOpts & {
@@ -316,9 +340,25 @@ function drawLockBadge(ctx: CanvasRenderingContext2D, opts: TeamHalfOpts, icon: 
 
 const BRAND_FOOTER_H = 12 + 104 + 10 + 18 + 10;
 
+// Header/stat-row/body block heights, named once and reused for both the
+// canvas-height calculation and the actual draw pass below - keeping them
+// as one source of truth instead of two hand-synced numbers.
+const HEADER_EYEBROW_PX = 15;
+const HEADER_EYEBROW_GAP = 16;
+const HEADER_TITLE_PX = 66;
+const HEADER_TITLE_GAP = 8;
+const HEADER_H = HEADER_EYEBROW_PX + HEADER_EYEBROW_GAP + HEADER_TITLE_PX + HEADER_TITLE_GAP;
+
+const STAT_ROW_GAP_BEFORE = 24;
+const STAT_ROW_H = 88;
+const STAT_ROW_GAP_AFTER = 24;
+
+// Must clear TAB_VISIBLE_H so one row's tab never overlaps the row above
+// it - mirrors the live grid's rowGap needing to clear the same tab.
+const ROW_GAP = 40;
+
 export type ShareImageParams = {
   games: Game[];
-  groups: DayGroup[];
   picks: Record<string, TeamAbbr>;
   week: number;
   results?: Record<string, TeamAbbr>;
@@ -329,15 +369,15 @@ export type ShareImageParams = {
 const LOCK_ICON = "/lock-of-week.png";
 
 export async function renderShareImage(params: ShareImageParams): Promise<Blob> {
-  const { games, groups, picks, week, results, avatarUrl, lockedGameId } = params;
+  const { games, picks, week, results, avatarUrl, lockedGameId } = params;
   const hasResults = !!results && games.some((g) => results[g.id]);
   const gradedCount = hasResults ? games.filter((g) => results![g.id]).length : 0;
   const correctCount = hasResults ? games.filter((g) => results![g.id] && picks[g.id] === results![g.id]).length : 0;
   const stats: PickStats = computePickStats(games, picks);
   const lockedTeam = lockedGameId && picks[lockedGameId] ? TEAMS[picks[lockedGameId]] : null;
   const tags = computePickTags(games, picks);
-  const { col1, col2 } = splitIntoColumns(groups);
-  const rowCount = Math.max(col1.length, col2.length);
+  const desktopRows: DesktopRow[] = buildDesktopRows(games);
+  const rowCount = desktopRows.length;
 
   const displayFont = resolveDisplayFont();
   if (typeof document !== "undefined" && "fonts" in document) {
@@ -366,14 +406,9 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   const logos = new Map(logoEntries);
   const tagIcons = new Map([[UNDERDOG_ICON, underdogIcon], [BOLDEST_PICK_ICON, boldestIcon]]);
 
-  let bodyHeight = 0;
-  for (let i = 0; i < rowCount; i++) {
-    bodyHeight += rowHeight(col1[i], col2[i]);
-    if (i < rowCount - 1) bodyHeight += GAP_Y;
-  }
-
-  const headerHeight = 141 + 24 + 88;
-  const totalHeight = PAD_TOP + headerHeight + 24 + bodyHeight + BRAND_FOOTER_H + PAD_BOTTOM;
+  const bodyHeight = TAB_VISIBLE_H + rowCount * PILL_H + Math.max(0, rowCount - 1) * ROW_GAP;
+  const totalHeight =
+    PAD_TOP + HEADER_H + STAT_ROW_GAP_BEFORE + STAT_ROW_H + STAT_ROW_GAP_AFTER + bodyHeight + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const pixelRatio = 2;
   const canvas = document.createElement("canvas");
@@ -390,33 +425,24 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
 
-  // "WEEK N" kicker, mirroring the live header (minus the picks-count
-  // sticker - redundant in a shared image since every pick is already
-  // visible below).
-  const kickerFontPx = 30;
-  ctx.font = `${kickerFontPx}px ${displayFont}`;
+  // Small eyebrow + "WEEK N" as the actual headline - mirrors the live
+  // header (no more "NFL PICK'EM" line/divider; the branding is already
+  // established by the eyebrow, same as the on-site header).
+  ctx.font = `${HEADER_EYEBROW_PX}px system-ui, sans-serif`;
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
+  ctx.fillText("SIDELINE BREW · PICK’EM", WIDTH / 2, cursorY + HEADER_EYEBROW_PX);
+  cursorY += HEADER_EYEBROW_PX + HEADER_EYEBROW_GAP;
+
+  ctx.font = `${HEADER_TITLE_PX}px ${displayFont}`;
   ctx.fillStyle = "#ffffff";
-  const kickerText = `WEEK ${week}`;
-  const kickerBaselineY = cursorY + kickerFontPx;
-  ctx.fillText(kickerText, WIDTH / 2, kickerBaselineY);
-  cursorY += kickerFontPx + 14;
+  ctx.fillText(`WEEK ${week}`, WIDTH / 2, cursorY + HEADER_TITLE_PX * 0.88);
+  cursorY += HEADER_TITLE_PX + HEADER_TITLE_GAP;
 
-  const dividerW = 48;
-  ctx.fillStyle = "rgba(255,255,255,0.25)";
-  ctx.fillRect(WIDTH / 2 - dividerW / 2, cursorY, dividerW, 3);
-  cursorY += 3 + 20;
-
-  ctx.font = `66px ${displayFont}`;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("NFL PICK’EM", WIDTH / 2, cursorY + 58);
-  cursorY += 66 + 8;
-
-  const pillH = 88;
-  cursorY += 24;
+  cursorY += STAT_ROW_GAP_BEFORE;
 
   if (hasResults) {
     const recordW = 260;
-    drawResultsRecordPill(ctx, displayFont, WIDTH / 2 - recordW / 2, cursorY, recordW, pillH, `${correctCount}-${gradedCount - correctCount}`, avatarImg);
+    drawResultsRecordPill(ctx, displayFont, WIDTH / 2 - recordW / 2, cursorY, recordW, STAT_ROW_H, `${correctCount}-${gradedCount - correctCount}`, avatarImg);
   } else {
     // Matches the live StatPills order: Lock of the Week took over the
     // prominent center slot (it's the more important tag), Boldest Pick
@@ -432,6 +458,7 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       logoH?: number;
       valueFontPx?: number;
       badgeSize?: number;
+      fillColor?: string;
     }> = [
       { w: 172, borderColor: "#ffffff", valueColor: "#ffffff", value: String(stats.underdogCount), label: "UNDERDOGS", badgeIcon: underdogIcon },
       {
@@ -448,6 +475,9 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
         // on purpose - a "pin," not an attempt to tuck neatly inside it
         // the way the other two badges do.
         badgeSize: 68,
+        // Matches the live pill: once a team is locked, the pill's own
+        // background becomes that team's color instead of the flat panel.
+        fillColor: lockedTeam ? lockedTeam.color : undefined,
       },
       {
         w: 172,
@@ -470,27 +500,28 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
     const totalPillsW = pillDefs.reduce((s, p) => s + p.w, 0) + pillGap * (pillDefs.length - 1);
     let pillX = WIDTH / 2 - totalPillsW / 2;
     for (const p of pillDefs) {
-      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, pillH, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeIcon, p.logoH, p.valueFontPx, p.badgeSize);
+      drawStatPill(ctx, displayFont, pillX, cursorY, p.w, STAT_ROW_H, p.borderColor, p.valueColor, p.value, p.label, p.logo, p.badgeIcon, p.logoH, p.valueFontPx, p.badgeSize, p.fillColor);
       pillX += p.w + pillGap;
     }
   }
-  cursorY += pillH + 24;
+  cursorY += STAT_ROW_H + STAT_ROW_GAP_AFTER;
+
+  // Clearance for the very first row's own tab, which pokes up above it -
+  // every subsequent row gets the same clearance from ROW_GAP instead.
+  cursorY += TAB_VISIBLE_H;
 
   const col1X = PAD_X;
   const col2X = PAD_X + PILL_W + GAP_X;
 
-  for (let i = 0; i < rowCount; i++) {
-    const h = rowHeight(col1[i], col2[i]);
+  desktopRows.forEach((row, i) => {
     [
-      { item: col1[i], x: col1X },
-      { item: col2[i], x: col2X },
-    ].forEach(({ item, x }) => {
-      if (!item || item.type === "blank") return;
-      if (item.type === "header") {
-        drawDayHeader(ctx, displayFont, item.label, x, cursorY, PILL_W, h);
-        return;
-      }
-      const game = item.game;
+      { cell: row.left, x: col1X },
+      { cell: row.right, x: col2X },
+    ].forEach(({ cell, x }) => {
+      if (!cell) return;
+      const { game, timeLabel } = cell;
+      drawGameTab(ctx, displayFont, timeLabel, x + PILL_W / 2, cursorY);
+
       const away = TEAMS[game.away];
       const home = TEAMS[game.home];
       const picked = picks[game.id];
@@ -576,8 +607,9 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
       if (awayOpts.isLockPick) drawLockBadge(ctx, awayOpts, lockIcon);
       if (homeOpts.isLockPick) drawLockBadge(ctx, homeOpts, lockIcon);
     });
-    cursorY += h + GAP_Y;
-  }
+    if (i < desktopRows.length - 1) cursorY += PILL_H + ROW_GAP;
+    else cursorY += PILL_H;
+  });
 
   drawBrandFooter(ctx, displayFont, cursorY, brandLogo, WIDTH);
 

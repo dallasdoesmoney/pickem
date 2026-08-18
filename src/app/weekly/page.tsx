@@ -17,7 +17,6 @@ import { fetchLeaderboard, fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib
 import { errorMessage } from "@/lib/errorMessage";
 import { WeekSwitcher } from "@/components/WeekSwitcher";
 import { LeaderboardBoard } from "@/components/LeaderboardBoard";
-import { groupGamesByDay } from "@/lib/groupGames";
 import { PickStats, DesktopCell, buildDesktopRows, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
 import { TeamAbbr, TEAMS } from "@/data/teams";
@@ -344,7 +343,6 @@ export default function Home() {
   const gradedCount = games.filter((g) => results[g.id]).length;
   const correctCount = games.filter((g) => results[g.id] && picks[g.id] === results[g.id]).length;
   const hasResults = gradedCount > 0;
-  const groups = groupGamesByDay(games);
   const stats = computePickStats(games, picks);
   const lockedTeam = lockedGameId && picks[lockedGameId] ? TEAMS[picks[lockedGameId]] : null;
   const tags = computePickTags(games, picks);
@@ -488,7 +486,7 @@ export default function Home() {
     if (!(await confirmIfIncomplete("SHARE ANYWAY"))) return;
     setSharing(true);
     try {
-      const blob = await renderShareImage({ games, groups, picks, week: activeWeek, results, avatarUrl: profile?.avatar_url, lockedGameId });
+      const blob = await renderShareImage({ games, picks, week: activeWeek, results, avatarUrl: profile?.avatar_url, lockedGameId });
       const filename = hasResults ? `pickem-week-${activeWeek}-results.png` : `pickem-week-${activeWeek}.png`;
       const file = new File([blob], filename, { type: "image/png" });
 
@@ -773,7 +771,7 @@ export default function Home() {
                     aria-label="Save and submit your picks"
                     onClick={handleSaveAndSubmit}
                     disabled={saving}
-                    className="flex items-center gap-2 rounded-full px-6 py-3 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 h-9 rounded-full px-6 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
                     style={{
                       fontFamily: "var(--font-display)",
                       background: "linear-gradient(135deg, #34d399, #059669)",
@@ -816,7 +814,7 @@ export default function Home() {
                         posthog.capture("weekly_picks_reset", { week: activeWeek });
                       }
                     }}
-                    className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors"
+                    className="flex items-center justify-center h-9 text-xs text-white/40 hover:text-white/70 rounded-full px-4 border border-white/15 hover:border-white/30 transition-colors"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     RESET

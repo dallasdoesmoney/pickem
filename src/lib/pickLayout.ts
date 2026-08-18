@@ -2,20 +2,6 @@ import { Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { gameTimeLabel } from "@/lib/groupGames";
 
-export type FlowItem =
-  | { type: "header"; key: string; label: string }
-  | { type: "game"; key: string; game: Game }
-  | { type: "blank"; key: string };
-
-export type DayGroup = { label: string; games: Game[] };
-
-export function flatten(groups: DayGroup[]): FlowItem[] {
-  return groups.flatMap((group) => [
-    { type: "header" as const, key: `h-${group.label}`, label: group.label },
-    ...group.games.map((game) => ({ type: "game" as const, key: game.id, game })),
-  ]);
-}
-
 export type DesktopCell = { game: Game; timeLabel: string };
 export type DesktopRow = { key: string; left: DesktopCell; right: DesktopCell | null };
 
@@ -35,30 +21,6 @@ export function buildDesktopRows(games: Game[]): DesktopRow[] {
     rows.push({ key: sorted[i].id, left, right });
   }
   return rows;
-}
-
-// Splits into two columns by total ROW count (headers + games), not just
-// game count - a header takes up a real row too, so balancing on games
-// alone let whichever column crossed more day-group boundaries end up
-// visibly taller than the other even with the same number of games in
-// each. Row-paired for a CSS grid so a header on one side and a game on
-// the other still force both cells in that row to the same height (the
-// grid's native "tallest cell wins" rule keeps every subsequent row
-// locked in alignment).
-//
-// Row 0 of column 1 is always the first day header (flatten() always
-// starts with one) - column 2's row 0 is forced blank instead of
-// whatever game would naturally fall there, so the very top of the page
-// never pairs a title-like header on the left with a matchup pill on the
-// right. col1 gets ceil((N+1)/2) items (one more than an even split,
-// since column 2 spends one of its own rows on the blank) so the two
-// columns still land within one row of each other in total height.
-export function splitIntoColumns(groups: DayGroup[]): { col1: FlowItem[]; col2: FlowItem[] } {
-  const items = flatten(groups);
-  const col1Count = Math.ceil((items.length + 1) / 2);
-  const col1 = items.slice(0, col1Count);
-  const col2: FlowItem[] = [{ type: "blank", key: "col2-top-spacer" }, ...items.slice(col1Count)];
-  return { col1, col2 };
 }
 
 // The single underdog pick with the largest spread against it - shared by
