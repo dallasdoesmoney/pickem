@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard, COMPACT_SCALE, PILL_WIDTH } from "@/components/GameCard";
+import { LOCK_COLOR } from "@/components/TeamHalfPill";
 import { usePicks } from "@/hooks/usePicks";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -68,8 +69,8 @@ function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeo
           since it's the more important tag; Boldest Pick moved to the
           slot Chalk used to occupy below. */}
       <div
-        className="relative shrink-0 rounded-full border-2 border-emerald-400 text-center flex flex-col items-center justify-center w-[144px] h-[56px] lg:w-[250px] lg:h-[88px]"
-        style={PILL_STYLE}
+        className="relative shrink-0 rounded-full border-2 text-center flex flex-col items-center justify-center w-[144px] h-[56px] lg:w-[250px] lg:h-[88px]"
+        style={{ ...PILL_STYLE, borderColor: LOCK_COLOR, background: lockedTeam ? lockedTeam.color : PILL_STYLE.background }}
       >
         <PillTexture />
         <img
@@ -389,8 +390,20 @@ export default function Home() {
       });
   }
 
+  // Shared by the Save and Share buttons - both are real, deliberate
+  // actions on an incomplete slate (unlike auto-save, which just runs
+  // silently in the background and shouldn't ever interrupt someone
+  // mid-pick with a dialog). Once the week's closed, "incomplete" no
+  // longer means anything - the picks are whatever they ended up being.
+  async function confirmIfIncomplete(confirmLabel: string) {
+    if (!isEditable || pickedCount >= games.length) return true;
+    const remaining = games.length - pickedCount;
+    return confirm(`You still have ${remaining} pick${remaining === 1 ? "" : "s"} left this week. Continue anyway?`, confirmLabel);
+  }
+
   async function handleSaveAndSubmit() {
     if (saving) return;
+    if (!(await confirmIfIncomplete("SAVE ANYWAY"))) return;
     setSaving(true);
     setSaveError(null);
     try {
@@ -472,6 +485,7 @@ export default function Home() {
 
   async function handleShare() {
     if (sharing) return;
+    if (!(await confirmIfIncomplete("SHARE ANYWAY"))) return;
     setSharing(true);
     try {
       const blob = await renderShareImage({ games, groups, picks, week: activeWeek, results, avatarUrl: profile?.avatar_url, lockedGameId });
@@ -540,6 +554,17 @@ export default function Home() {
     const raw = columnWidth / PILL_WIDTH;
     return Math.min(COMPACT_SCALE, Math.max(0.42, raw));
   }, [viewportWidth, gridColumnGap]);
+
+  // Share button used to be a fixed desktop size regardless of viewport,
+  // which read as oversized once the matchup pills themselves started
+  // scaling down for mobile (see gridScale above). These multipliers are
+  // solved so the button reproduces its original fixed size exactly at
+  // gridScale 0.85 (desktop) and shrinks proportionally below that, with a
+  // floor so it never gets too small to comfortably tap.
+  const shareBtnFontPx = Math.max(13, 21 * gridScale);
+  const shareBtnPadY = Math.max(9, 16.5 * gridScale);
+  const shareBtnPadX = Math.max(16, 33 * gridScale);
+  const shareBtnIconPx = Math.max(14, 20 * gridScale);
 
   // A small centered tab tucked behind each pill instead of a day-group
   // divider row - it's rendered BEFORE the GameCard in DOM order and
@@ -632,7 +657,7 @@ export default function Home() {
             <div className="text-center">
               <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SIDELINE BREW &middot; PICK&rsquo;EM</div>
               <span
-                className="relative inline-flex items-center gap-2 text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide"
+                className="inline-flex items-center gap-2 text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 WEEK {activeWeek}
@@ -644,12 +669,6 @@ export default function Home() {
                   onOpenChange={setWeekSwitcherOpen}
                   className="self-center"
                 />
-                <span
-                  className="absolute top-1/2 -right-2 translate-x-full -translate-y-1/2 whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
-                  style={{ fontFamily: "var(--font-display)", background: "#1b2947", boxShadow: "2.5px 2.5px 0 rgba(0,0,0,0.45)" }}
-                >
-                  {hasResults ? `✅ ${correctCount}/${gradedCount}` : `🏈 ${pickedCount}/${games.length}`}
-                </span>
               </span>
             </div>
           ) : (
@@ -700,7 +719,7 @@ export default function Home() {
               {desktopRows.flatMap((row) => [renderGridGame(row.left, `${row.key}-l`), renderGridGame(row.right, `${row.key}-r`)])}
             </div>
 
-            <div className="mt-8">
+            <div className="mt-5">
               {hasResults ? <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} /> : <StatPills stats={stats} lockedTeam={lockedTeam} />}
             </div>
 
@@ -709,21 +728,34 @@ export default function Home() {
                 aria-label={hasResults ? "Share your results" : "Share your picks"}
                 onClick={handleShare}
                 disabled={sharing}
-                className="flex items-center gap-2 rounded-full px-7 py-3.5 text-lg shadow-[0_4px_20px_rgba(74,222,128,0.35)] active:scale-95 transition-transform duration-150 disabled:opacity-60"
+                className="flex items-center gap-2 rounded-full shadow-[0_4px_20px_rgba(74,222,128,0.35)] active:scale-95 transition-transform duration-150 disabled:opacity-60"
                 style={{
                   fontFamily: "var(--font-display)",
                   background: "linear-gradient(135deg, #4ade80, #22c55e)",
                   color: "#0e1b33",
+                  fontSize: shareBtnFontPx,
+                  padding: `${shareBtnPadY}px ${shareBtnPadX}px`,
                 }}
               >
                 {sharing ? (
                   <>
-                    <span className="h-4 w-4 rounded-full border-2 border-[#0e1b33]/40 border-t-[#0e1b33] animate-spin" />
+                    <span
+                      className="rounded-full border-2 border-[#0e1b33]/40 border-t-[#0e1b33] animate-spin"
+                      style={{ height: shareBtnIconPx, width: shareBtnIconPx }}
+                    />
                     SHARING&hellip;
                   </>
                 ) : (
                   <>
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      viewBox="0 0 24 24"
+                      style={{ height: shareBtnIconPx, width: shareBtnIconPx }}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M12 3v12" />
                       <path d="M7 8l5-5 5 5" />
                       <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
@@ -735,8 +767,8 @@ export default function Home() {
             </div>
 
             {isEditable ? (
-              <>
-                <div className="flex flex-col items-center mt-3">
+              <div className="flex flex-col items-center mt-3">
+                <div className="flex items-center justify-center gap-3">
                   <button
                     aria-label="Save and submit your picks"
                     onClick={handleSaveAndSubmit}
@@ -775,14 +807,11 @@ export default function Home() {
                       </>
                     )}
                   </button>
-                  {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
-                </div>
 
-                <div className="flex justify-center mt-3">
                   <button
                     aria-label="Reset your picks"
                     onClick={async () => {
-                      if (await confirm("Reset all your picks for this week?")) {
+                      if (await confirm("Reset all your picks for this week?", "RESET")) {
                         resetPicks();
                         posthog.capture("weekly_picks_reset", { week: activeWeek });
                       }
@@ -793,7 +822,8 @@ export default function Home() {
                     RESET
                   </button>
                 </div>
-              </>
+                {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
+              </div>
             ) : (
               <p className="text-center text-xs text-white/40 mt-5" style={{ fontFamily: "var(--font-display)" }}>
                 {hasResults ? "RESULTS ARE IN FOR THIS WEEK" : "THIS WEEK IS CLOSED"}

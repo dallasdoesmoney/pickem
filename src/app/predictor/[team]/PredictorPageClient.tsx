@@ -455,7 +455,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             <button
               aria-label="Reset your predictions"
               onClick={async () => {
-                if (await confirm("Reset all your schedule predictions?")) {
+                if (await confirm("Reset all your schedule predictions?", "RESET")) {
                   resetPicks();
                   posthog.capture("season_predictions_reset", { team: trackedTeam });
                 }
