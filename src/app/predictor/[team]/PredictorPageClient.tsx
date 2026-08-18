@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
 import Link from "next/link";
 import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
@@ -41,6 +41,38 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const winTotal = WIN_TOTALS[trackedTeam];
+
+  // Same responsive sizing the weekly page uses - that page is the scale
+  // standard now, so this one solves for the identical card scale from the
+  // identical available width instead of running full-size on mobile and a
+  // fixed COMPACT_SCALE on desktop. Starts at a phone-sized guess (not
+  // null) so there's no flash of oversized cards before the first measure.
+  const [viewportWidth, setViewportWidth] = useState(390);
+  useEffect(() => {
+    function measure() {
+      setViewportWidth(window.innerWidth);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  const gridPageX = 16; // matches main's px-4
+  const gridColumnGap = viewportWidth < 640 ? 10 : 32;
+  const gridScale = useMemo(() => {
+    const contentWidth = Math.min(viewportWidth, 896) - gridPageX * 2;
+    const columnWidth = (contentWidth - gridColumnGap) / 2;
+    const raw = columnWidth / SEASON_PILL_WIDTH;
+    return Math.min(COMPACT_SCALE, Math.max(0.42, raw));
+  }, [viewportWidth, gridColumnGap]);
+
+  // Share button multipliers solved to reproduce the old fixed desktop size
+  // at gridScale 0.85 and shrink proportionally below it, with tap-target
+  // floors - identical treatment to the weekly page's share button.
+  const shareBtnFontPx = Math.max(13, 21 * gridScale);
+  const shareBtnPadY = Math.max(9, 16.5 * gridScale);
+  const shareBtnPadX = Math.max(16, 33 * gridScale);
+  const shareBtnIconPx = Math.max(14, 20 * gridScale);
 
   async function handleSaveAndSubmit() {
     if (saving) return;
@@ -245,13 +277,20 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
         {/* Nudged up slightly - flexbox centers the boxes, but the title's
             display font carries extra space below its cap height, so true
             box-centering reads as the logo sitting a touch low. */}
-        <img src={team.logo} alt="" className="h-24 sm:h-28 w-auto shrink-0 relative -top-1.5" crossOrigin="anonymous" />
-        {/* w-min below lg: when the title wraps (as it always does on
-            mobile), a plain flex item still keeps the full leftover row
-            width, so the lockup centers on that oversized box and reads
-            as shoved left. min-content sizing shrink-wraps the box to the
-            wrapped lines so logo+text center as one unit. */}
-        <div className="text-left w-min lg:w-auto">
+        {/* Smaller below sm so the title beside it clears the longest
+            single word in the league ("PHILADELPHIA" / "JACKSONVILLE" run
+            ~242px at this type size, against a box that was only 243px
+            wide on a 375px phone - no room at all on anything narrower). */}
+        <img src={team.logo} alt="" className="h-14 sm:h-20 lg:h-24 w-auto shrink-0 relative -top-1.5" crossOrigin="anonymous" />
+        {/* Sized to the room actually left beside the logo (a flex item
+            shrinking from its max-content width), NOT min-content: at
+            min-content the box collapses to the widest single word, which
+            wrapped long names like "NEW ENGLAND PATRIOTS" onto a line
+            each and made this header far taller than the weekly page's.
+            min-w-0 because a flex item won't shrink below its min-content
+            width (the longest word) by default, so without it the h1's
+            break-words guard below can never actually take effect. */}
+        <div className="text-left min-w-0">
           <div className="text-xs text-white/45 tracking-[0.25em] mb-1 whitespace-nowrap">RECORD PREDICTOR</div>
           {/* The switcher lives INSIDE the h1's own text flow (not as a
               flex sibling in a separate row) so it wraps along with the
@@ -260,10 +299,29 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               team name itself also opens it - clicking the small chevron
               specifically isn't an obvious enough target - by toggling the
               same lifted-up open state the chevron button controls. */}
-          <h1 className="text-[clamp(2rem,8vw,3rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-            <button type="button" onClick={() => setSwitcherOpen((v) => !v)} className="hover:opacity-80 transition-opacity cursor-pointer">
+          {/* Same clamp as the weekly page's WEEK N title - that page sets
+              the scale standard, so this one matches it rather than
+              running a size larger. */}
+          {/* break-words is the last-resort guard on the very narrowest
+              phones - the type size is pinned to match the weekly page
+              rather than shrinking further, so a word with nowhere left to
+              go breaks instead of running off the side of the page. */}
+          <h1 className="text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide break-words" style={{ fontFamily: "var(--font-display)" }}>
+            {/* A plain inline span, not a <button> - Chrome computes any
+                button as inline-block no matter what display it's given,
+                and as an atomic inline-block box a wrapped team name
+                claims the whole line width, stranding the switcher chevron
+                on a line of its own. Truly inline, the chevron sits right
+                after the last word. Nothing is lost for keyboard users:
+                the chevron beside it is a real focusable button that
+                toggles the same state, so this is a redundant pointer
+                affordance on top of it. */}
+            <span
+              onClick={() => setSwitcherOpen((v) => !v)}
+              className="hover:opacity-80 transition-opacity cursor-pointer"
+            >
               {team.city.toUpperCase()} {team.name.toUpperCase()}
-            </button>{" "}
+            </span>{" "}
             <TeamSwitcher
               currentTeam={trackedTeam}
               open={switcherOpen}
@@ -276,26 +334,24 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
 
       {loaded && (
         <>
-          <div className="flex flex-col gap-4 max-w-md mx-auto lg:hidden">
-            {schedule.map((row) => (
-              <SeasonRow key={row.week} row={row} trackedTeam={trackedTeam} picks={picks} setPick={setPick} />
-            ))}
-          </div>
-          {/* Explicit track width (not lg:grid-cols-2's 1fr 1fr) - same fix
-              as weekly/page.tsx's desktop grid. A 1fr column doesn't shrink
-              just because the (now-compact) cards inside it do; it stays
-              sized to the container and just re-centers the smaller column
-              content within it, which reads as a much bigger gap between
-              columns than gap-x-8. Track width matches SeasonGameCard's own
-              compact width exactly so the column hugs the smaller cards. */}
+          {/* One grid at every width now, exactly like weekly/page.tsx -
+              there's no separate full-size single-column mobile layout
+              anymore, which is what made these cards read as huge next to
+              the weekly page's. Explicit track width (not grid-cols-2's
+              1fr 1fr): a 1fr column doesn't shrink just because the scaled
+              card inside it does, it just leaves dead space that reads as
+              a far bigger gap between columns than the real one. The two
+              columns stay separate flex stacks so the schedule still reads
+              top-to-bottom then wraps (weeks 1-9, then 10-18) rather than
+              interleaving left/right the way grid auto-placement would. */}
           <div
-            className="hidden lg:grid lg:gap-x-8 lg:items-start lg:justify-center"
-            style={{ gridTemplateColumns: `repeat(2, ${SEASON_PILL_WIDTH * COMPACT_SCALE}px)` }}
+            className="grid items-start justify-center"
+            style={{ gridTemplateColumns: `repeat(2, ${SEASON_PILL_WIDTH * gridScale}px)`, columnGap: gridColumnGap }}
           >
             {[scheduleCol1, scheduleCol2].map((col, i) => (
-              <div key={i} className="flex flex-col gap-4">
+              <div key={i} className="flex flex-col" style={{ gap: 32 * gridScale }}>
                 {col.map((row) => (
-                  <SeasonRow key={row.week} row={row} trackedTeam={trackedTeam} picks={picks} setPick={setPick} compact />
+                  <SeasonRow key={row.week} row={row} trackedTeam={trackedTeam} picks={picks} setPick={setPick} scale={gridScale} />
                 ))}
               </div>
             ))}
@@ -316,17 +372,25 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
                 their natural content heights differed by up to 18px since
                 each has a different icon/text/padding combination, which
                 read as visibly uneven despite the widths already matching. */}
-            <div className="flex gap-2 sm:gap-3 justify-center items-center">
+            {/* Heights and the breakpoint match the weekly page's stat
+                pills exactly (56px, then 88px at lg) - these used to jump
+                to a much taller 108px all the way down at sm, which is a
+                big part of what made this page read as oversized next to
+                weekly. Widths still differ from that page's by design:
+                these lay their icon and label out side by side rather than
+                stacked, so they need more horizontal room at the same
+                height. */}
+            <div className="flex gap-2 lg:gap-5 justify-center items-center flex-wrap">
               <div
-                className="w-[108px] h-[54px] sm:w-[190px] sm:h-[108px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center gap-1.5 sm:gap-3"
+                className="w-[92px] h-[56px] lg:w-[190px] lg:h-[88px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center gap-1.5 lg:gap-3"
                 style={{ background: "transparent", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
-                <img src="/suspicious-dog.png" alt="" className="h-7 sm:h-12 w-auto select-none shrink-0" />
+                <img src="/suspicious-dog.png" alt="" className="h-7 lg:h-10 w-auto select-none shrink-0" />
                 <div className="text-left">
-                  <div className="text-base sm:text-3xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                  <div className="text-base lg:text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
                     {suspiciousCount}
                   </div>
-                  <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
+                  <div className="text-[7px] lg:text-[11px] leading-tight text-white/55 mt-0.5 lg:mt-1 tracking-wide">
                     SUSPICIOUS
                     <br />
                     PICKS
@@ -335,35 +399,35 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               </div>
 
               <div
-                className="h-[54px] sm:h-[108px] shrink-0 rounded-full border-2 border-white text-center pl-3.5 pr-4.5 sm:pl-7 sm:pr-10 flex items-center gap-1.5 sm:gap-3.5"
+                className="h-[56px] lg:h-[88px] shrink-0 rounded-full border-2 border-white text-center pl-3.5 pr-4.5 lg:pl-6 lg:pr-8 flex items-center gap-1.5 lg:gap-3"
                 style={{ background: team.color, boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
               >
-                <img src={team.logo} alt="" className="h-7 sm:h-[52px] w-auto shrink-0" crossOrigin="anonymous" />
+                <img src={team.logo} alt="" className="h-7 lg:h-[44px] w-auto shrink-0" crossOrigin="anonymous" />
                 <div className="text-left">
-                  <div className="text-lg sm:text-4xl leading-none text-white" style={{ fontFamily: "var(--font-display)" }}>
+                  <div className="text-lg lg:text-3xl leading-none text-white" style={{ fontFamily: "var(--font-display)" }}>
                     {wins}-{losses}
                   </div>
-                  <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
-                    <span className="sm:hidden">
+                  <div className="text-[7px] lg:text-[11px] leading-tight text-white/55 mt-0.5 lg:mt-1 tracking-wide">
+                    <span className="lg:hidden">
                       MY
                       <br />
                       PREDICTION
                     </span>
-                    <span className="hidden sm:inline whitespace-nowrap">MY PREDICTION</span>
+                    <span className="hidden lg:inline whitespace-nowrap">MY PREDICTION</span>
                   </div>
                 </div>
               </div>
 
               {winTotal !== undefined && (
                 <div
-                  className="w-[108px] h-[54px] sm:w-[190px] sm:h-[108px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center"
+                  className="w-[92px] h-[56px] lg:w-[190px] lg:h-[88px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center"
                   style={{ background: "transparent", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
                 >
                   <div className="text-center">
-                    <div className="text-base sm:text-4xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                    <div className="text-base lg:text-3xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
                       {winTotal}
                     </div>
-                    <div className="text-[7px] sm:text-[11px] leading-tight text-white/55 mt-0.5 sm:mt-1.5 tracking-wide">
+                    <div className="text-[7px] lg:text-[11px] leading-tight text-white/55 mt-0.5 lg:mt-1 tracking-wide">
                       VEGAS
                       <br />
                       PREDICTION
@@ -387,22 +451,27 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               aria-label="Share your predicted schedule"
               onClick={handleShare}
               disabled={sharing}
-              className="flex items-center gap-2 rounded-full px-7 py-3.5 text-lg mt-6 active:scale-95 transition-transform duration-150 disabled:opacity-60"
+              className="flex items-center gap-2 rounded-full mt-5 active:scale-95 transition-transform duration-150 disabled:opacity-60"
               style={{
                 fontFamily: "var(--font-display)",
                 background: team.color,
                 color: "#ffffff",
                 boxShadow: `0 4px 20px ${darkenColor(team.color, 1, 0.35)}`,
+                fontSize: shareBtnFontPx,
+                padding: `${shareBtnPadY}px ${shareBtnPadX}px`,
               }}
             >
               {sharing ? (
                 <>
-                  <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  <span
+                    className="rounded-full border-2 border-white/40 border-t-white animate-spin"
+                    style={{ height: shareBtnIconPx, width: shareBtnIconPx }}
+                  />
                   SHARING&hellip;
                 </>
               ) : (
                 <>
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 24 24" style={{ height: shareBtnIconPx, width: shareBtnIconPx }} fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 3v12" />
                     <path d="M7 8l5-5 5 5" />
                     <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
@@ -412,59 +481,66 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               )}
             </button>
 
-            <button
-              aria-label="Save and submit your predictions"
-              onClick={handleSaveAndSubmit}
-              disabled={saving}
-              className="flex items-center gap-2 rounded-full px-6 py-3 text-sm mt-3 active:scale-95 transition-transform duration-150 disabled:opacity-60"
-              style={{
-                fontFamily: "var(--font-display)",
-                background: "linear-gradient(135deg, #34d399, #059669)",
-                color: "#ffffff",
-              }}
-            >
-              {saving ? (
-                <>
-                  <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                  SAVING&hellip;
-                </>
-              ) : user ? (
-                // Signed in means auto-save has this covered - the button
-                // reads SAVED at rest instead of reverting to "Save &
-                // Submit" a few seconds later, which read as "did that not
-                // save?"
-                <>
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                  SAVED
-                </>
-              ) : (
-                <>
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-                    <path d="M17 21v-8H7v8" />
-                    <path d="M7 3v5h8" />
-                  </svg>
-                  SAVE &amp; SUBMIT PICKS
-                </>
-              )}
-            </button>
-            {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
+            {/* Save and Reset sit side by side in one row at a shared
+                height, same as the weekly page - stacking them made three
+                separate button rows below the pills. */}
+            <div className="flex flex-col items-center mt-3">
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  aria-label="Save and submit your predictions"
+                  onClick={handleSaveAndSubmit}
+                  disabled={saving}
+                  className="flex items-center justify-center gap-2 h-9 rounded-full px-6 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    background: "linear-gradient(135deg, #34d399, #059669)",
+                    color: "#ffffff",
+                  }}
+                >
+                  {saving ? (
+                    <>
+                      <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                      SAVING&hellip;
+                    </>
+                  ) : user ? (
+                    // Signed in means auto-save has this covered - the button
+                    // reads SAVED at rest instead of reverting to "Save &
+                    // Submit" a few seconds later, which read as "did that not
+                    // save?"
+                    <>
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                      SAVED
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+                        <path d="M17 21v-8H7v8" />
+                        <path d="M7 3v5h8" />
+                      </svg>
+                      SAVE &amp; SUBMIT PICKS
+                    </>
+                  )}
+                </button>
 
-            <button
-              aria-label="Reset your predictions"
-              onClick={async () => {
-                if (await confirm("Reset all your schedule predictions?", "RESET")) {
-                  resetPicks();
-                  posthog.capture("season_predictions_reset", { team: trackedTeam });
-                }
-              }}
-              className="text-xs text-white/40 hover:text-white/70 rounded-full px-4 py-1.5 border border-white/15 hover:border-white/30 transition-colors mt-3"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              RESET
-            </button>
+                <button
+                  aria-label="Reset your predictions"
+                  onClick={async () => {
+                    if (await confirm("Reset all your schedule predictions?", "RESET")) {
+                      resetPicks();
+                      posthog.capture("season_predictions_reset", { team: trackedTeam });
+                    }
+                  }}
+                  className="flex items-center justify-center h-9 text-xs text-white/40 hover:text-white/70 rounded-full px-4 border border-white/15 hover:border-white/30 transition-colors"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  RESET
+                </button>
+              </div>
+              {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
+            </div>
 
             <div className="flex items-center justify-between w-full max-w-xs mt-6 gap-3">
               <Link
@@ -507,18 +583,17 @@ function SeasonRow({
   trackedTeam,
   picks,
   setPick,
-  compact = false,
+  scale = 1,
 }: {
   row: ReturnType<typeof getTeamSchedule>[number];
   trackedTeam: TeamAbbr;
   picks: Record<number, TeamAbbr>;
   setPick: (week: number, winner: TeamAbbr) => void;
-  // Shrinks the whole row 15% - desktop's 2-column grid only, mirroring
-  // weekly/page.tsx's compact mode.
-  compact?: boolean;
+  // Responsive card scale solved by the page's grid - see gridScale.
+  scale?: number;
 }) {
   return "bye" in row ? (
-    <SeasonByeCard team={trackedTeam} week={row.week} compact={compact} />
+    <SeasonByeCard team={trackedTeam} week={row.week} scale={scale} />
   ) : (
     <SeasonGameCard
       away={row.away}
@@ -527,7 +602,7 @@ function SeasonRow({
       week={row.week}
       picked={picks[row.week]}
       onPick={(winner) => setPick(row.week, winner)}
-      compact={compact}
+      scale={scale}
     />
   );
 }

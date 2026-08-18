@@ -2,7 +2,6 @@
 
 import { TeamAbbr, TEAMS } from "@/data/teams";
 import { FOOTER_HEIGHT, LOGO_AREA_HEIGHT, PILL_HEIGHT, PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
-import { COMPACT_SCALE } from "@/components/GameCard";
 import { isSuspiciousPick } from "@/data/powerRankings";
 
 export { COMPACT_SCALE } from "@/components/GameCard";
@@ -22,15 +21,18 @@ export const SEASON_PILL_HEIGHT = PILL_HEIGHT;
 // suspicious-jumbo in globals.css); the resting rotation and the start
 // offset live in custom properties because the keyframes own `transform`,
 // so a static inline rotate would be overwritten while the animation runs.
-function SuspiciousBadge({ side }: { side: "left" | "right" }) {
-  const positionStyle = { [side === "left" ? "left" : "right"]: "-10px" } as const;
+function SuspiciousBadge({ side, scale = 1 }: { side: "left" | "right"; scale?: number }) {
+  const offset = 10 * scale;
+  const positionStyle = { [side === "left" ? "left" : "right"]: `-${offset}px` } as const;
   return (
     <img
       src="/suspicious-dog.png"
       alt="Suspicious pick"
-      className="absolute -top-2.5 z-40 h-11 w-auto pointer-events-none select-none"
+      className="absolute z-40 w-auto pointer-events-none select-none"
       style={{
         ...positionStyle,
+        top: `-${offset}px`,
+        height: 44 * scale,
         "--peek-rot": side === "left" ? "-22deg" : "22deg",
         "--jumbo-x": side === "left" ? "120px" : "-120px",
         transform: `rotate(${side === "left" ? "-22deg" : "22deg"})`,
@@ -49,7 +51,7 @@ export function SeasonGameCard({
   week,
   picked,
   onPick,
-  compact = false,
+  scale = 1,
 }: {
   away: TeamAbbr;
   home: TeamAbbr;
@@ -57,14 +59,14 @@ export function SeasonGameCard({
   week: number;
   picked?: TeamAbbr;
   onPick: (team: TeamAbbr) => void;
-  // Shrinks the whole card 15% - desktop's 2-column grid only, mirroring
-  // GameCard's own compact mode so the two pages scale identically.
-  compact?: boolean;
+  // Arbitrary scale factor rather than a boolean compact mode - the
+  // predictor's grid now solves for whatever scale fits the real viewport
+  // (same as the weekly page), so a single fixed 0.85 isn't enough.
+  scale?: number;
 }) {
   const awayTeam = TEAMS[away];
   const homeTeam = TEAMS[home];
   const hasPick = !!picked;
-  const scale = compact ? COMPACT_SCALE : 1;
 
   function outcomeFor(team: TeamAbbr): "win" | "loss" | null {
     if (!hasPick || team !== trackedTeam) return null;
@@ -94,7 +96,7 @@ export function SeasonGameCard({
         outcome={outcomeFor(away)}
         isFaded={isFadedFor(away)}
         onClick={() => onPick(away)}
-        badge={suspicious && picked === away ? <SuspiciousBadge side="left" /> : undefined}
+        badge={suspicious && picked === away ? <SuspiciousBadge side="left" scale={scale} /> : undefined}
         scale={scale}
       />
       <TeamHalfPill
@@ -103,7 +105,7 @@ export function SeasonGameCard({
         outcome={outcomeFor(home)}
         isFaded={isFadedFor(home)}
         onClick={() => onPick(home)}
-        badge={suspicious && picked === home ? <SuspiciousBadge side="right" /> : undefined}
+        badge={suspicious && picked === home ? <SuspiciousBadge side="right" scale={scale} /> : undefined}
         scale={scale}
       />
       <span
@@ -119,9 +121,8 @@ export function SeasonGameCard({
 // Matches SeasonGameCard's footprint exactly so a bye week doesn't disrupt
 // the rhythm of the list - same width/height, just a single muted pill
 // instead of a pickable pair.
-export function SeasonByeCard({ team, week, compact = false }: { team: TeamAbbr; week: number; compact?: boolean }) {
+export function SeasonByeCard({ team, week, scale = 1 }: { team: TeamAbbr; week: number; scale?: number }) {
   const t = TEAMS[team];
-  const scale = compact ? COMPACT_SCALE : 1;
   return (
     <div
       className="relative mx-auto shrink-0 rounded-full border-2 border-white/15 bg-white/[0.03] overflow-hidden"
