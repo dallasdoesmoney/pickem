@@ -5,12 +5,6 @@ import Link from "next/link";
 import { fetchWeeks, WeekRow } from "@/lib/supabase/admin";
 import { CURRENT_WEEK } from "@/data/games";
 
-// Fine grain over the glass, matching the noise-texture treatment from the
-// design review mockups - keeps the mesh-blob background from reading as a
-// flat gradient.
-const GRAIN_BG =
-  "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")";
-
 function WeeklyIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <svg viewBox="0 0 24 24" className={className} style={style} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
@@ -34,13 +28,14 @@ function TeamIcon({ className, style }: { className?: string; style?: React.CSSP
   );
 }
 
-// The Aurora Glass hub card - blurred mesh blobs behind frosted glass, fine
-// grain, a floating icon badge. Deliberately just an icon, a live/count
-// tag, a name, and a one-line subtitle - no avatar, stats, or standings
-// preview. Earlier versions packed the destination's own content into the
-// card (your record, a leaderboard slice, a team marquee) and it read as
+// The Aurora Glass hub card - blurred mesh blobs behind frosted glass, a
+// floating icon badge. Deliberately just an icon, a live/count tag, a
+// name, and a one-line subtitle - no avatar, stats, or standings preview.
+// Earlier versions packed the destination's own content into the card
+// (your record, a leaderboard slice, a team marquee) and it read as
 // "you're already looking at the page" instead of a choice between two
-// modes; that detail already lives on /weekly and /account.
+// modes; that detail already lives on /weekly and /account. No grain
+// texture - the rest of the app is flat, and this should match it.
 function HubCard({
   href,
   base,
@@ -67,17 +62,22 @@ function HubCard({
   return (
     <Link
       href={href}
-      className="group relative flex flex-col justify-between overflow-hidden rounded-[22px] p-[18px] transition-transform active:scale-[0.98]"
-      style={{ minHeight: 150, background: base, border: "1px solid rgba(255,255,255,0.20)" }}
+      className="group relative flex flex-col justify-between overflow-hidden rounded-[22px] border border-white/20 p-[18px] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-white/35 hover:shadow-[0_18px_40px_-12px_rgba(0,0,0,0.55)] active:translate-y-0 active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+      style={{ minHeight: 150, background: base }}
     >
-      <span className="absolute -left-[50px] -top-[70px] h-[200px] w-[200px] rounded-full" style={{ background: blob1, opacity: 0.6, filter: "blur(46px)" }} />
-      <span className="absolute -bottom-[80px] -right-[60px] h-[200px] w-[200px] rounded-full" style={{ background: blob2, opacity: 0.4, filter: "blur(46px)" }} />
+      <span
+        className="absolute -left-[50px] -top-[70px] h-[200px] w-[200px] rounded-full opacity-60 transition-[transform,opacity] duration-500 ease-out group-hover:scale-110 group-hover:opacity-85 motion-reduce:transition-none"
+        style={{ background: blob1, filter: "blur(46px)" }}
+      />
+      <span
+        className="absolute -bottom-[80px] -right-[60px] h-[200px] w-[200px] rounded-full opacity-40 transition-[transform,opacity] duration-500 ease-out group-hover:scale-110 group-hover:opacity-60 motion-reduce:transition-none"
+        style={{ background: blob2, filter: "blur(46px)" }}
+      />
       <span className="absolute inset-0" style={{ background: glassTint, backdropFilter: "blur(28px)" }} />
-      <span className="pointer-events-none absolute inset-0" style={{ opacity: 0.5, mixBlendMode: "overlay", backgroundImage: GRAIN_BG }} />
       <div className="relative z-10 flex h-full flex-col justify-between">
         <div className="flex items-center justify-between">
           <span
-            className="flex h-11 w-11 items-center justify-center rounded-2xl"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transition-none"
             style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", boxShadow: "0 8px 20px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.1)" }}
           >
             {icon}
@@ -91,7 +91,7 @@ function HubCard({
           <div className="text-[21px]" style={{ fontFamily: "var(--font-display)", color: "#f4f6fb" }}>
             {title}
           </div>
-          <div className="mt-0.5 text-[11.5px]" style={{ color: "rgba(244,246,251,0.65)" }}>
+          <div className="mt-1 text-[12px] leading-snug" style={{ color: "rgba(244,246,251,0.65)" }}>
             {subtitle}
           </div>
         </div>
@@ -133,7 +133,7 @@ export default function HomePage() {
         tag="Live"
         tagColor="#4ade80"
         title="Weekly Pick&rsquo;em"
-        subtitle={`Make your Week ${activeWeek} picks`}
+        subtitle={`Pick a winner in every Week ${activeWeek} game and climb the leaderboard.`}
       />
 
       <HubCard
@@ -146,7 +146,7 @@ export default function HomePage() {
         tag="32 teams"
         tagColor="#38bdf8"
         title="Team Pick&rsquo;em"
-        subtitle="Predict a team&rsquo;s 2026 season"
+        subtitle="Lock in one team for the season and track their record all year."
       />
     </main>
   );
