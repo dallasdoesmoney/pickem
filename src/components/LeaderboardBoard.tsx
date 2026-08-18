@@ -154,27 +154,31 @@ export function LeaderboardBoard() {
                 <span className="w-6 text-center text-sm text-white/40" style={{ fontFamily: "var(--font-display)" }}>
                   {i + 1}
                 </span>
-                {row.avatar_url ? (
-                  <img
-                    src={row.avatar_url}
-                    alt=""
-                    className="h-9 w-9 rounded-full object-cover shrink-0"
-                    style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 8px -2px ${rankColor}` }}
-                  />
-                ) : (
-                  <span
-                    className="h-9 w-9 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs"
-                    style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 8px -2px ${rankColor}` }}
-                  >
-                    {label.charAt(0).toUpperCase()}
+                <span className="relative shrink-0">
+                  {row.avatar_url ? (
+                    <img
+                      src={row.avatar_url}
+                      alt=""
+                      className="h-9 w-9 rounded-full object-cover"
+                      style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 8px -2px ${rankColor}` }}
+                    />
+                  ) : (
+                    <span
+                      className="h-9 w-9 flex items-center justify-center text-xs rounded-full bg-white/10"
+                      style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 8px -2px ${rankColor}` }}
+                    >
+                      {label.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="absolute left-1/2 -bottom-1 w-max -translate-x-1/2">
+                    <LevelBadge totalPoints={row.total_points} size="xs" />
                   </span>
-                )}
+                </span>
                 <span className="flex-1 min-w-0 flex items-center gap-1.5">
                   <span className="text-sm truncate">
                     {label}
                     {isMe && <span className="text-white/40"> (you)</span>}
                   </span>
-                  <LevelBadge totalPoints={row.total_points} />
                   {creatorIds.has(row.user_id) && <CreatorBadgeIcon size="sm" />}
                 </span>
                 <span className="text-sm shrink-0" style={{ fontFamily: "var(--font-display)" }}>

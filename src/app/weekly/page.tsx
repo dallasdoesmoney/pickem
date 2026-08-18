@@ -573,7 +573,7 @@ export default function Home() {
     const tabVisibleHeight = 21.2 * gridScale;
     const tabFontPx = Math.max(7.5, 10.6 * gridScale);
     const tabTextHeight = tabFontPx * 1.15;
-    const tabPadCenter = Math.max(1, (tabVisibleHeight - tabTextHeight) / 2);
+    const tabPadSlack = Math.max(1, tabVisibleHeight - tabTextHeight);
     return (
       <div key={key} className="relative">
         <div
@@ -584,8 +584,8 @@ export default function Home() {
             fontSize: tabFontPx,
             paddingLeft: tabPadX,
             paddingRight: tabPadX,
-            paddingTop: tabPadCenter,
-            paddingBottom: tabPadCenter + 10,
+            paddingTop: tabPadSlack * 0.15,
+            paddingBottom: tabPadSlack * 0.85 + 10,
           }}
         >
           {timeLabel}
