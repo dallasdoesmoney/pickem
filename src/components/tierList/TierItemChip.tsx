@@ -43,11 +43,9 @@ export function TierItemChip({
         // read much better bare, exactly as they do in the share image.
         // Selection is carried by a ring instead of a fill.
         // While a drag is in flight this element sits at the spot the item
-        // would land, so it becomes a dashed slot rather than a dim copy -
-        // it's showing a destination, not a duplicate of what's under the
-        // cursor.
-        background: dragging ? `${item.accent}1f` : selected ? `${item.accent}33` : "transparent",
-        border: dragging ? `2px dashed ${item.accent}` : undefined,
+        // would land. The faded logo alone carries that - an outline round
+        // it just added noise.
+        background: selected && !dragging ? `${item.accent}33` : "transparent",
         boxShadow: selected && !dragging ? `0 0 0 2px ${item.accent}, 0 6px 18px -6px ${item.accent}` : undefined,
         touchAction: "manipulation",
       }}
@@ -58,7 +56,7 @@ export function TierItemChip({
         crossOrigin="anonymous"
         draggable={false}
         className="w-full h-full object-contain select-none pointer-events-none transition-opacity duration-150"
-        style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.45))", opacity: dragging ? 0.22 : 1 }}
+        style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.45))", opacity: dragging ? 0.3 : 1 }}
       />
     </button>
   );

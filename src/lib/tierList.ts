@@ -1,4 +1,5 @@
 import { TierTemplate } from "@/data/tierTemplates";
+import { RANKS } from "@/lib/levels";
 
 // Tier identity is a generated id, never the label - users rename "S" to
 // "Elite" and every placement has to survive that. Labels are display
@@ -29,23 +30,19 @@ export const MIN_TIERS = 1;
 export const MAX_TIER_LABEL = 20;
 export const MAX_TITLE = 60;
 
-// Lifted straight off the rank ladder in src/lib/levels.ts, top-down:
-// GOAT, Hall of Famer, MVP, All-Pro, Pro Bowler. Anyone who has seen
-// their own level badge already knows pink outranks orange, so the tiers
-// inherit that meaning instead of inventing a second colour language.
-//
-// F breaks the sequence deliberately: the next rank down is Team Captain
-// lime, and a green bottom tier would read as "good" against every other
-// green in the app. Practice Squad slate - the actual bottom of the
-// ladder - says "didn't make the roster", which is the point.
-const DEFAULT_TIER_SPEC: [label: string, accent: string][] = [
-  ["S", "#f472b6"],
-  ["A", "#c084fc"],
-  ["B", "#f87171"],
-  ["C", "#fb923c"],
-  ["D", "#facc15"],
-  ["F", "#94a3b8"],
-];
+// Tier colours ARE the rank ladder, walked from the top down: GOAT pink,
+// Hall of Famer purple, MVP salmon, All-Pro orange, Pro Bowler yellow,
+// Team Captain green, and onward if more tiers get added. Derived from
+// RANKS rather than copied, so retuning a rank colour in levels.ts moves
+// the tier list with it instead of quietly leaving the two out of sync.
+// RANKS has ten entries, which covers MAX_TIERS exactly.
+const TIER_ACCENTS: string[] = [...RANKS].reverse().map((r) => r.color);
+
+const DEFAULT_TIER_LABELS = ["S", "A", "B", "C", "D", "F"];
+
+function accentForIndex(i: number): string {
+  return TIER_ACCENTS[i % TIER_ACCENTS.length];
+}
 
 // Counter-based rather than crypto.randomUUID(): ids only need to be
 // unique within one list, and a deterministic sequence keeps SSR and the
@@ -58,7 +55,7 @@ export function newTierId() {
 }
 
 export function createInitialState(template: TierTemplate): TierListState {
-  const tiers = DEFAULT_TIER_SPEC.map(([label, accent], i) => ({ id: `t_${i}_${label.toLowerCase()}`, label, accent }));
+  const tiers = DEFAULT_TIER_LABELS.map((label, i) => ({ id: `t_${i}_${label.toLowerCase()}`, label, accent: accentForIndex(i) }));
   const placements: Record<string, string[]> = {};
   for (const t of tiers) placements[t.id] = [];
   return {
@@ -129,7 +126,7 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
     case "addTier": {
       if (state.tiers.length >= MAX_TIERS) return state;
       const id = newTierId();
-      const accent = DEFAULT_TIER_SPEC[state.tiers.length % DEFAULT_TIER_SPEC.length][1];
+      const accent = accentForIndex(state.tiers.length);
       const tier: Tier = { id, label: "NEW", accent };
       const at = action.afterTierId ? state.tiers.findIndex((t) => t.id === action.afterTierId) : -1;
       const tiers = [...state.tiers];
@@ -231,7 +228,7 @@ export function sanitizeState(raw: unknown, template: TierTemplate): TierListSta
       // IS positional: first tier is best, whatever it's been renamed to.
       // When colour customisation ships, this is the one line that has to
       // start respecting a user-set value.
-      accent: DEFAULT_TIER_SPEC[tiers.length % DEFAULT_TIER_SPEC.length][1],
+      accent: accentForIndex(tiers.length),
     });
   }
   if (!tiers.length) return null;

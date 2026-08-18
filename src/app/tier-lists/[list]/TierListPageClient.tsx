@@ -61,6 +61,9 @@ export default function TierListPageClient({
   const [sheetItem, setSheetItem] = useState<TierItem | null>(null);
   const [landedId, setLandedId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  // Which container the drag is currently over. undefined = no drag,
+  // null = the unranked pool, otherwise a tier id.
+  const [overTier, setOverTier] = useState<string | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -114,12 +117,18 @@ export default function TierListPageClient({
 
   // Solve chip size from real available width so two columns of logos
   // never overflow a 320px phone.
-  const { chipSize } = useMemo(() => {
+  const { chipSize, railWidth } = useMemo(() => {
     const content = Math.min(viewportWidth, 896) - 32;
-    const track = content - 64 - 16;
-    const perRow = viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : 10;
+    // The rail got wider to give tier names room, but a phone can't spare
+    // it - a fixed 92 there would have cost the logos more than the label
+    // gained.
+    const rail = viewportWidth < 768 ? 68 : 92;
+    const track = content - rail - 16;
+    const perRow = viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : 8;
     const size = Math.floor((track - (perRow - 1) * 6) / perRow);
-    return { chipSize: Math.max(34, Math.min(58, size)) };
+    // Desktop earns a bigger mark than the old 58px cap allowed - this
+    // page IS the logos, so they should be what you actually look at.
+    return { chipSize: Math.max(34, Math.min(74, size)), railWidth: rail };
   }, [viewportWidth]);
 
   const sensors = useSensors(
@@ -155,6 +164,12 @@ export default function TierListPageClient({
     return null;
   }
 
+  function currentTierOf(itemId: string): string | null | undefined {
+    const t = findItemTier(state, itemId);
+    if (t) return t;
+    return state.unranked.includes(itemId) ? null : undefined;
+  }
+
   function applyMove(activeId: string, overId: string, flash: boolean) {
     const target = containerOf(overId);
     if (!target) return;
@@ -163,8 +178,7 @@ export default function TierListPageClient({
     const overIsItem = !overId.startsWith("tier:") && overId !== "unranked";
     const index = overIsItem ? list.indexOf(overId) : null;
 
-    const from = findItemTier(state, activeId);
-    const already = from === target.tier;
+    const already = currentTierOf(activeId) === target.tier;
     // Nothing to do if it's already sitting exactly where it would land.
     if (already && (index === null || list[index] === activeId)) return;
 
@@ -178,18 +192,38 @@ export default function TierListPageClient({
     if (flash && target.tier !== null) flashLanded(activeId);
   }
 
-  // Live repositioning while dragging. Without this the list sat frozen
-  // until the pointer was released, which read as the drag not working at
-  // all on desktop - on mobile it goes unnoticed because tap-to-rank is
-  // the primary path there.
+  // Two jobs while a drag is in flight.
+  //
+  // First, publish which container is being targeted. This can't come from
+  // each row's own useDroppable().isOver, because once a row has items in
+  // it dnd-kit reports the ITEM under the cursor as `over`, not the row -
+  // so a row only ever lit up while it was still empty.
+  //
+  // Second, move the item live so it lands where you're pointing. The
+  // distinction that matters is whether the cursor is over an ITEM or over
+  // the empty gap of a container:
+  //   - over an item -> reorder to that item's slot, in any container.
+  //     This is what makes dropping BETWEEN two teams work.
+  //   - over a container's gap -> only act if crossing into a new one.
+  //     Re-dispatching here just thrashed the row's ordering while the
+  //     cursor sat in dead space between chips.
   function handleDragOver(e: DragOverEvent) {
     const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    applyMove(String(active.id), String(over.id), false);
+    if (!over) return;
+    const overId = String(over.id);
+    const target = containerOf(overId);
+    if (!target) return;
+    setOverTier(target.tier);
+
+    const overIsItem = !overId.startsWith("tier:") && overId !== "unranked";
+    const sameContainer = currentTierOf(String(active.id)) === target.tier;
+    if (!overIsItem && sameContainer) return;
+    applyMove(String(active.id), overId, false);
   }
 
   function handleDragEnd(e: DragEndEvent) {
     setDraggingId(null);
+    setOverTier(undefined);
     // The pointerup that ends a drag also fires a click on the chip
     // underneath, which would immediately select (desktop) or open the
     // sheet (touch) on whatever was just dropped.
@@ -394,7 +428,10 @@ export default function TierListPageClient({
           setSelectedId(null);
         }}
         onDragOver={handleDragOver}
-        onDragCancel={() => setDraggingId(null)}
+        onDragCancel={() => {
+          setDraggingId(null);
+          setOverTier(undefined);
+        }}
         onDragEnd={handleDragEnd}
       >
         {/* Solid panel behind the whole board. The site paints a tiled
@@ -410,9 +447,11 @@ export default function TierListPageClient({
               itemIds={state.placements[tier.id] ?? []}
               template={template}
               chipSize={chipSize}
+              railWidth={railWidth}
               editing={editing}
               selectedItemId={selectedId}
               landedItemId={landedId}
+              hot={overTier === tier.id}
               isDropTarget={!!selectedId}
               canMoveUp={i > 0}
               canMoveDown={i < state.tiers.length - 1}
@@ -439,6 +478,7 @@ export default function TierListPageClient({
         )}
 
         <UnrankedPool
+          hot={draggingId !== null && overTier === null}
           ids={state.unranked}
           template={template}
           chipSize={chipSize}
@@ -577,6 +617,7 @@ function ProgressBar({ ranked, total, complete }: { ranked: number; total: numbe
 }
 
 function UnrankedPool({
+  hot,
   ids,
   template,
   chipSize,
@@ -586,6 +627,7 @@ function UnrankedPool({
   onPlaceSelected,
   onShuffle,
 }: {
+  hot: boolean;
   ids: string[];
   template: TierTemplate;
   chipSize: number;
@@ -595,7 +637,9 @@ function UnrankedPool({
   onPlaceSelected: () => void;
   onShuffle: () => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: "unranked" });
+  // Registered so an empty pool is still a drop target; the lit state
+  // comes from the page, which resolves item-hovers to their container.
+  const { setNodeRef } = useDroppable({ id: "unranked" });
   const items = ids.map((id) => resolveItem(template, id));
 
   return (
@@ -629,12 +673,12 @@ function UnrankedPool({
         className="rounded-2xl border p-2.5 flex flex-wrap gap-1.5 content-start transition-[background,border-color,box-shadow] duration-150"
         style={{
           minHeight: chipSize + 20,
-          borderColor: isOver ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.10)",
+          borderColor: hot ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.10)",
           // Opaque, same as the tier board above it. Lifts on drag-over
           // exactly like a tier row does, so dropping a team back out
           // feels like the same gesture in reverse.
-          background: isOver ? "#16294d" : "#101f3d",
-          boxShadow: isOver ? "0 0 0 2px rgba(255,255,255,0.5), 0 10px 30px -12px rgba(0,0,0,0.9)" : undefined,
+          background: hot ? "#16294d" : "#101f3d",
+          boxShadow: hot ? "0 0 0 2px rgba(255,255,255,0.5), 0 10px 30px -12px rgba(0,0,0,0.9)" : undefined,
           cursor: selectedItemId ? "pointer" : undefined,
         }}
       >

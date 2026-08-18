@@ -12,7 +12,9 @@ export function TierRow({
   itemIds,
   template,
   chipSize,
+  railWidth,
   editing,
+  hot,
   selectedItemId,
   landedItemId,
   isDropTarget,
@@ -30,7 +32,12 @@ export function TierRow({
   itemIds: string[];
   template: TierTemplate;
   chipSize: number;
+  railWidth: number;
   editing: boolean;
+  // Resolved by the page, not by this row's own isOver: once a row has
+  // items, dnd-kit reports the item under the cursor as the drop target
+  // rather than the row, so isOver only ever fired on empty rows.
+  hot: boolean;
   selectedItemId: string | null;
   landedItemId: string | null;
   isDropTarget: boolean;
@@ -43,14 +50,13 @@ export function TierRow({
   onItemActivate: (item: TierItem) => void;
   onPlaceSelected: () => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `tier:${tier.id}` });
+  // Registered so an empty row is still a drop target; the lit state
+  // arrives as a prop instead (see `hot` above).
+  const { setNodeRef } = useDroppable({ id: `tier:${tier.id}` });
   const items = itemIds.map((id) => resolveItem(template, id));
-  // Two different states, deliberately weighted differently. `hot` is the
-  // one row a drag is actually over and gets the full treatment. `armed`
-  // is every row while an item is selected for tap-to-place - giving all
-  // six of those a full glow at once would just be noise.
-  const hot = isOver;
-  const armed = isDropTarget && !isOver;
+  // `armed` is every row while an item is selected for tap-to-place -
+  // giving all six a full glow at once would just be noise.
+  const armed = isDropTarget && !hot;
 
   return (
     <div
@@ -76,7 +82,7 @@ export function TierRow({
       <div
         className="shrink-0 flex items-center justify-center transition-[width,filter] duration-150"
         style={{
-          width: editing ? 116 : hot ? 88 : 74,
+          width: editing ? railWidth + 40 : hot ? railWidth + 14 : railWidth,
           background: tier.accent,
           clipPath: "polygon(0 0, 84% 0, 100% 50%, 84% 100%, 0 100%)",
           filter: hot ? "brightness(1.18)" : undefined,
@@ -131,12 +137,14 @@ export function TierRow({
           ))}
         </SortableContext>
 
-        {items.length === 0 && (
+        {/* No "EMPTY" placeholder - an empty row is self-evidently empty.
+            Only the actionable hints render. */}
+        {items.length === 0 && (selectedItemId || hot) && (
           <span
             className="self-center text-[11px] tracking-wide px-1 transition-colors duration-150"
-            style={{ color: hot || armed ? tier.accent : "rgba(255,255,255,0.28)" }}
+            style={{ color: tier.accent }}
           >
-            {selectedItemId ? "TAP TO PLACE HERE" : hot ? "DROP HERE" : "EMPTY"}
+            {selectedItemId ? "TAP TO PLACE HERE" : "DROP HERE"}
           </span>
         )}
       </div>
