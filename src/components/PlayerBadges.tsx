@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchUserBadges } from "@/lib/supabase/badges";
 import { badgeDef, BADGE_CATALOG } from "@/lib/badgeCatalog";
+import { CreatorBadgeIcon } from "@/components/CreatorBadgeIcon";
 
 const CREATOR_KEY = "creator";
 
@@ -33,11 +34,9 @@ export function PlayerBadges({ userId }: { userId: string }) {
           type="button"
           onClick={() => setExplainerOpen(true)}
           aria-label={`${creatorDef.label} badge - tap to learn more`}
-          title={creatorDef.label}
-          className="h-6 w-6 rounded-full flex items-center justify-center text-sm shrink-0 active:scale-90 transition-transform"
-          style={{ background: creatorDef.color }}
+          className="active:scale-90 transition-transform"
         >
-          {creatorDef.icon}
+          <CreatorBadgeIcon className="h-9 w-9 text-lg" />
         </button>
       )}
       {otherKeys.map((key) => {

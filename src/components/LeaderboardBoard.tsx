@@ -5,9 +5,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { fetchMyFriendIds } from "@/lib/supabase/follows";
+import { fetchCreatorUserIds } from "@/lib/supabase/badges";
 import { errorMessage } from "@/lib/errorMessage";
 import { PlayerProfileModal } from "@/components/PlayerProfileModal";
 import { LevelBadge } from "@/components/LevelBadge";
+import { CreatorBadgeIcon } from "@/components/CreatorBadgeIcon";
 import { getLevelInfo } from "@/lib/levels";
 
 type BoardView = "global" | "friends";
@@ -59,13 +61,19 @@ export function LeaderboardBoard() {
   const { requestSignIn, signInModal } = useSignInModal();
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [friendIds, setFriendIds] = useState<Set<string> | null>(null);
+  const [creatorIds, setCreatorIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<BoardView>("global");
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<LeaderboardRow | null>(null);
 
   useEffect(() => {
     fetchLeaderboard()
-      .then(setRows)
+      .then((fetched) => {
+        setRows(fetched);
+        fetchCreatorUserIds(fetched.map((r) => r.user_id))
+          .then(setCreatorIds)
+          .catch(() => {});
+      })
       .catch((err) => setError(errorMessage(err)));
   }, []);
 
@@ -167,6 +175,7 @@ export function LeaderboardBoard() {
                     {isMe && <span className="text-white/40"> (you)</span>}
                   </span>
                   <LevelBadge totalPoints={row.total_points} />
+                  {creatorIds.has(row.user_id) && <CreatorBadgeIcon className="h-4 w-4 text-[9px]" />}
                 </span>
                 <span className="text-sm shrink-0" style={{ fontFamily: "var(--font-display)" }}>
                   {row.correct}-{row.graded - row.correct}
