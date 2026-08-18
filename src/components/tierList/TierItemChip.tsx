@@ -32,17 +32,18 @@ export function TierItemChip({
       aria-pressed={selected}
       title={item.label}
       onClick={onActivate}
-      className={`relative shrink-0 rounded-xl flex items-center justify-center transition-[box-shadow,border-color,transform] duration-150 ${
-        selected ? "border-2" : "border border-white/10"
-      } ${landed ? "tier-anim-land" : ""} ${dragging ? "opacity-30" : "hover:brightness-110 active:scale-95"}`}
+      className={`relative shrink-0 rounded-xl flex items-center justify-center transition-[box-shadow,transform] duration-150 ${
+        landed ? "tier-anim-land" : ""
+      } ${dragging ? "opacity-30" : "hover:scale-110 active:scale-95"}`}
       style={{
         width: size,
         height: size,
-        // A faint wash of the team's own colour keeps 32 dark logos from
-        // reading as a grey slab, without competing with the mark itself.
-        background: `${item.accent}2e`,
-        borderColor: selected ? item.accent : undefined,
-        boxShadow: selected ? `0 0 0 3px ${item.accent}55, 0 6px 18px -6px ${item.accent}` : undefined,
+        // No plate behind the mark - the ESPN "500-dark" logos are already
+        // built to sit on dark ground (see espnLogo in teams.ts), and they
+        // read much better bare, exactly as they do in the share image.
+        // Selection is carried by a ring instead of a fill.
+        background: selected ? `${item.accent}33` : "transparent",
+        boxShadow: selected ? `0 0 0 2px ${item.accent}, 0 6px 18px -6px ${item.accent}` : undefined,
         touchAction: "manipulation",
       }}
     >
@@ -51,7 +52,8 @@ export function TierItemChip({
         alt=""
         crossOrigin="anonymous"
         draggable={false}
-        className="w-[78%] h-[78%] object-contain select-none pointer-events-none"
+        className="w-full h-full object-contain select-none pointer-events-none"
+        style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.45))" }}
       />
     </button>
   );

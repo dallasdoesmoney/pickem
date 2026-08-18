@@ -51,8 +51,10 @@ export function TierRow({
     <div
       className="flex items-stretch rounded-2xl overflow-hidden border transition-colors duration-150"
       style={{
-        borderColor: active ? tier.accent : "rgba(255,255,255,0.10)",
-        background: active ? `${tier.accent}14` : "rgba(255,255,255,0.03)",
+        borderColor: active ? tier.accent : "rgba(255,255,255,0.08)",
+        // Darker than the panel it sits on, so each tier reads as an inset
+        // well rather than blending into the board.
+        background: active ? `${tier.accent}1f` : "#0c1830",
       }}
     >
       {/* Label rail. Always visible, always the tier's colour - it's the

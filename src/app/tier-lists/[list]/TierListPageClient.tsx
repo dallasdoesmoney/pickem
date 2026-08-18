@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
 import {
+  CollisionDetection,
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
   closestCenter,
+  pointerWithin,
   useDroppable,
   useSensor,
   useSensors,
@@ -64,6 +67,10 @@ export default function TierListPageClient({
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const dbLoadedFor = useRef<string | null>(null);
+  // Bumped per drag so a drag's many intermediate moves coalesce into one
+  // undo step, without merging into the *previous* drag of the same item.
+  const dragSession = useRef(0);
+  const suppressClick = useRef(false);
 
   useEffect(() => {
     function measure() {
@@ -130,32 +137,73 @@ export default function TierListPageClient({
     setTimeout(() => setLandedId((cur) => (cur === id ? null : cur)), 340);
   }, []);
 
+  // pointerWithin tracks the actual cursor, which is what makes dropping
+  // into a big empty tier row feel predictable. It returns nothing for the
+  // keyboard sensor (no pointer), so closestCenter backs it up.
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const hits = pointerWithin(args);
+    return hits.length ? hits : closestCenter(args);
+  }, []);
+
   function containerOf(overId: string): { tier: string | null } | null {
     if (overId === "unranked") return { tier: null };
     if (overId.startsWith("tier:")) return { tier: overId.slice(5) };
-    // Dropped onto another item - inherit that item's container.
+    // Over another item - inherit that item's container.
     const t = findItemTier(state, overId);
     if (t) return { tier: t };
     if (state.unranked.includes(overId)) return { tier: null };
     return null;
   }
 
-  function handleDragEnd(e: DragEndEvent) {
-    setDraggingId(null);
-    const { active, over } = e;
-    if (!over) return;
-    const target = containerOf(String(over.id));
+  function applyMove(activeId: string, overId: string, flash: boolean) {
+    const target = containerOf(overId);
     if (!target) return;
 
     const list = target.tier === null ? state.unranked : state.placements[target.tier] ?? [];
-    const overIsItem = !String(over.id).startsWith("tier:") && String(over.id) !== "unranked";
-    const index = overIsItem ? list.indexOf(String(over.id)) : null;
+    const overIsItem = !overId.startsWith("tier:") && overId !== "unranked";
+    const index = overIsItem ? list.indexOf(overId) : null;
 
-    dispatch({ type: "moveItem", itemId: String(active.id), toTier: target.tier, toIndex: index });
-    if (target.tier !== null) flashLanded(String(active.id));
+    const from = findItemTier(state, activeId);
+    const already = from === target.tier;
+    // Nothing to do if it's already sitting exactly where it would land.
+    if (already && (index === null || list[index] === activeId)) return;
+
+    dispatch({
+      type: "moveItem",
+      itemId: activeId,
+      toTier: target.tier,
+      toIndex: index,
+      mergeToken: `${activeId}:${dragSession.current}`,
+    });
+    if (flash && target.tier !== null) flashLanded(activeId);
+  }
+
+  // Live repositioning while dragging. Without this the list sat frozen
+  // until the pointer was released, which read as the drag not working at
+  // all on desktop - on mobile it goes unnoticed because tap-to-rank is
+  // the primary path there.
+  function handleDragOver(e: DragOverEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    applyMove(String(active.id), String(over.id), false);
+  }
+
+  function handleDragEnd(e: DragEndEvent) {
+    setDraggingId(null);
+    // The pointerup that ends a drag also fires a click on the chip
+    // underneath, which would immediately select (desktop) or open the
+    // sheet (touch) on whatever was just dropped.
+    suppressClick.current = true;
+    setTimeout(() => {
+      suppressClick.current = false;
+    }, 0);
+    const { active, over } = e;
+    if (!over) return;
+    applyMove(String(active.id), String(over.id), true);
   }
 
   function handleItemActivate(item: TierItem) {
+    if (suppressClick.current) return;
     if (isCompact) {
       setSheetItem(item);
       return;
@@ -347,15 +395,21 @@ export default function TierListPageClient({
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collisionDetection}
         onDragStart={(e: DragStartEvent) => {
+          dragSession.current += 1;
           setDraggingId(String(e.active.id));
           setSelectedId(null);
         }}
+        onDragOver={handleDragOver}
         onDragCancel={() => setDraggingId(null)}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex flex-col gap-2">
+        {/* Solid panel behind the whole board. The site paints a tiled
+            logo watermark at the page level, and letting it show through
+            the tier rows made the list read as a translucent overlay
+            rather than the thing you're actually working on. */}
+        <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-[#101f3d] p-2">
           {state.tiers.map((tier, i) => (
             <TierRow
               key={tier.id}
@@ -590,7 +644,8 @@ function UnrankedPool({
         style={{
           minHeight: chipSize + 20,
           borderColor: isOver ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.10)",
-          background: isOver ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
+          // Opaque, same as the tier board above it.
+          background: isOver ? "#16294d" : "#101f3d",
           cursor: selectedItemId ? "pointer" : undefined,
         }}
       >

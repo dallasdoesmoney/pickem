@@ -16,6 +16,10 @@ function storageKey(slug: string) {
 function mergeKeyFor(action: TierListAction): string | null {
   if (action.type === "renameTier") return `rename:${action.tierId}`;
   if (action.type === "setTitle") return "title";
+  // One drag = one undo step, however many hovers it passed through. The
+  // token carries a per-drag session id, so dragging the same item twice
+  // still produces two separate entries.
+  if (action.type === "moveItem" && action.mergeToken) return `move:${action.mergeToken}`;
   return null;
 }
 

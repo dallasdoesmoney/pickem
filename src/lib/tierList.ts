@@ -63,7 +63,10 @@ export function createInitialState(template: TierTemplate): TierListState {
 
 export type TierListAction =
   // toTier null === back to the unranked pool. toIndex null === append.
-  | { type: "moveItem"; itemId: string; toTier: string | null; toIndex: number | null }
+  // mergeToken groups the flurry of moves a single drag produces (one per
+  // dragOver, plus the final drop) into one undo step - without it,
+  // undoing a drag would rewind it one hover at a time.
+  | { type: "moveItem"; itemId: string; toTier: string | null; toIndex: number | null; mergeToken?: string }
   | { type: "renameTier"; tierId: string; label: string }
   | { type: "addTier"; afterTierId?: string }
   | { type: "deleteTier"; tierId: string }
