@@ -119,7 +119,7 @@ function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeo
 // have an account. Lives inside WeeklyRecordPill's own bordered pill (see
 // below) rather than sitting next to it as a separate circle.
 function ProfileAvatar({ url, initial, signedIn }: { url?: string | null; initial: string; signedIn: boolean }) {
-  const dims = "h-7 w-7 sm:h-9 sm:w-9 shrink-0 rounded-full flex items-center justify-center text-xs sm:text-sm";
+  const dims = "h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-full flex items-center justify-center text-sm sm:text-base";
   if (!signedIn) {
     return <span className={`${dims} bg-white/5 border border-dashed border-white/25 text-white/40`}>?</span>;
   }
@@ -150,6 +150,7 @@ function WeeklyRecordPill({
   initial,
   signedIn,
   onActivate,
+  onOpenStandings,
 }: {
   seasonCorrect: number;
   seasonGraded: number;
@@ -161,6 +162,7 @@ function WeeklyRecordPill({
   initial: string;
   signedIn: boolean;
   onActivate?: () => void;
+  onOpenStandings?: () => void;
 }) {
   const segments = [
     { icon: "🏆", value: `${seasonCorrect}-${seasonGraded - seasonCorrect}`, label: "SEASON RECORD", color: "#c084fc" },
@@ -171,30 +173,37 @@ function WeeklyRecordPill({
   const inner = (
     <>
       <ProfileAvatar url={avatarUrl} initial={initial} signedIn={signedIn} />
-      <div className="w-px self-stretch bg-white/10 mx-1 sm:mx-2" />
+      <div className="w-px self-stretch bg-white/10 mx-1.5 sm:mx-2.5" />
       {segments.map((seg, i) => (
         <div key={seg.label} className="flex items-center">
-          {i > 0 && <div className="w-px self-stretch bg-white/10 mx-3 sm:mx-5" />}
-          <div className="flex flex-col items-center gap-0.5 px-1">
+          {i > 0 && <div className="w-px self-stretch bg-white/10 mx-4 sm:mx-6" />}
+          <div className="flex flex-col items-center gap-0.5 px-1.5">
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] sm:text-xs leading-none">{seg.icon}</span>
-              <span className="text-sm sm:text-base leading-none" style={{ fontFamily: "var(--font-display)", color: seg.color }}>
+              <span className="text-xs sm:text-sm leading-none">{seg.icon}</span>
+              <span className="text-base sm:text-lg leading-none whitespace-nowrap" style={{ fontFamily: "var(--font-display)", color: seg.color }}>
                 {seg.value}
               </span>
             </div>
-            <span className="text-[7px] sm:text-[8px] text-white/50 tracking-wide whitespace-nowrap">{seg.label}</span>
+            <span className="text-[8px] sm:text-[9px] text-white/50 tracking-wide whitespace-nowrap">{seg.label}</span>
           </div>
         </div>
       ))}
     </>
   );
 
-  const pillClass = "flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2 py-1.5 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]";
+  const pillClass = "flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2.5 py-2 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]";
 
   return (
     <div className="flex justify-center mb-5 lg:mb-7">
       {signedIn ? (
-        <div className={pillClass}>{inner}</div>
+        <button
+          type="button"
+          onClick={onOpenStandings}
+          aria-label="View standings"
+          className={`${pillClass} hover:border-white/30 transition-colors cursor-pointer`}
+        >
+          {inner}
+        </button>
       ) : (
         <button
           type="button"
@@ -608,7 +617,11 @@ export default function Home() {
 
           {pageTab === "picks" ? (
             <div className="text-center">
-              <span className="relative inline-flex items-center gap-2 text-lg text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
+              <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SIDELINE BREW &middot; PICK&rsquo;EM</div>
+              <span
+                className="relative inline-flex items-center gap-2 text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
                 WEEK {activeWeek}
                 <WeekSwitcher
                   weeks={weeks}
@@ -616,21 +629,15 @@ export default function Home() {
                   onSelectWeek={setActiveWeek}
                   open={weekSwitcherOpen}
                   onOpenChange={setWeekSwitcherOpen}
+                  className="self-center"
                 />
                 <span
-                  className="absolute top-1/2 -right-4 translate-x-full -translate-y-1/2 whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
+                  className="absolute top-0 -right-2 translate-x-full whitespace-nowrap rotate-[10deg] text-[11px] text-white rounded-full px-2.5 py-0.5 border-2 border-white"
                   style={{ fontFamily: "var(--font-display)", background: "#1b2947", boxShadow: "2.5px 2.5px 0 rgba(0,0,0,0.45)" }}
                 >
                   {hasResults ? `✅ ${correctCount}/${gradedCount}` : `🏈 ${pickedCount}/${games.length}`}
                 </span>
               </span>
-              <div className="w-10 h-[2px] bg-white/25 mx-auto mb-2" />
-              <h1
-                className="text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                NFL PICK&rsquo;EM
-              </h1>
             </div>
           ) : (
             <div className="text-center">
@@ -663,6 +670,7 @@ export default function Home() {
               initial={(profile?.display_name || profile?.username || "?").charAt(0).toUpperCase()}
               signedIn={!!user}
               onActivate={!user ? () => requestSignIn() : undefined}
+              onOpenStandings={() => setPageTab("leaderboard")}
             />
             {/* Explicit track width (not grid-cols-2's 1fr 1fr) - a 1fr
                 column doesn't shrink just because the card inside it does,
