@@ -1,5 +1,6 @@
 import { Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
+import { gameTimeLabel } from "@/lib/groupGames";
 
 export type FlowItem =
   | { type: "header"; key: string; label: string }
@@ -13,6 +14,27 @@ export function flatten(groups: DayGroup[]): FlowItem[] {
     { type: "header" as const, key: `h-${group.label}`, label: group.label },
     ...group.games.map((game) => ({ type: "game" as const, key: game.id, game })),
   ]);
+}
+
+export type DesktopCell = { game: Game; timeLabel: string };
+export type DesktopRow = { key: string; left: DesktopCell; right: DesktopCell | null };
+
+// No more day-group dividers at all - every matchup carries its own
+// "WED · 8:20PM" tab instead (see the desktop grid's renderGridGame), so
+// there's no row ever spent on a label, full stop. Games just pair up two
+// at a time in kickoff order; sorted here rather than trusted from the
+// caller since groupGamesByDay's Map only preserves first-occurrence
+// order, not a true chronological sort.
+export function buildDesktopRows(games: Game[]): DesktopRow[] {
+  const sorted = [...games].sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
+  const rows: DesktopRow[] = [];
+  for (let i = 0; i < sorted.length; i += 2) {
+    const left: DesktopCell = { game: sorted[i], timeLabel: gameTimeLabel(sorted[i].kickoff) };
+    const rightGame = sorted[i + 1];
+    const right: DesktopCell | null = rightGame ? { game: rightGame, timeLabel: gameTimeLabel(rightGame.kickoff) } : null;
+    rows.push({ key: sorted[i].id, left, right });
+  }
+  return rows;
 }
 
 // Splits into two columns by total ROW count (headers + games), not just

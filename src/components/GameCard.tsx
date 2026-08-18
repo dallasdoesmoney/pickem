@@ -91,7 +91,7 @@ export function GameCard({
   isLockPick,
   hasLock,
   onToggleLock,
-  compact = false,
+  scale = 1,
 }: {
   game: Game;
   picked?: TeamAbbr;
@@ -110,15 +110,16 @@ export function GameCard({
   // lock is cleared.
   hasLock?: boolean;
   onToggleLock?: () => void;
-  // Shrinks the whole card 15% - desktop's 2-column grid only
-  // (renderGridCell in weekly/page.tsx), never the single mobile column
-  // (renderMobileItem), which stays full size.
-  compact?: boolean;
+  // Uniform shrink for the two-column grid, which now runs at every
+  // viewport width (not just desktop) - the grid computes this from the
+  // actual available column width so two cards always fit side by side,
+  // down to the smallest phone. Defaults to 1 (full size) for any other
+  // caller.
+  scale?: number;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
   const hasResult = !!result;
-  const scale = compact ? COMPACT_SCALE : 1;
 
   // Whichever side matters visually - your pick if you made one, or the
   // real winner if you didn't (e.g. viewing results signed out) - stays

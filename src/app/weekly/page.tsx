@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
 import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard, COMPACT_SCALE, PILL_WIDTH } from "@/components/GameCard";
@@ -17,7 +17,7 @@ import { errorMessage } from "@/lib/errorMessage";
 import { WeekSwitcher } from "@/components/WeekSwitcher";
 import { LeaderboardBoard } from "@/components/LeaderboardBoard";
 import { groupGamesByDay } from "@/lib/groupGames";
-import { FlowItem, PickStats, flatten, splitIntoColumns, computePickStats, computePickTags } from "@/lib/pickLayout";
+import { PickStats, DesktopCell, buildDesktopRows, computePickStats, computePickTags } from "@/lib/pickLayout";
 import { renderShareImage } from "@/lib/shareImage";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 import { buildReferralLink } from "@/lib/referralStorage";
@@ -119,7 +119,7 @@ function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeo
 // have an account. Lives inside WeeklyRecordPill's own bordered pill (see
 // below) rather than sitting next to it as a separate circle.
 function ProfileAvatar({ url, initial, signedIn }: { url?: string | null; initial: string; signedIn: boolean }) {
-  const dims = "h-11 w-11 sm:h-14 sm:w-14 shrink-0 rounded-full flex items-center justify-center text-base sm:text-lg";
+  const dims = "h-7 w-7 sm:h-9 sm:w-9 shrink-0 rounded-full flex items-center justify-center text-xs sm:text-sm";
   if (!signedIn) {
     return <span className={`${dims} bg-white/5 border border-dashed border-white/25 text-white/40`}>?</span>;
   }
@@ -177,22 +177,22 @@ function WeeklyRecordPill({
           {i > 0 && <div className="w-px self-stretch bg-white/10 mx-3 sm:mx-5" />}
           <div className="flex flex-col items-center gap-0.5 px-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm sm:text-base leading-none">{seg.icon}</span>
-              <span className="text-lg sm:text-xl leading-none" style={{ fontFamily: "var(--font-display)", color: seg.color }}>
+              <span className="text-[10px] sm:text-xs leading-none">{seg.icon}</span>
+              <span className="text-sm sm:text-base leading-none" style={{ fontFamily: "var(--font-display)", color: seg.color }}>
                 {seg.value}
               </span>
             </div>
-            <span className="text-[8px] sm:text-[9px] text-white/50 tracking-wide whitespace-nowrap">{seg.label}</span>
+            <span className="text-[7px] sm:text-[8px] text-white/50 tracking-wide whitespace-nowrap">{seg.label}</span>
           </div>
         </div>
       ))}
     </>
   );
 
-  const pillClass = "flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2 py-2 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]";
+  const pillClass = "flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2 py-1.5 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]";
 
   return (
-    <div className="flex justify-center mb-6">
+    <div className="flex justify-center mb-4 lg:mb-7">
       {signedIn ? (
         <div className={pillClass}>{inner}</div>
       ) : (
@@ -258,6 +258,21 @@ export default function Home() {
   const [pageTab, setPageTab] = useState<"picks" | "leaderboard">("picks");
   const [weekSwitcherOpen, setWeekSwitcherOpen] = useState(false);
   const [results, setResults] = useState<Record<string, TeamAbbr>>({});
+  // Drives the two-column grid's card scale (see gridScale below) - the
+  // grid now runs at every viewport width, not just desktop, so it needs
+  // to know the real available width to fit two cards side by side down
+  // to the smallest phone. Starts at a conservative phone-sized guess
+  // rather than null so there's no flash of desktop-sized (overflowing)
+  // cards before the first real measurement lands.
+  const [viewportWidth, setViewportWidth] = useState(390);
+  useEffect(() => {
+    function measure() {
+      setViewportWidth(window.innerWidth);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   useEffect(() => {
     fetchWeeks()
@@ -502,75 +517,78 @@ export default function Home() {
     }
   }
 
-  const items = flatten(groups);
-  const { col1, col2 } = splitIntoColumns(groups);
-  const rowCount = Math.max(col1.length, col2.length);
+  const desktopRows = buildDesktopRows(games);
 
-  const renderMobileItem = (item: FlowItem, isFirst: boolean) =>
-    item.type === "header" ? (
-      <h2
-        key={item.key}
-        className={`text-center whitespace-nowrap px-2 mb-2 text-[clamp(1.25rem,7.5vw,2.75rem)] lg:text-4xl ${
-          isFirst ? "mt-0" : "mt-5"
-        }`}
-        style={{ fontFamily: "var(--font-display)" }}
-      >
-        {item.label}
-      </h2>
-    ) : item.type === "game" ? (
-      <div key={item.key} className="mb-4">
+  // The grid's own track width/gap, computed from whatever room is
+  // actually available - mirrors what the old fixed COMPACT_SCALE did for
+  // desktop only, just solved for instead of hardcoded, so two columns
+  // fit on any screen instead of collapsing to a single mobile column.
+  const gridPageX = 16; // matches main's px-4
+  const gridColumnGap = viewportWidth < 640 ? 10 : 32;
+  const gridScale = useMemo(() => {
+    const contentWidth = Math.min(viewportWidth, 896) - gridPageX * 2;
+    const columnWidth = (contentWidth - gridColumnGap) / 2;
+    const raw = columnWidth / PILL_WIDTH;
+    return Math.min(COMPACT_SCALE, Math.max(0.42, raw));
+  }, [viewportWidth, gridColumnGap]);
+
+  // A small centered tab tucked behind each pill instead of a day-group
+  // divider row - it's rendered BEFORE the GameCard in DOM order and
+  // neither element sets an explicit z-index, so the pill's own opaque
+  // fill (painted after, per normal stacking rules for same-stacking-
+  // context elements) naturally covers the tab's lower half, leaving just
+  // enough peeking out above to read the day and kickoff time. No row is
+  // ever spent on a label now, on any day - the win here over the
+  // per-day-divider approach is that single-game days (Thursday, Sunday
+  // Night, Monday) no longer strand a wasted empty cell next to them.
+  // Tab dimensions were tuned by eye at gridScale 0.85 (9px text, -18px
+  // top, etc.) - these are that same tuning expressed as "at scale 1", so
+  // multiplying by the actual gridScale reproduces the original desktop
+  // look exactly at 0.85 and scales proportionally at any other width.
+  // Font size gets a floor rather than scaling all the way down with the
+  // card - a time label that shrinks below ~7.5px stops being legible
+  // long before the pill itself does.
+  const renderGridGame = (cell: DesktopCell | null, key: string) => {
+    if (!cell) return <div key={key} />;
+    const { game, timeLabel } = cell;
+    const tabPadX = 11.8 * gridScale;
+    return (
+      <div key={key} className="relative">
+        <div
+          className="absolute left-1/2 -translate-x-1/2 rounded-t-md border border-b-0 border-white/15 bg-[#1b2947] tracking-wide text-white/55 whitespace-nowrap"
+          style={{
+            fontFamily: "var(--font-display)",
+            top: -21.2 * gridScale,
+            fontSize: Math.max(7.5, 10.6 * gridScale),
+            paddingLeft: tabPadX,
+            paddingRight: tabPadX,
+            paddingTop: 4.7 * gridScale,
+            paddingBottom: 14.1 * gridScale,
+          }}
+        >
+          {timeLabel}
+        </div>
         <GameCard
-          game={item.game}
-          picked={picks[item.game.id]}
-          onPick={(team) => setPick(item.game.id, team)}
-          tag={tags[item.game.id]}
-          result={results[item.game.id]}
+          game={game}
+          picked={picks[game.id]}
+          onPick={(team) => setPick(game.id, team)}
+          tag={tags[game.id]}
+          result={results[game.id]}
           locked={!isEditable}
-          isLockPick={lockedGameId === item.game.id}
+          isLockPick={lockedGameId === game.id}
           hasLock={lockedGameId !== null}
-          onToggleLock={() => toggleLock(item.game.id)}
+          onToggleLock={() => toggleLock(game.id)}
+          scale={gridScale}
         />
       </div>
-    ) : null;
-
-  const renderGridCell = (item: FlowItem | undefined) => {
-    if (!item || item.type === "blank") {
-      return <div key={item?.key ?? Math.random()} />;
-    }
-    if (item.type === "header") {
-      return (
-        <div key={item.key} className="h-full flex items-end justify-center pb-2">
-          <h2
-            className="text-center whitespace-nowrap px-2"
-            style={{ fontFamily: "var(--font-display)", fontSize: 36 * 0.85 }}
-          >
-            {item.label}
-          </h2>
-        </div>
-      );
-    }
-    return (
-      <GameCard
-        key={item.key}
-        game={item.game}
-        picked={picks[item.game.id]}
-        onPick={(team) => setPick(item.game.id, team)}
-        tag={tags[item.game.id]}
-        result={results[item.game.id]}
-        locked={!isEditable}
-        isLockPick={lockedGameId === item.game.id}
-        hasLock={lockedGameId !== null}
-        onToggleLock={() => toggleLock(item.game.id)}
-        compact
-      />
     );
   };
 
   return (
     <div className="flex flex-col flex-1">
-      <header className="px-4 pt-6 pb-8 max-w-4xl w-full mx-auto relative">
+      <header className="px-4 pt-5 pb-5 max-w-4xl w-full mx-auto relative">
         <div className="flex flex-col items-center">
-          <div className="flex justify-center mb-5">
+          <div className="flex justify-center mb-4">
             <div className="inline-flex rounded-full border border-white/15 bg-[#1b2947] p-1">
               {(["picks", "leaderboard"] as const).map((tab) => (
                 <button
@@ -590,7 +608,7 @@ export default function Home() {
 
           {pageTab === "picks" ? (
             <div className="text-center">
-              <span className="relative inline-flex items-center gap-2 text-xl text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="relative inline-flex items-center gap-2 text-lg text-white tracking-[0.1em] mb-1" style={{ fontFamily: "var(--font-display)" }}>
                 WEEK {activeWeek}
                 <WeekSwitcher
                   weeks={weeks}
@@ -606,9 +624,9 @@ export default function Home() {
                   {hasResults ? `✅ ${correctCount}/${gradedCount}` : `🏈 ${pickedCount}/${games.length}`}
                 </span>
               </span>
-              <div className="w-10 h-[2px] bg-white/25 mx-auto mb-3" />
+              <div className="w-10 h-[2px] bg-white/25 mx-auto mb-2" />
               <h1
-                className="text-[clamp(2.25rem,9vw,3.5rem)] leading-none tracking-wide"
+                className="text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 NFL PICK&rsquo;EM
@@ -617,10 +635,10 @@ export default function Home() {
           ) : (
             <div className="text-center">
               <div className="text-xs text-white/45 tracking-[0.25em] mb-1">PICK&rsquo;EM</div>
-              <h1 className="text-[clamp(2.25rem,9vw,3.5rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+              <h1 className="text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
                 STANDINGS
               </h1>
-              <p className="text-white/50 text-sm mt-3">Ranked by total correct picks across every published week.</p>
+              <p className="text-white/50 text-sm mt-2">Ranked by total correct picks across every published week.</p>
             </div>
           )}
         </div>
@@ -646,23 +664,19 @@ export default function Home() {
               signedIn={!!user}
               onActivate={!user ? () => requestSignIn() : undefined}
             />
-            <div className="flex flex-col lg:hidden">
-              {items.map((item, i) => renderMobileItem(item, i === 0))}
-            </div>
-            {/* Explicit track width (not lg:grid-cols-2's 1fr 1fr) - a 1fr
+            {/* Explicit track width (not grid-cols-2's 1fr 1fr) - a 1fr
                 column doesn't shrink just because the card inside it does,
                 it just leaves dead space, which would visually read as a
-                far bigger gap between columns than the real gap-x-8. Track
-                width matches GameCard's own compact width exactly so the
-                column hugs the (now smaller) card again. */}
+                far bigger gap between columns than the real gridColumnGap.
+                Track width matches GameCard's own scaled width exactly so
+                the column hugs the card at any screen size, mobile
+                included - this same grid now runs everywhere, there's no
+                separate single-column mobile layout anymore. */}
             <div
-              className="hidden lg:grid lg:gap-x-8 lg:gap-y-4 lg:items-stretch lg:justify-center"
-              style={{ gridTemplateColumns: `repeat(2, ${PILL_WIDTH * COMPACT_SCALE}px)` }}
+              className="grid items-stretch justify-center"
+              style={{ gridTemplateColumns: `repeat(2, ${PILL_WIDTH * gridScale}px)`, columnGap: gridColumnGap, rowGap: 24 * gridScale }}
             >
-              {Array.from({ length: rowCount }).flatMap((_, i) => [
-                renderGridCell(col1[i]),
-                renderGridCell(col2[i]),
-              ])}
+              {desktopRows.flatMap((row) => [renderGridGame(row.left, `${row.key}-l`), renderGridGame(row.right, `${row.key}-r`)])}
             </div>
 
             <div className="mt-8">

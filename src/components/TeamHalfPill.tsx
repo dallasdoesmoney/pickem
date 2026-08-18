@@ -120,11 +120,11 @@ export function TeamHalfPill({
             {footer}
           </div>
           {showOutcomeTreatment && (
-            <div className="pointer-events-none absolute inset-0" style={{ backgroundColor: `rgba(${outcomeColorRgb},0.34)` }} />
+            <div className="pointer-events-none absolute inset-0 z-[35]" style={{ backgroundColor: `rgba(${outcomeColorRgb},0.34)` }} />
           )}
           {showOutcomeTreatment && (
             <span
-              className="pointer-events-none absolute inset-0 flex items-center justify-center whitespace-nowrap"
+              className="pointer-events-none absolute inset-0 z-[35] flex items-center justify-center whitespace-nowrap"
               style={{
                 fontFamily: "var(--font-display)",
                 fontSize: outcomeFontPx,
