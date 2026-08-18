@@ -156,6 +156,7 @@ function SignedInAccount({
           <div className="mt-2">
             <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
             <div className="flex flex-col gap-1.5">
+              <StatDetailRow icon="👀" label="Followers" value={stats ? String(stats.followerCount) : "–"} />
               <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} onClick={() => setFriendsOpen(true)} />
               <TeamsPredictedRow completedCount={stats?.completedTeamCount} href="/predictor" />
               <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} href="/weekly" />
