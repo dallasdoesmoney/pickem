@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
-import { MAX_TIERS, MAX_TITLE, TierListState, findItemTier, rankedCount, tierLabelFor } from "@/lib/tierList";
+import { MAX_TIERS, TierListState, findItemTier, rankedCount, tierLabelFor } from "@/lib/tierList";
 import { useTierList } from "@/hooks/useTierList";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
@@ -369,7 +369,6 @@ export default function TierListPageClient({
         <h1 className="text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
           {template.title.toUpperCase()}
         </h1>
-        <p className="text-white/50 text-sm mt-2">{template.tagline}</p>
 
         <ProgressBar ranked={ranked} total={total} complete={complete} />
 
@@ -380,18 +379,11 @@ export default function TierListPageClient({
         )}
       </header>
 
-      {/* Title. Editable in place - no modal for a single text field. */}
-      <div className="flex justify-center mb-5">
-        <input
-          value={state.title}
-          onChange={(e) => dispatch({ type: "setTitle", title: e.target.value })}
-          maxLength={MAX_TITLE}
-          aria-label="Tier list title"
-          placeholder={template.defaultListTitle}
-          className="w-full max-w-sm text-center rounded-xl border border-white/10 hover:border-white/25 focus:border-white/40 bg-white/5 px-4 py-2 text-white text-sm outline-none transition-colors placeholder:text-white/30"
-          style={{ fontFamily: "var(--font-display)" }}
-        />
-      </div>
+      {/* No editable title for now - the page already carries one, and two
+          titles stacked on top of each other just clogged the header. The
+          title still lives in state (share images and snapshots use it),
+          so making it editable again is only a matter of putting an input
+          back. */}
 
       <DndContext
         sensors={sensors}
@@ -560,19 +552,12 @@ export default function TierListPageClient({
   );
 }
 
+// Deliberately quiet: progress is useful at a glance but it isn't the
+// point of the page, and at its old size it dominated the header.
 function ProgressBar({ ranked, total, complete }: { ranked: number; total: number; complete: boolean }) {
   return (
-    <div className="mt-4 max-w-xs mx-auto">
-      <div className="flex items-baseline justify-center gap-2">
-        <span
-          className="text-2xl leading-none transition-colors duration-300"
-          style={{ fontFamily: "var(--font-display)", color: complete ? "#4ade80" : "#ffffff" }}
-        >
-          {ranked}/{total}
-        </span>
-        <span className="text-xs text-white/45 tracking-wide">RANKED</span>
-      </div>
-      <div className="h-1.5 rounded-full bg-white/10 mt-2 overflow-hidden">
+    <div className="mt-3 max-w-[200px] mx-auto">
+      <div className="h-1 rounded-full bg-white/10 overflow-hidden">
         <div
           className="h-full rounded-full transition-[width,background] duration-300"
           style={{
@@ -581,11 +566,12 @@ function ProgressBar({ ranked, total, complete }: { ranked: number; total: numbe
           }}
         />
       </div>
-      {complete && (
-        <p className="text-xs mt-2" style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}>
-          YOUR HIERARCHY IS COMPLETE.
-        </p>
-      )}
+      <div
+        className="text-[11px] tracking-wide mt-1.5 transition-colors duration-300"
+        style={{ fontFamily: "var(--font-display)", color: complete ? "#4ade80" : "rgba(255,255,255,0.45)" }}
+      >
+        {complete ? "ALL 32 RANKED" : `${ranked}/${total} RANKED`}
+      </div>
     </div>
   );
 }
@@ -640,12 +626,15 @@ function UnrankedPool({
       <div
         ref={setNodeRef}
         onClick={selectedItemId ? onPlaceSelected : undefined}
-        className="rounded-2xl border p-2.5 flex flex-wrap gap-1.5 content-start transition-colors duration-150"
+        className="rounded-2xl border p-2.5 flex flex-wrap gap-1.5 content-start transition-[background,border-color,box-shadow] duration-150"
         style={{
           minHeight: chipSize + 20,
-          borderColor: isOver ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.10)",
-          // Opaque, same as the tier board above it.
+          borderColor: isOver ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.10)",
+          // Opaque, same as the tier board above it. Lifts on drag-over
+          // exactly like a tier row does, so dropping a team back out
+          // feels like the same gesture in reverse.
           background: isOver ? "#16294d" : "#101f3d",
+          boxShadow: isOver ? "0 0 0 2px rgba(255,255,255,0.5), 0 10px 30px -12px rgba(0,0,0,0.9)" : undefined,
           cursor: selectedItemId ? "pointer" : undefined,
         }}
       >

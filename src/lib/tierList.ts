@@ -23,19 +23,28 @@ export type TierListState = {
 
 export const MAX_TIERS = 10;
 export const MIN_TIERS = 1;
-export const MAX_TIER_LABEL = 14;
+// Long enough for a real name ("UNDEFEATED", "SHOULD BE FIRED") rather
+// than just a letter - the rail shrinks the type to fit, so a long label
+// costs legibility, not layout.
+export const MAX_TIER_LABEL = 20;
 export const MAX_TITLE = 60;
 
-// Gold (best) down to red (worst). Deliberately reuses the app's existing
-// win-green / loss-red vocabulary at the ends rather than the usual
-// tiermaker rainbow, where green-at-the-bottom would read as "good" here.
+// Lifted straight off the rank ladder in src/lib/levels.ts, top-down:
+// GOAT, Hall of Famer, MVP, All-Pro, Pro Bowler. Anyone who has seen
+// their own level badge already knows pink outranks orange, so the tiers
+// inherit that meaning instead of inventing a second colour language.
+//
+// F breaks the sequence deliberately: the next rank down is Team Captain
+// lime, and a green bottom tier would read as "good" against every other
+// green in the app. Practice Squad slate - the actual bottom of the
+// ladder - says "didn't make the roster", which is the point.
 const DEFAULT_TIER_SPEC: [label: string, accent: string][] = [
-  ["S", "#fbbf24"],
-  ["A", "#4ade80"],
-  ["B", "#38bdf8"],
-  ["C", "#a78bfa"],
-  ["D", "#fb923c"],
-  ["F", "#f87171"],
+  ["S", "#f472b6"],
+  ["A", "#c084fc"],
+  ["B", "#f87171"],
+  ["C", "#fb923c"],
+  ["D", "#facc15"],
+  ["F", "#94a3b8"],
 ];
 
 // Counter-based rather than crypto.randomUUID(): ids only need to be
@@ -214,7 +223,15 @@ export function sanitizeState(raw: unknown, template: TierTemplate): TierListSta
     tiers.push({
       id: t.id,
       label: typeof t.label === "string" ? t.label.slice(0, MAX_TIER_LABEL) : "",
-      accent: typeof t.accent === "string" && /^#[0-9a-f]{6}$/i.test(t.accent) ? t.accent : "#94a3b8",
+      // Accent is re-derived from position rather than trusted from the
+      // stored value. Nothing lets a user choose a colour yet, so every
+      // stored accent is one we generated - which means a list saved
+      // before the palette changed would otherwise keep the dead colours
+      // forever. Position is the right key because the ladder's meaning
+      // IS positional: first tier is best, whatever it's been renamed to.
+      // When colour customisation ships, this is the one line that has to
+      // start respecting a user-set value.
+      accent: DEFAULT_TIER_SPEC[tiers.length % DEFAULT_TIER_SPEC.length][1],
     });
   }
   if (!tiers.length) return null;

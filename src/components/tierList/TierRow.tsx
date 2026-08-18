@@ -45,24 +45,45 @@ export function TierRow({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `tier:${tier.id}` });
   const items = itemIds.map((id) => resolveItem(template, id));
-  const active = isOver || isDropTarget;
+  // Two different states, deliberately weighted differently. `hot` is the
+  // one row a drag is actually over and gets the full treatment. `armed`
+  // is every row while an item is selected for tap-to-place - giving all
+  // six of those a full glow at once would just be noise.
+  const hot = isOver;
+  const armed = isDropTarget && !isOver;
 
   return (
     <div
-      className="flex items-stretch rounded-2xl overflow-hidden border transition-colors duration-150"
+      className="flex items-stretch rounded-2xl overflow-hidden border transition-[background,border-color,box-shadow] duration-150"
       style={{
-        borderColor: active ? tier.accent : "rgba(255,255,255,0.08)",
+        borderColor: hot || armed ? tier.accent : "rgba(255,255,255,0.08)",
         // Darker than the panel it sits on, so each tier reads as an inset
         // well rather than blending into the board.
-        background: active ? `${tier.accent}1f` : "#0c1830",
+        background: hot ? `${tier.accent}33` : armed ? `${tier.accent}12` : "#0c1830",
+        // The row lifts off the board the moment a drag is over it - this
+        // is the single clearest "yes, here" signal on the page.
+        boxShadow: hot ? `0 0 0 2px ${tier.accent}, 0 10px 30px -12px ${tier.accent}` : undefined,
       }}
     >
-      {/* Label rail. Always visible, always the tier's colour - it's the
-          only thing telling you which row you're looking at once the
-          labels are renamed to something arbitrary. */}
+      {/* Label rail, cut to a chevron so the tiers read as a descending
+          ladder rather than six identical shelves. Solid accent with dark
+          type: at this size a tinted rail with coloured text loses the
+          letter entirely. It also drives forward on drag-over, which
+          reads as the row reaching out to take the item.
+
+          No border-right - clip-path would cut it off anyway. The point
+          IS the edge. */}
       <div
-        className="shrink-0 flex flex-col items-center justify-center gap-1 px-1 py-2"
-        style={{ width: 64, background: `${tier.accent}26`, borderRight: `2px solid ${tier.accent}` }}
+        className="shrink-0 flex items-center justify-center transition-[width,filter] duration-150"
+        style={{
+          width: editing ? 116 : hot ? 88 : 74,
+          background: tier.accent,
+          clipPath: "polygon(0 0, 84% 0, 100% 50%, 84% 100%, 0 100%)",
+          filter: hot ? "brightness(1.18)" : undefined,
+          // Keeps the label clear of the point.
+          paddingRight: 14,
+          paddingLeft: 4,
+        }}
       >
         {editing ? (
           <input
@@ -70,38 +91,22 @@ export function TierRow({
             onChange={(e) => onRename(e.target.value)}
             maxLength={MAX_TIER_LABEL}
             aria-label={`Rename ${tierLabelFor(tier, index)} tier`}
-            className="w-full bg-black/30 rounded-md text-center text-white text-sm py-1 outline-none border border-white/20 focus:border-white/50"
+            className="w-full min-w-0 bg-black/35 rounded-md text-center text-white text-xs py-1 px-1 outline-none border border-black/25 focus:border-black/50"
             style={{ fontFamily: "var(--font-display)" }}
           />
         ) : (
           <span
-            className="text-center leading-none break-all"
+            className="text-center leading-none break-words"
             style={{
               fontFamily: "var(--font-display)",
-              color: tier.accent,
-              // Long custom labels shrink rather than blowing out the
-              // rail's fixed width.
-              fontSize: tierLabelFor(tier, index).length > 4 ? 13 : 22,
+              color: "#0c1830",
+              // Steps down as the label grows so a renamed tier costs
+              // legibility rather than breaking the rail's width.
+              fontSize: labelSize(tierLabelFor(tier, index)),
             }}
           >
             {tierLabelFor(tier, index)}
           </span>
-        )}
-
-        {editing && (
-          <div className="flex items-center gap-0.5 mt-0.5">
-            <RailButton label="Move tier up" disabled={!canMoveUp} onClick={() => onMove(-1)}>
-              <path d="M18 15l-6-6-6 6" />
-            </RailButton>
-            <RailButton label="Move tier down" disabled={!canMoveDown} onClick={() => onMove(1)}>
-              <path d="M6 9l6 6 6-6" />
-            </RailButton>
-            <RailButton label={`Delete ${tierLabelFor(tier, index)} tier`} disabled={!canDelete} onClick={onDelete} danger>
-              <path d="M3 6h18" />
-              <path d="M8 6V4h8v2" />
-              <path d="M19 6l-1 14H6L5 6" />
-            </RailButton>
-          </div>
         )}
       </div>
 
@@ -128,15 +133,45 @@ export function TierRow({
 
         {items.length === 0 && (
           <span
-            className="self-center text-[11px] tracking-wide px-1"
-            style={{ color: active ? tier.accent : "rgba(255,255,255,0.28)" }}
+            className="self-center text-[11px] tracking-wide px-1 transition-colors duration-150"
+            style={{ color: hot || armed ? tier.accent : "rgba(255,255,255,0.28)" }}
           >
-            {selectedItemId ? "TAP TO PLACE HERE" : active ? "DROP HERE" : "EMPTY"}
+            {selectedItemId ? "TAP TO PLACE HERE" : hot ? "DROP HERE" : "EMPTY"}
           </span>
         )}
       </div>
+
+      {/* Tier controls live at the end of the row, not inside the rail.
+          Three buttons crushed into a 64px rail under the label was the
+          worst part of edit mode; out here they get full-size targets and
+          the rail only has to hold a name. */}
+      {editing && (
+        <div className="shrink-0 flex items-center gap-1.5 pr-2.5 pl-1">
+          <RailButton label="Move tier up" disabled={!canMoveUp} onClick={() => onMove(-1)}>
+            <path d="M18 15l-6-6-6 6" />
+          </RailButton>
+          <RailButton label="Move tier down" disabled={!canMoveDown} onClick={() => onMove(1)}>
+            <path d="M6 9l6 6 6-6" />
+          </RailButton>
+          <RailButton label={`Delete ${tierLabelFor(tier, index)} tier`} disabled={!canDelete} onClick={onDelete} danger>
+            <path d="M3 6h18" />
+            <path d="M8 6V4h8v2" />
+            <path d="M19 6l-1 14H6L5 6" />
+          </RailButton>
+        </div>
+      )}
     </div>
   );
+}
+
+// Type steps down in bands rather than scaling continuously, so tiers of
+// similar name length stay visually consistent with each other.
+function labelSize(label: string): number {
+  const n = label.length;
+  if (n <= 2) return 26;
+  if (n <= 5) return 16;
+  if (n <= 9) return 12;
+  return 10;
 }
 
 function RailButton({
@@ -158,11 +193,13 @@ function RailButton({
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      className={`h-6 w-6 rounded-full border border-white/20 flex items-center justify-center transition-colors disabled:opacity-25 ${
-        danger ? "text-red-300 hover:text-red-200" : "text-white/60 hover:text-white"
+      className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors disabled:opacity-25 shrink-0 ${
+        danger
+          ? "border-red-400/30 text-red-300 hover:text-red-200 hover:border-red-400/60"
+          : "border-white/15 text-white/60 hover:text-white hover:border-white/35"
       }`}
     >
-      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
         {children}
       </svg>
     </button>
