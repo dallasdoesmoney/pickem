@@ -141,8 +141,8 @@ export default function NotificationsPage() {
                       <button
                         onClick={() => handleFollowBack(f)}
                         disabled={busyId === f.user_id}
-                        className="shrink-0 rounded-full px-3 py-1.5 text-xs disabled:opacity-50 active:scale-95 transition-transform duration-150"
-                        style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
+                        className="shrink-0 rounded-full px-3 py-1.5 text-xs border disabled:opacity-50 transition-colors hover:brightness-110"
+                        style={{ fontFamily: "var(--font-display)", background: "rgba(192,132,252,0.14)", borderColor: "rgba(192,132,252,0.4)", color: "#d8b4fe" }}
                       >
                         {busyId === f.user_id ? "…" : "Follow Back"}
                       </button>

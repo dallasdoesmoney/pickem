@@ -81,24 +81,45 @@ export function FollowButton({
 
   if (status === undefined) return null;
 
-  const buttonStyle = { fontFamily: "var(--font-display)" };
-  const primaryStyle = { ...buttonStyle, background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" };
-  const outlineClass = "border border-white/20 text-white/70 hover:text-white hover:border-white/40 transition-colors";
-
-  const label = status.iFollow && status.followsMe ? "✓ Friends" : status.iFollow ? "Following" : status.followsMe ? "Follow Back" : "Follow";
-  const isPrimary = !status.iFollow; // Follow / Follow Back are the "do something" actions; Following / Friends are outline
   const onClick = status.iFollow ? handleUnfollow : handleFollow;
+
+  // Follow is the only real "do something new" call to action, so it
+  // keeps the bold gradient CTA treatment. The other three are status
+  // pills, not calls to action - each gets its own color so the three
+  // are distinguishable at a glance in a list: sky = you're following
+  // them (one-directional out), purple = they're following you and
+  // it's on you to follow back (one-directional in, needs a decision),
+  // emerald = mutual/complete, matching the color already used for
+  // "done" states elsewhere (achievements, level-ups).
+  const kind = status.iFollow && status.followsMe ? "friends" : status.iFollow ? "following" : status.followsMe ? "followBack" : "follow";
+  const label = kind === "friends" ? "✓ Friends" : kind === "following" ? "Following" : kind === "followBack" ? "Follow Back" : "Follow";
+
+  const fontStyle = { fontFamily: "var(--font-display)" };
+  const KIND_STYLE: Record<typeof kind, { className: string; style: React.CSSProperties }> = {
+    follow: {
+      className: "active:scale-95 transition-transform duration-150",
+      style: { ...fontStyle, background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" },
+    },
+    following: {
+      className: "border transition-colors hover:brightness-110",
+      style: { ...fontStyle, background: "rgba(56,189,248,0.14)", borderColor: "rgba(56,189,248,0.4)", color: "#7dd3fc" },
+    },
+    followBack: {
+      className: "border transition-colors hover:brightness-110",
+      style: { ...fontStyle, background: "rgba(192,132,252,0.14)", borderColor: "rgba(192,132,252,0.4)", color: "#d8b4fe" },
+    },
+    friends: {
+      className: "border transition-colors hover:brightness-110",
+      style: { ...fontStyle, background: "rgba(74,222,128,0.14)", borderColor: "rgba(74,222,128,0.4)", color: "#86efac" },
+    },
+  };
+  const { className: kindClassName, style: kindStyle } = KIND_STYLE[kind];
 
   if (compact) {
     const compactPill = "rounded-full px-3 py-1.5 text-xs whitespace-nowrap disabled:opacity-50 shrink-0";
     return (
       <div className="flex items-center gap-1.5 shrink-0">
-        <button
-          onClick={onClick}
-          disabled={busy}
-          className={`${compactPill} ${isPrimary ? "active:scale-95 transition-transform duration-150" : outlineClass}`}
-          style={isPrimary ? primaryStyle : buttonStyle}
-        >
+        <button onClick={onClick} disabled={busy} className={`${compactPill} ${kindClassName}`} style={kindStyle}>
           {busy ? "…" : label}
         </button>
         {error && <p className="text-[10px] text-red-400">{error}</p>}
@@ -109,15 +130,9 @@ export function FollowButton({
 
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <button
-        onClick={onClick}
-        disabled={busy}
-        className={`rounded-full px-5 py-2 text-sm disabled:opacity-50 ${isPrimary ? "active:scale-95 transition-transform duration-150" : outlineClass}`}
-        style={isPrimary ? primaryStyle : buttonStyle}
-      >
+      <button onClick={onClick} disabled={busy} className={`rounded-full px-5 py-2 text-sm disabled:opacity-50 ${kindClassName}`} style={kindStyle}>
         {busy ? "…" : label}
       </button>
-      {status.followsMe && !status.iFollow && <p className="text-[10px] text-white/40">Follows you</p>}
       {error && <p className="text-xs text-red-400">{error}</p>}
       {signInModal}
     </div>
