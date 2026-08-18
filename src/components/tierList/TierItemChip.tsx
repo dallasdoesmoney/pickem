@@ -1,0 +1,93 @@
+"use client";
+
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { TierItem } from "@/data/tierTemplates";
+
+// Items render as a bare logo by product decision, so the accessible name
+// has to come from somewhere else entirely: aria-label carries the full
+// team name for screen readers, `title` gives sighted users a hover
+// tooltip, and the img itself stays alt="" so the name isn't announced
+// twice.
+export function TierItemChip({
+  item,
+  size,
+  selected,
+  landed,
+  onActivate,
+  dragging,
+}: {
+  item: TierItem;
+  size: number;
+  selected?: boolean;
+  // Set for one beat right after a placement so the chip can pop.
+  landed?: boolean;
+  onActivate?: () => void;
+  dragging?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={item.label}
+      aria-pressed={selected}
+      title={item.label}
+      onClick={onActivate}
+      className={`relative shrink-0 rounded-xl flex items-center justify-center transition-[box-shadow,border-color,transform] duration-150 ${
+        selected ? "border-2" : "border border-white/10"
+      } ${landed ? "tier-anim-land" : ""} ${dragging ? "opacity-30" : "hover:brightness-110 active:scale-95"}`}
+      style={{
+        width: size,
+        height: size,
+        // A faint wash of the team's own colour keeps 32 dark logos from
+        // reading as a grey slab, without competing with the mark itself.
+        background: `${item.accent}2e`,
+        borderColor: selected ? item.accent : undefined,
+        boxShadow: selected ? `0 0 0 3px ${item.accent}55, 0 6px 18px -6px ${item.accent}` : undefined,
+        touchAction: "manipulation",
+      }}
+    >
+      <img
+        src={item.imageUrl}
+        alt=""
+        crossOrigin="anonymous"
+        draggable={false}
+        className="w-[78%] h-[78%] object-contain select-none pointer-events-none"
+      />
+    </button>
+  );
+}
+
+// Sortable wrapper. Kept separate from the presentational chip so the
+// share-image preview and the mobile sheet can render a chip without
+// pulling in dnd-kit context (useSortable throws outside a DndContext).
+export function SortableTierItem({
+  item,
+  size,
+  selected,
+  landed,
+  onActivate,
+  disabled,
+}: {
+  item: TierItem;
+  size: number;
+  selected?: boolean;
+  landed?: boolean;
+  onActivate?: () => void;
+  disabled?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 30 : undefined }}
+      {...attributes}
+      {...listeners}
+    >
+      <TierItemChip item={item} size={size} selected={selected} landed={landed} onActivate={onActivate} dragging={isDragging} />
+    </div>
+  );
+}

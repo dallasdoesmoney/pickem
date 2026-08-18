@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 
-type ConfirmState = { message: string; confirmLabel: string; resolve: (ok: boolean) => void } | null;
+type ConfirmState = { message: string; confirmLabel: string; cancelLabel: string; resolve: (ok: boolean) => void } | null;
 
 // In-app replacement for window.confirm() - the native dialog reads as an
 // "official" browser/OS chrome popup, not part of the product. Usage
@@ -10,9 +10,12 @@ type ConfirmState = { message: string; confirmLabel: string; resolve: (ok: boole
 export function useConfirmDialog() {
   const [state, setState] = useState<ConfirmState>(null);
 
-  const confirm = useCallback((message: string, confirmLabel: string = "CONFIRM") => {
+  // cancelLabel is worth overriding when declining isn't really
+  // "cancelling" but choosing the other branch - e.g. "Keep Ranking"
+  // against "Share Anyway".
+  const confirm = useCallback((message: string, confirmLabel: string = "CONFIRM", cancelLabel: string = "CANCEL") => {
     return new Promise<boolean>((resolve) => {
-      setState({ message, confirmLabel, resolve });
+      setState({ message, confirmLabel, cancelLabel, resolve });
     });
   }, []);
 
@@ -33,7 +36,7 @@ export function useConfirmDialog() {
             className="rounded-full px-5 py-2 text-xs text-white/60 hover:text-white border border-white/15 hover:border-white/30 transition-colors"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            CANCEL
+            {state.cancelLabel}
           </button>
           <button
             aria-label="Confirm"

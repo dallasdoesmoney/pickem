@@ -19,6 +19,80 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Tier list. The first bottom sheet in the app, so it brings its own
+   entrance - everything else here hard-cuts in, but a sheet that snaps
+   into existence at the bottom edge reads as a rendering glitch rather
+   than a deliberate surface. */
+@keyframes sheet-rise {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes scrim-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Played on a team the moment it lands in a tier - the whole point of
+   ranking 32 of them is that each placement feels like it registered. */
+@keyframes tier-land {
+  0% {
+    transform: scale(0.62);
+  }
+  55% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The tier a selected team is about to drop into. */
+@keyframes tier-target-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.tier-anim-sheet {
+  animation: sheet-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.tier-anim-scrim {
+  animation: scrim-fade 200ms ease-out both;
+}
+
+.tier-anim-land {
+  animation: tier-land 300ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.tier-anim-target {
+  animation: tier-target-pulse 1.6s ease-in-out infinite;
+}
+
+/* Motion here is feedback, not decoration - honour the OS setting by
+   dropping straight to the resting state rather than removing the cue. */
+@media (prefers-reduced-motion: reduce) {
+  .tier-anim-sheet,
+  .tier-anim-scrim,
+  .tier-anim-land,
+  .tier-anim-target {
+    animation: none;
+  }
+}
+
 /* Suspicious-pick dog badge: fades in HUGE over the middle of the card,
    holds the stare for a beat, then shrinks back to its corner in one
    continuous eased glide (no overshoot - kept deliberately smooth).
