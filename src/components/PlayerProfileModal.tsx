@@ -6,7 +6,6 @@ import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { FollowButton } from "@/components/FollowButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
-import { CreatorBadge } from "@/components/CreatorBadge";
 import { CreatorLinks } from "@/components/CreatorLinks";
 import { LevelListModal } from "@/components/LevelListModal";
 import { StatTile, StatDetailRow } from "@/components/StatTile";
@@ -64,7 +63,6 @@ export function PlayerProfileModal({
             <button type="button" onClick={() => setLevelModalOpen(true)} aria-label="View all levels" className="active:scale-95 transition-transform">
               <LevelBadge totalPoints={row.total_points} size="lg" />
             </button>
-            <CreatorBadge userId={row.user_id} size="lg" />
           </div>
           <p className="text-white/45 text-sm mt-1">@{row.username}</p>
           <PlayerBadges userId={row.user_id} />
