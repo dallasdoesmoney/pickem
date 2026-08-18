@@ -7,6 +7,7 @@ import { fetchLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboar
 import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/hooks/useAuth";
+import { getLevelInfo } from "@/lib/levels";
 import { FollowButton } from "@/components/FollowButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
@@ -29,6 +30,7 @@ export default function PlayerPage() {
   const [error, setError] = useState<string | null>(null);
   const [levelModalOpen, setLevelModalOpen] = useState(false);
   const stats = usePlayerStats(row?.user_id);
+  const rankColor = row ? getLevelInfo(row.total_points).rankColor : undefined;
 
   useEffect(() => {
     fetchLeaderboardEntry(params.username)
@@ -55,21 +57,34 @@ export default function PlayerPage() {
         </div>
       ) : row ? (
         <div className="flex flex-col items-center mt-10">
-          {row.avatar_url ? (
-            <img src={row.avatar_url} alt="" className="h-28 w-28 rounded-full object-cover border-2 border-white/20" />
-          ) : (
-            <span className="h-28 w-28 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center text-4xl">
-              {(row.display_name || row.username).charAt(0).toUpperCase()}
-            </span>
-          )}
-          <div className="flex items-center gap-2 mt-4">
-            <h1 className="text-3xl text-center" style={{ fontFamily: "var(--font-display)" }}>
-              {row.display_name || row.username}
-            </h1>
-            <button type="button" onClick={() => setLevelModalOpen(true)} aria-label="View all levels" className="active:scale-95 transition-transform">
-              <LevelBadge totalPoints={row.total_points} size="lg" />
+          <div className="relative">
+            {row.avatar_url ? (
+              <img
+                src={row.avatar_url}
+                alt=""
+                className="h-28 w-28 rounded-full object-cover"
+                style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 10px -2px ${rankColor}` }}
+              />
+            ) : (
+              <span
+                className="h-28 w-28 rounded-full bg-white/10 flex items-center justify-center text-4xl"
+                style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 10px -2px ${rankColor}` }}
+              >
+                {(row.display_name || row.username).charAt(0).toUpperCase()}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setLevelModalOpen(true)}
+              aria-label="View all levels"
+              className="absolute left-1/2 -bottom-2 w-max -translate-x-1/2 active:scale-95 transition-transform"
+            >
+              <LevelBadge totalPoints={row.total_points} size="sm" />
             </button>
           </div>
+          <h1 className="text-3xl text-center mt-4" style={{ fontFamily: "var(--font-display)" }}>
+            {row.display_name || row.username}
+          </h1>
           <p className="text-white/45 text-sm mt-1">@{row.username}</p>
           <PlayerBadges userId={row.user_id} />
           <CreatorLinks userId={row.user_id} />

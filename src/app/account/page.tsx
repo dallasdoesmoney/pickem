@@ -85,24 +85,37 @@ function SignedInAccount({
   return (
     <main className="flex-1 px-4 pb-16 pt-10 max-w-md w-full mx-auto">
       <div className="flex flex-col items-center">
-        {authProfile?.avatar_url ? (
-          <img src={authProfile.avatar_url} alt="" className="h-28 w-28 rounded-full object-cover border-2 border-white/20" />
-        ) : (
-          <span className="h-28 w-28 rounded-full bg-white/10 border-2 border-white/20 flex items-center justify-center text-4xl">
-            {label.charAt(0).toUpperCase()}
-          </span>
-        )}
-
-        <div className="flex items-center gap-2 mt-4">
-          <h1 className="text-3xl text-center" style={{ fontFamily: "var(--font-display)" }}>
-            {label}
-          </h1>
+        <div className="relative">
+          {authProfile?.avatar_url ? (
+            <img
+              src={authProfile.avatar_url}
+              alt=""
+              className="h-28 w-28 rounded-full object-cover"
+              style={myRecord ? { boxShadow: `0 0 0 2px ${getLevelInfo(myRecord.total_points).rankColor}, 0 0 10px -2px ${getLevelInfo(myRecord.total_points).rankColor}` } : { boxShadow: "0 0 0 2px rgba(255,255,255,0.2)" }}
+            />
+          ) : (
+            <span
+              className="h-28 w-28 rounded-full bg-white/10 flex items-center justify-center text-4xl"
+              style={myRecord ? { boxShadow: `0 0 0 2px ${getLevelInfo(myRecord.total_points).rankColor}, 0 0 10px -2px ${getLevelInfo(myRecord.total_points).rankColor}` } : { boxShadow: "0 0 0 2px rgba(255,255,255,0.2)" }}
+            >
+              {label.charAt(0).toUpperCase()}
+            </span>
+          )}
           {myRecord && (
-            <button type="button" onClick={() => setProgressModalOpen(true)} aria-label="View all levels" className="active:scale-95 transition-transform">
-              <LevelBadge totalPoints={myRecord.total_points} size="lg" />
+            <button
+              type="button"
+              onClick={() => setProgressModalOpen(true)}
+              aria-label="View all levels"
+              className="absolute left-1/2 -bottom-2 w-max -translate-x-1/2 active:scale-95 transition-transform"
+            >
+              <LevelBadge totalPoints={myRecord.total_points} size="sm" />
             </button>
           )}
         </div>
+
+        <h1 className="text-3xl text-center mt-4" style={{ fontFamily: "var(--font-display)" }}>
+          {label}
+        </h1>
 
         {authProfile?.username ? (
           <p className="text-white/45 text-sm mt-1">@{authProfile.username}</p>
