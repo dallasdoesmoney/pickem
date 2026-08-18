@@ -192,7 +192,7 @@ function WeeklyRecordPill({
   const pillClass = "flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2 py-1.5 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]";
 
   return (
-    <div className="flex justify-center mb-4 lg:mb-7">
+    <div className="flex justify-center mb-5 lg:mb-7">
       {signedIn ? (
         <div className={pillClass}>{inner}</div>
       ) : (
@@ -586,7 +586,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col flex-1">
-      <header className="px-4 pt-5 pb-5 max-w-4xl w-full mx-auto relative">
+      <header className="px-4 pt-5 pb-2 max-w-4xl w-full mx-auto relative">
         <div className="flex flex-col items-center">
           <div className="flex justify-center mb-4">
             <div className="inline-flex rounded-full border border-white/15 bg-[#1b2947] p-1">
@@ -674,7 +674,7 @@ export default function Home() {
                 separate single-column mobile layout anymore. */}
             <div
               className="grid items-stretch justify-center"
-              style={{ gridTemplateColumns: `repeat(2, ${PILL_WIDTH * gridScale}px)`, columnGap: gridColumnGap, rowGap: 24 * gridScale }}
+              style={{ gridTemplateColumns: `repeat(2, ${PILL_WIDTH * gridScale}px)`, columnGap: gridColumnGap, rowGap: 32 * gridScale }}
             >
               {desktopRows.flatMap((row) => [renderGridGame(row.left, `${row.key}-l`), renderGridGame(row.right, `${row.key}-r`)])}
             </div>
