@@ -14,13 +14,13 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export type ActivityKind = "new_follower" | "referral_joined" | "level_up";
+export type ActivityKind = "new_follower" | "referral_joined" | "level_up" | "creator_request_approved";
 
 export type ActivityGroup = {
   kind: ActivityKind;
   ids: string[];
   createdAt: string; // most recent event in the group
-  actorIds: string[]; // distinct, in first-seen order; empty for level_up
+  actorIds: string[]; // distinct, in first-seen order; empty for level_up/creator_request_approved
   level?: number; // level_up only
 };
 
@@ -46,6 +46,8 @@ export function buildActivityGroups(notifications: NotificationRow[]): ActivityG
       resolved.push({ kind: "referral_joined", actorId: refereeId, createdAt: n.created_at, id: n.id });
     } else if (n.type === "level_up") {
       resolved.push({ kind: "level_up", actorId: null, createdAt: n.created_at, id: n.id, level: Number(n.data.level) });
+    } else if (n.type === "creator_request_approved") {
+      resolved.push({ kind: "creator_request_approved", actorId: null, createdAt: n.created_at, id: n.id });
     }
   }
 

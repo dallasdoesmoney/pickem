@@ -40,6 +40,14 @@ function describeGroup(group: ActivityGroup, actors: (Pick<LeaderboardRow, "user
       initial: firstLabel.charAt(0).toUpperCase(),
     };
   }
+  if (group.kind === "creator_request_approved") {
+    return {
+      text: "You're now a Creator! Your badge is live on your profile.",
+      accentColor: "#ef4444",
+      avatarUrl: null as string | null,
+      initial: "🎥",
+    };
+  }
   // referral_joined
   return {
     text: `${namePhrase} joined using your invite!`,

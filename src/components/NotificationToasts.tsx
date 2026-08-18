@@ -47,6 +47,16 @@ function buildToastContent(n: NotificationRow, referrals: ReferralRow[], actors:
     };
   }
 
+  if (n.type === "creator_request_approved") {
+    return {
+      avatarUrl: null,
+      initial: "🎥",
+      title: "You're now a Creator!",
+      subtitle: "Your badge is live on your profile",
+      accentColor: "#ef4444",
+    };
+  }
+
   // referral_joined
   const referee = referrals.find((r) => r.user_id === n.data.referee_id);
   const label = referee?.display_name || referee?.username || "Someone";

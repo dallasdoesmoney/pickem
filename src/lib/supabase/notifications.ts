@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 
-export type NotificationType = "new_follower" | "referral_joined" | "level_up";
+export type NotificationType = "new_follower" | "referral_joined" | "level_up" | "creator_request_approved";
 
 export type NotificationRow = {
   id: string;

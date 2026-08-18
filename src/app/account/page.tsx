@@ -14,9 +14,11 @@ import { MyReferralsModal } from "@/components/MyReferralsModal";
 import { FriendsListModal } from "@/components/FriendsListModal";
 import { FollowersListModal } from "@/components/FollowersListModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
+import { CreatorRequestModal } from "@/components/CreatorRequestModal";
 import { StatTile, StatDetailRow } from "@/components/StatTile";
 import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
+import { fetchUserBadges } from "@/lib/supabase/badges";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 
 export default function AccountPage() {
@@ -66,7 +68,15 @@ function SignedInAccount({
   const [referralsOpen, setReferralsOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
   const [followersOpen, setFollowersOpen] = useState(false);
+  const [creatorRequestOpen, setCreatorRequestOpen] = useState(false);
+  const [isCreator, setIsCreator] = useState<boolean | null>(null);
   const stats = usePlayerStats(userId);
+
+  useEffect(() => {
+    fetchUserBadges(userId)
+      .then((badges) => setIsCreator(badges.some((b) => b.badge_key === "creator")))
+      .catch(() => setIsCreator(false));
+  }, [userId]);
 
   const label = authProfile?.display_name || authProfile?.username || "Your Profile";
 
@@ -168,6 +178,22 @@ function SignedInAccount({
         </div>
       )}
 
+      {isCreator === false && (
+        <button
+          type="button"
+          onClick={() => setCreatorRequestOpen(true)}
+          className="w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors mt-6"
+        >
+          <span className="text-2xl shrink-0">🎥</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+              BECOME A CREATOR
+            </div>
+            <div className="text-[11px] text-white/45 mt-0.5">Stream or make content? Request the Creator badge &rarr;</div>
+          </div>
+        </button>
+      )}
+
       {myRecord?.username && (
         <div className="text-center mt-6">
           <Link href={`/leaderboard/${myRecord.username}`} className="text-xs text-white/40 hover:text-white/70 transition-colors">
@@ -203,6 +229,7 @@ function SignedInAccount({
       <MyReferralsModal open={referralsOpen} onClose={() => setReferralsOpen(false)} />
       <FriendsListModal userId={userId} open={friendsOpen} onClose={() => setFriendsOpen(false)} />
       <FollowersListModal userId={userId} open={followersOpen} onClose={() => setFollowersOpen(false)} />
+      <CreatorRequestModal userId={userId} open={creatorRequestOpen} onClose={() => setCreatorRequestOpen(false)} />
     </main>
   );
 }

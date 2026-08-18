@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { GAMES_BY_WEEK } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { fetchWeeks, setWeekOpen, setWeekResultsPublished, fetchGameResults, setGameResult, clearGameResult, WeekRow } from "@/lib/supabase/admin";
+import { fetchPendingCreatorRequests, reviewCreatorRequest, PendingCreatorRequest } from "@/lib/supabase/creatorRequests";
 import { errorMessage } from "@/lib/errorMessage";
 
 export default function AdminPage() {
@@ -40,12 +41,34 @@ function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [savingWeek, setSavingWeek] = useState(false);
   const [savingGameId, setSavingGameId] = useState<string | null>(null);
+  const [creatorRequests, setCreatorRequests] = useState<PendingCreatorRequest[] | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWeeks()
       .then(setWeeks)
       .catch((err) => setError(errorMessage(err)));
   }, []);
+
+  useEffect(() => {
+    fetchPendingCreatorRequests()
+      .then(setCreatorRequests)
+      .catch((err) => setError(errorMessage(err)));
+  }, []);
+
+  async function handleReviewRequest(requestId: string, approve: boolean) {
+    if (reviewingId) return;
+    setReviewingId(requestId);
+    setError(null);
+    try {
+      await reviewCreatorRequest(requestId, approve);
+      setCreatorRequests((prev) => prev?.filter((r) => r.id !== requestId) ?? null);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setReviewingId(null);
+    }
+  }
 
   useEffect(() => {
     setResultsLoaded(false);
@@ -235,6 +258,54 @@ function AdminDashboard() {
             })}
           </div>
         </>
+      )}
+
+      {creatorRequests && creatorRequests.length > 0 && (
+        <div className="mt-10">
+          <div className="text-[11px] text-white/45 tracking-[0.15em] mb-3">CREATOR REQUESTS ({creatorRequests.length})</div>
+          <div className="flex flex-col gap-2">
+            {creatorRequests.map((req) => {
+              const label = req.display_name || req.username;
+              const busy = reviewingId === req.id;
+              return (
+                <div key={req.id} className="rounded-xl border border-white/10 bg-white/5 p-3 flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    {req.avatar_url ? (
+                      <img src={req.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <span className="h-9 w-9 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{label.charAt(0).toUpperCase()}</span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">{label}</div>
+                      <a href={req.content_url} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-300/80 hover:text-sky-300 truncate block">
+                        {req.content_url}
+                      </a>
+                    </div>
+                  </div>
+                  {req.note && <p className="text-xs text-white/50">{req.note}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleReviewRequest(req.id, true)}
+                      disabled={busy}
+                      className="flex-1 rounded-full px-3 py-1.5 text-xs disabled:opacity-50 active:scale-95 transition-transform duration-150"
+                      style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
+                    >
+                      {busy ? "…" : "Approve"}
+                    </button>
+                    <button
+                      onClick={() => handleReviewRequest(req.id, false)}
+                      disabled={busy}
+                      className="flex-1 rounded-full px-3 py-1.5 text-xs border border-white/15 text-white/60 hover:text-white hover:border-white/30 transition-colors disabled:opacity-50"
+                      style={{ fontFamily: "var(--font-display)" }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </main>
   );
