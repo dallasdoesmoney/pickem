@@ -12,6 +12,7 @@ import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 import { MyReferralsModal } from "@/components/MyReferralsModal";
 import { FriendsListModal } from "@/components/FriendsListModal";
+import { FollowersListModal } from "@/components/FollowersListModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
 import { StatTile, StatDetailRow } from "@/components/StatTile";
 import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
@@ -64,6 +65,7 @@ function SignedInAccount({
   const [editOpen, setEditOpen] = useState(false);
   const [referralsOpen, setReferralsOpen] = useState(false);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [followersOpen, setFollowersOpen] = useState(false);
   const stats = usePlayerStats(userId);
 
   const label = authProfile?.display_name || authProfile?.username || "Your Profile";
@@ -156,7 +158,7 @@ function SignedInAccount({
           <div className="mt-2">
             <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
             <div className="flex flex-col gap-1.5">
-              <StatDetailRow icon="👀" label="Followers" value={stats ? String(stats.followerCount) : "–"} />
+              <StatDetailRow icon="👀" label="Followers" value={stats ? String(stats.followerCount) : "–"} onClick={() => setFollowersOpen(true)} />
               <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} onClick={() => setFriendsOpen(true)} />
               <TeamsPredictedRow completedCount={stats?.completedTeamCount} href="/predictor" />
               <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} href="/weekly" />
@@ -200,6 +202,7 @@ function SignedInAccount({
       />
       <MyReferralsModal open={referralsOpen} onClose={() => setReferralsOpen(false)} />
       <FriendsListModal userId={userId} open={friendsOpen} onClose={() => setFriendsOpen(false)} />
+      <FollowersListModal userId={userId} open={followersOpen} onClose={() => setFollowersOpen(false)} />
     </main>
   );
 }

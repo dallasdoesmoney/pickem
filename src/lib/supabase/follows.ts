@@ -69,6 +69,32 @@ export async function fetchFollowersNotFollowingBack(myId: string): Promise<Foll
     .filter((x): x is FollowerRow => x !== null);
 }
 
+// Everyone who follows me, mutual or not - the Followers list modal's
+// full list (contrast fetchFollowersNotFollowingBack, which is the
+// narrower "still needs action" subset for the notifications page).
+export async function fetchMyFollowers(myId: string): Promise<FollowerRow[]> {
+  const { data: followers, error } = await supabase
+    .from("follows")
+    .select("follower_id, created_at")
+    .eq("followee_id", myId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  if (!followers || followers.length === 0) return [];
+
+  const ids = followers.map((r) => r.follower_id);
+  const { data: profiles, error: profilesError } = await supabase.from("leaderboard").select("user_id, username, display_name, avatar_url").in("user_id", ids);
+  if (profilesError) throw profilesError;
+  const byId = new Map((profiles ?? []).map((p) => [p.user_id, p]));
+
+  return followers
+    .map((r) => {
+      const p = byId.get(r.follower_id);
+      if (!p) return null;
+      return { user_id: r.follower_id, username: p.username, display_name: p.display_name, avatar_url: p.avatar_url, created_at: r.created_at };
+    })
+    .filter((x): x is FollowerRow => x !== null);
+}
+
 // Anyone's follower count, for public profiles - follows is publicly
 // readable, so this is just a plain filtered count, no RPC needed.
 export async function fetchPublicFollowerCount(userId: string): Promise<number> {
