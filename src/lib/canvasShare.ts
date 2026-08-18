@@ -26,6 +26,13 @@ export function loadImage(src: string): Promise<HTMLImageElement | null> {
 
 export function resolveDisplayFont(): string {
   if (typeof document === "undefined") return "sans-serif";
+  // Read the --font-display custom property straight off the root element
+  // rather than sniffing some specific element's computed font-family - the
+  // Picks tab (the only tab with a Share button) doesn't always have an
+  // <h1> in the DOM, which used to make this silently fall back to
+  // sans-serif for the whole canvas.
+  const rootFamily = getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim();
+  if (rootFamily) return rootFamily;
   const probe = document.querySelector("h1");
   const family = probe ? getComputedStyle(probe).fontFamily : "";
   return family || "sans-serif";
