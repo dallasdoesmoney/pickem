@@ -75,7 +75,7 @@ export function PlayerProfileModal({
           <div className="w-full mt-5">
             <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
             <div className="flex flex-col gap-1.5">
-              <StatDetailRow icon="🧑‍🤝‍🧑" label="Followers" value={stats ? String(stats.followerCount) : "–"} />
+              <StatDetailRow icon="👀" label="Followers" value={stats ? String(stats.followerCount) : "–"} />
               <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} />
               <TeamsPredictedRow completedCount={stats?.completedTeamCount} completedAbbrs={stats?.completedTeamAbbrs} />
               <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} />
