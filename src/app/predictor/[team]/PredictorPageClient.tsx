@@ -273,7 +273,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
         className="fixed -z-10 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.17] h-[85vh] w-auto max-w-none left-[-15vh] lg:left-[20px]"
       />
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
-      <div className="mb-8 flex items-center justify-center gap-5">
+      <div className="mb-6 flex items-center justify-center gap-5">
         {/* Nudged up slightly - flexbox centers the boxes, but the title's
             display font carries extra space below its cap height, so true
             box-centering reads as the logo sitting a touch low. */}
@@ -357,7 +357,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             ))}
           </div>
 
-          <div className="flex flex-col items-center mt-10">
+          <div className="flex flex-col items-center mt-5">
             {/* Suspicious Picks and Vegas Prediction share one explicit
                 width at each breakpoint (instead of sizing to their own
                 content) so they land as equal-size bookends - which is
