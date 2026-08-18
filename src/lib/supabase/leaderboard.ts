@@ -43,8 +43,7 @@ export async function fetchMyLeaderboardEntry(userId: string): Promise<Leaderboa
 
 // Batch identity lookup for a set of user_ids whose profiles aren't
 // otherwise available (e.g. resolving who's behind an activity feed
-// entry) - the leaderboard view is already public, same reasoning
-// fetchIncomingRequests relies on for requester identity.
+// entry) - the leaderboard view is already public.
 export async function fetchProfilesByIds(ids: string[]): Promise<Map<string, Pick<LeaderboardRow, "username" | "display_name" | "avatar_url">>> {
   const uniqueIds = Array.from(new Set(ids));
   if (uniqueIds.length === 0) return new Map();

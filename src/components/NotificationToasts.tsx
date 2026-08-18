@@ -4,12 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreadNotifications, markNotificationRead, syncLevelUpNotifications, NotificationRow } from "@/lib/supabase/notifications";
-import { fetchIncomingRequests, FriendRequest } from "@/lib/supabase/friends";
 import { fetchMyReferrals, ReferralRow } from "@/lib/supabase/referrals";
 import { fetchProfilesByIds, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { ALL_LEVELS, subLevelRoman } from "@/lib/levels";
 
-type Accepter = Pick<LeaderboardRow, "username" | "display_name" | "avatar_url">;
+type Actor = Pick<LeaderboardRow, "username" | "display_name" | "avatar_url">;
 
 const TOAST_DURATION_MS = 5000;
 
@@ -21,16 +20,17 @@ type ToastContent = {
   accentColor: string;
 };
 
-function buildToastContent(n: NotificationRow, requests: FriendRequest[], referrals: ReferralRow[], accepters: Map<string, Accepter>): ToastContent {
-  if (n.type === "friend_accepted") {
-    const accepter = accepters.get(String(n.data.accepter_id));
-    const label = accepter?.display_name || accepter?.username || "Someone";
+function buildToastContent(n: NotificationRow, referrals: ReferralRow[], actors: Map<string, Actor>): ToastContent {
+  if (n.type === "new_follower") {
+    const follower = actors.get(String(n.data.follower_id));
+    const label = follower?.display_name || follower?.username || "Someone";
+    const isMutual = n.data.is_mutual === true;
     return {
-      avatarUrl: accepter?.avatar_url ?? null,
+      avatarUrl: follower?.avatar_url ?? null,
       initial: label.charAt(0).toUpperCase(),
-      title: `${label} accepted your friend request`,
-      subtitle: "You're now friends",
-      accentColor: "#4ade80",
+      title: isMutual ? `${label} followed you back — you're now friends!` : `${label} started following you`,
+      subtitle: isMutual ? "You're now friends" : "Tap to view",
+      accentColor: isMutual ? "#4ade80" : "#c084fc",
     };
   }
 
@@ -47,30 +47,15 @@ function buildToastContent(n: NotificationRow, requests: FriendRequest[], referr
     };
   }
 
-  if (n.type === "referral_joined") {
-    const referee = referrals.find((r) => r.user_id === n.data.referee_id);
-    const label = referee?.display_name || referee?.username || "Someone";
-    return {
-      avatarUrl: referee?.avatar_url ?? null,
-      initial: label.charAt(0).toUpperCase(),
-      title: `${label} joined using your invite!`,
-      subtitle: "You both earned 1,000 pts",
-      accentColor: "#4ade80",
-    };
-  }
-
-  // friend_request - the requester may not be in fetchIncomingRequests if
-  // they don't have a username yet (same blind spot /notifications
-  // already has today) - fall back to generic copy rather than dropping
-  // the toast entirely.
-  const req = requests.find((r) => r.requester_id === n.data.requester_id);
-  const label = req?.display_name || req?.username;
+  // referral_joined
+  const referee = referrals.find((r) => r.user_id === n.data.referee_id);
+  const label = referee?.display_name || referee?.username || "Someone";
   return {
-    avatarUrl: req?.avatar_url ?? null,
-    initial: (label ?? "?").charAt(0).toUpperCase(),
-    title: label ? `${label} sent you a friend request` : "Someone sent you a friend request",
-    subtitle: "Tap to view",
-    accentColor: "#7c3aed",
+    avatarUrl: referee?.avatar_url ?? null,
+    initial: label.charAt(0).toUpperCase(),
+    title: `${label} joined using your invite!`,
+    subtitle: "You both earned 1,000 pts",
+    accentColor: "#4ade80",
   };
 }
 
@@ -84,9 +69,8 @@ export function NotificationToasts() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const [queue, setQueue] = useState<NotificationRow[]>([]);
-  const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
-  const [accepters, setAccepters] = useState<Map<string, Accepter>>(new Map());
+  const [actors, setActors] = useState<Map<string, Actor>>(new Map());
   const [current, setCurrent] = useState<NotificationRow | null>(null);
 
   useEffect(() => {
@@ -96,20 +80,17 @@ export function NotificationToasts() {
       .catch((err) => console.error("Level-up sync failed", err))
       .finally(() => {
         if (cancelled) return;
-        Promise.all([fetchUnreadNotifications(user.id).catch(() => []), fetchIncomingRequests(user.id).catch(() => []), fetchMyReferrals().catch(() => [])]).then(
-          ([notifications, incoming, myReferrals]) => {
-            if (cancelled) return;
-            setRequests(incoming);
-            setReferrals(myReferrals);
-            setQueue(notifications);
-            const accepterIds = notifications.filter((n) => n.type === "friend_accepted").map((n) => String(n.data.accepter_id));
-            if (accepterIds.length > 0) {
-              fetchProfilesByIds(accepterIds)
-                .then(setAccepters)
-                .catch((err) => console.error("Failed to resolve accepter profiles", err));
-            }
+        Promise.all([fetchUnreadNotifications(user.id).catch(() => []), fetchMyReferrals().catch(() => [])]).then(([notifications, myReferrals]) => {
+          if (cancelled) return;
+          setReferrals(myReferrals);
+          setQueue(notifications);
+          const actorIds = notifications.filter((n) => n.type === "new_follower").map((n) => String(n.data.follower_id));
+          if (actorIds.length > 0) {
+            fetchProfilesByIds(actorIds)
+              .then(setActors)
+              .catch((err) => console.error("Failed to resolve follower profiles", err));
           }
-        );
+        });
       });
     return () => {
       cancelled = true;
@@ -149,7 +130,7 @@ export function NotificationToasts() {
 
   if (!current) return null;
 
-  const content = buildToastContent(current, requests, referrals, accepters);
+  const content = buildToastContent(current, referrals, actors);
 
   return (
     <div className="fixed top-[84px] left-1/2 -translate-x-1/2 z-[70] w-full max-w-sm px-4">

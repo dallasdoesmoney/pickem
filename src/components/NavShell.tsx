@@ -8,7 +8,7 @@ import { ReferralBanner } from "@/components/ReferralBanner";
 import { NotificationToasts } from "@/components/NotificationToasts";
 import { ReferrerSuggestionCard } from "@/components/ReferrerSuggestionCard";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchPendingRequestCount } from "@/lib/supabase/friends";
+import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 
 type NavItem = {
   href: string;
@@ -144,7 +144,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       setPendingCount(0);
       return;
     }
-    fetchPendingRequestCount(user.id)
+    fetchUnreciprocatedFollowerCount(user.id)
       .then(setPendingCount)
       .catch(() => {});
   }, [user, mobileOpen]);

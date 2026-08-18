@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchMyFriends, FriendRow } from "@/lib/supabase/friends";
+import { fetchMyFriends, FriendRow } from "@/lib/supabase/follows";
 import { errorMessage } from "@/lib/errorMessage";
 
 export function FriendsListModal({ userId, open, onClose }: { userId: string; open: boolean; onClose: () => void }) {

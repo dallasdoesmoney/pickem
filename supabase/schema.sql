@@ -392,39 +392,67 @@ end;
 $$;
 grant execute on function public.claim_referral(text) to authenticated;
 
--- friends: symmetric, request/accept (not the asymmetric "follow"
--- planned for later). Unique index on the unordered pair stops A->B and
--- B->A pending requests from coexisting.
-create table public.friendships (
+-- follows: Twitter-style, one-directional, no approval needed. "Friends"
+-- is derived (see the public.friends view below), not its own stored
+-- state. Deliberately PUBLIC READ (unlike the old friendships table,
+-- which was select-own and needed a security-definer RPC just to show a
+-- count on someone else's profile) - follow graphs are public info on
+-- platforms like this, same posture as the leaderboard/user_badges views
+-- below. Writes stay locked down: insert only as yourself, delete only
+-- your own outgoing edge.
+create table public.follows (
   id uuid primary key default gen_random_uuid(),
-  requester_id uuid not null references auth.users(id) on delete cascade,
-  addressee_id uuid not null references auth.users(id) on delete cascade,
-  status text not null default 'pending' check (status in ('pending', 'accepted')),
+  follower_id uuid not null references auth.users(id) on delete cascade,
+  followee_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  check (requester_id <> addressee_id)
+  check (follower_id <> followee_id)
 );
-create unique index friendships_unique_pair_idx on public.friendships (least(requester_id, addressee_id), greatest(requester_id, addressee_id));
-create index friendships_addressee_idx on public.friendships (addressee_id, status);
-create index friendships_requester_idx on public.friendships (requester_id, status);
-alter table public.friendships enable row level security;
--- Column-level lockdown (same pattern as profiles.is_admin): the only
--- thing an update is ever allowed to touch is status.
-revoke insert on public.friendships from authenticated;
-revoke update on public.friendships from authenticated;
-grant insert (requester_id, addressee_id) on public.friendships to authenticated;
-grant update (status) on public.friendships to authenticated;
-create policy "friendships_select_own" on public.friendships for select
-  using (auth.uid() = requester_id or auth.uid() = addressee_id);
-create policy "friendships_insert_own" on public.friendships for insert
-  with check (auth.uid() = requester_id);
-create policy "friendships_update_addressee_accept" on public.friendships for update
-  using (auth.uid() = addressee_id and status = 'pending')
-  with check (status = 'accepted');
-create policy "friendships_delete_party" on public.friendships for delete
-  using (auth.uid() = requester_id or auth.uid() = addressee_id);
-create trigger friendships_set_updated_at before update on public.friendships
-  for each row execute function public.set_updated_at();
+create unique index follows_unique_edge_idx on public.follows (follower_id, followee_id);
+create index follows_followee_idx on public.follows (followee_id, created_at);
+alter table public.follows enable row level security;
+create policy "follows_select_all" on public.follows for select using (true);
+grant select on public.follows to anon, authenticated;
+revoke insert on public.follows from authenticated;
+grant insert (follower_id, followee_id) on public.follows to authenticated;
+create policy "follows_insert_own" on public.follows for insert with check (auth.uid() = follower_id);
+-- Each row belongs to exactly one person (the follower) - unfollowing
+-- only ever removes your own edge, never the other side's. No update
+-- policy: a follow has nothing mutable to change.
+create policy "follows_delete_own" on public.follows for delete using (auth.uid() = follower_id);
+
+-- Mutual pairs, both directions - plain view (not security-definer) is
+-- safe here specifically because follows itself already grants
+-- unrestricted select.
+create view public.friends as
+select a.follower_id as user_id, a.followee_id as friend_id, greatest(a.created_at, b.created_at) as became_friends_at
+from public.follows a
+join public.follows b on b.follower_id = a.followee_id and b.followee_id = a.follower_id;
+grant select on public.friends to anon, authenticated;
+
+-- Notifies the followee, stamping is_mutual so the client can render
+-- "followed you back - you're now friends!" without a second
+-- notification type or a live re-resolution step.
+create or replace function public.notify_new_follower()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_is_mutual boolean;
+begin
+  v_is_mutual := exists (
+    select 1 from public.follows
+    where follower_id = new.followee_id and followee_id = new.follower_id
+  );
+  insert into public.notifications (user_id, type, data)
+  values (new.followee_id, 'new_follower', jsonb_build_object('follower_id', new.follower_id, 'is_mutual', v_is_mutual));
+  return new;
+end;
+$$;
+create trigger follows_notify_new_follower
+  after insert on public.follows
+  for each row execute function public.notify_new_follower();
 
 -- avatars storage policies (after creating the public "avatars" bucket)
 create policy "avatar_upload_own" on storage.objects for insert
@@ -445,7 +473,7 @@ create policy "avatar_read_public" on storage.objects for select
 create table public.notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  type text not null check (type in ('friend_request', 'referral_joined', 'level_up', 'friend_accepted')),
+  type text not null check (type in ('new_follower', 'referral_joined', 'level_up')),
   data jsonb not null default '{}'::jsonb,
   read_at timestamptz,
   created_at timestamptz not null default now()
@@ -458,49 +486,6 @@ revoke update on public.notifications from authenticated;
 grant update (read_at) on public.notifications to authenticated;
 create policy "notifications_update_own" on public.notifications for update
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
--- Fires whenever a friend request is sent (friendships always inserts as
--- 'pending' - the client can't supply any other status, see the
--- column-level grant on friendships) so the addressee gets a toast
--- without sendFriendRequest() needing to know about notifications at all.
-create or replace function public.notify_friend_request()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if new.status = 'pending' then
-    insert into public.notifications (user_id, type, data)
-    values (new.addressee_id, 'friend_request', jsonb_build_object('requester_id', new.requester_id, 'friendship_id', new.id));
-  end if;
-  return new;
-end;
-$$;
-create trigger friendships_notify_request
-  after insert on public.friendships
-  for each row execute function public.notify_friend_request();
-
--- Fires on the pending->accepted transition specifically and notifies the
--- requester, not the accepter - the accepter already sees the result of
--- their own action immediately in FriendButton's state.
-create or replace function public.notify_friend_accepted()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if old.status = 'pending' and new.status = 'accepted' then
-    insert into public.notifications (user_id, type, data)
-    values (new.requester_id, 'friend_accepted', jsonb_build_object('accepter_id', new.addressee_id, 'friendship_id', new.id));
-  end if;
-  return new;
-end;
-$$;
-create trigger friendships_notify_accepted
-  after update on public.friendships
-  for each row execute function public.notify_friend_accepted();
 
 -- last_notified_level: watermark for sync_level_up_notifications() below,
 -- separate from the level itself (never stored - see src/lib/levels.ts)
@@ -645,19 +630,6 @@ as $$
 $$;
 grant execute on function public.public_lock_bonus_count(uuid) to anon, authenticated;
 
--- friendships is locked to "select own" (requester or addressee), so the
--- player profile popup needs a security-definer RPC for an arbitrary
--- user_id's friend count.
-create or replace function public.public_friend_count(p_user_id uuid)
-returns integer
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select count(*)::integer
-  from public.friendships
-  where status = 'accepted'
-    and (requester_id = p_user_id or addressee_id = p_user_id);
-$$;
-grant execute on function public.public_friend_count(uuid) to anon, authenticated;
+-- public_friend_count no longer needed: follows/friends are publicly
+-- readable (see the follows table above), so a friend count is just a
+-- plain filtered count against public.friends, no RPC required.

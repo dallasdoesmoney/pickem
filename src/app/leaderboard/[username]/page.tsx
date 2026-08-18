@@ -7,7 +7,7 @@ import { fetchLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboar
 import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/hooks/useAuth";
-import { FriendButton } from "@/components/FriendButton";
+import { FollowButton } from "@/components/FollowButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelListModal } from "@/components/LevelListModal";
@@ -81,6 +81,7 @@ export default function PlayerPage() {
           <div className="w-full mt-5">
             <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
             <div className="flex flex-col gap-1.5">
+              <StatDetailRow icon="🧑‍🤝‍🧑" label="Followers" value={stats ? String(stats.followerCount) : "–"} />
               <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} />
               <TeamsPredictedRow completedCount={stats?.completedTeamCount} completedAbbrs={stats?.completedTeamAbbrs} />
               <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} />
@@ -88,9 +89,11 @@ export default function PlayerPage() {
             </div>
           </div>
 
-          {user && user.id !== row.user_id && (
+          {/* Always visible, even signed out - clicking it while signed
+              out prompts sign-in instead of the button just disappearing. */}
+          {(!user || user.id !== row.user_id) && (
             <div className="mt-6">
-              <FriendButton myId={user.id} otherId={row.user_id} />
+              <FollowButton myId={user?.id} otherId={row.user_id} />
             </div>
           )}
         </div>

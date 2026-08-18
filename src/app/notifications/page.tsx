@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchIncomingRequests, acceptFriendRequest, removeFriendship, fetchMyFriendIds, FriendRequest } from "@/lib/supabase/friends";
+import { fetchFollowersNotFollowingBack, followUser, FollowerRow } from "@/lib/supabase/follows";
 import { fetchAllNotifications, markAllNotificationsRead, NotificationRow } from "@/lib/supabase/notifications";
 import { fetchProfilesByIds, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { buildActivityGroups, relativeTime, ActivityGroup } from "@/lib/activity";
 import { ALL_LEVELS, subLevelRoman } from "@/lib/levels";
 import { errorMessage } from "@/lib/errorMessage";
 
-const PENDING_PREVIEW_COUNT = 5;
+const FOLLOWERS_PREVIEW_COUNT = 5;
 
 function pluralOthers(n: number): string {
   return n === 1 ? "1 other" : `${n} others`;
@@ -21,9 +21,6 @@ function describeGroup(group: ActivityGroup, actors: (Pick<LeaderboardRow, "user
   const first = actors[0];
   const firstLabel = first?.display_name || first?.username || "Someone";
   const extra = group.actorIds.length - 1;
-  // "Lucas" or "Lucas and 3 others" - built once, reused for both the
-  // subject form (friend_accepted, referral_joined) and the possessive
-  // form (friend_request_accepted_by_me) below.
   const namePhrase = extra > 0 ? `${firstLabel} and ${pluralOthers(extra)}` : firstLabel;
 
   if (group.kind === "level_up") {
@@ -35,18 +32,10 @@ function describeGroup(group: ActivityGroup, actors: (Pick<LeaderboardRow, "user
       initial: entry?.rankEmoji ?? "🎉",
     };
   }
-  if (group.kind === "friend_accepted") {
+  if (group.kind === "new_follower") {
     return {
-      text: `${namePhrase} accepted your friend request${extra > 0 ? "s" : ""}`,
-      accentColor: "#4ade80",
-      avatarUrl: first?.avatar_url ?? null,
-      initial: firstLabel.charAt(0).toUpperCase(),
-    };
-  }
-  if (group.kind === "friend_request_accepted_by_me") {
-    return {
-      text: `You accepted ${namePhrase}${extra > 0 ? "’" : "’s"} friend request${extra > 0 ? "s" : ""}`,
-      accentColor: "#38bdf8",
+      text: `${namePhrase} started following you`,
+      accentColor: "#c084fc",
       avatarUrl: first?.avatar_url ?? null,
       initial: firstLabel.charAt(0).toUpperCase(),
     };
@@ -63,10 +52,9 @@ function describeGroup(group: ActivityGroup, actors: (Pick<LeaderboardRow, "user
 export default function NotificationsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [requests, setRequests] = useState<FriendRequest[] | null>(null);
-  const [pendingExpanded, setPendingExpanded] = useState(false);
+  const [followers, setFollowers] = useState<FollowerRow[] | null>(null);
+  const [followersExpanded, setFollowersExpanded] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[] | null>(null);
-  const [friendIds, setFriendIds] = useState<Set<string> | null>(null);
   const [profiles, setProfiles] = useState<Map<string, Pick<LeaderboardRow, "username" | "display_name" | "avatar_url">>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -77,22 +65,19 @@ export default function NotificationsPage() {
       router.replace("/account");
       return;
     }
-    Promise.all([fetchIncomingRequests(user.id), fetchAllNotifications(user.id), fetchMyFriendIds(user.id)])
-      .then(([incoming, allNotifications, friends]) => {
-        setRequests(incoming);
+    Promise.all([fetchFollowersNotFollowingBack(user.id), fetchAllNotifications(user.id)])
+      .then(([unreciprocated, allNotifications]) => {
+        setFollowers(unreciprocated);
         setNotifications(allNotifications);
-        setFriendIds(friends);
         markAllNotificationsRead(user.id).catch((err) => console.error("Failed to mark notifications read", err));
       })
       .catch((err) => setError(errorMessage(err)));
   }, [user, loading, router]);
 
-  const pendingRequesterIds = useMemo(() => new Set((requests ?? []).map((r) => r.requester_id)), [requests]);
-
   const groups = useMemo(() => {
-    if (!notifications || !friendIds) return [];
-    return buildActivityGroups(notifications, { pendingRequesterIds, friendIds });
-  }, [notifications, friendIds, pendingRequesterIds]);
+    if (!notifications) return [];
+    return buildActivityGroups(notifications);
+  }, [notifications]);
 
   useEffect(() => {
     const actorIds = groups.flatMap((g) => g.actorIds).filter((id) => !profiles.has(id));
@@ -103,31 +88,20 @@ export default function NotificationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups]);
 
-  async function handleAccept(req: FriendRequest) {
-    setBusyId(req.id);
-    const { error } = await acceptFriendRequest(req.id);
+  async function handleFollowBack(row: FollowerRow) {
+    if (!user) return;
+    setBusyId(row.user_id);
+    const { error } = await followUser(user.id, row.user_id);
     setBusyId(null);
     if (error) {
       setError(error);
       return;
     }
-    setRequests((prev) => prev?.filter((r) => r.id !== req.id) ?? null);
-    setFriendIds((prev) => new Set(prev).add(req.requester_id));
+    setFollowers((prev) => prev?.filter((f) => f.user_id !== row.user_id) ?? null);
   }
 
-  async function handleDecline(req: FriendRequest) {
-    setBusyId(req.id);
-    const { error } = await removeFriendship(req.id);
-    setBusyId(null);
-    if (error) {
-      setError(error);
-      return;
-    }
-    setRequests((prev) => prev?.filter((r) => r.id !== req.id) ?? null);
-  }
-
-  const visibleRequests = requests && !pendingExpanded ? requests.slice(0, PENDING_PREVIEW_COUNT) : requests;
-  const hiddenCount = requests ? requests.length - PENDING_PREVIEW_COUNT : 0;
+  const visibleFollowers = followers && !followersExpanded ? followers.slice(0, FOLLOWERS_PREVIEW_COUNT) : followers;
+  const hiddenCount = followers ? followers.length - FOLLOWERS_PREVIEW_COUNT : 0;
 
   return (
     <main className="flex-1 px-4 pb-16 pt-10 max-w-md w-full mx-auto">
@@ -140,23 +114,23 @@ export default function NotificationsPage() {
 
       {error && <p className="text-sm text-red-400 text-center mb-4">{error}</p>}
 
-      {!requests ? (
+      {!followers ? (
         <div className="flex justify-center py-10">
           <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
         </div>
       ) : (
         <>
-          {requests.length > 0 && (
+          {followers.length > 0 && (
             <div className="mb-8">
-              <div className="text-[11px] text-white/45 tracking-[0.15em] mb-3">FRIEND REQUESTS ({requests.length})</div>
+              <div className="text-[11px] text-white/45 tracking-[0.15em] mb-3">FOLLOW BACK ({followers.length})</div>
               <div className="flex flex-col gap-2">
-                {visibleRequests!.map((req) => {
-                  const label = req.display_name || req.username;
+                {visibleFollowers!.map((f) => {
+                  const label = f.display_name || f.username;
                   return (
-                    <div key={req.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
-                      <Link href={`/leaderboard/${req.username}`} className="flex items-center gap-3 flex-1 min-w-0">
-                        {req.avatar_url ? (
-                          <img src={req.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
+                    <div key={f.user_id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+                      <Link href={`/leaderboard/${f.username}`} className="flex items-center gap-3 flex-1 min-w-0">
+                        {f.avatar_url ? (
+                          <img src={f.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
                         ) : (
                           <span className="h-9 w-9 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">
                             {label.charAt(0).toUpperCase()}
@@ -164,39 +138,30 @@ export default function NotificationsPage() {
                         )}
                         <span className="text-sm truncate">{label}</span>
                       </Link>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => handleAccept(req)}
-                          disabled={busyId === req.id}
-                          className="rounded-full px-3 py-1.5 text-xs disabled:opacity-50 active:scale-95 transition-transform duration-150"
-                          style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
-                        >
-                          Accept
-                        </button>
-                        <button
-                          onClick={() => handleDecline(req)}
-                          disabled={busyId === req.id}
-                          className="text-xs text-white/40 hover:text-white/70 transition-colors disabled:opacity-50"
-                        >
-                          Decline
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleFollowBack(f)}
+                        disabled={busyId === f.user_id}
+                        className="shrink-0 rounded-full px-3 py-1.5 text-xs disabled:opacity-50 active:scale-95 transition-transform duration-150"
+                        style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
+                      >
+                        {busyId === f.user_id ? "…" : "Follow Back"}
+                      </button>
                     </div>
                   );
                 })}
-                {!pendingExpanded && hiddenCount > 0 && (
+                {!followersExpanded && hiddenCount > 0 && (
                   <button
                     type="button"
-                    onClick={() => setPendingExpanded(true)}
+                    onClick={() => setFollowersExpanded(true)}
                     className="text-center text-xs text-sky-300/80 hover:text-sky-300 transition-colors py-2"
                   >
-                    +{hiddenCount} more pending request{hiddenCount === 1 ? "" : "s"} &rarr;
+                    +{hiddenCount} more follower{hiddenCount === 1 ? "" : "s"} &rarr;
                   </button>
                 )}
-                {pendingExpanded && requests.length > PENDING_PREVIEW_COUNT && (
+                {followersExpanded && followers.length > FOLLOWERS_PREVIEW_COUNT && (
                   <button
                     type="button"
-                    onClick={() => setPendingExpanded(false)}
+                    onClick={() => setFollowersExpanded(false)}
                     className="text-center text-xs text-white/40 hover:text-white/70 transition-colors py-2"
                   >
                     Show less
@@ -214,7 +179,7 @@ export default function NotificationsPage() {
           ) : groups.length === 0 ? (
             <div className="text-center py-16 text-white/50">
               <div className="text-4xl mb-3">🔔</div>
-              <p className="text-sm">Nothing here yet - friend activity and level-ups will show up as they happen.</p>
+              <p className="text-sm">Nothing here yet - new followers and level-ups will show up as they happen.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-2">

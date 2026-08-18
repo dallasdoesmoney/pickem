@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
-import { fetchMyFriendIds } from "@/lib/supabase/friends";
+import { fetchMyFriendIds } from "@/lib/supabase/follows";
 import { errorMessage } from "@/lib/errorMessage";
 import { PlayerProfileModal } from "@/components/PlayerProfileModal";
 import { LevelBadge } from "@/components/LevelBadge";
@@ -177,7 +177,7 @@ export function LeaderboardBoard() {
         </div>
       )}
 
-      <PlayerProfileModal row={selected} myId={user?.id} onClose={() => setSelected(null)} onFriendshipChange={reloadFriends} />
+      <PlayerProfileModal row={selected} myId={user?.id} onClose={() => setSelected(null)} onFollowChange={reloadFriends} />
       {signInModal}
     </>
   );

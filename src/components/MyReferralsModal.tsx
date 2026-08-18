@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchMyReferrals, ReferralRow } from "@/lib/supabase/referrals";
 import { buildReferralLink } from "@/lib/referralStorage";
 import { errorMessage } from "@/lib/errorMessage";
-import { FriendButton } from "@/components/FriendButton";
+import { FollowButton } from "@/components/FollowButton";
 
 export function MyReferralsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, profile } = useAuth();
@@ -131,7 +131,7 @@ export function MyReferralsModal({ open, onClose }: { open: boolean; onClose: ()
                     <span className="h-9 w-9 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{label.charAt(0).toUpperCase()}</span>
                   )}
                   <span className="flex-1 min-w-0 text-sm truncate">{label}</span>
-                  {r.user_id !== user.id && <FriendButton myId={user.id} otherId={r.user_id} compact />}
+                  {r.user_id !== user.id && <FollowButton myId={user.id} otherId={r.user_id} compact />}
                 </div>
               );
             })

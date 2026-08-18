@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
-import { fetchPendingRequestCount } from "@/lib/supabase/friends";
+import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 
 const PANEL_WIDTH = 200;
 
@@ -35,7 +35,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
       setPendingCount(0);
       return;
     }
-    fetchPendingRequestCount(user.id)
+    fetchUnreciprocatedFollowerCount(user.id)
       .then(setPendingCount)
       .catch(() => {});
   }, [user, open]);

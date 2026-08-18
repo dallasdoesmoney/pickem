@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { sendFriendRequest } from "@/lib/supabase/friends";
+import { followUser } from "@/lib/supabase/follows";
 
 // The post-signup counterpart to ReferralBanner - same card shape, but
-// this one needs an action button (Add Friend) rather than just an
+// this one needs an action button (Follow) rather than just an
 // auto-dismiss message, so it's a plain ambient component like
 // ReferralBanner, not part of the NotificationToasts queue. Naturally
 // one-shot already: useAuth only ever populates pendingReferrerSuggestion
@@ -20,7 +20,7 @@ export function ReferrerSuggestionCard() {
   async function handleAdd() {
     if (!user || !pendingReferrerSuggestion) return;
     setSending(true);
-    const { error } = await sendFriendRequest(user.id, pendingReferrerSuggestion.userId);
+    const { error } = await followUser(user.id, pendingReferrerSuggestion.userId);
     setSending(false);
     if (!error) setSent(true);
     setTimeout(() => clearPendingReferrerSuggestion(), error ? 0 : 1500);
@@ -43,11 +43,11 @@ export function ReferrerSuggestionCard() {
           <div className="text-sm text-white font-medium truncate" style={{ fontFamily: "var(--font-display)" }}>
             {pendingReferrerSuggestion.label} invited you
           </div>
-          <div className="text-xs text-white/55 truncate mt-0.5">Add them as a friend to compare picks</div>
+          <div className="text-xs text-white/55 truncate mt-0.5">Follow them to compare picks</div>
         </div>
         {sent ? (
           <span className="shrink-0 text-xs text-emerald-300" style={{ fontFamily: "var(--font-display)" }}>
-            SENT
+            FOLLOWING
           </span>
         ) : (
           <button
@@ -57,7 +57,7 @@ export function ReferrerSuggestionCard() {
             className="shrink-0 rounded-full px-4 py-2 text-xs active:scale-95 transition-transform duration-150 disabled:opacity-60"
             style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
           >
-            {sending ? "…" : "ADD FRIEND"}
+            {sending ? "…" : "FOLLOW"}
           </button>
         )}
         <button

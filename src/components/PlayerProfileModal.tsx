@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
-import { FriendButton } from "@/components/FriendButton";
+import { FollowButton } from "@/components/FollowButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelListModal } from "@/components/LevelListModal";
@@ -19,12 +19,12 @@ export function PlayerProfileModal({
   row,
   myId,
   onClose,
-  onFriendshipChange,
+  onFollowChange,
 }: {
   row: LeaderboardRow | null;
   myId?: string;
   onClose: () => void;
-  onFriendshipChange?: () => void;
+  onFollowChange?: () => void;
 }) {
   const [levelModalOpen, setLevelModalOpen] = useState(false);
   const stats = usePlayerStats(row?.user_id);
@@ -75,6 +75,7 @@ export function PlayerProfileModal({
           <div className="w-full mt-5">
             <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
             <div className="flex flex-col gap-1.5">
+              <StatDetailRow icon="🧑‍🤝‍🧑" label="Followers" value={stats ? String(stats.followerCount) : "–"} />
               <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} />
               <TeamsPredictedRow completedCount={stats?.completedTeamCount} completedAbbrs={stats?.completedTeamAbbrs} />
               <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} />
@@ -82,9 +83,12 @@ export function PlayerProfileModal({
             </div>
           </div>
 
-          {myId && myId !== row.user_id && (
+          {/* Always visible, even signed out - clicking it while signed
+              out prompts sign-in instead of the button just disappearing,
+              same as every other "here's what you could do" affordance. */}
+          {(!myId || myId !== row.user_id) && (
             <div className="mt-6 w-full flex justify-center">
-              <FriendButton myId={myId} otherId={row.user_id} onChange={onFriendshipChange} />
+              <FollowButton myId={myId} otherId={row.user_id} onChange={onFollowChange} />
             </div>
           )}
         </div>

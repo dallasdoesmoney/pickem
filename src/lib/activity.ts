@@ -14,11 +14,7 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-// Distinct from NotificationType - friend_request notifications split
-// into two different display kinds here (still-pending ones live in the
-// separate pending-requests section entirely, not this feed) or get
-// dropped (declined/removed - nothing worth remembering).
-export type ActivityKind = "friend_accepted" | "friend_request_accepted_by_me" | "referral_joined" | "level_up";
+export type ActivityKind = "new_follower" | "referral_joined" | "level_up";
 
 export type ActivityGroup = {
   kind: ActivityKind;
@@ -31,29 +27,19 @@ export type ActivityGroup = {
 const GROUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Builds the grouped, newest-first activity feed from raw notification
-// rows. friend_request rows are resolved against current friendship state
-// (not stored on the notification itself, since a request's outcome can
-// change well after it was sent):
-//   - still pending -> excluded (shown in the separate pending section)
-//   - now a friend -> "you accepted" history entry
-//   - neither -> declined/removed, dropped entirely
-export function buildActivityGroups(
-  notifications: NotificationRow[],
-  { pendingRequesterIds, friendIds }: { pendingRequesterIds: Set<string>; friendIds: Set<string> }
-): ActivityGroup[] {
+// rows. Unlike the old friend_request handling, new_follower is final at
+// insert time (mutuality is baked into data.is_mutual, not resolved
+// against live state), so there's nothing to re-resolve here - every row
+// just becomes an entry.
+export function buildActivityGroups(notifications: NotificationRow[]): ActivityGroup[] {
   type Resolved = { kind: ActivityKind; actorId: string | null; createdAt: string; id: string; level?: number };
   const resolved: Resolved[] = [];
 
   for (const n of notifications) {
-    if (n.type === "friend_request") {
-      const requesterId = String(n.data.requester_id ?? "");
-      if (!requesterId || pendingRequesterIds.has(requesterId)) continue;
-      if (!friendIds.has(requesterId)) continue;
-      resolved.push({ kind: "friend_request_accepted_by_me", actorId: requesterId, createdAt: n.created_at, id: n.id });
-    } else if (n.type === "friend_accepted") {
-      const accepterId = String(n.data.accepter_id ?? "");
-      if (!accepterId) continue;
-      resolved.push({ kind: "friend_accepted", actorId: accepterId, createdAt: n.created_at, id: n.id });
+    if (n.type === "new_follower") {
+      const followerId = String(n.data.follower_id ?? "");
+      if (!followerId) continue;
+      resolved.push({ kind: "new_follower", actorId: followerId, createdAt: n.created_at, id: n.id });
     } else if (n.type === "referral_joined") {
       const refereeId = String(n.data.referee_id ?? "");
       if (!refereeId) continue;
