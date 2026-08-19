@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { TierItem, TierTemplate, getTierTemplate, resolveItem } from "@/data/tierTemplates";
-import { TierListState, rankedCount } from "@/lib/tierList";
+import { TierListState, createInitialState } from "@/lib/tierList";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
-import { SavedTierListSummary, deleteTierList, listMyTierLists } from "@/lib/supabase/tierLists";
+import {
+  SavedTierListSummary,
+  deleteTierList,
+  fetchTierListRankCounts,
+  listMyTierLists,
+} from "@/lib/supabase/tierLists";
 
 type Tab = "all" | "mine";
 
@@ -26,8 +31,46 @@ function whenTouched(iso: string): string {
   return new Date(then).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// Exact up to a thousand, then one decimal: 999, 1k, 1.4k, 15.4k, 115.3k,
+// 1.1M. The decimal is dropped when it would read ".0", so a round
+// thousand is "1k" rather than "1.0k".
+function abbreviate(n: number): string {
+  if (n < 1000) return String(n);
+  const [value, suffix] = n < 1_000_000 ? [n / 1000, "k"] : [n / 1_000_000, "M"];
+  const rounded = Math.floor(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}${suffix}`;
+}
+
 function matches(haystack: string, query: string): boolean {
   return haystack.toLowerCase().includes(query.trim().toLowerCase());
+}
+
+// A category has no ranking of its own, so its card art is an invented
+// one. Seeded off the slug rather than Math.random: the same category
+// must draw the same board on the server and on the client, or hydration
+// tears - and a preview that reshuffles on every render is just noise.
+function previewFor(template: TierTemplate): TierListState {
+  const base = createInitialState(template);
+  let seed = 2166136261;
+  for (const ch of template.slug) seed = ((seed ^ ch.charCodeAt(0)) * 16777619) >>> 0;
+
+  const ids = template.items.map((i) => i.id);
+  for (let i = ids.length - 1; i > 0; i--) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const j = seed % (i + 1);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+
+  // Uneven on purpose - a real board is never a neat rectangle.
+  const perRow = [4, 7, 9, 6, 3];
+  const placements: Record<string, string[]> = {};
+  let cut = 0;
+  base.tiers.forEach((tier, i) => {
+    const take = perRow[i] ?? 0;
+    placements[tier.id] = ids.slice(cut, cut + take);
+    cut += take;
+  });
+  return { ...base, placements, unranked: ids.slice(cut) };
 }
 
 // A mark, falling back to a plain tile rather than a broken image - these
@@ -39,7 +82,7 @@ function Mark({ item, size }: { item: TierItem; size: number }) {
     return (
       <span
         aria-hidden
-        className="shrink-0 rounded-[4px]"
+        className="shrink-0 rounded-[3px]"
         style={{ width: size, height: size, background: item.accent, opacity: 0.85 }}
       />
     );
@@ -57,9 +100,8 @@ function Mark({ item, size }: { item: TierItem; size: number }) {
   );
 }
 
-// A saved list's own board, shrunk to card art. The colours ARE the
-// preview - you recognise your list by its shape long before you read the
-// name, which is the whole reason the index carries the state blob.
+// The board, shrunk to card art. The colours ARE the preview - you
+// recognise a list by its shape long before you read the name.
 function BoardThumb({ state, template }: { state: TierListState; template: TierTemplate }) {
   const rows = state.tiers.slice(0, 5);
   return (
@@ -75,14 +117,14 @@ function BoardThumb({ state, template }: { state: TierListState; template: TierT
             <span
               className="shrink-0"
               style={{
-                width: 16,
+                width: 13,
                 background: tier.accent,
                 clipPath: "polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%)",
               }}
             />
-            <span className="flex-1 min-w-0 flex flex-wrap gap-1 p-1.5 content-start" style={{ minHeight: 22 }}>
+            <span className="flex-1 min-w-0 flex flex-wrap gap-[3px] p-1 content-start" style={{ minHeight: 20 }}>
               {ids.map((id) => (
-                <Mark key={id} item={resolveItem(template, id)} size={14} />
+                <Mark key={id} item={resolveItem(template, id)} size={13} />
               ))}
             </span>
           </div>
@@ -92,70 +134,31 @@ function BoardThumb({ state, template }: { state: TierListState; template: TierT
   );
 }
 
-// One result is a feature, not a lonely tile in a grid built for nine.
-// With a single category today, the grid left one small card top-left and
-// acres of nothing; laid out wide it reads as a deliberate hero instead.
-function WideTemplateCard({ template }: { template: TierTemplate }) {
-  const marks = template.items.slice(0, 16);
-  return (
-    <Link
-      href={`/tier-lists/${template.slug}`}
-      className="group flex flex-col rounded-2xl border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/35"
-    >
-      <span className="h-[5px] shrink-0 bg-gradient-to-r from-[#f472b6] via-[#fb923c] to-[#a3e635]" />
-      <span className="flex flex-wrap items-center gap-x-8 gap-y-5 p-6">
-        <span className="flex flex-col gap-2 min-w-[210px] flex-1">
-          <span className="text-lg" style={{ fontFamily: "var(--font-display)" }}>
-            {template.title.toUpperCase()}
-          </span>
-          <span className="text-sm text-white/50">{template.tagline}</span>
-          <span
-            className="mt-2 self-start rounded-full px-5 py-2.5 text-sm"
-            style={{
-              fontFamily: "var(--font-display)",
-              background: "linear-gradient(135deg, #4ade80, #22c55e)",
-              color: "#0e1b33",
-            }}
-          >
-            START RANKING
-          </span>
-        </span>
-        <span className="flex flex-wrap gap-2 content-start flex-1 min-w-[220px] justify-end">
-          {marks.map((item) => (
-            <Mark key={item.id} item={item} size={38} />
-          ))}
-        </span>
-      </span>
-    </Link>
-  );
-}
-
 const CARD =
-  "group flex flex-col rounded-2xl border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/35";
+  "group flex flex-col rounded-2xl border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/40";
 
-function TemplateCard({ template }: { template: TierTemplate }) {
-  // The item set is the card art: a category is best explained by what is
-  // in it.
-  const marks = template.items.slice(0, 12);
+function TemplateCard({ template, people }: { template: TierTemplate; people?: number }) {
+  const preview = useMemo(() => previewFor(template), [template]);
   return (
     <Link href={`/tier-lists/${template.slug}`} className={CARD}>
-      <span className="flex flex-wrap gap-1.5 p-3 pb-2 content-start" style={{ minHeight: 76 }}>
-        {marks.map((item) => (
-          <Mark key={item.id} item={item} size={26} />
-        ))}
+      <span className="block p-2.5 pb-0">
+        <BoardThumb state={preview} template={template} />
       </span>
-      <span className="h-[5px] shrink-0 bg-gradient-to-r from-[#f472b6] via-[#fb923c] to-[#a3e635]" />
-      <span className="flex flex-col gap-1 p-4">
-        <span className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+      <span className="flex flex-col gap-1 p-3">
+        <span className="text-[12.5px] leading-tight" style={{ fontFamily: "var(--font-display)" }}>
           {template.title.toUpperCase()}
         </span>
-        <span className="text-xs text-white/45">{template.tagline}</span>
-        <span
-          className="text-[10px] tracking-[0.14em] text-white/35 mt-1"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {template.items.length} {template.itemNoun[1].toUpperCase()}
-        </span>
+        <span className="text-[11.5px] text-white/45 leading-snug">{template.tagline}</span>
+        {/* Hidden at zero rather than shown as "0 RANKED" - a counter is
+            social proof, and an empty one is the opposite. */}
+        {!!people && (
+          <span
+            className="text-[10px] tracking-[0.14em] text-white/40 mt-0.5"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {abbreviate(people)} RANKED
+          </span>
+        )}
       </span>
     </Link>
   );
@@ -172,51 +175,37 @@ function SavedCard({
   busy: boolean;
   onDelete: () => void;
 }) {
-  const ranked = template ? rankedCount(row.state) : 0;
-  const total = template?.items.length ?? 0;
   return (
-    <div className={CARD}>
+    <div className={`${CARD} relative`}>
       <Link href={`/tier-lists/${row.template}?id=${row.id}`} className="flex flex-col">
-        <span className="p-3 pb-0">
+        <span className="block p-2.5 pb-0">
           {template ? (
             <BoardThumb state={row.state} template={template} />
           ) : (
-            <span className="block rounded-lg bg-black/60" style={{ height: 76 }} />
+            <span className="block rounded-lg bg-black/60" style={{ height: 70 }} />
           )}
         </span>
-        <span className="flex flex-col gap-1 p-4 pb-3">
-          <span className="text-sm truncate" style={{ fontFamily: "var(--font-display)" }}>
+        <span className="flex flex-col gap-1 p-3 pr-10">
+          <span className="text-[12.5px] leading-tight truncate" style={{ fontFamily: "var(--font-display)" }}>
             {row.title.toUpperCase()}
           </span>
-          <span className="text-xs text-white/45 truncate">
-            {/* A list whose category no longer exists still has to render,
-                so fall back to the slug. */}
-            {template?.title ?? row.template} &middot; saved {whenTouched(row.updated_at)}
-          </span>
+          <span className="text-[11.5px] text-white/45">saved {whenTouched(row.updated_at)}</span>
         </span>
       </Link>
-      <div className="flex items-center justify-between gap-2 px-4 pb-3 mt-auto">
-        <span
-          className="text-[10px] tracking-[0.14em] text-white/35"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {total ? `${ranked}/${total} RANKED` : ""}
-        </span>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={busy}
-          aria-label={`Delete ${row.title}`}
-          className="shrink-0 h-8 w-8 rounded-full text-white/35 hover:text-red-300 hover:bg-red-300/10 flex items-center justify-center transition-colors disabled:opacity-40"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 7h16" />
-            <path d="M10 11v6M14 11v6" />
-            <path d="M6 7l1 13h10l1-13" />
-            <path d="M9 7V4h6v3" />
-          </svg>
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={busy}
+        aria-label={`Delete ${row.title}`}
+        className="absolute bottom-2 right-2 h-8 w-8 rounded-full text-white/35 hover:text-red-300 hover:bg-red-300/10 flex items-center justify-center transition-colors disabled:opacity-40"
+      >
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 7h16" />
+          <path d="M10 11v6M14 11v6" />
+          <path d="M6 7l1 13h10l1-13" />
+          <path d="M9 7V4h6v3" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -229,6 +218,7 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
   const [saved, setSaved] = useState<SavedTierListSummary[] | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -251,6 +241,11 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
     }
     load(user.id);
   }, [user, load]);
+
+  // Public: the counter shows for signed-out visitors too.
+  useEffect(() => {
+    fetchTierListRankCounts().then(setCounts);
+  }, []);
 
   const shownTemplates = useMemo(
     () => (query ? templates.filter((t) => matches(`${t.title} ${t.tagline}`, query)) : templates),
@@ -278,7 +273,9 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
   }
 
   const savedCount = saved?.length ?? null;
-  const grid = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
+  // Two up on a phone, three from large screens - a single column made
+  // the page a long scroll of near-identical cards.
+  const grid = "grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4";
 
   return (
     <main className="flex-1 px-4 pb-16 pt-8 max-w-5xl w-full mx-auto">
@@ -295,10 +292,10 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
 
       {/* Search above the toggle: it narrows whichever set you're looking
           at, so it belongs to the page rather than to either tab. */}
-      <div className="relative mb-4">
+      <div className="relative mb-3">
         <svg
           viewBox="0 0 24 24"
-          className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/35 pointer-events-none"
+          className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none"
           fill="none"
           stroke="currentColor"
           strokeWidth={2.2}
@@ -312,8 +309,9 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tier lists"
           aria-label="Search tier lists"
-          // 16px: iOS zooms the page when you focus anything smaller.
-          className="w-full rounded-full border border-white/15 bg-white/5 pl-11 pr-11 py-3 text-base text-white placeholder:text-white/35 outline-none focus:border-white/40 transition-colors"
+          // Solid fill, not a wash over the page background, and 16px so
+          // iOS doesn't zoom the page on focus.
+          className="w-full rounded-full border border-white/15 bg-[#101d38] pl-11 pr-11 py-3 text-base text-white placeholder:text-white/35 outline-none focus:border-white/45 transition-colors"
         />
         {query && (
           <button
@@ -330,9 +328,10 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
         )}
       </div>
 
-      {/* Two tabs, one rail. A segmented control rather than a dropdown:
-          there are exactly two sets and both deserve to be visible. */}
-      <div className="flex p-1 rounded-full border border-white/15 bg-white/5 mb-6" role="tablist">
+      {/* Both halves carry a real fill - the selected one lighter than the
+          page, the other darker - so the control reads as a switch rather
+          than as text floating on the background. */}
+      <div className="flex gap-2 mb-6" role="tablist">
         {([
           ["all", "ALL TIER LISTS", shownTemplates.length],
           ["mine", "MY TIER LISTS", savedCount],
@@ -345,8 +344,10 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
               role="tab"
               aria-selected={active}
               onClick={() => setTab(id)}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-full py-2.5 text-xs sm:text-sm transition-colors ${
-                active ? "bg-white/12 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28)]" : "text-white/50 hover:text-white"
+              className={`flex-1 flex items-center justify-center gap-2 rounded-full py-3 px-3 text-[11px] sm:text-sm border transition-colors ${
+                active
+                  ? "bg-[#2b4173] border-white/35 text-white"
+                  : "bg-[#0a1428] border-white/12 text-white/55 hover:text-white hover:border-white/25"
               }`}
               style={{ fontFamily: "var(--font-display)" }}
             >
@@ -368,12 +369,10 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
       {tab === "all" ? (
         shownTemplates.length === 0 ? (
           <p className="text-sm text-white/45 text-center py-14">Nothing matches &ldquo;{query}&rdquo;.</p>
-        ) : shownTemplates.length === 1 ? (
-          <WideTemplateCard template={shownTemplates[0]} />
         ) : (
           <div className={grid}>
             {shownTemplates.map((t) => (
-              <TemplateCard key={t.slug} template={t} />
+              <TemplateCard key={t.slug} template={t} people={counts[t.slug]} />
             ))}
           </div>
         )
@@ -382,7 +381,7 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
           <span className="h-6 w-6 rounded-full border-2 border-white/25 border-t-white animate-spin" />
         </div>
       ) : !user ? (
-        <div className="rounded-2xl border border-white/15 bg-[#0b1730] p-8 text-center">
+        <div className="rounded-2xl border border-white/15 bg-[#101d38] p-8 text-center">
           <p className="text-sm text-white/60">Sign in to save tier lists and pick them back up later.</p>
           <button
             type="button"
@@ -398,7 +397,7 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
           </button>
         </div>
       ) : shownSaved.length === 0 ? (
-        <div className="rounded-2xl border border-white/15 bg-[#0b1730] p-8 text-center flex flex-col items-center gap-4">
+        <div className="rounded-2xl border border-white/15 bg-[#101d38] p-8 text-center flex flex-col items-center gap-4">
           <p className="text-sm text-white/60">
             {query ? `Nothing matches “${query}”.` : "Nothing saved yet. Build one and hit Save."}
           </p>

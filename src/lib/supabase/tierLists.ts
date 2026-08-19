@@ -48,6 +48,26 @@ export async function fetchTierList(userId: string, id: string): Promise<SavedTi
   return (data as SavedTierList) ?? null;
 }
 
+// How many distinct people have saved a list in each category, keyed by
+// template slug. Goes through a security-definer RPC because RLS limits
+// every client to its own rows - see 0030.
+//
+// Returns an empty map rather than throwing if the function isn't there:
+// the counter is a nice-to-have on a card, and the hub must still render
+// on a database where 0030 hasn't been run yet.
+export async function fetchTierListRankCounts(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.rpc("tier_list_rank_counts");
+  if (error) {
+    console.warn("Rank counts unavailable", error.message);
+    return {};
+  }
+  const out: Record<string, number> = {};
+  for (const row of (data as { template: string; people: number }[]) ?? []) {
+    out[row.template] = Number(row.people) || 0;
+  }
+  return out;
+}
+
 export async function deleteTierList(userId: string, id: string): Promise<{ error: string | null }> {
   const { error } = await supabase.from("tier_lists").delete().eq("user_id", userId).eq("id", id);
   if (error) {
