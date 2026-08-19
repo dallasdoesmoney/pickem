@@ -23,10 +23,9 @@
 -- worse than one that shows a field less.
 -- Dropped first, not just replaced: create-or-replace cannot change a
 -- function's OUT columns, and this one's return type has already changed
--- once (it used to select profiles.newsletter_subscribed, a column added
--- by a migration that was never run). Without the drop, editing the
--- returned shape again fails with 42P13 against any database that already
--- has an older copy.
+-- once since it was written. Without the drop, editing the returned shape
+-- again fails with 42P13 against any database that already has an older
+-- copy.
 drop function if exists public.admin_list_users(text, int, int);
 create function public.admin_list_users(
   p_search text default '',

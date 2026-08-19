@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase/client";
 import { migrateLocalDataToAccount } from "@/lib/supabase/migration";
 import { claimReferral } from "@/lib/supabase/referrals";
 import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
-import { subscribeToNewsletter } from "@/lib/newsletter";
 import { PENDING_REFERRAL_KEY } from "@/lib/referralStorage";
 
 export type Profile = {
@@ -19,7 +18,6 @@ export type Profile = {
   migrated_local_picks: boolean;
   referred_by: string | null;
   onboarding_avatar_prompted: boolean;
-  newsletter_subscribed: boolean;
 };
 
 export type PendingReferrerSuggestion = { userId: string; label: string; avatarUrl: string | null };
@@ -56,7 +54,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const migratingRef = useRef(false);
   const identifiedUserIdRef = useRef<string | null>(null);
   const claimingReferralRef = useRef(false);
-  const subscribingNewsletterRef = useRef(false);
   const [pendingReferrerSuggestion, setPendingReferrerSuggestion] = useState<PendingReferrerSuggestion | null>(null);
 
   // Captured on first load (not just the signup page - a shared link can
@@ -129,23 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } finally {
           claimingReferralRef.current = false;
         }
-      }
-    }
-
-    // Left false on failure (missing Beehiiv config, network hiccup,
-    // etc.) so this naturally retries on the next session load rather
-    // than silently giving up - same "retry until it actually succeeds"
-    // approach as the referral claim above.
-    if (nextProfile && !nextProfile.newsletter_subscribed && !subscribingNewsletterRef.current) {
-      subscribingNewsletterRef.current = true;
-      try {
-        const { error } = await subscribeToNewsletter();
-        if (!error) {
-          await supabase.from("profiles").update({ newsletter_subscribed: true }).eq("id", nextUser.id);
-          setProfile((prev) => (prev ? { ...prev, newsletter_subscribed: true } : prev));
-        }
-      } finally {
-        subscribingNewsletterRef.current = false;
       }
     }
   }, []);

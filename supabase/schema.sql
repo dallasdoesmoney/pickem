@@ -12,7 +12,6 @@ create table public.profiles (
   migrated_local_picks boolean not null default false,
   referred_by uuid references auth.users(id),
   onboarding_avatar_prompted boolean not null default false,
-  newsletter_subscribed boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -26,7 +25,7 @@ alter table public.profiles enable row level security;
 -- referred them to farm points for a friend after the fact.
 revoke insert on public.profiles from authenticated;
 revoke update on public.profiles from authenticated;
-grant update (display_name, avatar_url, username, migrated_local_picks, onboarding_avatar_prompted, newsletter_subscribed) on public.profiles to authenticated;
+grant update (display_name, avatar_url, username, migrated_local_picks, onboarding_avatar_prompted) on public.profiles to authenticated;
 -- Format + a small server-side profanity backstop matching
 -- src/lib/usernamePolicy.ts's client-side list.
 alter table public.profiles add constraint profiles_username_format
