@@ -13,7 +13,6 @@ export type AdminUserRow = {
   email: string | null;
   created_at: string;
   is_admin: boolean;
-  newsletter_subscribed: boolean;
   referred_by: string | null;
   referrer_username: string | null;
   referrer_display_name: string | null;

@@ -16,6 +16,11 @@
 -- attribution is plausible: who referred them, how many they have
 -- referred, when they joined, and their email (the only usable
 -- identifier for an account that never picked a username).
+--
+-- Deliberately narrow: it selects only columns guaranteed by the original
+-- schema.sql, never one added by a later migration. An admin tool that
+-- fails to open because an unrelated optional migration was skipped is
+-- worse than one that shows a field less.
 create or replace function public.admin_list_users(
   p_search text default '',
   p_limit int default 50,
@@ -29,7 +34,6 @@ returns table (
   email text,
   created_at timestamptz,
   is_admin boolean,
-  newsletter_subscribed boolean,
   referred_by uuid,
   referrer_username text,
   referrer_display_name text,
@@ -56,7 +60,6 @@ begin
     u.email::text,
     p.created_at,
     p.is_admin,
-    p.newsletter_subscribed,
     p.referred_by,
     r.username,
     r.display_name,
