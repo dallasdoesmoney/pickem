@@ -44,6 +44,7 @@ import { buildReferralLink } from "@/lib/referralStorage";
 import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TierRow } from "@/components/tierList/TierRow";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
+import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
@@ -83,6 +84,7 @@ export default function TierListPageClient({
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [namingOpen, setNamingOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   // Bumped per drag so a drag's many intermediate moves coalesce into one
@@ -453,25 +455,58 @@ export default function TierListPageClient({
     [template.slug]
   );
 
-  async function handleSave() {
-    if (saving) return;
+  // Resolves the account to save under, prompting for sign-in if needed.
+  // Null means the caller should stop: either the prompt was dismissed,
+  // or sign-in went out to Google and the page is about to reload, in
+  // which case the effect below finishes the save on the way back.
+  async function requireUserId(): Promise<string | null> {
+    if (user?.id) return user.id;
+    const signedIn = await requestSignIn();
+    if (!signedIn) return null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user.id ?? null;
+  }
+
+  // Save over the list currently open. Only offered when there IS one -
+  // otherwise this is a create, and a create asks for a name first.
+  async function handleSaveOver() {
+    if (saving || !savedId) return;
     setSaving(true);
     setSaveError(null);
     try {
-      let userId = user?.id;
-      if (!userId) {
-        const signedIn = await requestSignIn();
-        if (!signedIn) {
-          setSaving(false);
-          return;
-        }
-        const { data } = await supabase.auth.getSession();
-        userId = data.session?.user.id;
-      }
-      // No userId means the sign-in was a Google redirect - the effect
-      // below finishes the save once the page reloads with a session.
+      const userId = await requireUserId();
       if (!userId) return;
       await doSave(userId, state, savedId);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Every create goes through the name dialog. Saving used to create a
+  // new row whenever the editor happened not to be tracking one, which is
+  // the case any time you arrive without ?id= - and since the working
+  // draft survives navigation, that quietly cloned the last list you had
+  // open under a new name, over and over.
+  function handleSaveAsNew() {
+    if (saving) return;
+    setSaveError(null);
+    setNamingOpen(true);
+  }
+
+  async function handleNameConfirm(name: string) {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const userId = await requireUserId();
+      if (!userId) {
+        setNamingOpen(false);
+        return;
+      }
+      // Renames the board too: this list is what you are editing now, so
+      // the title above the board and the caption on its export follow.
+      dispatch({ type: "setTitle", title: name });
+      await doSave(userId, { ...state, title: name }, null);
+      setNamingOpen(false);
     } finally {
       setSaving(false);
     }
@@ -638,16 +673,30 @@ export default function TierListPageClient({
               and it's what the exported image is captioned with, so the
               page has to show the same thing the share does. */}
           {editing ? (
-            <input
-              value={state.title}
-              onChange={(e) => dispatch({ type: "setTitle", title: e.target.value })}
-              onFocus={(e) => e.currentTarget.select()}
-              maxLength={MAX_TITLE}
-              aria-label="List title"
-              placeholder={template.defaultListTitle}
-              className="w-full text-center text-[clamp(1.25rem,5.4vw,2.6rem)] leading-none tracking-wide px-12 bg-transparent border-b border-white/25 focus:border-white/60 outline-none uppercase"
-              style={{ fontFamily: "var(--font-display)" }}
-            />
+            // A bare input with a hairline under it looked exactly like
+            // the heading it replaced, so nobody could tell the name had
+            // become editable at all. It gets the same treatment as a
+            // field anywhere else in the app - a filled box, a border, a
+            // pencil, and a caption saying what it is.
+            <span className="w-full px-10 sm:px-12 flex flex-col items-center gap-1">
+              <span className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-white/45" style={{ fontFamily: "var(--font-display)" }}>
+                <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+                LIST NAME
+              </span>
+              <input
+                value={state.title}
+                onChange={(e) => dispatch({ type: "setTitle", title: e.target.value })}
+                onFocus={(e) => e.currentTarget.select()}
+                maxLength={MAX_TITLE}
+                aria-label="List title"
+                placeholder={template.defaultListTitle}
+                className="w-full text-center text-[clamp(1.1rem,4.6vw,2.1rem)] leading-tight tracking-wide rounded-xl border border-white/25 bg-white/10 px-3 py-1.5 focus:border-white/60 focus:bg-white/15 outline-none uppercase placeholder:text-white/25 transition-colors"
+                style={{ fontFamily: "var(--font-display)" }}
+              />
+            </span>
           ) : (
             <h1
               className="text-center text-[clamp(1.25rem,5.4vw,2.6rem)] leading-none tracking-wide px-12"
@@ -789,33 +838,76 @@ export default function TierListPageClient({
         </button>
       </div>
 
+      {/* Saving over a list and creating one are separate buttons, because
+          they are separate intentions and guessing between them is what
+          quietly filled the index with copies of the same board. Which
+          list is being written to is spelled out above them - a Save
+          button whose target you can't see is the whole problem. */}
       <div className="flex flex-col items-center mt-3">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center justify-center gap-2 h-9 rounded-full px-6 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
-          style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #34d399, #059669)", color: "#ffffff" }}
-        >
-          {saving ? (
+        <p className="text-xs text-white/45 mb-2 text-center px-4">
+          {savedId ? (
             <>
-              <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-              SAVING&hellip;
-            </>
-          ) : savedAt ? (
-            <>
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
-              SAVED
+              Editing <span className="text-white/75">{listTitleFor(state, template)}</span>
             </>
           ) : (
-            "SAVE MY TIER LIST"
+            "Not saved yet"
           )}
-        </button>
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {savedId && (
+            <button
+              type="button"
+              onClick={handleSaveOver}
+              disabled={saving}
+              className="flex items-center justify-center gap-2 h-9 rounded-full px-6 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
+              style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #34d399, #059669)", color: "#ffffff" }}
+            >
+              {saving ? (
+                <>
+                  <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  SAVING&hellip;
+                </>
+              ) : savedAt ? (
+                <>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                  SAVED
+                </>
+              ) : (
+                "SAVE CHANGES"
+              )}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleSaveAsNew}
+            disabled={saving}
+            className={
+              savedId
+                ? "flex items-center justify-center gap-2 h-9 rounded-full px-6 text-sm border border-white/20 hover:border-white/40 text-white/70 hover:text-white transition-colors disabled:opacity-60"
+                : "flex items-center justify-center gap-2 h-9 rounded-full px-6 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
+            }
+            style={
+              savedId
+                ? { fontFamily: "var(--font-display)" }
+                : { fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #34d399, #059669)", color: "#ffffff" }
+            }
+          >
+            {savedId ? "SAVE AS NEW LIST" : "SAVE MY TIER LIST"}
+          </button>
+        </div>
         {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
       </div>
 
+
+      <NameListDialog
+        open={namingOpen}
+        initialName={listTitleFor(state, template)}
+        busy={saving}
+        onCancel={() => setNamingOpen(false)}
+        onConfirm={handleNameConfirm}
+      />
 
       <ShareDialog
         open={shareOpen}

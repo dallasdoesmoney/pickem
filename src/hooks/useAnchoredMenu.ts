@@ -54,6 +54,14 @@ export function useAnchoredMenu<T extends HTMLElement>(
     function onScrollOrResize(e: Event) {
       if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
       if (e.type === "resize" && window.innerWidth === widthAtOpen) return;
+      // Focus inside the panel means this scroll is the browser revealing
+      // a field the user just tapped - iOS scrolls an input clear of the
+      // keyboard - not the user scrolling away from the menu. A scroll
+      // event's target is the document, never the panel, so the check
+      // above can't catch it and the menu closed the instant the search
+      // box was tapped. That is what still broke this on a phone after
+      // the resize case was handled.
+      if (panelRef.current && panelRef.current.contains(document.activeElement)) return;
       onOpenChange(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
