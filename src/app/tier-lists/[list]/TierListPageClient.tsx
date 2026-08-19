@@ -37,7 +37,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { supabase } from "@/lib/supabase/client";
-import { createTierListShare, fetchTierList, saveTierList } from "@/lib/supabase/tierLists";
+import { createTierListShare, fetchTierList, listMyTierLists, saveTierList } from "@/lib/supabase/tierLists";
 import { renderTierShareImage } from "@/lib/tierShareImage";
 import { shareBlob } from "@/lib/shareBlob";
 import { buildReferralLink } from "@/lib/referralStorage";
@@ -85,6 +85,7 @@ export default function TierListPageClient({
   const [savedAt, setSavedAt] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [namingOpen, setNamingOpen] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   // Bumped per drag so a drag's many intermediate moves coalesce into one
@@ -131,6 +132,39 @@ export default function TierListPageClient({
     requestedId.current = new URLSearchParams(window.location.search).get("id") ?? "";
   }
 
+  // The working draft outlives navigation, so it has to remember which
+  // saved list it came from. Without this, opening a list and then
+  // reaching the editor by any route that drops ?id= - the category on
+  // the hub, say - left the same board on screen with nothing tying it to
+  // its row, and the only save available was "create", which quietly made
+  // a copy. Every copy then looked identical, because they were.
+  const originKey = `pickem:tier-list:${template.slug}:saved-id`;
+  const rememberOrigin = useCallback(
+    (id: string | null) => {
+      try {
+        if (id) localStorage.setItem(originKey, id);
+        else localStorage.removeItem(originKey);
+      } catch {
+        // Private mode. Losing the association is survivable.
+      }
+    },
+    [originKey],
+  );
+
+  // Adopt the remembered row when the URL doesn't name one. Deliberately
+  // does NOT reload from the server: the draft on screen may hold edits
+  // that were never saved, and refetching would throw them away. It only
+  // restores which row a save should write to.
+  useEffect(() => {
+    if (!loaded || initialState || requestedId.current) return;
+    try {
+      const remembered = localStorage.getItem(originKey);
+      if (remembered) setSavedId(remembered);
+    } catch {
+      // Nothing to restore.
+    }
+  }, [loaded, initialState, originKey]);
+
   // Open the saved list named in the URL. A snapshot seed wins over it -
   // arriving from someone else's share link is a different intent than
   // reopening your own list.
@@ -148,6 +182,7 @@ export default function TierListPageClient({
         if (!row?.state) return;
         replace({ ...row.state, template: template.slug });
         setSavedId(row.id);
+        rememberOrigin(row.id);
       })
       .catch((err) => console.error("Failed to load saved tier list", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -430,12 +465,13 @@ export default function TierListPageClient({
       const { id: rowId, error } = await saveTierList(userId, next, id);
       if (error) {
         setSaveError(error);
-        return;
+        return false;
       }
       setSaveError(null);
       setSavedAt(Date.now());
       if (rowId) {
         setSavedId(rowId);
+        rememberOrigin(rowId);
         // Keep editing the same row across a refresh, and give the user a
         // URL that reopens this list rather than the generic draft.
         const url = new URL(window.location.href);
@@ -451,9 +487,17 @@ export default function TierListPageClient({
         ranked: rankedCount(next),
         created: !id,
       });
+      return true;
     },
-    [template.slug]
+    [template.slug, rememberOrigin]
   );
+
+  // "SAVED" was sticky: it was set on save and never cleared, so the
+  // button went on claiming the list was saved through every edit that
+  // followed. Any change to the board takes the confirmation back off.
+  useEffect(() => {
+    setSavedAt(0);
+  }, [state]);
 
   // Resolves the account to save under, prompting for sign-in if needed.
   // Null means the caller should stop: either the prompt was dismissed,
@@ -487,26 +531,61 @@ export default function TierListPageClient({
   // the case any time you arrive without ?id= - and since the working
   // draft survives navigation, that quietly cloned the last list you had
   // open under a new name, over and over.
-  function handleSaveAsNew() {
+  async function handleSaveAsNew() {
     if (saving) return;
     setSaveError(null);
+    setNameError(null);
+    // Sign in BEFORE the name dialog, not during it. Asking afterwards
+    // put the sign-in prompt up while the name dialog was still on
+    // screen, and it landed behind it.
+    if (!user) {
+      setSaving(true);
+      try {
+        if (!(await requireUserId())) return;
+      } finally {
+        setSaving(false);
+      }
+    }
     setNamingOpen(true);
+  }
+
+  // Two lists called the same thing are indistinguishable on the index,
+  // which is the only place you pick between them. Checked here for a
+  // useful message; the database enforces it as well, since this check
+  // and the insert are not atomic.
+  async function nameIsTaken(userId: string, name: string, exceptId: string | null) {
+    try {
+      const rows = await listMyTierLists(userId);
+      const wanted = name.trim().toLowerCase();
+      return rows.some(
+        (r) => r.template === template.slug && r.id !== exceptId && r.title.trim().toLowerCase() === wanted,
+      );
+    } catch {
+      // Don't block a save because the check itself failed - the unique
+      // index still has the final say.
+      return false;
+    }
   }
 
   async function handleNameConfirm(name: string) {
     setSaving(true);
     setSaveError(null);
+    setNameError(null);
     try {
       const userId = await requireUserId();
       if (!userId) {
         setNamingOpen(false);
         return;
       }
+      if (await nameIsTaken(userId, name, null)) {
+        setNameError("You already have a list with that name.");
+        return;
+      }
       // Renames the board too: this list is what you are editing now, so
       // the title above the board and the caption on its export follow.
       dispatch({ type: "setTitle", title: name });
-      await doSave(userId, { ...state, title: name }, null);
-      setNamingOpen(false);
+      const ok = await doSave(userId, { ...state, title: name }, null);
+      if (ok) setNamingOpen(false);
     } finally {
       setSaving(false);
     }
@@ -689,7 +768,13 @@ export default function TierListPageClient({
               <input
                 value={state.title}
                 onChange={(e) => dispatch({ type: "setTitle", title: e.target.value })}
-                onFocus={(e) => e.currentTarget.select()}
+                // Caret at the end, not a select-all: this field is
+                // centre-aligned, so a tap landed the caret in front of
+                // the name and backspace appeared to do nothing.
+                onFocus={(e) => {
+                  const end = e.currentTarget.value.length;
+                  e.currentTarget.setSelectionRange(end, end);
+                }}
                 maxLength={MAX_TITLE}
                 aria-label="List title"
                 placeholder={template.defaultListTitle}
@@ -905,7 +990,11 @@ export default function TierListPageClient({
         open={namingOpen}
         initialName={listTitleFor(state, template)}
         busy={saving}
-        onCancel={() => setNamingOpen(false)}
+        error={nameError}
+        onCancel={() => {
+          setNamingOpen(false);
+          setNameError(null);
+        }}
         onConfirm={handleNameConfirm}
       />
 

@@ -72,6 +72,12 @@ export async function saveTierList(
 ): Promise<{ id: string | null; error: string | null }> {
   const failed = (stage: string, err: unknown) => {
     console.error(`Tier list save failed (${stage})`, err);
+    // 23505 here is the unique index on (user_id, template, lower(title)):
+    // a name collision, which is the user's to fix, not a failure to
+    // retry. Anything else is genuinely unexpected.
+    if ((err as { code?: string })?.code === "23505") {
+      return { id: null, error: "You already have a list with that name." };
+    }
     return { id: null, error: "Couldn't save your tier list. Try again." };
   };
 

@@ -98,7 +98,11 @@ export function useSignInModal() {
   }
 
   const modal = state && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
+    // z-[80] puts this above every other dialog in the app, because it is
+    // the one that interrupts them: a flow can be halfway through its own
+    // modal (naming a tier list, say) when it discovers it needs an
+    // account, and the sign-in has to land in front of that, not behind.
+    <div className="fixed inset-0 z-[80] flex items-center justify-center px-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/60" onClick={() => close(false)} />
       <div className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1730] p-6 shadow-2xl shadow-black/50">
         <button
@@ -113,7 +117,29 @@ export function useSignInModal() {
         <h2 className="text-white text-lg" style={{ fontFamily: "var(--font-display)" }}>
           {mode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}
         </h2>
-        <p className="text-white/50 text-sm mt-1 mb-4">{mode === "signin" ? "Sign in to save your picks." : "Create an account to save your picks."}</p>
+        <p className="text-white/50 text-sm mt-1 mb-3">
+          {mode === "signin" ? "Pick up where you left off." : "Free, and it takes about ten seconds."}
+        </p>
+
+        {/* What an account actually buys. This modal is the only place
+            most people meet that pitch, and "sign in to save your picks"
+            undersold it - saving tier lists, the leaderboard and the
+            season predictor were all invisible from here. */}
+        <ul className="flex flex-col gap-2 mb-4">
+          {[
+            "Save tier lists and come back to them later",
+            "Keep every week's picks in one place",
+            "Climb the leaderboard against your friends",
+            "Earn badges and levels as you go",
+          ].map((benefit) => (
+            <li key={benefit} className="flex items-start gap-2 text-sm text-white/70">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 mt-0.5 shrink-0 text-emerald-400" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+              {benefit}
+            </li>
+          ))}
+        </ul>
 
         {referrer && mode === "signup" && (
           <div className="flex flex-col items-center gap-1.5 text-center mb-4">

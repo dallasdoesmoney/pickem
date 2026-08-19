@@ -11,12 +11,15 @@ export function NameListDialog({
   open,
   initialName,
   busy,
+  error,
   onCancel,
   onConfirm,
 }: {
   open: boolean;
   initialName: string;
   busy?: boolean;
+  // Kept open on a rejected name so the typed value survives the fix.
+  error?: string | null;
   onCancel: () => void;
   onConfirm: (name: string) => void;
 }) {
@@ -64,12 +67,18 @@ export function NameListDialog({
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
-          onFocus={(e) => e.currentTarget.select()}
+          onFocus={(e) => {
+            const end = e.currentTarget.value.length;
+            e.currentTarget.setSelectionRange(end, end);
+          }}
           maxLength={MAX_TITLE}
           aria-label="List name"
           // 16px so iOS doesn't zoom the page on focus.
-          className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-base text-white placeholder:text-white/30 outline-none focus:border-white/40"
+          className={`w-full rounded-xl border bg-white/5 px-4 py-2.5 text-base text-white placeholder:text-white/30 outline-none ${
+            error ? "border-red-400/60 focus:border-red-400" : "border-white/15 focus:border-white/40"
+          }`}
         />
+        {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
 
         <div className="flex gap-2 mt-5">
           <button

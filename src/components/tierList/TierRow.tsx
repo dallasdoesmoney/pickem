@@ -127,9 +127,20 @@ export function TierRow({
                 onCommitRename();
               }
             }}
+            // Caret to the end rather than wherever the tap landed. The
+            // field is centre-aligned, so tapping it usually put the caret
+            // in front of the existing name and backspace did nothing.
+            onFocus={(e) => {
+              const end = e.currentTarget.value.length;
+              e.currentTarget.setSelectionRange(end, end);
+            }}
             aria-label={`Rename ${tierLabelFor(tier, index)} tier`}
-            className="w-full min-w-0 bg-black/35 rounded-md text-center text-white text-xs py-1 px-1 outline-none border border-black/25 focus:border-black/50"
-            style={{ fontFamily: "var(--font-display)" }}
+            className="w-full min-w-0 bg-black/35 rounded-md text-center text-white py-1 px-1 outline-none border border-black/25 focus:border-black/50"
+            // 16px: iOS zooms the page when you focus anything smaller,
+            // and there is no reason renaming a tier should leave you
+            // zoomed in. Set here rather than as a text-* class because
+            // the label below scales with the rail and this must not.
+            style={{ fontFamily: "var(--font-display)", fontSize: 16 }}
           />
         ) : (
           <span

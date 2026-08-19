@@ -33,7 +33,7 @@ export type TierTemplate = {
 const NFL_TEAMS: TierTemplate = {
   slug: "nfl-teams",
   title: "NFL Team Tier List",
-  tagline: "32 teams. Six tiers. No fence sitting.",
+  tagline: "Rank all 32 NFL Teams",
   // Matches `title` above rather than personalising it: this is what the
   // exported image is captioned with, and a card that says something
   // different from the page it was built on reads as a different thing.
