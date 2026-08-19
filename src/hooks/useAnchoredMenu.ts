@@ -45,8 +45,15 @@ export function useAnchoredMenu<T extends HTMLElement>(
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onOpenChange(false);
     }
+    // A soft keyboard opening counts as a window resize, and it changes
+    // the height only - the width is untouched. Closing on that means a
+    // menu containing a text field shuts the instant the field is
+    // focused, which is exactly what it did on a phone. Width is the
+    // signal for a resize that actually invalidates the position.
+    const widthAtOpen = window.innerWidth;
     function onScrollOrResize(e: Event) {
       if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
+      if (e.type === "resize" && window.innerWidth === widthAtOpen) return;
       onOpenChange(false);
     }
     document.addEventListener("pointerdown", onPointerDown);

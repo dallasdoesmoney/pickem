@@ -83,6 +83,23 @@ export function TierListMenu({
   );
   const searchable = typeof query === "string" && !!onQueryChange;
 
+  // Focus the filter on open so you can type straight away - but only
+  // where typing is the likely intent. On a touch device this summons the
+  // keyboard over the very list you just opened, and half the panel
+  // disappears behind it before you've read a row. Same coarse-pointer
+  // signal shareBlob uses to tell a real touch device from a desktop
+  // browser that merely claims to support touch.
+  // Keyed on `coords` as well as `open`: the panel isn't rendered on the
+  // pass where `open` first flips, because it waits for the trigger to be
+  // measured. Without coords in the deps the input doesn't exist yet when
+  // this runs, and the effect never fires again to catch it.
+  const searchRef = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => {
+    if (!open || !coords || !searchable || !searchRef.current) return;
+    if (window.matchMedia?.("(pointer: coarse)").matches) return;
+    searchRef.current.focus({ preventScroll: true });
+  }, [open, coords, searchable]);
+
   return (
     <div ref={wrapRef} className="relative flex-1">
       <button
@@ -130,7 +147,7 @@ export function TierListMenu({
           >
             {searchable && (
               <input
-                autoFocus
+                ref={searchRef}
                 value={query}
                 onChange={(e) => onQueryChange(e.target.value)}
                 placeholder={searchPlaceholder ?? "Search"}
