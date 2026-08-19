@@ -75,6 +75,11 @@ export default function TierListPageClient({
   // undo step, without merging into the *previous* drag of the same item.
   const dragSession = useRef(0);
   const suppressClick = useRef(false);
+  // Where the dragged item started. Captured at drag START because
+  // handleDragOver moves it across containers live - by the time the drop
+  // lands, "where did this come from" already answers with the
+  // destination, which silently killed the top-tier celebration.
+  const dragOrigin = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     function measure() {
@@ -207,9 +212,11 @@ export default function TierListPageClient({
     return state.unranked.includes(itemId) ? null : undefined;
   }
 
-  function applyMove(activeId: string, overId: string, flash: boolean) {
+  // Returns the container it landed in, so callers can decide whether that
+  // deserves a celebration - they know the real origin, this doesn't.
+  function applyMove(activeId: string, overId: string, flash: boolean): string | null | undefined {
     const target = containerOf(overId);
-    if (!target) return;
+    if (!target) return undefined;
 
     const list = target.tier === null ? state.unranked : state.placements[target.tier] ?? [];
     const overIsItem = !overId.startsWith("tier:") && overId !== "unranked";
@@ -217,9 +224,8 @@ export default function TierListPageClient({
 
     const already = currentTierOf(activeId) === target.tier;
     // Nothing to do if it's already sitting exactly where it would land.
-    if (already && (index === null || list[index] === activeId)) return;
+    if (already && (index === null || list[index] === activeId)) return target.tier;
 
-    const from = currentTierOf(activeId);
     dispatch({
       type: "moveItem",
       itemId: activeId,
@@ -227,10 +233,8 @@ export default function TierListPageClient({
       toIndex: index,
       mergeToken: `${activeId}:${dragSession.current}`,
     });
-    if (flash && target.tier !== null) {
-      flashLanded(activeId);
-      maybeCelebrate(activeId, target.tier, from);
-    }
+    if (flash && target.tier !== null) flashLanded(activeId);
+    return target.tier;
   }
 
   // Two jobs while a drag is in flight.
@@ -274,7 +278,9 @@ export default function TierListPageClient({
     }, 0);
     const { active, over } = e;
     if (!over) return;
-    applyMove(String(active.id), String(over.id), true);
+    const landed = applyMove(String(active.id), String(over.id), true);
+    maybeCelebrate(String(active.id), landed ?? null, dragOrigin.current);
+    dragOrigin.current = undefined;
   }
 
   // One interaction on every device: tap a team to arm it, then tap the
@@ -493,6 +499,7 @@ export default function TierListPageClient({
         collisionDetection={collisionDetection}
         onDragStart={(e: DragStartEvent) => {
           dragSession.current += 1;
+          dragOrigin.current = currentTierOf(String(e.active.id));
           setDraggingId(String(e.active.id));
           setSelectedId(null);
         }}

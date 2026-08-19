@@ -192,10 +192,28 @@ body {
   animation-fill-mode: both;
 }
 
+/* Calm version of the takeover: the moment still happens, it just fades
+   rather than flying. Used under reduced motion. */
+@keyframes tier-takeover-quiet {
+  0% {
+    opacity: 0;
+  }
+  20%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Motion here is feedback, not decoration - honour the OS setting by
    dropping straight to the resting state rather than removing the cue.
-   The celebration is pure spectacle, so under reduced motion it doesn't
-   play at all rather than snapping through. */
+   The celebration degrades rather than disappearing: reduced motion means
+   "don't fly 48 objects across my screen", not "show me nothing". The
+   wash and the banner still play, as a plain cross-fade with no
+   transform; the rain and the bloom are the parts that actually trigger
+   vestibular discomfort, so those are the parts that go. */
 @media (prefers-reduced-motion: reduce) {
   .tier-anim-sheet,
   .tier-anim-scrim,
@@ -205,11 +223,18 @@ body {
     animation: none;
   }
 
-  .tier-anim-flash,
-  .tier-anim-bloom,
-  .tier-anim-banner,
   .tier-anim-rain {
     display: none;
+  }
+
+  .tier-anim-flash,
+  .tier-anim-banner {
+    animation: tier-takeover-quiet 1500ms ease-out both;
+  }
+
+  .tier-anim-bloom {
+    animation: tier-takeover-quiet 1500ms ease-out both;
+    transform: scale(1.6);
   }
 }
 
