@@ -33,6 +33,15 @@ export const MIN_TIERS = 1;
 export const MAX_TIER_LABEL = 36;
 export const MAX_TITLE = 60;
 
+// The name to show and save for a list. Editing the title can leave it
+// momentarily empty, and an empty name is no use on the index (where the
+// name is all there is to tell lists apart), in the exported image, or in
+// the database, whose title column rejects blanks. Everything that
+// displays or persists a title goes through here so all three agree.
+export function listTitleFor(state: TierListState, template: TierTemplate): string {
+  return state.title.trim() || template.defaultListTitle;
+}
+
 // Tier colours ARE the rank ladder, walked from the top down: GOAT pink,
 // Hall of Famer purple, MVP salmon, All-Pro orange, Pro Bowler yellow,
 // Team Captain green, and onward if more tiers get added. Derived from

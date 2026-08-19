@@ -20,13 +20,23 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
-import { MAX_TIERS, TierListAction, TierListState, findItemTier, rankedCount, tierListReducer, tierLabelFor } from "@/lib/tierList";
+import {
+  MAX_TIERS,
+  MAX_TITLE,
+  TierListAction,
+  TierListState,
+  findItemTier,
+  listTitleFor,
+  rankedCount,
+  tierListReducer,
+  tierLabelFor,
+} from "@/lib/tierList";
 import { useTierList } from "@/hooks/useTierList";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { supabase } from "@/lib/supabase/client";
-import { createTierListShare, fetchMyTierList, saveTierList } from "@/lib/supabase/tierLists";
+import { createTierListShare, fetchTierList, saveTierList } from "@/lib/supabase/tierLists";
 import { renderTierShareImage } from "@/lib/tierShareImage";
 import { shareBlob } from "@/lib/shareBlob";
 import { buildReferralLink } from "@/lib/referralStorage";
@@ -74,7 +84,6 @@ export default function TierListPageClient({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const dbLoadedFor = useRef<string | null>(null);
   // Bumped per drag so a drag's many intermediate moves coalesce into one
   // undo step, without merging into the *previous* drag of the same item.
   const dragSession = useRef(0);
@@ -107,18 +116,35 @@ export default function TierListPageClient({
     replace(initialState);
   }, [loaded, initialState, replace]);
 
-  // Pull a saved list down, but ONLY over a pristine local list. The rest
-  // of the app treats the DB as authoritative; here that would throw away
-  // a list someone just built signed-out, which is the exact work the
-  // sign-in prompt is trying to preserve.
+  // Which saved row this editor is writing to. Null means the working
+  // draft in localStorage, and saving it will create a new list.
+  //
+  // Read straight off window.location rather than through
+  // useSearchParams: this route is statically prerendered, and that hook
+  // would force the whole page behind a Suspense boundary to build.
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const requestedId = useRef<string | null>(null);
+  if (typeof window !== "undefined" && requestedId.current === null) {
+    requestedId.current = new URLSearchParams(window.location.search).get("id") ?? "";
+  }
+
+  // Open the saved list named in the URL. A snapshot seed wins over it -
+  // arriving from someone else's share link is a different intent than
+  // reopening your own list.
+  const openedId = useRef<string | null>(null);
   useEffect(() => {
-    if (!loaded || !user || initialState) return;
-    if (dbLoadedFor.current === user.id) return;
-    dbLoadedFor.current = user.id;
-    if (rankedCount(state) > 0) return;
-    fetchMyTierList(user.id, template.slug)
+    const id = requestedId.current;
+    if (!loaded || !user || initialState || !id) return;
+    if (openedId.current === id) return;
+    openedId.current = id;
+    fetchTierList(user.id, id)
       .then((row) => {
-        if (row?.state) replace({ ...row.state, template: template.slug });
+        // No row means it was deleted, or the id belongs to someone else.
+        // Either way this is not your list, so leave the draft alone and
+        // let Save create a new one rather than silently adopting the id.
+        if (!row?.state) return;
+        replace({ ...row.state, template: template.slug });
+        setSavedId(row.id);
       })
       .catch((err) => console.error("Failed to load saved tier list", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -394,15 +420,34 @@ export default function TierListPageClient({
   }
 
   const doSave = useCallback(
-    async (userId: string, next: TierListState) => {
-      const { error } = await saveTierList(userId, next);
+    async (userId: string, draft: TierListState, id: string | null) => {
+      // Normalised before it leaves: the title column rejects a blank,
+      // and an untitled list is unidentifiable on the index anyway.
+      const next = { ...draft, title: listTitleFor(draft, template) };
+      const { id: rowId, error } = await saveTierList(userId, next, id);
       if (error) {
         setSaveError(error);
         return;
       }
       setSaveError(null);
       setSavedAt(Date.now());
-      posthog.capture("tier_list_saved", { template: template.slug, ranked: rankedCount(next) });
+      if (rowId) {
+        setSavedId(rowId);
+        // Keep editing the same row across a refresh, and give the user a
+        // URL that reopens this list rather than the generic draft.
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("id") !== rowId) {
+          url.searchParams.set("id", rowId);
+          window.history.replaceState(null, "", url);
+        }
+        requestedId.current = rowId;
+        openedId.current = rowId;
+      }
+      posthog.capture("tier_list_saved", {
+        template: template.slug,
+        ranked: rankedCount(next),
+        created: !id,
+      });
     },
     [template.slug]
   );
@@ -425,7 +470,7 @@ export default function TierListPageClient({
       // No userId means the sign-in was a Google redirect - the effect
       // below finishes the save once the page reloads with a session.
       if (!userId) return;
-      await doSave(userId, state);
+      await doSave(userId, state, savedId);
     } finally {
       setSaving(false);
     }
@@ -438,7 +483,7 @@ export default function TierListPageClient({
     if (!user || !loaded) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
-    doSave(user.id, state);
+    doSave(user.id, state, savedId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loaded]);
 
@@ -459,8 +504,11 @@ export default function TierListPageClient({
   }
 
   async function handleShareImage() {
+    // Shared under the name the board is showing, so renaming a list in
+    // Edit Tiers changes the caption on the exported card too.
+    const shared = { ...state, title: listTitleFor(state, template) };
     const blob = await renderTierShareImage({
-      state,
+      state: shared,
       template,
       authorLabel: profile?.display_name || profile?.username || null,
     });
@@ -468,13 +516,13 @@ export default function TierListPageClient({
       blob,
       filename: `${template.slug}-tier-list.png`,
       title: template.title,
-      text: `${state.title}\n\n${buildReferralLink(profile?.username)}`,
+      text: `${shared.title}\n\n${buildReferralLink(profile?.username)}`,
       onShared: (method) => posthog.capture("tier_list_shared", { template: template.slug, method, ranked }),
     });
   }
 
   async function handleCreateLink() {
-    const { code, error } = await createTierListShare(state);
+    const { code, error } = await createTierListShare({ ...state, title: listTitleFor(state, template) });
     if (error || !code) return null;
     const url = `${window.location.origin}/tier-lists/${template.slug}/share/${code}`;
     setShareUrl(url);
@@ -563,13 +611,31 @@ export default function TierListPageClient({
 
           {/* px-12 reserves the button's width on both sides so the
               centred title can never run into it on a narrow screen -
-              they were landing flush at 375px. */}
-          <h1
-            className="text-center text-[clamp(1.25rem,5.4vw,2.6rem)] leading-none tracking-wide px-12"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {template.title.toUpperCase()}
-          </h1>
+              they were landing flush at 375px.
+
+              This is the LIST's name, not the category's. With several
+              saved lists per category the name is what tells them apart,
+              and it's what the exported image is captioned with, so the
+              page has to show the same thing the share does. */}
+          {editing ? (
+            <input
+              value={state.title}
+              onChange={(e) => dispatch({ type: "setTitle", title: e.target.value })}
+              onFocus={(e) => e.currentTarget.select()}
+              maxLength={MAX_TITLE}
+              aria-label="List title"
+              placeholder={template.defaultListTitle}
+              className="w-full text-center text-[clamp(1.25rem,5.4vw,2.6rem)] leading-none tracking-wide px-12 bg-transparent border-b border-white/25 focus:border-white/60 outline-none uppercase"
+              style={{ fontFamily: "var(--font-display)" }}
+            />
+          ) : (
+            <h1
+              className="text-center text-[clamp(1.25rem,5.4vw,2.6rem)] leading-none tracking-wide px-12"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {listTitleFor(state, template).toUpperCase()}
+            </h1>
+          )}
         </div>
 
         {readOnlySnapshot && snapshotAuthor && (

@@ -2,70 +2,100 @@ import { supabase } from "@/lib/supabase/client";
 import { TierListState } from "@/lib/tierList";
 
 export type SavedTierList = {
+  id: string;
   template: string;
   title: string;
   state: TierListState;
   updated_at: string;
 };
 
-export async function fetchMyTierList(userId: string, template: string): Promise<SavedTierList | null> {
+// Row shape for the index, which lists lists - it never needs the state
+// blob, and that blob is by far the biggest column in the table.
+export type SavedTierListSummary = {
+  id: string;
+  template: string;
+  title: string;
+  updated_at: string;
+};
+
+// Every saved list the signed-in user has, newest touched first. Covered
+// by the (user_id, updated_at desc) index from 0027.
+export async function listMyTierLists(userId: string): Promise<SavedTierListSummary[]> {
   const { data, error } = await supabase
     .from("tier_lists")
-    .select("template, title, state, updated_at")
+    .select("id, template, title, updated_at")
     .eq("user_id", userId)
-    .eq("template", template)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data as SavedTierListSummary[]) ?? [];
+}
+
+// One saved list, by id. Scoped to the user as well as the id so a
+// guessed id can't be opened - RLS enforces this too, but the editor
+// should treat someone else's id as "not found" rather than as an error.
+export async function fetchTierList(userId: string, id: string): Promise<SavedTierList | null> {
+  const { data, error } = await supabase
+    .from("tier_lists")
+    .select("id, template, title, state, updated_at")
+    .eq("user_id", userId)
+    .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   return (data as SavedTierList) ?? null;
 }
 
-// Update first, insert only if there was nothing to update. There is one
-// saved list per (user, template), so this is still idempotent.
+export async function deleteTierList(userId: string, id: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("tier_lists").delete().eq("user_id", userId).eq("id", id);
+  if (error) {
+    console.error("Tier list delete failed", error);
+    return { error: "Couldn't delete that list. Try again." };
+  }
+  return { error: null };
+}
+
+// Saves to `id` when given one, otherwise creates a new list and hands
+// back its id so the caller can keep saving to the same row.
 //
-// NOT an upsert, though the unique constraint invites one. PostgREST
-// compiles .upsert() into INSERT ... ON CONFLICT DO UPDATE SET <every
-// column in the payload>, and the payload has to carry user_id and
-// template to satisfy the insert. But this table deliberately grants
-// UPDATE on only (title, state) - updated_at is the trigger's, and
-// user_id is RLS's. Postgres checks column privileges statically, so that
-// statement is denied outright whether or not a row actually conflicts:
-// every save failed with "permission denied for table tier_lists".
-//
-// Splitting it means each statement touches only columns the role
-// actually holds - insert has all four, update has the two it changes -
-// so this needs no grant change and no migration.
-export async function saveTierList(userId: string, state: TierListState): Promise<{ error: string | null }> {
+// Deliberately NOT an upsert. PostgREST compiles .upsert() into
+// INSERT ... ON CONFLICT DO UPDATE SET <every column in the payload>, and
+// the payload has to carry user_id and template to satisfy the insert
+// half. But this table grants UPDATE on only (title, state) - updated_at
+// belongs to the trigger and user_id to RLS. Postgres checks column
+// privileges statically, so that statement was denied whether or not a
+// row actually conflicted, and every save failed with "permission denied
+// for table tier_lists". Separate statements each touch only the columns
+// the role holds.
+export async function saveTierList(
+  userId: string,
+  state: TierListState,
+  id?: string | null,
+): Promise<{ id: string | null; error: string | null }> {
   const failed = (stage: string, err: unknown) => {
     console.error(`Tier list save failed (${stage})`, err);
-    return { error: "Couldn't save your tier list. Try again." };
+    return { id: null, error: "Couldn't save your tier list. Try again." };
   };
 
-  const { data: updated, error: updateError } = await supabase
-    .from("tier_lists")
-    .update({ title: state.title, state })
-    .eq("user_id", userId)
-    .eq("template", state.template)
-    .select("id");
-  if (updateError) return failed("update", updateError);
-  if (updated && updated.length > 0) return { error: null };
-
-  const { error: insertError } = await supabase
-    .from("tier_lists")
-    .insert({ user_id: userId, template: state.template, title: state.title, state });
-  if (!insertError) return { error: null };
-
-  // Two saves racing: the row appeared between the update and the insert,
-  // and the unique constraint caught it. The other write is the same
-  // user's, so the resolution is simply to apply this one on top.
-  if (insertError.code === "23505") {
-    const { error: retryError } = await supabase
+  if (id) {
+    const { data, error } = await supabase
       .from("tier_lists")
       .update({ title: state.title, state })
       .eq("user_id", userId)
-      .eq("template", state.template);
-    return retryError ? failed("retry", retryError) : { error: null };
+      .eq("id", id)
+      .select("id");
+    if (error) return failed("update", error);
+    if (data && data.length > 0) return { id, error: null };
+    // Nothing updated: the list was deleted from another tab or device
+    // while this one still had it open. Saving is the more useful answer
+    // than erroring, so fall through and re-create it.
   }
-  return failed("insert", insertError);
+
+  const { data, error } = await supabase
+    .from("tier_lists")
+    .insert({ user_id: userId, template: state.template, title: state.title, state })
+    .select("id")
+    .single();
+  if (error) return failed("insert", error);
+  return { id: (data as { id: string }).id, error: null };
 }
 
 export type TierListSnapshot = {
