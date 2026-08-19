@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
 import {
   CollisionDetection,
@@ -123,54 +124,22 @@ export default function TierListPageClient({
   // Which saved row this editor is writing to. Null means the working
   // draft in localStorage, and saving it will create a new list.
   //
-  // Read straight off window.location rather than through
-  // useSearchParams: this route is statically prerendered, and that hook
-  // would force the whole page behind a Suspense boundary to build.
   const [savedId, setSavedId] = useState<string | null>(null);
-  const requestedId = useRef<string | null>(null);
-  if (typeof window !== "undefined" && requestedId.current === null) {
-    requestedId.current = new URLSearchParams(window.location.search).get("id") ?? "";
-  }
-
-  // The working draft outlives navigation, so it has to remember which
-  // saved list it came from. Without this, opening a list and then
-  // reaching the editor by any route that drops ?id= - the category on
-  // the hub, say - left the same board on screen with nothing tying it to
-  // its row, and the only save available was "create", which quietly made
-  // a copy. Every copy then looked identical, because they were.
-  const originKey = `pickem:tier-list:${template.slug}:saved-id`;
-  const rememberOrigin = useCallback(
-    (id: string | null) => {
-      try {
-        if (id) localStorage.setItem(originKey, id);
-        else localStorage.removeItem(originKey);
-      } catch {
-        // Private mode. Losing the association is survivable.
-      }
-    },
-    [originKey],
-  );
-
-  // Adopt the remembered row when the URL doesn't name one. Deliberately
-  // does NOT reload from the server: the draft on screen may hold edits
-  // that were never saved, and refetching would throw them away. It only
-  // restores which row a save should write to.
-  useEffect(() => {
-    if (!loaded || initialState || requestedId.current) return;
-    try {
-      const remembered = localStorage.getItem(originKey);
-      if (remembered) setSavedId(remembered);
-    } catch {
-      // Nothing to restore.
-    }
-  }, [loaded, initialState, originKey]);
+  // From useSearchParams, NOT window.location read during render. On a
+  // client navigation React renders the new page before the browser URL
+  // commits, so reading location here returned the PREVIOUS page's query:
+  // opening a saved list found no id, never fetched it, and left the last
+  // list's board on screen still pointed at the last list's row. Editing
+  // and saving then wrote to that other list, which is what made every
+  // saved list look like the same one.
+  const requestedId = useSearchParams().get("id") ?? "";
 
   // Open the saved list named in the URL. A snapshot seed wins over it -
   // arriving from someone else's share link is a different intent than
   // reopening your own list.
   const openedId = useRef<string | null>(null);
   useEffect(() => {
-    const id = requestedId.current;
+    const id = requestedId;
     if (!loaded || !user || initialState || !id) return;
     if (openedId.current === id) return;
     openedId.current = id;
@@ -182,11 +151,10 @@ export default function TierListPageClient({
         if (!row?.state) return;
         replace({ ...row.state, template: template.slug });
         setSavedId(row.id);
-        rememberOrigin(row.id);
       })
       .catch((err) => console.error("Failed to load saved tier list", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, user, template.slug, initialState]);
+  }, [loaded, user, template.slug, initialState, requestedId]);
 
   const wasComplete = useRef(false);
   const sawFirstState = useRef(false);
@@ -471,7 +439,6 @@ export default function TierListPageClient({
       setSavedAt(Date.now());
       if (rowId) {
         setSavedId(rowId);
-        rememberOrigin(rowId);
         // Keep editing the same row across a refresh, and give the user a
         // URL that reopens this list rather than the generic draft.
         const url = new URL(window.location.href);
@@ -479,7 +446,8 @@ export default function TierListPageClient({
           url.searchParams.set("id", rowId);
           window.history.replaceState(null, "", url);
         }
-        requestedId.current = rowId;
+        // Mark it opened so the effect above doesn't refetch and clobber
+        // edits made after the save.
         openedId.current = rowId;
       }
       posthog.capture("tier_list_saved", {
@@ -489,7 +457,7 @@ export default function TierListPageClient({
       });
       return true;
     },
-    [template.slug, rememberOrigin]
+    [template.slug]
   );
 
   // "SAVED" was sticky: it was set on save and never cleared, so the

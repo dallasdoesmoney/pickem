@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TIER_TEMPLATES, getTierTemplate } from "@/data/tierTemplates";
 import TierListPageClient from "./TierListPageClient";
+import { RouteLoading } from "@/components/RouteLoading";
 
 // Soft launch: the page is reachable by anyone with the URL, but nothing
 // links to it and search engines are told to stay away, so it isn't
@@ -20,5 +22,11 @@ export default async function Page({ params }: { params: Promise<{ list: string 
   const template = getTierTemplate(list);
   if (!template) notFound();
 
-  return <TierListPageClient template={template} />;
+  // The editor reads ?id= through useSearchParams, which needs a Suspense
+  // boundary for this route to stay statically prerendered.
+  return (
+    <Suspense fallback={<RouteLoading label="Tier List" />}>
+      <TierListPageClient template={template} />
+    </Suspense>
+  );
 }

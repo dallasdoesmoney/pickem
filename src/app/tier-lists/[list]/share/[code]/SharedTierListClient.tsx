@@ -7,7 +7,9 @@ import { TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { TierListState, rankedCount, sanitizeState, tierLabelFor } from "@/lib/tierList";
 import { fetchTierListShare } from "@/lib/supabase/tierLists";
 import { fetchProfilesByIds } from "@/lib/supabase/leaderboard";
+import { Suspense } from "react";
 import TierListPageClient from "@/app/tier-lists/[list]/TierListPageClient";
+import { RouteLoading } from "@/components/RouteLoading";
 
 // A shared snapshot is read-only by construction: it renders from the
 // fetched row and never writes back. "Make Your Own" swaps in the full
@@ -60,7 +62,13 @@ export default function SharedTierListClient({ template, code }: { template: Tie
   if (cloning && snapshot) {
     // Deliberately a fresh copy - the editor persists to the visitor's
     // own localStorage key under their own control.
-    return <TierListPageClient template={template} initialState={{ ...snapshot, title: `${snapshot.title} (my version)` }} snapshotAuthor={author} />;
+    // Same Suspense requirement as the editor route: TierListPageClient
+    // reads the query string through useSearchParams.
+    return (
+      <Suspense fallback={<RouteLoading label="Tier List" />}>
+        <TierListPageClient template={template} initialState={{ ...snapshot, title: `${snapshot.title} (my version)` }} snapshotAuthor={author} />
+      </Suspense>
+    );
   }
 
   if (status === "loading") {
