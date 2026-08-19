@@ -113,7 +113,7 @@ export function TierCelebration({
       ))}
 
       {bin && (
-        <div className="absolute inset-0 flex items-end justify-center pb-[16vh]">
+        <div className="tier-anim-bin-exit absolute inset-0 flex items-end justify-center pb-[16vh]">
           <div
             className="tier-anim-bin-jolt relative"
             style={{ width: "clamp(190px, 32vmin, 320px)", aspectRatio: "150 / 154" }}

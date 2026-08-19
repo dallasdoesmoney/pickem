@@ -312,6 +312,21 @@ body {
   }
 }
 
+/* The can had no exit at all: the lid finishes closing around 1.6s but the
+   bin stayed fully painted until the overlay unmounted at 3.6s, leaving two
+   dead seconds of it just sitting there. It now bows out just after the lid
+   shuts, which is the moment the gag is over. */
+@keyframes tier-bin-exit {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+}
+
 @keyframes tier-bin-label {
   0%,
   38% {
@@ -350,6 +365,10 @@ body {
 
 .tier-anim-bin-label {
   animation: tier-bin-label 2300ms ease-out both;
+}
+
+.tier-anim-bin-exit {
+  animation: tier-bin-exit 420ms 1640ms cubic-bezier(0.4, 0, 0.8, 0.4) both;
 }
 
 /* Same fall as the promotion's rain, drained of colour and slowed down. */
@@ -405,6 +424,10 @@ body {
   .tier-anim-bin-lid {
     animation: none;
     transform: translateX(64%) rotate(15deg);
+  }
+
+  .tier-anim-bin-exit {
+    animation: tier-takeover-quiet 1800ms ease-out both;
   }
 
   .tier-anim-bin-drop {
