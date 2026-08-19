@@ -1,22 +1,18 @@
 "use client";
 
-import { useState } from "react";
 import { LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
-import { getLevelInfo } from "@/lib/levels";
-import { FollowButton } from "@/components/FollowButton";
-import { LevelBadge } from "@/components/LevelBadge";
-import { PlayerBadges } from "@/components/PlayerBadges";
-import { CreatorLinks } from "@/components/CreatorLinks";
-import { LevelListModal } from "@/components/LevelListModal";
-import { StatTile, StatDetailRow } from "@/components/StatTile";
-import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
+import { ProfileCard } from "@/components/ProfileCard";
 
 // The whole profile in one scrollable popup - no more "view full profile
 // page" hop to a separate route. The standalone /leaderboard/[username]
 // page still exists for direct/shareable links (notifications, sharing a
 // profile URL outside the app), but browsing from the leaderboard never
 // needs to leave it.
+//
+// Only the surface lives here - the popup shell, the scrim and the close
+// button. Everything inside is ProfileCard, shared with that standalone
+// page so the two can't drift.
 export function PlayerProfileModal({
   row,
   myId,
@@ -28,12 +24,9 @@ export function PlayerProfileModal({
   onClose: () => void;
   onFollowChange?: () => void;
 }) {
-  const [levelModalOpen, setLevelModalOpen] = useState(false);
   const stats = usePlayerStats(row?.user_id);
 
   if (!row) return null;
-  const label = row.display_name || row.username;
-  const rankColor = getLevelInfo(row.total_points).rankColor;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
@@ -50,68 +43,10 @@ export function PlayerProfileModal({
           </svg>
         </button>
 
-        <div className="overflow-y-auto px-6 pb-6 pt-8 flex flex-col items-center">
-          <div className="relative">
-            {row.avatar_url ? (
-              <img
-                src={row.avatar_url}
-                alt=""
-                className="h-24 w-24 rounded-full object-cover"
-                style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 10px -2px ${rankColor}` }}
-              />
-            ) : (
-              <span
-                className="h-24 w-24 rounded-full bg-white/10 flex items-center justify-center text-3xl"
-                style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 10px -2px ${rankColor}` }}
-              >
-                {label.charAt(0).toUpperCase()}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setLevelModalOpen(true)}
-              aria-label="View all levels"
-              className="absolute left-1/2 -bottom-2 w-max -translate-x-1/2 active:scale-95 transition-transform"
-            >
-              <LevelBadge totalPoints={row.total_points} size="sm" />
-            </button>
-          </div>
-          <h2 className="text-2xl text-center mt-4" style={{ fontFamily: "var(--font-display)" }}>
-            {label}
-          </h2>
-          <p className="text-white/45 text-sm mt-1">@{row.username}</p>
-          <PlayerBadges userId={row.user_id} />
-          <CreatorLinks userId={row.user_id} />
-
-          <div className="w-full mt-6 grid grid-cols-3 gap-2">
-            <StatTile icon="🔗" value={stats ? String(stats.referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" />
-            <StatTile icon="🔥" value="–" label="STREAK SOON" accentColor="rgba(255,255,255,0.35)" />
-            <StatTile icon="🏆" value={`${row.correct}-${row.graded - row.correct}`} label="SEASON" accentColor="#4ade80" />
-          </div>
-
-          <div className="w-full mt-5">
-            <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
-            <div className="flex flex-col gap-1.5">
-              <StatDetailRow icon="👀" label="Followers" value={stats ? String(stats.followerCount) : "–"} />
-              <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} />
-              <TeamsPredictedRow completedCount={stats?.completedTeamCount} completedAbbrs={stats?.completedTeamAbbrs} />
-              <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} />
-              <StatDetailRow icon="📅" label="Weeks completed" value={stats ? String(stats.completedWeekCount) : "–"} />
-            </div>
-          </div>
-
-          {/* Always visible, even signed out - clicking it while signed
-              out prompts sign-in instead of the button just disappearing,
-              same as every other "here's what you could do" affordance. */}
-          {(!myId || myId !== row.user_id) && (
-            <div className="mt-6 w-full flex justify-center">
-              <FollowButton myId={myId} otherId={row.user_id} onChange={onFollowChange} />
-            </div>
-          )}
+        <div className="overflow-y-auto px-6 pb-6 pt-8">
+          <ProfileCard row={row} stats={stats} myId={myId} onFollowChange={onFollowChange} />
         </div>
       </div>
-
-      <LevelListModal open={levelModalOpen} totalPoints={row.total_points} onClose={() => setLevelModalOpen(false)} />
     </div>
   );
 }

@@ -258,7 +258,12 @@ function SignedInAccount({
         onClose={() => setProgressModalOpen(false)}
       />
       <MyReferralsModal open={referralsOpen} onClose={() => setReferralsOpen(false)} />
-      <FriendsListModal userId={userId} open={friendsOpen} onClose={() => setFriendsOpen(false)} />
+      <FriendsListModal
+        userId={userId}
+        open={friendsOpen}
+        onClose={() => setFriendsOpen(false)}
+        emptyHint="No friends yet - add some from the leaderboard."
+      />
       <FollowersListModal userId={userId} open={followersOpen} onClose={() => setFollowersOpen(false)} />
       <CreatorRequestModal userId={userId} open={creatorRequestOpen} onClose={() => setCreatorRequestOpen(false)} />
       <SocialLinksModal userId={userId} open={socialLinksOpen} onClose={() => setSocialLinksOpen(false)} />
