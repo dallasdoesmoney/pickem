@@ -502,52 +502,63 @@ export default function TierListPageClient({
   }
 
   return (
-    <main className="flex-1 px-4 pb-16 pt-8 max-w-4xl w-full mx-auto">
-      <header className="text-center mb-6">
-        <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SIDELINE BREW &middot; TIER LIST</div>
-        <h1 className="text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-          {template.title.toUpperCase()}
-        </h1>
+    <main className="flex-1 px-4 pb-16 pt-5 max-w-4xl w-full mx-auto">
+      {/* Scrolls away - it's brand dressing, not something you need while
+          you're working. */}
+      <div className="text-center text-xs text-white/45 tracking-[0.25em] mb-1.5">SIDELINE BREW &middot; TIER LIST</div>
 
-        <ProgressBar ranked={ranked} total={total} complete={complete} />
+      {/* Pinned directly above the board, and pinned literally: on a
+          stream the board is taller than the viewport, so a title that
+          scrolls away means the shot has no title on it for most of the
+          session. Offset by the site header's own 72px. Everything that
+          used to sit between the title and the board - progress, tier
+          count, edit - is folded into one line here, which closed a
+          101px gap down to about 30. */}
+      {/* Nothing between the title and the board. Edit rides on the same
+          line, pinned left, so the title sits directly on top of the
+          thing it names. Still sticky, offset by the site header's 72px:
+          the board is taller than the viewport, so without this the title
+          leaves the frame the moment you scroll to the lower tiers - and
+          on a stream that means most of the session is shot without one. */}
+      <header className="sticky top-[72px] z-20 -mx-4 px-4 pt-1 pb-2 bg-[#0e1b33]">
+        <div className="relative flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            aria-pressed={editing}
+            aria-label={editing ? "Finish editing tiers" : "Edit tiers"}
+            className={`absolute left-0 flex items-center gap-1.5 rounded-full py-1.5 pl-2.5 pr-2.5 sm:pr-3.5 text-[11px] border transition-colors ${
+              editing
+                ? "border-white/45 text-white bg-white/10"
+                : "border-white/15 hover:border-white/35 text-white/60 hover:text-white"
+            }`}
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+              {editing ? <path d="M20 6L9 17l-5-5" /> : <><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></>}
+            </svg>
+            {/* Label drops on narrow screens so it can't collide with the
+                centred title - the icon carries it on its own there. */}
+            <span className="hidden sm:inline">{editing ? "DONE" : "EDIT TIERS"}</span>
+          </button>
+
+          {/* px-12 reserves the button's width on both sides so the
+              centred title can never run into it on a narrow screen -
+              they were landing flush at 375px. */}
+          <h1
+            className="text-center text-[clamp(1.25rem,5.4vw,2.6rem)] leading-none tracking-wide px-12"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {template.title.toUpperCase()}
+          </h1>
+        </div>
 
         {readOnlySnapshot && snapshotAuthor && (
-          <p className="text-white/45 text-xs mt-2">
+          <p className="text-center text-white/45 text-xs mt-1.5">
             Originally ranked by <span className="text-white/70">{snapshotAuthor}</span>
           </p>
         )}
       </header>
-
-      {/* No editable title for now - the page already carries one, and two
-          titles stacked on top of each other just clogged the header. The
-          title still lives in state (share images and snapshots use it),
-          so making it editable again is only a matter of putting an input
-          back. */}
-
-      {/* Sits with the board it acts on rather than down in the generic
-          control cluster - it changes what the rows look like, so it
-          belongs next to them. */}
-      <div className="flex items-center justify-between mb-2 px-0.5">
-        <span className="text-[11px] tracking-[0.18em] text-white/35" style={{ fontFamily: "var(--font-display)" }}>
-          {state.tiers.length} TIERS
-        </span>
-        <button
-          type="button"
-          onClick={() => setEditing((v) => !v)}
-          aria-pressed={editing}
-          className={`flex items-center gap-1.5 rounded-full pl-2.5 pr-3.5 py-1.5 text-[11px] border transition-colors ${
-            editing
-              ? "border-white/45 text-white bg-white/10"
-              : "border-white/15 hover:border-white/35 text-white/60 hover:text-white"
-          }`}
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
-            {editing ? <path d="M20 6L9 17l-5-5" /> : <><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></>}
-          </svg>
-          {editing ? "DONE" : "EDIT TIERS"}
-        </button>
-      </div>
 
       <DndContext
         sensors={sensors}
@@ -719,30 +730,6 @@ export default function TierListPageClient({
       {dialog}
       {signInModal}
     </main>
-  );
-}
-
-// Deliberately quiet: progress is useful at a glance but it isn't the
-// point of the page, and at its old size it dominated the header.
-function ProgressBar({ ranked, total, complete }: { ranked: number; total: number; complete: boolean }) {
-  return (
-    <div className="mt-3 max-w-[200px] mx-auto">
-      <div className="h-1 rounded-full bg-white/10 overflow-hidden">
-        <div
-          className="h-full rounded-full transition-[width,background] duration-300"
-          style={{
-            width: `${(ranked / total) * 100}%`,
-            background: complete ? "linear-gradient(90deg,#4ade80,#22c55e)" : "linear-gradient(90deg,#fbbf24,#4ade80)",
-          }}
-        />
-      </div>
-      <div
-        className="text-[11px] tracking-wide mt-1.5 transition-colors duration-300"
-        style={{ fontFamily: "var(--font-display)", color: complete ? "#4ade80" : "rgba(255,255,255,0.45)" }}
-      >
-        {complete ? "ALL 32 RANKED" : `${ranked}/${total} RANKED`}
-      </div>
-    </div>
   );
 }
 
