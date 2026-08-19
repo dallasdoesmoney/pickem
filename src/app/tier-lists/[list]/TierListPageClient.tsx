@@ -125,6 +125,10 @@ export default function TierListPageClient({
   // draft in localStorage, and saving it will create a new list.
   //
   const [savedId, setSavedId] = useState<string | null>(null);
+  // What this list is CALLED in your saved lists. Separate from
+  // state.title, which is the heading on the board and on the share card:
+  // naming a save used to overwrite that heading.
+  const [savedName, setSavedName] = useState<string | null>(null);
   // From useSearchParams, NOT window.location read during render. On a
   // client navigation React renders the new page before the browser URL
   // commits, so reading location here returned the PREVIOUS page's query:
@@ -151,6 +155,7 @@ export default function TierListPageClient({
         if (!row?.state) return;
         replace({ ...row.state, template: template.slug });
         setSavedId(row.id);
+        setSavedName(row.title);
       })
       .catch((err) => console.error("Failed to load saved tier list", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,33 +187,34 @@ export default function TierListPageClient({
   // Solve chip size from real available width so two columns of logos
   // never overflow a 320px phone.
   const { chipSize, railWidth } = useMemo(() => {
-    // 1000 is the board's max width (max-w-[62.5rem] on the main below)
-    // and is chosen, not rounded to: at a 74px chip and the wider rail
-    // below it leaves a track that holds exactly ten marks with ~22px to
-    // spare. It has to move in step with the rail - the rail is taken out
-    // of the same width the chips run in, so widening one without the
-    // other is what costs a column.
-    const content = Math.min(viewportWidth, 1000) - 32;
+    // 1056 is the board's max width (max-w-[66rem] on the main below) and
+    // is chosen, not rounded to: at an 80px chip and the rail below it
+    // leaves a track that holds exactly ten marks with ~16px to spare. It
+    // has to move in step with BOTH the chip cap and the rail - all three
+    // come out of the same width - so widening the mark without widening
+    // this is what costs a column.
+    const content = Math.min(viewportWidth, 1056) - 32;
     // The rail carries names now, not just letters, so it's held wide
     // enough for a phrase like "SUPER BOWL CONTENDER" to wrap across two
     // or three readable lines. A phone still can't spare as much as a
     // desktop can, so it gets a narrower one and wraps sooner.
     const base = viewportWidth < 768 ? 86 : 136;
     const track = content - base - 16;
-    // Ten across only once the board is actually wide enough to hold ten
-    // full-size marks. Widening to ten at the 768 breakpoint would have
-    // paid for the extra columns out of the chip - a 13" laptop would have
-    // dropped from a 70px logo to about 54 - so the tenth column waits for
-    // the width that can afford it.
+    // Ten across from 1024 up - any normal laptop - rather than only once
+    // the board hits its own max width. Between the two the chip solves a
+    // little under its cap to make room, which is the right trade at that
+    // size: ten marks at 78px beats nine at 80. Below 1024 the tenth
+    // column would come out of the mark instead, so it waits.
     const perRow =
-      viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : viewportWidth < 1000 ? 8 : 10;
+      viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : viewportWidth < 1024 ? 8 : 10;
     const size = Math.floor((track - (perRow - 1) * 6) / perRow);
     // Desktop earns a bigger mark than the old 58px cap allowed - this
     // page IS the logos, so they should be what you actually look at.
     // Don't raise this without re-measuring: the rail width below is
     // derived from the chip, so a bigger chip widens the rail, which eats
-    // the very track the chips need and can cost a whole column.
-    const chip = Math.max(34, Math.min(74, size));
+    // the very track the chips need and can cost a whole column. At 80 the
+    // rail formula still lands under its 136 floor, so the floor holds.
+    const chip = Math.max(34, Math.min(80, size));
     // The chevron has to read as a landscape tab, not a square - a name
     // like "SHOULD BE FIRED" needs horizontal room, and a rail narrower
     // than the row is tall looks like a stub. Held wider than the row
@@ -405,16 +411,29 @@ export default function TierListPageClient({
     dispatch({ type: "deleteTier", tierId });
   }
 
-  async function handleReset() {
-    if (!(await confirm("Reset this tier list back to a blank slate?", "RESET"))) return;
-    // Sweep first, clear second. Resetting instantly gave no sense that
+  // Emptying the board and undoing your tier setup are different regrets,
+  // and one button for both meant you couldn't have either on its own.
+  async function handleClearBoard() {
+    const noun = template.itemNoun[1];
+    if (!(await confirm(`Send all ${noun} back to Unranked? Your tiers stay as they are.`, "CLEAR BOARD"))) return;
+    // Sweep first, clear second. Clearing instantly gave no sense that
     // anything happened - the board just blinked and everything was gone.
     setSweeping(true);
     setTimeout(() => {
-      dispatch({ type: "reset", template });
+      dispatch({ type: "clearBoard", template });
       setSweeping(false);
     }, 420);
-    posthog.capture("tier_list_reset", { template: template.slug });
+    posthog.capture("tier_list_cleared", { template: template.slug });
+  }
+
+  async function handleResetTiers() {
+    const extra = Math.max(0, state.tiers.length - 6);
+    const warning = extra
+      ? ` The ${template.itemNoun[1]} in your ${extra} extra ${extra === 1 ? "tier" : "tiers"} go back to Unranked.`
+      : "";
+    if (!(await confirm(`Put the tiers back to S through F? Your ranking is kept.${warning}`, "RESET TIERS"))) return;
+    dispatch({ type: "resetTiers", template });
+    posthog.capture("tier_list_tiers_reset", { template: template.slug });
   }
 
   // Shuffle reorders instantly, which reads as nothing happening at all.
@@ -426,11 +445,11 @@ export default function TierListPageClient({
   }
 
   const doSave = useCallback(
-    async (userId: string, draft: TierListState, id: string | null) => {
-      // Normalised before it leaves: the title column rejects a blank,
-      // and an untitled list is unidentifiable on the index anyway.
+    async (userId: string, draft: TierListState, id: string | null, listName: string) => {
+      // Board title normalised so the heading and the exported card never
+      // go blank; the list's own name is passed through untouched.
       const next = { ...draft, title: listTitleFor(draft, template) };
-      const { id: rowId, error } = await saveTierList(userId, next, id);
+      const { id: rowId, error } = await saveTierList(userId, next, id, listName);
       if (error) {
         setSaveError(error);
         return false;
@@ -439,6 +458,7 @@ export default function TierListPageClient({
       setSavedAt(Date.now());
       if (rowId) {
         setSavedId(rowId);
+        setSavedName(listName);
         // Keep editing the same row across a refresh, and give the user a
         // URL that reopens this list rather than the generic draft.
         const url = new URL(window.location.href);
@@ -488,7 +508,7 @@ export default function TierListPageClient({
     try {
       const userId = await requireUserId();
       if (!userId) return;
-      await doSave(userId, state, savedId);
+      await doSave(userId, state, savedId, savedName ?? listTitleFor(state, template));
     } finally {
       setSaving(false);
     }
@@ -549,10 +569,9 @@ export default function TierListPageClient({
         setNameError("You already have a list with that name.");
         return;
       }
-      // Renames the board too: this list is what you are editing now, so
-      // the title above the board and the caption on its export follow.
-      dispatch({ type: "setTitle", title: name });
-      const ok = await doSave(userId, { ...state, title: name }, null);
+      // Names the SAVE, not the board. The heading you set stays put, and
+      // is only ever the starting suggestion for this field.
+      const ok = await doSave(userId, state, null, name);
       if (ok) setNamingOpen(false);
     } finally {
       setSaving(false);
@@ -566,7 +585,7 @@ export default function TierListPageClient({
     if (!user || !loaded) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
-    doSave(user.id, state, savedId);
+    doSave(user.id, state, savedId, savedName ?? listTitleFor(state, template));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loaded]);
 
@@ -640,7 +659,7 @@ export default function TierListPageClient({
 
   if (!loaded) {
     return (
-      <main className="flex-1 px-4 pb-16 pt-10 max-w-[62.5rem] w-full mx-auto">
+      <main className="flex-1 px-4 pb-16 pt-10 max-w-[66rem] w-full mx-auto">
         <div className="flex justify-center pt-16">
           <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
         </div>
@@ -648,11 +667,11 @@ export default function TierListPageClient({
     );
   }
 
-  // max-w-[62.5rem] is 1000px, and the chip solver above hardcodes that
+  // max-w-[66rem] is 1000px, and the chip solver above hardcodes that
   // same 1000 as its ceiling and as its ten-across breakpoint - all three
   // have to move together or the board stops holding exactly ten.
   return (
-    <main className="flex-1 px-4 pb-16 pt-5 max-w-[62.5rem] w-full mx-auto">
+    <main className="flex-1 px-4 pb-16 pt-5 max-w-[66rem] w-full mx-auto">
       {/* Scrolls away - it's brand dressing, not something you need while
           you're working. The way back out rides on the same line, pinned
           left, so it costs no vertical room above the board: this page is
@@ -690,13 +709,13 @@ export default function TierListPageClient({
           leaves the frame the moment you scroll to the lower tiers - and
           on a stream that means most of the session is shot without one. */}
       <header className="sticky top-[72px] z-20 -mx-4 px-4 pt-1 pb-2 bg-[#0e1b33]">
-        <div className="relative flex items-center justify-center">
+        <div className={editing ? "flex items-center gap-3" : "relative flex items-center justify-center"}>
           <button
             type="button"
             onClick={() => setEditing((v) => !v)}
             aria-pressed={editing}
             aria-label={editing ? "Finish editing tiers" : "Edit tiers"}
-            className={`absolute left-0 flex items-center gap-1.5 rounded-full py-1.5 pl-2.5 pr-2.5 sm:pr-3.5 text-[11px] border transition-colors ${
+            className={`${editing ? "shrink-0" : "absolute left-0"} flex items-center gap-1.5 rounded-full py-1.5 pl-2.5 pr-2.5 sm:pr-3.5 text-[11px] border transition-colors ${
               editing
                 ? "border-white/45 text-white bg-white/10"
                 : "border-white/15 hover:border-white/35 text-white/60 hover:text-white"
@@ -725,7 +744,7 @@ export default function TierListPageClient({
             // become editable at all. It gets the same treatment as a
             // field anywhere else in the app - a filled box, a border, a
             // pencil, and a caption saying what it is.
-            <span className="w-full px-10 sm:px-12 flex flex-col items-center gap-1">
+            <span className="min-w-0 flex-1 flex flex-col items-center gap-1">
               <span className="flex items-center gap-1.5 text-[10px] tracking-[0.2em] text-white/45" style={{ fontFamily: "var(--font-display)" }}>
                 <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 20h9" />
@@ -859,14 +878,11 @@ export default function TierListPageClient({
       {/* Controls. Deliberately below the list and visually quiet - they
           support the ranking, they aren't the point of the page. */}
       <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
-        <GhostButton onClick={undo} disabled={!canUndo} label="Undo">
-          UNDO
+        <GhostButton onClick={handleClearBoard} label="Clear the board">
+          CLEAR BOARD
         </GhostButton>
-        <GhostButton onClick={redo} disabled={!canRedo} label="Redo">
-          REDO
-        </GhostButton>
-        <GhostButton onClick={handleReset} label="Reset tier list">
-          RESET
+        <GhostButton onClick={handleResetTiers} label="Reset tiers to default">
+          RESET TIERS
         </GhostButton>
       </div>
 
@@ -900,7 +916,7 @@ export default function TierListPageClient({
         <p className="text-xs text-white/45 mb-2 text-center px-4">
           {savedId ? (
             <>
-              Editing <span className="text-white/75">{listTitleFor(state, template)}</span>
+              Editing <span className="text-white/75">{savedName ?? listTitleFor(state, template)}</span>
             </>
           ) : (
             "Not saved yet"

@@ -65,10 +65,16 @@ export async function deleteTierList(userId: string, id: string): Promise<{ erro
 // row actually conflicted, and every save failed with "permission denied
 // for table tier_lists". Separate statements each touch only the columns
 // the role holds.
+// `listName` is what the list is CALLED in your saved lists, and it is
+// deliberately not state.title, which is the heading printed on the board
+// and on the exported card. They were being written from the same value,
+// so naming a save renamed the board. Two columns already existed for
+// them; they just needed to stop being fed the same string.
 export async function saveTierList(
   userId: string,
   state: TierListState,
-  id?: string | null,
+  id: string | null | undefined,
+  listName: string,
 ): Promise<{ id: string | null; error: string | null }> {
   const failed = (stage: string, err: unknown) => {
     console.error(`Tier list save failed (${stage})`, err);
@@ -84,7 +90,7 @@ export async function saveTierList(
   if (id) {
     const { data, error } = await supabase
       .from("tier_lists")
-      .update({ title: state.title, state })
+      .update({ title: listName, state })
       .eq("user_id", userId)
       .eq("id", id)
       .select("id");
@@ -97,7 +103,7 @@ export async function saveTierList(
 
   const { data, error } = await supabase
     .from("tier_lists")
-    .insert({ user_id: userId, template: state.template, title: state.title, state })
+    .insert({ user_id: userId, template: state.template, title: listName, state })
     .select("id")
     .single();
   if (error) return failed("insert", error);

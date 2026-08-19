@@ -66,8 +66,12 @@ export function newTierId() {
   return `t${Date.now().toString(36)}${tierSeq.toString(36)}`;
 }
 
+function defaultTiers(): Tier[] {
+  return DEFAULT_TIER_LABELS.map((label, i) => ({ id: `t_${i}_${label.toLowerCase()}`, label, accent: accentForIndex(i) }));
+}
+
 export function createInitialState(template: TierTemplate): TierListState {
-  const tiers = DEFAULT_TIER_LABELS.map((label, i) => ({ id: `t_${i}_${label.toLowerCase()}`, label, accent: accentForIndex(i) }));
+  const tiers = defaultTiers();
   const placements: Record<string, string[]> = {};
   for (const t of tiers) placements[t.id] = [];
   return {
@@ -91,7 +95,11 @@ export type TierListAction =
   | { type: "moveTier"; tierId: string; direction: -1 | 1 }
   | { type: "setTitle"; title: string }
   | { type: "shuffleUnranked" }
-  | { type: "reset"; template: TierTemplate }
+  // Two different kinds of starting over. Clearing empties the board but
+  // keeps the tiers you set up; resetting settings puts the tiers back to
+  // stock but keeps your ranking wherever it still has somewhere to go.
+  | { type: "clearBoard"; template: TierTemplate }
+  | { type: "resetTiers"; template: TierTemplate }
   | { type: "load"; state: TierListState };
 
 // Pull an item out of wherever it currently lives. Returns a new
@@ -185,8 +193,30 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
       return { ...state, unranked: next };
     }
 
-    case "reset":
-      return createInitialState(action.template);
+    case "clearBoard": {
+      // Every item back to the pool, in the template's own order, with the
+      // tiers exactly as the user left them.
+      const placements: Record<string, string[]> = {};
+      for (const t of state.tiers) placements[t.id] = [];
+      return { ...state, placements, unranked: action.template.items.map((i) => i.id) };
+    }
+
+    case "resetTiers": {
+      // Stock tiers back, ranking preserved by position: whatever was in
+      // the old first tier lands in the new first tier. Anything below the
+      // last default tier has nowhere to go and returns to the pool, which
+      // is the only honest answer when the shelf it sat on is gone.
+      const tiers = defaultTiers();
+      const placements: Record<string, string[]> = {};
+      for (const t of tiers) placements[t.id] = [];
+      const displaced: string[] = [];
+      state.tiers.forEach((old, i) => {
+        const ids = state.placements[old.id] ?? [];
+        if (i < tiers.length) placements[tiers[i].id] = [...ids];
+        else displaced.push(...ids);
+      });
+      return { ...state, tiers, placements, unranked: [...state.unranked, ...displaced] };
+    }
 
     case "load":
       return action.state;
