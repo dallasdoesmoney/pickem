@@ -23,6 +23,10 @@ export type TierTemplate = {
   defaultListTitle: string;
   // Singular/plural noun for progress + warning copy ("7 unranked teams").
   itemNoun: [singular: string, plural: string];
+  // Mark for the category itself, shown beside it in the tier list menus.
+  // Optional because a category is perfectly usable without one - callers
+  // fall back to a neutral glyph rather than a broken image.
+  icon?: string;
   items: TierItem[];
 };
 
@@ -35,6 +39,11 @@ const NFL_TEAMS: TierTemplate = {
   // different from the page it was built on reads as a different thing.
   defaultListTitle: "NFL Team Tier List",
   itemNoun: ["team", "teams"],
+  // Same CDN the 32 team logos already come from, so this needs no new
+  // asset and no new host. If the league path ever moves, the menus fall
+  // back to a glyph rather than showing a broken image - drop a file in
+  // /public and point this at it to pin it locally instead.
+  icon: "https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png",
   items: TEAMS_SORTED.map((t) => ({
     id: t.abbr,
     label: `${t.city} ${t.name}`,
