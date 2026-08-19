@@ -152,7 +152,14 @@ export function TierListMenu({
                 onChange={(e) => onQueryChange(e.target.value)}
                 placeholder={searchPlaceholder ?? "Search"}
                 aria-label={searchPlaceholder ?? "Search"}
-                className="w-full mb-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/35 outline-none focus:border-white/40"
+                // 16px, not the text-sm the app's other inputs use, and
+                // not a taste call: iOS Safari zooms the page when you
+                // focus an input smaller than 16px. The rest of the app
+                // gets away with it because its inputs sit in full-screen
+                // modals, but this panel is anchored to a trigger, so the
+                // zoom shifts the viewport out from under it and the menu
+                // appears to vanish.
+                className="w-full mb-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-base text-white placeholder:text-white/35 outline-none focus:border-white/40"
               />
             )}
             {/* The list scrolls, not the panel, so a search box stays put

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import posthog from "posthog-js";
 import {
   CollisionDetection,
@@ -571,8 +572,27 @@ export default function TierListPageClient({
   return (
     <main className="flex-1 px-4 pb-16 pt-5 max-w-[62.5rem] w-full mx-auto">
       {/* Scrolls away - it's brand dressing, not something you need while
-          you're working. */}
-      <div className="text-center text-xs text-white/45 tracking-[0.25em] mb-1.5">SIDELINE BREW &middot; TIER LIST</div>
+          you're working. The way back out rides on the same line, pinned
+          left, so it costs no vertical room above the board: this page is
+          already taller than the viewport and the title below is sticky.
+          A real link, not history.back(), because you can arrive here
+          straight from a share link or a bookmark with nothing to go back
+          to. */}
+      <div className="relative flex items-center justify-center mb-1.5">
+        <Link
+          href="/tier-lists"
+          aria-label="All tier lists"
+          className="absolute left-0 flex items-center gap-1 text-xs text-white/45 hover:text-white transition-colors"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          {/* The arrow alone carries it where the eyebrow would collide. */}
+          <span className="hidden sm:inline tracking-[0.15em]">ALL TIER LISTS</span>
+        </Link>
+        <div className="text-center text-xs text-white/45 tracking-[0.25em]">SIDELINE BREW &middot; TIER LIST</div>
+      </div>
 
       {/* Pinned directly above the board, and pinned literally: on a
           stream the board is taller than the viewport, so a title that
