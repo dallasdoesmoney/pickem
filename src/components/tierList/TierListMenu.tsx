@@ -1,14 +1,16 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 
-const PANEL_WIDTH = 360;
+// Only used for the very first frame of the very first open, before the
+// trigger has been measured. After that the panel is exactly as wide as
+// the button that opened it.
+const FALLBACK_WIDTH = 360;
 
-// Below this a search box is noise - you can see every row without it.
-// Above it, scrolling to find one saved list by eye gets old fast.
-export const SEARCH_THRESHOLD = 7;
+// Sits directly under the trigger rather than floating away from it.
+const PANEL_GAP = 4;
 
 // A category or saved list's mark. Falls back to a glyph rather than a
 // broken image: the icons are remote, and a category is perfectly usable
@@ -61,11 +63,28 @@ export function TierListMenu({
   searchPlaceholder?: string;
   children: ReactNode;
 }) {
-  const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
+  // The panel is measured from the trigger rather than fixed, so it lines
+  // up with the button on both edges. A panel narrower than its own
+  // button leaves the button poking out either side of it, which is what
+  // made these read as floating cards that had come loose from the thing
+  // that opened them.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [panelWidth, setPanelWidth] = useState(FALLBACK_WIDTH);
+  useLayoutEffect(() => {
+    if (!open || !wrapRef.current) return;
+    setPanelWidth(wrapRef.current.getBoundingClientRect().width);
+  }, [open]);
+
+  const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(
+    open,
+    onOpenChange,
+    panelWidth,
+    PANEL_GAP,
+  );
   const searchable = typeof query === "string" && !!onQueryChange;
 
   return (
-    <div className="relative flex-1">
+    <div ref={wrapRef} className="relative flex-1">
       <button
         ref={buttonRef}
         type="button"
@@ -105,7 +124,7 @@ export function TierListMenu({
             style={{
               top: coords.top,
               left: coords.left,
-              width: Math.min(PANEL_WIDTH, typeof window !== "undefined" ? window.innerWidth - 24 : PANEL_WIDTH),
+              width: Math.min(panelWidth, typeof window !== "undefined" ? window.innerWidth - 24 : panelWidth),
             }}
             className="fixed z-[100] rounded-2xl border border-white/10 bg-[#101d38] shadow-2xl shadow-black/60 p-2"
           >

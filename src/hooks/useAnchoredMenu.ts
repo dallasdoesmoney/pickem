@@ -10,7 +10,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 // from the trigger's own rect, closes on outside click/Escape/page
 // scroll, but ignores scroll events that originate from inside the
 // panel itself (its own scrollable list shouldn't close it).
-export function useAnchoredMenu<T extends HTMLElement>(open: boolean, onOpenChange: (open: boolean) => void, panelWidth: number) {
+// `gap` is the distance from the trigger's bottom edge to the panel.
+// It defaults to the 10px the icon-button menus were built around; a
+// panel that is as wide as its own trigger wants to sit much closer than
+// that, or it reads as a floating card rather than as that button's menu.
+export function useAnchoredMenu<T extends HTMLElement>(
+  open: boolean,
+  onOpenChange: (open: boolean) => void,
+  panelWidth: number,
+  gap: number = 10,
+) {
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<T>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -21,8 +30,8 @@ export function useAnchoredMenu<T extends HTMLElement>(open: boolean, onOpenChan
     const width = Math.min(panelWidth, window.innerWidth - 24);
     let left = rect.left + rect.width / 2 - width / 2;
     left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
-    setCoords({ top: rect.bottom + 10, left });
-  }, [open, panelWidth]);
+    setCoords({ top: rect.bottom + gap, left });
+  }, [open, panelWidth, gap]);
 
   useEffect(() => {
     if (!open) return;

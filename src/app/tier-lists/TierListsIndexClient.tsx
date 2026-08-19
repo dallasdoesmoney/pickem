@@ -6,7 +6,7 @@ import { TierTemplate, getTierTemplate } from "@/data/tierTemplates";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
-import { MenuIcon, SEARCH_THRESHOLD, TierListMenu } from "@/components/tierList/TierListMenu";
+import { MenuIcon, TierListMenu } from "@/components/tierList/TierListMenu";
 import { SavedTierListSummary, deleteTierList, listMyTierLists } from "@/lib/supabase/tierLists";
 
 // Coarse on purpose: "when did I last touch this" only needs to be right
@@ -114,8 +114,8 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
             setOpenMenu(next ? "start" : null);
             if (!next) setStartQuery("");
           }}
-          query={templates.length >= SEARCH_THRESHOLD ? startQuery : undefined}
-          onQueryChange={templates.length >= SEARCH_THRESHOLD ? setStartQuery : undefined}
+          query={startQuery}
+          onQueryChange={setStartQuery}
           searchPlaceholder="Search tier lists"
         >
           {shownTemplates.length === 0 ? (
@@ -149,8 +149,11 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
             setOpenMenu(next ? "saved" : null);
             if (!next) setSavedQuery("");
           }}
-          query={(saved?.length ?? 0) >= SEARCH_THRESHOLD ? savedQuery : undefined}
-          onQueryChange={(saved?.length ?? 0) >= SEARCH_THRESHOLD ? setSavedQuery : undefined}
+          // Only once there is something to search: the panel otherwise
+          // holds a sign-in prompt or an empty state, and a filter box
+          // above either of those is a control that can do nothing.
+          query={user && (saved?.length ?? 0) > 0 ? savedQuery : undefined}
+          onQueryChange={user && (saved?.length ?? 0) > 0 ? setSavedQuery : undefined}
           searchPlaceholder="Search your lists"
         >
           {authLoading || (user && saved === null) ? (
