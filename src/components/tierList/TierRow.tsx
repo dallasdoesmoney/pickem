@@ -133,13 +133,18 @@ export function TierRow({
           />
         ) : (
           <span
-            className="text-center leading-none break-words"
+            // leading-none stacks wrapped lines right on top of each
+            // other; a name long enough to wrap needs the gap back.
+            // w-full/min-w-0 are what make break-words actually bite: as a
+            // bare flex item the span sizes to its content instead, so a
+            // long word overflowed the rail and got cut by the chevron.
+            className="w-full min-w-0 text-center leading-[1.12] break-words"
             style={{
               fontFamily: "var(--font-display)",
               color: "#0c1830",
               // Steps down as the label grows so a renamed tier costs
               // legibility rather than breaking the rail's width.
-              fontSize: labelSize(tierLabelFor(tier, index)),
+              fontSize: labelSize(tierLabelFor(tier, index), railWidth),
             }}
           >
             {tierLabelFor(tier, index)}
@@ -206,13 +211,29 @@ export function TierRow({
 }
 
 // Type steps down in bands rather than scaling continuously, so tiers of
-// similar name length stay visually consistent with each other.
-function labelSize(label: string): number {
+// similar name length stay visually consistent with each other. The rail
+// wraps, so these are sized to fill it across two or three lines rather
+// than to squeeze a long name onto one - the old bands bottomed out at
+// 10px, which read as fine print next to a 74px logo.
+//
+// The band alone isn't enough: the rail is much narrower on a phone than
+// on a desktop, and a band picked for a 136px rail overflows an 86px one.
+// Wrapping can't save a single word that is itself too wide, so the band
+// is also capped by what the longest word can measure at - "REBUILDING"
+// has to fit the rail on its own or it gets sliced by the chevron.
+function labelSize(label: string, railWidth: number): number {
   const n = label.length;
-  if (n <= 2) return 26;
-  if (n <= 5) return 16;
-  if (n <= 9) return 12;
-  return 10;
+  const band = n <= 2 ? 30 : n <= 5 ? 20 : n <= 9 ? 16 : n <= 14 ? 15 : n <= 22 ? 14 : 13;
+  // Rail minus its own left/right padding.
+  const inner = railWidth - 18;
+  const longestWord = label.split(/\s+/).reduce((m, w) => Math.max(m, w.length), 1);
+  // 0.75em per character is a deliberately pessimistic stand-in for the
+  // display font's advance width - measured, it runs 0.70 for long words
+  // and 0.73 for short ones, so rounding up keeps the cap honest at every
+  // length. Erring the other way is what put a lone "R" on its own line.
+  // break-words below is the backstop if a face ever runs wider still.
+  const capByWord = Math.floor(inner / (0.75 * longestWord));
+  return Math.max(9, Math.min(band, capByWord));
 }
 
 function RailButton({

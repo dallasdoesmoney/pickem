@@ -24,10 +24,13 @@ export type TierListState = {
 
 export const MAX_TIERS = 10;
 export const MIN_TIERS = 1;
-// Long enough for a real name ("UNDEFEATED", "SHOULD BE FIRED") rather
-// than just a letter - the rail shrinks the type to fit, so a long label
-// costs legibility, not layout.
-export const MAX_TIER_LABEL = 20;
+// Long enough for a real name rather than just a letter - the rail wraps
+// and shrinks the type to fit, so a long label costs legibility, not
+// layout. 20 was cutting off phrases people actually reach for
+// ("SUPER BOWL CONTENDER" is exactly 20); 36 clears three lines in the
+// rail, which is as much as it can hold before the type gets too small
+// to read at a glance.
+export const MAX_TIER_LABEL = 36;
 export const MAX_TITLE = 60;
 
 // Tier colours ARE the rank ladder, walked from the top down: GOAT pink,
