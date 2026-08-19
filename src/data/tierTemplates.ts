@@ -30,7 +30,10 @@ const NFL_TEAMS: TierTemplate = {
   slug: "nfl-teams",
   title: "NFL Team Tier List",
   tagline: "32 teams. Six tiers. No fence sitting.",
-  defaultListTitle: "My NFL Team Tier List",
+  // Matches `title` above rather than personalising it: this is what the
+  // exported image is captioned with, and a card that says something
+  // different from the page it was built on reads as a different thing.
+  defaultListTitle: "NFL Team Tier List",
   itemNoun: ["team", "teams"],
   items: TEAMS_SORTED.map((t) => ({
     id: t.abbr,

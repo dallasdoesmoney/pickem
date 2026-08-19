@@ -203,6 +203,19 @@ export function tierLabelFor(tier: Tier, index: number): string {
   return trimmed || `TIER ${index + 1}`;
 }
 
+// Titles that were once the shipped default. A list saved while one of
+// these was current carries it forever, so restoring one re-points it at
+// today's default instead - otherwise every list made before the default
+// changed would keep exporting the old wording. Only an exact match is
+// rewritten, so a title someone actually typed is left alone.
+const LEGACY_DEFAULT_TITLES = new Set(["My NFL Team Tier List"]);
+
+function restoreTitle(raw: unknown, template: TierTemplate): string {
+  if (typeof raw !== "string" || !raw.trim()) return template.defaultListTitle;
+  const title = raw.slice(0, MAX_TITLE);
+  return LEGACY_DEFAULT_TITLES.has(title) ? template.defaultListTitle : title;
+}
+
 // Defensive rehydration for anything that crossed a trust boundary:
 // localStorage a user could have hand-edited, an old saved row whose
 // template has since changed, or a share snapshot. Rebuilds against the
@@ -250,7 +263,7 @@ export function sanitizeState(raw: unknown, template: TierTemplate): TierListSta
 
   return {
     template: template.slug,
-    title: typeof r.title === "string" && r.title.trim() ? r.title.slice(0, MAX_TITLE) : template.defaultListTitle,
+    title: restoreTitle(r.title, template),
     tiers,
     placements,
     unranked,

@@ -24,6 +24,13 @@ export function ShareDialog({ open, onClose, onShareImage, onCreateLink, shareUr
     setError(null);
     try {
       await onShareImage();
+      // Once this resolves the image has already been handed off - to the
+      // OS share sheet on touch, or straight to a download everywhere
+      // else - so the dialog has nothing left to say and dismissing it by
+      // hand is just an extra tap. The picks page shares directly from
+      // its button with no modal at all; this is the closest equivalent.
+      // Only on success: a failure has to stay up to show the error.
+      onClose();
     } catch {
       setError("Couldn't build the image. Try again.");
     } finally {
