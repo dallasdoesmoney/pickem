@@ -8,6 +8,7 @@ import { TEAMS, TeamAbbr } from "@/data/teams";
 import { fetchWeeks, setWeekOpen, setWeekResultsPublished, fetchGameResults, setGameResult, clearGameResult, WeekRow } from "@/lib/supabase/admin";
 import { fetchPendingCreatorRequests, reviewCreatorRequest, PendingCreatorRequest } from "@/lib/supabase/creatorRequests";
 import { errorMessage } from "@/lib/errorMessage";
+import { AdminUsers } from "@/components/admin/AdminUsers";
 
 export default function AdminPage() {
   const { user, profile, loading } = useAuth();
@@ -42,7 +43,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-type AdminSection = "menu" | "pickem" | "tasks";
+type AdminSection = "menu" | "pickem" | "tasks" | "users";
 
 // Every admin capability lives behind one of a small set of cards
 // (Pick'em today, Tasks for anything needing a human decision - just
@@ -210,7 +211,31 @@ function AdminDashboard() {
               <path d="M9 6l6 6-6 6" />
             </svg>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setSection("users")}
+            className="w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors"
+          >
+            <span className="text-2xl shrink-0">👥</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+                USERS
+              </div>
+              <div className="text-[11px] text-white/45 mt-0.5">Search everyone, fix who referred who</div>
+            </div>
+            <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-white/30" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
         </div>
+      )}
+
+      {section === "users" && (
+        <>
+          <BackButton onClick={() => setSection("menu")} />
+          <AdminUsers />
+        </>
       )}
 
       {section === "pickem" && (
