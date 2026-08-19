@@ -82,6 +82,12 @@ body {
   animation: tier-target-pulse 1.6s ease-in-out infinite;
 }
 
+/* Applied to every pool chip; harmless on first paint because the chips
+   only remount (and so only replay it) when a shuffle bumps their key. */
+.tier-anim-scatter {
+  animation: tier-scatter 460ms cubic-bezier(0.3, 1.2, 0.4, 1) both;
+}
+
 /* Fires down the board when the last item lands - the whole thing lights
    up in sequence rather than the page just quietly reaching a state. */
 @keyframes tier-cascade {
@@ -177,9 +183,48 @@ body {
   }
 }
 
+/* Reset used to blink the board empty, which read as a glitch rather than
+   an action. Now everything physically leaves first - thrown outward,
+   alternating sides so it clears like a table being swept. */
+@keyframes tier-sweep-out {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--sweep-x, 120px), -40px) rotate(var(--sweep-rot, 90deg)) scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* Shuffle reorders instantly and therefore invisibly. This tosses each
+   chip so the new order arrives as something you watched happen. */
+@keyframes tier-scatter {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  38% {
+    transform: translateY(-18px) rotate(-14deg) scale(1.14);
+  }
+  68% {
+    transform: translateY(4px) rotate(7deg) scale(0.94);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
 .tier-anim-cascade {
   animation: tier-cascade 520ms ease-out both;
 }
+
+.tier-anim-sweep {
+  animation: tier-sweep-out 420ms cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+
+/* Direction comes from the chip's own index, set inline. nth-child can't
+   do it here: each chip is an only child of its own sortable wrapper, so
+   every one of them matches :nth-child(odd). */
 
 .tier-anim-flash {
   animation: tier-takeover-flash 1100ms ease-out both;
@@ -226,7 +271,9 @@ body {
   .tier-anim-scrim,
   .tier-anim-land,
   .tier-anim-target,
-  .tier-anim-cascade {
+  .tier-anim-cascade,
+  .tier-anim-sweep,
+  .tier-anim-scatter {
     animation: none;
   }
 

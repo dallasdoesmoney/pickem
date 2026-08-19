@@ -15,6 +15,7 @@ export function TierRow({
   railWidth,
   first,
   cascading,
+  sweeping,
   editing,
   hot,
   selectedItemId,
@@ -40,6 +41,8 @@ export function TierRow({
   first: boolean;
   // Set for a beat when the board fills, so the rows can light in sequence.
   cascading: boolean;
+  // Set while a reset is clearing out, so the chips can fly before they go.
+  sweeping: boolean;
   editing: boolean;
   // Resolved by the page, not by this row's own isOver: once a row has
   // items, dnd-kit reports the item under the cursor as the drop target
@@ -153,13 +156,15 @@ export function TierRow({
         style={{ minHeight: chipSize + 16, cursor: selectedItemId ? "pointer" : undefined }}
       >
         <SortableContext items={itemIds} strategy={rectSortingStrategy}>
-          {items.map((item) => (
+          {items.map((item, i) => (
             <SortableTierItem
               key={item.id}
               item={item}
               size={chipSize}
               selected={selectedItemId === item.id}
               landed={landedItemId === item.id}
+              sweeping={sweeping}
+              sweepIndex={i}
               onActivate={() => onItemActivate(item)}
             />
           ))}

@@ -14,6 +14,10 @@ export function TierItemChip({
   size,
   selected,
   landed,
+  sweeping,
+  sweepIndex = 0,
+  scatterKey = 0,
+  scatterIndex = 0,
   onActivate,
   dragging,
 }: {
@@ -22,6 +26,12 @@ export function TierItemChip({
   selected?: boolean;
   // Set for one beat right after a placement so the chip can pop.
   landed?: boolean;
+  // Reset is clearing the board - fly out before it does.
+  sweeping?: boolean;
+  sweepIndex?: number;
+  // Bumped per shuffle; the key remounts the chip so the scatter replays.
+  scatterKey?: number;
+  scatterIndex?: number;
   onActivate?: () => void;
   dragging?: boolean;
 }) {
@@ -34,7 +44,8 @@ export function TierItemChip({
       onClick={onActivate}
       className={`relative shrink-0 rounded-xl flex items-center justify-center transition-[box-shadow,transform] duration-150 ${
         landed ? "tier-anim-land" : ""
-      } ${dragging ? "tier-anim-target" : "hover:scale-110 active:scale-95"}`}
+      } ${dragging ? "tier-anim-target" : "hover:scale-110 active:scale-95"} ${sweeping ? "tier-anim-sweep" : scatterKey ? "tier-anim-scatter" : ""}`}
+      key={scatterKey}
       style={{
         width: size,
         height: size,
@@ -48,6 +59,17 @@ export function TierItemChip({
         background: selected && !dragging ? `${item.accent}33` : "transparent",
         boxShadow: selected && !dragging ? `0 0 0 2px ${item.accent}, 0 6px 18px -6px ${item.accent}` : undefined,
         touchAction: "manipulation",
+        // Staggered so the board empties in a wave rather than all at once,
+        // and the pool scatters in a ripple rather than a single blink.
+        animationDelay: sweeping ? `${sweepIndex * 22}ms` : scatterKey ? `${scatterIndex * 26}ms` : undefined,
+        // Alternating so the board clears outward in both directions
+        // instead of every chip piling toward one corner.
+        ...(sweeping
+          ? {
+              ["--sweep-x" as string]: `${(sweepIndex % 2 ? 1 : -1) * (130 + (sweepIndex % 3) * 40)}px`,
+              ["--sweep-rot" as string]: `${(sweepIndex % 2 ? 1 : -1) * (100 + (sweepIndex % 4) * 45)}deg`,
+            }
+          : {}),
       }}
     >
       <img
@@ -70,6 +92,10 @@ export function SortableTierItem({
   size,
   selected,
   landed,
+  sweeping,
+  sweepIndex,
+  scatterKey,
+  scatterIndex,
   onActivate,
   disabled,
 }: {
@@ -77,6 +103,10 @@ export function SortableTierItem({
   size: number;
   selected?: boolean;
   landed?: boolean;
+  sweeping?: boolean;
+  sweepIndex?: number;
+  scatterKey?: number;
+  scatterIndex?: number;
   onActivate?: () => void;
   disabled?: boolean;
 }) {
@@ -92,7 +122,18 @@ export function SortableTierItem({
       {...attributes}
       {...listeners}
     >
-      <TierItemChip item={item} size={size} selected={selected} landed={landed} onActivate={onActivate} dragging={isDragging} />
+      <TierItemChip
+        item={item}
+        size={size}
+        selected={selected}
+        landed={landed}
+        sweeping={sweeping}
+        sweepIndex={sweepIndex}
+        scatterKey={scatterKey}
+        scatterIndex={scatterIndex}
+        onActivate={onActivate}
+        dragging={isDragging}
+      />
     </div>
   );
 }

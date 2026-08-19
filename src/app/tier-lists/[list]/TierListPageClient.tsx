@@ -79,11 +79,14 @@ export default function TierListPageClient({
   // undo step, without merging into the *previous* drag of the same item.
   const dragSession = useRef(0);
   const suppressClick = useRef(false);
-  // Whether the dragged item already held the #1 slot when the drag began.
-  // Captured at drag START because handleDragOver moves it live - asking at
-  // drop time can answer "it was already there" about a move this very drag
-  // just made, which silently swallows the celebration.
+  // Whether the dragged item was already in the top tier when the drag
+  // began. Captured at drag START because handleDragOver moves it live -
+  // asking at drop time can answer "it was already there" about a move
+  // this very drag just made, which silently swallows the celebration.
   const dragStartedAtTop = useRef(false);
+  // Drives the reset sweep: chips fly out before the board actually clears.
+  const [sweeping, setSweeping] = useState(false);
+  const [scatterKey, setScatterKey] = useState(0);
 
   useEffect(() => {
     function measure() {
@@ -177,25 +180,25 @@ export default function TierListPageClient({
 
   const topTierId = state.tiers[0]?.id;
 
-  const holdsTopSpot = useCallback(
-    (s: TierListState, itemId: string) => !!topTierId && (s.placements[topTierId] ?? [])[0] === itemId,
+  const isInTopTier = useCallback(
+    (s: TierListState, itemId: string) => !!topTierId && (s.placements[topTierId] ?? []).includes(itemId),
     [topTierId]
   );
 
-  // The prize is the single #1 slot, not the top tier generally.
+  // Any arrival into the top tier earns it, not just the #1 slot.
   //
   // Judged on the state the whole interaction ENDS in, against whether the
-  // item held #1 when it BEGAN - not on what the final move did. A drag
-  // moves the item live as it goes, so the drop itself is frequently a
-  // no-op even though the drag as a whole just took first place.
-  const celebrateIfTakesTopSpot = useCallback(
-    (finalState: TierListState, itemId: string, wasAlreadyFirst: boolean) => {
-      if (!topTierId || wasAlreadyFirst) return;
-      if (!holdsTopSpot(finalState, itemId)) return;
+  // item was already up there when it BEGAN - not on what the final move
+  // did. A drag moves the item live as it goes, so the drop itself is
+  // frequently a no-op even though the drag as a whole just promoted it.
+  const celebrateIfPromoted = useCallback(
+    (finalState: TierListState, itemId: string, wasAlreadyTop: boolean) => {
+      if (!topTierId || wasAlreadyTop) return;
+      if (!isInTopTier(finalState, itemId)) return;
       celebrationKey.current += 1;
       setCelebration({ item: resolveItem(template, itemId), key: celebrationKey.current });
     },
-    [topTierId, holdsTopSpot, template]
+    [topTierId, isInTopTier, template]
   );
 
   const flashLanded = useCallback((id: string) => {
@@ -298,7 +301,7 @@ export default function TierListPageClient({
     const action = applyMove(id, String(over.id), true);
     // A no-op drop still counts: the live moves during the drag may have
     // already carried this item into first place.
-    celebrateIfTakesTopSpot(action ? tierListReducer(state, action) : state, id, dragStartedAtTop.current);
+    celebrateIfPromoted(action ? tierListReducer(state, action) : state, id, dragStartedAtTop.current);
     dragStartedAtTop.current = false;
   }
 
@@ -314,7 +317,7 @@ export default function TierListPageClient({
   function placeSelected(tierId: string | null) {
     if (!selectedId) return;
     const action: TierListAction = { type: "moveItem", itemId: selectedId, toTier: tierId, toIndex: null };
-    celebrateIfTakesTopSpot(tierListReducer(state, action), selectedId, holdsTopSpot(state, selectedId));
+    celebrateIfPromoted(tierListReducer(state, action), selectedId, isInTopTier(state, selectedId));
     dispatch(action);
     if (tierId !== null) flashLanded(selectedId);
     setSelectedId(null);
@@ -333,10 +336,23 @@ export default function TierListPageClient({
   }
 
   async function handleReset() {
-    if (await confirm("Reset this tier list back to a blank slate?", "RESET")) {
+    if (!(await confirm("Reset this tier list back to a blank slate?", "RESET"))) return;
+    // Sweep first, clear second. Resetting instantly gave no sense that
+    // anything happened - the board just blinked and everything was gone.
+    setSweeping(true);
+    setTimeout(() => {
       dispatch({ type: "reset", template });
-      posthog.capture("tier_list_reset", { template: template.slug });
-    }
+      setSweeping(false);
+    }, 420);
+    posthog.capture("tier_list_reset", { template: template.slug });
+  }
+
+  // Shuffle reorders instantly, which reads as nothing happening at all.
+  // Bumping the key replays a scatter across the pool as the new order
+  // lands underneath it.
+  function handleShuffle() {
+    dispatch({ type: "shuffleUnranked" });
+    setScatterKey((k) => k + 1);
   }
 
   const doSave = useCallback(
@@ -516,7 +532,7 @@ export default function TierListPageClient({
         collisionDetection={collisionDetection}
         onDragStart={(e: DragStartEvent) => {
           dragSession.current += 1;
-          dragStartedAtTop.current = holdsTopSpot(state, String(e.active.id));
+          dragStartedAtTop.current = isInTopTier(state, String(e.active.id));
           setDraggingId(String(e.active.id));
           setSelectedId(null);
         }}
@@ -544,6 +560,7 @@ export default function TierListPageClient({
               railWidth={railWidth}
               first={i === 0}
               cascading={cascading}
+              sweeping={sweeping}
               editing={editing}
               selectedItemId={selectedId}
               landedItemId={landedId}
@@ -583,7 +600,8 @@ export default function TierListPageClient({
           landedItemId={landedId}
           onItemActivate={handleItemActivate}
           onPlaceSelected={() => placeSelected(null)}
-          onShuffle={() => dispatch({ type: "shuffleUnranked" })}
+          onShuffle={handleShuffle}
+          scatterKey={scatterKey}
         />
 
         <DragOverlay dropAnimation={null}>
@@ -702,6 +720,7 @@ function ProgressBar({ ranked, total, complete }: { ranked: number; total: numbe
 
 function UnrankedPool({
   hot,
+  scatterKey,
   ids,
   template,
   chipSize,
@@ -712,6 +731,8 @@ function UnrankedPool({
   onShuffle,
 }: {
   hot: boolean;
+  // Bumped on every shuffle so the chips can replay their scatter.
+  scatterKey: number;
   ids: string[];
   template: TierTemplate;
   chipSize: number;
@@ -768,13 +789,15 @@ function UnrankedPool({
         }}
       >
         <SortableContext items={ids} strategy={rectSortingStrategy}>
-          {items.map((item) => (
+          {items.map((item, i) => (
             <SortableTierItem
               key={item.id}
               item={item}
               size={chipSize}
               selected={selectedItemId === item.id}
               landed={landedItemId === item.id}
+              scatterKey={scatterKey}
+              scatterIndex={i}
               onActivate={() => onItemActivate(item)}
             />
           ))}
