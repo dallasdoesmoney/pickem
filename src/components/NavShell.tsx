@@ -15,22 +15,18 @@ type NavItem = {
   label: string;
   icon: (props: { className?: string }) => React.JSX.Element;
   matchPrefix: string;
-  exact?: boolean;
 };
 
-type NavSection = { label: string; items: NavItem[] };
-
-// Pick'em is one link to the hub now (weekly/team pick'em both live
-// inside it), not a dropdown with its own sub-items - mirrors the
-// desktop header's own two top-level links.
-const MOBILE_NAV_SECTIONS: NavSection[] = [
-  {
-    label: "Pick’em",
-    items: [
-      { href: "/", label: "Pick’em Hub", icon: PicksIcon, matchPrefix: "/", exact: true },
-      { href: "/leaderboard", label: "Leaderboard", icon: LeaderboardIcon, matchPrefix: "/leaderboard" },
-    ],
-  },
+// The four destinations, flat. There used to be an intermediate
+// "Pick'em hub" page between the nav and the two pick'em modes; the home
+// page now fronts all four directly, so a nav item that pointed at a
+// menu of the same four links was a stop on the way to nowhere. Every
+// entry here goes straight to the thing it names.
+const NAV_ITEMS: NavItem[] = [
+  { href: "/weekly", label: "Pick’em", icon: PicksIcon, matchPrefix: "/weekly" },
+  { href: "/predictor", label: "Record Predictor", icon: TeamIcon, matchPrefix: "/predictor" },
+  { href: "/tier-lists", label: "Tier Lists", icon: TierListIcon, matchPrefix: "/tier-lists" },
+  { href: "/leaderboard", label: "Leaderboard", icon: LeaderboardIcon, matchPrefix: "/leaderboard" },
 ];
 
 const MOBILE_STANDALONE_ITEMS: NavItem[] = [{ href: "/account", label: "Profile", icon: AccountIcon, matchPrefix: "/account" }];
@@ -42,6 +38,27 @@ function PicksIcon({ className }: { className?: string }) {
       <rect x="13" y="3" width="8" height="8" rx="2" />
       <rect x="3" y="13" width="8" height="8" rx="2" />
       <rect x="13" y="13" width="8" height="8" rx="2" />
+    </svg>
+  );
+}
+
+function TeamIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M8 3v3" />
+      <path d="M16 3v3" />
+      <path d="M8 14l2.5 2.5L16 11" />
+    </svg>
+  );
+}
+
+function TierListIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 5h11l3 2.5L14 10H3z" />
+      <path d="M3 14h8l3 2.5L11 19H3z" />
     </svg>
   );
 }
@@ -95,17 +112,16 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
-// Plain pill link, not a dropdown - Pick'em and Leaderboard are both
-// single destinations now (weekly/team pick'em live inside the hub
-// itself), so neither needs the anchored-menu machinery PickemMenu used
-// to provide.
+// Plain pill links, not dropdowns - all four are single destinations, so
+// none of them needs the anchored-menu machinery PickemMenu used to
+// provide.
 function TopNavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
-  const active = href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+  const active = pathname === href || pathname.startsWith(`${href}/`);
   return (
     <Link
       href={href}
-      className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm transition-colors ${
+      className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-[13px] transition-colors ${
         active ? "bg-white/10 text-white" : "text-white/70 hover:text-white hover:bg-white/5"
       }`}
       style={{ fontFamily: "var(--font-display)" }}
@@ -117,7 +133,7 @@ function TopNavLink({ href, label }: { href: string; label: string }) {
 
 function MobileNavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const pathname = usePathname();
-  const active = item.exact ? pathname === item.href : pathname.startsWith(item.matchPrefix);
+  const active = pathname.startsWith(item.matchPrefix);
   const Icon = item.icon;
   return (
     <Link
@@ -164,20 +180,15 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                 <CloseIcon className="h-4 w-4" />
               </button>
             </div>
+            {/* Flat, no section heading: the four items ARE the app, and
+                the heading that used to sit above them said "Pick'em" -
+                which is now also the name of one of the items under it. */}
             <nav className="flex flex-col gap-4 px-3">
-              {MOBILE_NAV_SECTIONS.map((section) => (
-                <div key={section.label} className="flex flex-col gap-1">
-                  <div
-                    className="px-3 text-[11px] text-white/35 tracking-[0.15em] uppercase"
-                    style={{ fontFamily: "var(--font-display)" }}
-                  >
-                    {section.label}
-                  </div>
-                  {section.items.map((item) => (
-                    <MobileNavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />
-                  ))}
-                </div>
-              ))}
+              <div className="flex flex-col gap-1">
+                {NAV_ITEMS.map((item) => (
+                  <MobileNavLink key={item.href} item={item} onClick={() => setMobileOpen(false)} />
+                ))}
+              </div>
               <div className="flex flex-col gap-1 pt-3 border-t border-white/10">
                 {user ? (
                   <>
@@ -233,7 +244,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="sticky top-0 z-50 relative flex items-center justify-center px-4 lg:px-6 h-[72px] border-b border-white/10 bg-[#0e1b33]/90 backdrop-blur">
+        <div className="sticky top-0 z-50 relative flex items-center justify-center px-4 lg:px-6 h-[72px] border-b border-white/10 bg-[#070e1c]/90 backdrop-blur">
           <button
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}
@@ -242,9 +253,10 @@ export function NavShell({ children }: { children: React.ReactNode }) {
             <HamburgerIcon className="h-5 w-5" />
           </button>
 
-          <div className="hidden lg:flex items-center gap-1 absolute left-6">
-            <TopNavLink href="/" label="Pick’em" />
-            <TopNavLink href="/leaderboard" label="Leaderboard" />
+          <div className="hidden lg:flex items-center gap-0.5 absolute left-6">
+            {NAV_ITEMS.map((item) => (
+              <TopNavLink key={item.href} href={item.href} label={item.label} />
+            ))}
           </div>
 
           <Link href="/" aria-label="Go to the homepage">

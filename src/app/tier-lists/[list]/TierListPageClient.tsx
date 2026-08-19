@@ -716,7 +716,7 @@ export default function TierListPageClient({
           the board is taller than the viewport, so without this the title
           leaves the frame the moment you scroll to the lower tiers - and
           on a stream that means most of the session is shot without one. */}
-      <header className="sticky top-[72px] z-20 -mx-4 px-4 pt-1 pb-2 bg-[#0e1b33]">
+      <header className="sticky top-[72px] z-20 -mx-4 px-4 pt-1 pb-2 bg-[#070e1c]">
         <div className={editing ? "flex items-center gap-3" : "relative flex items-center justify-center"}>
           <button
             type="button"

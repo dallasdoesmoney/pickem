@@ -233,8 +233,8 @@ function AdminDashboard() {
                     style={{ fontFamily: "var(--font-display)" }}
                   >
                     {w.week}
-                    {w.is_open && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 border-2 border-[#0e1b33]" />}
-                    {w.results_published && <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-sky-400 border-2 border-[#0e1b33]" />}
+                    {w.is_open && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 border-2 border-[#070e1c]" />}
+                    {w.results_published && <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-sky-400 border-2 border-[#070e1c]" />}
                   </button>
                 ))}
               </div>

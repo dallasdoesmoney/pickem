@@ -1,7 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0e1b33;
+  /* Deliberately much darker than the #0e1b33 this started as. Every
+     panel in the app is a navy only a few steps lighter than the ground,
+     so on the old value a menu, a modal and the page behind it all read
+     as one surface. The panels didn't need changing - the ground did. */
+  --background: #070e1c;
   --foreground: #f4f6fb;
 }
 

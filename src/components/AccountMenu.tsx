@@ -74,7 +74,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
             <span className="h-8 w-8 lg:h-7 lg:w-7 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{initial}</span>
           )}
           {pendingCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-[#0e1b33]" />
+            <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-[#070e1c]" />
           )}
         </span>
         {/* Name stays desktop-only - mobile's header is tight enough that
