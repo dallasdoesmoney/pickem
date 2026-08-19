@@ -114,20 +114,27 @@ body {
   }
 }
 
+/* Rushes up to full size, then sits there - the hold between 38% and 72%
+   is the bit that reads as "look at this", and without it the mark is
+   already on its way out before anyone has registered whose it is. */
 @keyframes tier-takeover-bloom {
   0% {
     transform: scale(0.3) rotate(-8deg);
     opacity: 0;
   }
-  16% {
+  14% {
     opacity: 0.95;
   }
-  55% {
-    transform: scale(2.4) rotate(2deg);
-    opacity: 0.5;
+  38% {
+    transform: scale(2.2) rotate(1deg);
+    opacity: 0.92;
+  }
+  72% {
+    transform: scale(2.4) rotate(3deg);
+    opacity: 0.85;
   }
   100% {
-    transform: scale(3.3) rotate(5deg);
+    transform: scale(3.3) rotate(6deg);
     opacity: 0;
   }
 }

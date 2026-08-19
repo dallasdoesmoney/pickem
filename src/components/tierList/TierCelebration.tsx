@@ -38,7 +38,10 @@ export function TierCelebration({ item, onDone }: { item: TierItem | null; onDon
     setDrops(
       Array.from({ length: DROPS }, () => ({
         left: Math.random() * 100,
-        size: 26 + Math.random() * 42,
+        // Roughly 2.5x what this started at. Small marks read as confetti
+        // at streaming bitrates; at this size you can tell whose logo it is
+        // while it falls, which is the whole point.
+        size: 68 + Math.random() * 112,
         delay: Math.random() * 750,
         duration: 1500 + Math.random() * 1200,
         // A little horizontal travel so they don't fall like a grid.
@@ -73,6 +76,28 @@ export function TierCelebration({ item, onDone }: { item: TierItem | null; onDon
         />
       </div>
 
+      {/* Rain sits under the banner: at this size the storm would
+          otherwise bury the one thing anyone needs to read. */}
+      {drops.map((d, i) => (
+        <img
+          key={i}
+          src={item.imageUrl}
+          alt=""
+          crossOrigin="anonymous"
+          className="tier-anim-rain absolute top-0 object-contain"
+          style={{
+            left: `${d.left}%`,
+            width: d.size,
+            height: d.size,
+            opacity: d.opacity,
+            animationDelay: `${d.delay}ms`,
+            animationDuration: `${d.duration}ms`,
+            ["--rain-x" as string]: `${d.drift}px`,
+            ["--rain-rot" as string]: `${d.spin}deg`,
+          }}
+        />
+      ))}
+
       <div className="absolute inset-0 flex items-center justify-center px-6">
         <div className="tier-anim-banner text-center">
           <div
@@ -93,26 +118,6 @@ export function TierCelebration({ item, onDone }: { item: TierItem | null; onDon
           </div>
         </div>
       </div>
-
-      {drops.map((d, i) => (
-        <img
-          key={i}
-          src={item.imageUrl}
-          alt=""
-          crossOrigin="anonymous"
-          className="tier-anim-rain absolute top-0 object-contain"
-          style={{
-            left: `${d.left}%`,
-            width: d.size,
-            height: d.size,
-            opacity: d.opacity,
-            animationDelay: `${d.delay}ms`,
-            animationDuration: `${d.duration}ms`,
-            ["--rain-x" as string]: `${d.drift}px`,
-            ["--rain-rot" as string]: `${d.spin}deg`,
-          }}
-        />
-      ))}
     </div>
   );
 }
