@@ -21,7 +21,14 @@
 -- schema.sql, never one added by a later migration. An admin tool that
 -- fails to open because an unrelated optional migration was skipped is
 -- worse than one that shows a field less.
-create or replace function public.admin_list_users(
+-- Dropped first, not just replaced: create-or-replace cannot change a
+-- function's OUT columns, and this one's return type has already changed
+-- once (it used to select profiles.newsletter_subscribed, a column added
+-- by a migration that was never run). Without the drop, editing the
+-- returned shape again fails with 42P13 against any database that already
+-- has an older copy.
+drop function if exists public.admin_list_users(text, int, int);
+create function public.admin_list_users(
   p_search text default '',
   p_limit int default 50,
   p_offset int default 0
@@ -104,7 +111,8 @@ grant execute on function public.admin_list_users(text, int, int) to authenticat
 -- somebody joined using your link, which is not what happened here and
 -- would be dated to today for a signup that may be months old. The points
 -- and the referral count are the credit; the timeline stays honest.
-create or replace function public.admin_set_referrer(p_user_id uuid, p_referrer_username text)
+drop function if exists public.admin_set_referrer(uuid, text);
+create function public.admin_set_referrer(p_user_id uuid, p_referrer_username text)
 returns void
 language plpgsql
 security definer
