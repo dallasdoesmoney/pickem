@@ -7,14 +7,7 @@ import { fetchLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboar
 import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { errorMessage } from "@/lib/errorMessage";
 import { useAuth } from "@/hooks/useAuth";
-import { getLevelInfo } from "@/lib/levels";
-import { FollowButton } from "@/components/FollowButton";
-import { LevelBadge } from "@/components/LevelBadge";
-import { PlayerBadges } from "@/components/PlayerBadges";
-import { CreatorLinks } from "@/components/CreatorLinks";
-import { LevelListModal } from "@/components/LevelListModal";
-import { StatTile, StatDetailRow } from "@/components/StatTile";
-import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
+import { ProfileCard } from "@/components/ProfileCard";
 
 // A client page (not the server-component-plus-notFound() pattern used by
 // /predictor/[team], which validates against a fixed, known team list) -
@@ -22,15 +15,13 @@ import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
 // has to be a real query, not a static param check. Kept around as a
 // direct/shareable URL (notifications, sharing a profile link outside the
 // app) - browsing from the leaderboard itself uses PlayerProfileModal's
-// popup instead, same content, no page navigation.
+// popup instead, which renders the same ProfileCard this page does.
 export default function PlayerPage() {
   const params = useParams<{ username: string }>();
   const { user } = useAuth();
   const [row, setRow] = useState<LeaderboardRow | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
-  const [levelModalOpen, setLevelModalOpen] = useState(false);
   const stats = usePlayerStats(row?.user_id);
-  const rankColor = row ? getLevelInfo(row.total_points).rankColor : undefined;
 
   useEffect(() => {
     fetchLeaderboardEntry(params.username)
@@ -56,67 +47,10 @@ export default function PlayerPage() {
           <p className="text-sm">No player found for &ldquo;{params.username}&rdquo;.</p>
         </div>
       ) : row ? (
-        <div className="flex flex-col items-center mt-10">
-          <div className="relative">
-            {row.avatar_url ? (
-              <img
-                src={row.avatar_url}
-                alt=""
-                className="h-28 w-28 rounded-full object-cover"
-                style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 10px -2px ${rankColor}` }}
-              />
-            ) : (
-              <span
-                className="h-28 w-28 rounded-full bg-white/10 flex items-center justify-center text-4xl"
-                style={{ boxShadow: `0 0 0 2px ${rankColor}, 0 0 10px -2px ${rankColor}` }}
-              >
-                {(row.display_name || row.username).charAt(0).toUpperCase()}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setLevelModalOpen(true)}
-              aria-label="View all levels"
-              className="absolute left-1/2 -bottom-2 w-max -translate-x-1/2 active:scale-95 transition-transform"
-            >
-              <LevelBadge totalPoints={row.total_points} size="sm" />
-            </button>
-          </div>
-          <h1 className="text-3xl text-center mt-4" style={{ fontFamily: "var(--font-display)" }}>
-            {row.display_name || row.username}
-          </h1>
-          <p className="text-white/45 text-sm mt-1">@{row.username}</p>
-          <PlayerBadges userId={row.user_id} />
-          <CreatorLinks userId={row.user_id} />
-
-          <div className="w-full mt-8 grid grid-cols-3 gap-2.5">
-            <StatTile icon="🔗" value={stats ? String(stats.referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" />
-            <StatTile icon="🔥" value="–" label="STREAK SOON" accentColor="rgba(255,255,255,0.35)" />
-            <StatTile icon="🏆" value={`${row.correct}-${row.graded - row.correct}`} label="SEASON" accentColor="#4ade80" />
-          </div>
-
-          <div className="w-full mt-5">
-            <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
-            <div className="flex flex-col gap-1.5">
-              <StatDetailRow icon="👀" label="Followers" value={stats ? String(stats.followerCount) : "–"} />
-              <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} />
-              <TeamsPredictedRow completedCount={stats?.completedTeamCount} completedAbbrs={stats?.completedTeamAbbrs} />
-              <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} />
-              <StatDetailRow icon="📅" label="Weeks completed" value={stats ? String(stats.completedWeekCount) : "–"} />
-            </div>
-          </div>
-
-          {/* Always visible, even signed out - clicking it while signed
-              out prompts sign-in instead of the button just disappearing. */}
-          {(!user || user.id !== row.user_id) && (
-            <div className="mt-6">
-              <FollowButton myId={user?.id} otherId={row.user_id} />
-            </div>
-          )}
+        <div className="mt-10">
+          <ProfileCard row={row} stats={stats} myId={user?.id} variant="page" />
         </div>
       ) : null}
-
-      {row && <LevelListModal open={levelModalOpen} totalPoints={row.total_points} onClose={() => setLevelModalOpen(false)} />}
     </main>
   );
 }

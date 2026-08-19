@@ -5,7 +5,21 @@ import Link from "next/link";
 import { fetchMyFriends, FriendRow } from "@/lib/supabase/follows";
 import { errorMessage } from "@/lib/errorMessage";
 
-export function FriendsListModal({ userId, open, onClose }: { userId: string; open: boolean; onClose: () => void }) {
+// Opened from your own account page and from anyone's profile (friends
+// is a public view, so the same read serves both). Copy stays neutral
+// for that reason; emptyHint carries the one piece of self-addressed
+// advice, passed only by the caller that knows the profile is yours.
+export function FriendsListModal({
+  userId,
+  open,
+  onClose,
+  emptyHint,
+}: {
+  userId: string;
+  open: boolean;
+  onClose: () => void;
+  emptyHint?: string;
+}) {
   const [friends, setFriends] = useState<FriendRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -17,7 +31,7 @@ export function FriendsListModal({ userId, open, onClose }: { userId: string; op
       .then(setFriends)
       .catch((err) => {
         console.error("Failed to load friends", errorMessage(err));
-        setError("Couldn't load your friends.");
+        setError("Couldn't load friends.");
       });
   }
 
@@ -84,7 +98,7 @@ export function FriendsListModal({ userId, open, onClose }: { userId: string; op
           ) : friends.length === 0 ? (
             <div className="text-center py-10 text-white/50">
               <div className="text-3xl mb-3">👥</div>
-              <p className="text-sm">No friends yet - add some from the leaderboard.</p>
+              <p className="text-sm">{emptyHint ?? "No friends yet."}</p>
             </div>
           ) : filtered && filtered.length === 0 ? (
             <p className="text-center py-10 text-sm text-white/40">No friends match &ldquo;{query}&rdquo;.</p>

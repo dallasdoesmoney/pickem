@@ -5,6 +5,9 @@ import Link from "next/link";
 import { fetchMyFollowers, FollowerRow } from "@/lib/supabase/follows";
 import { errorMessage } from "@/lib/errorMessage";
 
+// Opened from your own account page and from anyone's profile, so the
+// copy in here stays neutral - the reads behind it (follows plus the
+// public leaderboard view) work the same either way.
 export function FollowersListModal({ userId, open, onClose }: { userId: string; open: boolean; onClose: () => void }) {
   const [followers, setFollowers] = useState<FollowerRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +20,7 @@ export function FollowersListModal({ userId, open, onClose }: { userId: string; 
       .then(setFollowers)
       .catch((err) => {
         console.error("Failed to load followers", errorMessage(err));
-        setError("Couldn't load your followers.");
+        setError("Couldn't load followers.");
       });
   }
 
