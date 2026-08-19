@@ -96,8 +96,10 @@ export type TierListAction =
   | { type: "setTitle"; title: string }
   | { type: "shuffleUnranked" }
   // Two different kinds of starting over. Clearing empties the board but
-  // keeps the tiers you set up; resetting settings puts the tiers back to
-  // stock but keeps your ranking wherever it still has somewhere to go.
+  // keeps everything you set up; resetting puts the tiers AND the heading
+  // back to stock while keeping your ranking wherever it still has
+  // somewhere to go. The heading is part of the setup, so a reset that
+  // left it renamed would only be a partial one.
   | { type: "clearBoard"; template: TierTemplate }
   | { type: "resetTiers"; template: TierTemplate }
   | { type: "load"; state: TierListState };
@@ -215,7 +217,17 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
         if (i < tiers.length) placements[tiers[i].id] = [...ids];
         else displaced.push(...ids);
       });
-      return { ...state, tiers, placements, unranked: [...state.unranked, ...displaced] };
+      return {
+        ...state,
+        // The heading goes back with the tiers - it's a customisation too.
+        // The list's own saved NAME is untouched: that lives on the row,
+        // not in here, and resetting a board shouldn't rename the list it
+        // belongs to.
+        title: action.template.defaultListTitle,
+        tiers,
+        placements,
+        unranked: [...state.unranked, ...displaced],
+      };
     }
 
     case "load":

@@ -431,7 +431,15 @@ export default function TierListPageClient({
     const warning = extra
       ? ` The ${template.itemNoun[1]} in your ${extra} extra ${extra === 1 ? "tier" : "tiers"} go back to Unranked.`
       : "";
-    if (!(await confirm(`Put the tiers back to S through F? Your ranking is kept.${warning}`, "RESET TIERS"))) return;
+    const renamed = listTitleFor(state, template) !== template.defaultListTitle;
+    const titleNote = renamed ? " The heading goes back to its default too." : "";
+    if (
+      !(await confirm(
+        `Put the tiers back to S through F? Your ranking is kept.${titleNote}${warning}`,
+        "RESET TIERS",
+      ))
+    )
+      return;
     dispatch({ type: "resetTiers", template });
     posthog.capture("tier_list_tiers_reset", { template: template.slug });
   }
