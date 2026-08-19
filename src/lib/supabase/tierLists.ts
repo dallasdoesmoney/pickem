@@ -9,13 +9,17 @@ export type SavedTierList = {
   updated_at: string;
 };
 
-// Row shape for the index, which lists lists - it never needs the state
-// blob, and that blob is by far the biggest column in the table.
+// Row shape for the index. It carries `state` because each saved list is
+// shown as a thumbnail of its own board, and the colours and placements
+// that thumbnail draws live in the blob. That blob is the biggest column
+// in the table, so this is a deliberate cost: a few KB per list, and only
+// on a page whose whole job is showing them.
 export type SavedTierListSummary = {
   id: string;
   template: string;
   title: string;
   updated_at: string;
+  state: TierListState;
 };
 
 // Every saved list the signed-in user has, newest touched first. Covered
@@ -23,7 +27,7 @@ export type SavedTierListSummary = {
 export async function listMyTierLists(userId: string): Promise<SavedTierListSummary[]> {
   const { data, error } = await supabase
     .from("tier_lists")
-    .select("id, template, title, updated_at")
+    .select("id, template, title, updated_at, state")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
   if (error) throw error;

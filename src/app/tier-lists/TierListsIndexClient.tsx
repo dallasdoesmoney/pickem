@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { TierTemplate, getTierTemplate } from "@/data/tierTemplates";
+import { TierItem, TierTemplate, getTierTemplate, resolveItem } from "@/data/tierTemplates";
+import { TierListState, rankedCount } from "@/lib/tierList";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
-import { MenuIcon, TierListMenu } from "@/components/tierList/TierListMenu";
 import { SavedTierListSummary, deleteTierList, listMyTierLists } from "@/lib/supabase/tierLists";
 
+type Tab = "all" | "mine";
+
 // Coarse on purpose: "when did I last touch this" only needs to be right
-// to the day, and an exact timestamp reads as clutter in a menu row.
+// to the day, and an exact timestamp reads as clutter on a card.
 function whenTouched(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
@@ -28,20 +30,207 @@ function matches(haystack: string, query: string): boolean {
   return haystack.toLowerCase().includes(query.trim().toLowerCase());
 }
 
+// A mark, falling back to a plain tile rather than a broken image - these
+// are remote, and a card full of broken icons is worse than a card of
+// blanks.
+function Mark({ item, size }: { item: TierItem; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed || !item.imageUrl) {
+    return (
+      <span
+        aria-hidden
+        className="shrink-0 rounded-[4px]"
+        style={{ width: size, height: size, background: item.accent, opacity: 0.85 }}
+      />
+    );
+  }
+  return (
+    <img
+      src={item.imageUrl}
+      alt=""
+      loading="lazy"
+      onError={() => setFailed(true)}
+      crossOrigin="anonymous"
+      className="shrink-0 object-contain"
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
+// A saved list's own board, shrunk to card art. The colours ARE the
+// preview - you recognise your list by its shape long before you read the
+// name, which is the whole reason the index carries the state blob.
+function BoardThumb({ state, template }: { state: TierListState; template: TierTemplate }) {
+  const rows = state.tiers.slice(0, 5);
+  return (
+    <div className="rounded-lg overflow-hidden bg-black">
+      {rows.map((tier, i) => {
+        const ids = (state.placements[tier.id] ?? []).slice(0, 9);
+        return (
+          <div
+            key={tier.id}
+            className="flex items-stretch"
+            style={{ borderTop: i === 0 ? undefined : "1px solid rgba(255,255,255,0.09)" }}
+          >
+            <span
+              className="shrink-0"
+              style={{
+                width: 16,
+                background: tier.accent,
+                clipPath: "polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%)",
+              }}
+            />
+            <span className="flex-1 min-w-0 flex flex-wrap gap-1 p-1.5 content-start" style={{ minHeight: 22 }}>
+              {ids.map((id) => (
+                <Mark key={id} item={resolveItem(template, id)} size={14} />
+              ))}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// One result is a feature, not a lonely tile in a grid built for nine.
+// With a single category today, the grid left one small card top-left and
+// acres of nothing; laid out wide it reads as a deliberate hero instead.
+function WideTemplateCard({ template }: { template: TierTemplate }) {
+  const marks = template.items.slice(0, 16);
+  return (
+    <Link
+      href={`/tier-lists/${template.slug}`}
+      className="group flex flex-col rounded-2xl border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/35"
+    >
+      <span className="h-[5px] shrink-0 bg-gradient-to-r from-[#f472b6] via-[#fb923c] to-[#a3e635]" />
+      <span className="flex flex-wrap items-center gap-x-8 gap-y-5 p-6">
+        <span className="flex flex-col gap-2 min-w-[210px] flex-1">
+          <span className="text-lg" style={{ fontFamily: "var(--font-display)" }}>
+            {template.title.toUpperCase()}
+          </span>
+          <span className="text-sm text-white/50">{template.tagline}</span>
+          <span
+            className="mt-2 self-start rounded-full px-5 py-2.5 text-sm"
+            style={{
+              fontFamily: "var(--font-display)",
+              background: "linear-gradient(135deg, #4ade80, #22c55e)",
+              color: "#0e1b33",
+            }}
+          >
+            START RANKING
+          </span>
+        </span>
+        <span className="flex flex-wrap gap-2 content-start flex-1 min-w-[220px] justify-end">
+          {marks.map((item) => (
+            <Mark key={item.id} item={item} size={38} />
+          ))}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+const CARD =
+  "group flex flex-col rounded-2xl border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/35";
+
+function TemplateCard({ template }: { template: TierTemplate }) {
+  // The item set is the card art: a category is best explained by what is
+  // in it.
+  const marks = template.items.slice(0, 12);
+  return (
+    <Link href={`/tier-lists/${template.slug}`} className={CARD}>
+      <span className="flex flex-wrap gap-1.5 p-3 pb-2 content-start" style={{ minHeight: 76 }}>
+        {marks.map((item) => (
+          <Mark key={item.id} item={item} size={26} />
+        ))}
+      </span>
+      <span className="h-[5px] shrink-0 bg-gradient-to-r from-[#f472b6] via-[#fb923c] to-[#a3e635]" />
+      <span className="flex flex-col gap-1 p-4">
+        <span className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+          {template.title.toUpperCase()}
+        </span>
+        <span className="text-xs text-white/45">{template.tagline}</span>
+        <span
+          className="text-[10px] tracking-[0.14em] text-white/35 mt-1"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {template.items.length} {template.itemNoun[1].toUpperCase()}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+function SavedCard({
+  row,
+  template,
+  busy,
+  onDelete,
+}: {
+  row: SavedTierListSummary;
+  template: TierTemplate | null;
+  busy: boolean;
+  onDelete: () => void;
+}) {
+  const ranked = template ? rankedCount(row.state) : 0;
+  const total = template?.items.length ?? 0;
+  return (
+    <div className={CARD}>
+      <Link href={`/tier-lists/${row.template}?id=${row.id}`} className="flex flex-col">
+        <span className="p-3 pb-0">
+          {template ? (
+            <BoardThumb state={row.state} template={template} />
+          ) : (
+            <span className="block rounded-lg bg-black/60" style={{ height: 76 }} />
+          )}
+        </span>
+        <span className="flex flex-col gap-1 p-4 pb-3">
+          <span className="text-sm truncate" style={{ fontFamily: "var(--font-display)" }}>
+            {row.title.toUpperCase()}
+          </span>
+          <span className="text-xs text-white/45 truncate">
+            {/* A list whose category no longer exists still has to render,
+                so fall back to the slug. */}
+            {template?.title ?? row.template} &middot; saved {whenTouched(row.updated_at)}
+          </span>
+        </span>
+      </Link>
+      <div className="flex items-center justify-between gap-2 px-4 pb-3 mt-auto">
+        <span
+          className="text-[10px] tracking-[0.14em] text-white/35"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {total ? `${ranked}/${total} RANKED` : ""}
+        </span>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={busy}
+          aria-label={`Delete ${row.title}`}
+          className="shrink-0 h-8 w-8 rounded-full text-white/35 hover:text-red-300 hover:bg-red-300/10 flex items-center justify-center transition-colors disabled:opacity-40"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 7h16" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M6 7l1 13h10l1-13" />
+            <path d="M9 7V4h6v3" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function TierListsIndexClient({ templates }: { templates: TierTemplate[] }) {
   const { user, loading: authLoading } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
   const { confirm, dialog } = useConfirmDialog();
 
+  const [tab, setTab] = useState<Tab>("all");
+  const [query, setQuery] = useState("");
   const [saved, setSaved] = useState<SavedTierListSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-
-  // Only one menu open at a time - two overlapping panels anchored to
-  // adjacent buttons would sit on top of each other.
-  const [openMenu, setOpenMenu] = useState<"start" | "saved" | null>(null);
-  const [startQuery, setStartQuery] = useState("");
-  const [savedQuery, setSavedQuery] = useState("");
 
   const load = useCallback(async (userId: string) => {
     try {
@@ -64,21 +253,18 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
   }, [user, load]);
 
   const shownTemplates = useMemo(
-    () => (startQuery ? templates.filter((t) => matches(`${t.title} ${t.tagline}`, startQuery)) : templates),
-    [templates, startQuery],
+    () => (query ? templates.filter((t) => matches(`${t.title} ${t.tagline}`, query)) : templates),
+    [templates, query],
   );
 
   const shownSaved = useMemo(() => {
     const rows = saved ?? [];
-    if (!savedQuery) return rows;
-    return rows.filter((r) => matches(`${r.title} ${getTierTemplate(r.template)?.title ?? r.template}`, savedQuery));
-  }, [saved, savedQuery]);
+    if (!query) return rows;
+    return rows.filter((r) => matches(`${r.title} ${getTierTemplate(r.template)?.title ?? r.template}`, query));
+  }, [saved, query]);
 
   async function handleDelete(row: SavedTierListSummary) {
     if (!user) return;
-    // Close first: the confirm dialog renders outside the panel, so the
-    // menu's own outside-click would tear it down mid-question anyway.
-    setOpenMenu(null);
     const ok = await confirm(`Delete "${row.title}"? This can't be undone.`, "DELETE");
     if (!ok) return;
     setBusyId(row.id);
@@ -92,10 +278,11 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
   }
 
   const savedCount = saved?.length ?? null;
+  const grid = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
 
   return (
-    <main className="flex-1 px-4 pb-16 pt-8 max-w-3xl w-full mx-auto">
-      <header className="text-center mb-8">
+    <main className="flex-1 px-4 pb-16 pt-8 max-w-5xl w-full mx-auto">
+      <header className="text-center mb-7">
         <div className="text-xs text-white/45 tracking-[0.25em] mb-1.5">SIDELINE BREW</div>
         <h1
           className="text-[clamp(1.75rem,7vw,3rem)] leading-none tracking-wide"
@@ -106,128 +293,141 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
         <p className="text-sm text-white/50 mt-3">Rank it, name it, argue about it.</p>
       </header>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <TierListMenu
-          label="TIER LISTS"
-          open={openMenu === "start"}
-          onOpenChange={(next) => {
-            setOpenMenu(next ? "start" : null);
-            if (!next) setStartQuery("");
-          }}
-          query={startQuery}
-          onQueryChange={setStartQuery}
-          searchPlaceholder="Search tier lists"
+      {/* Search above the toggle: it narrows whichever set you're looking
+          at, so it belongs to the page rather than to either tab. */}
+      <div className="relative mb-4">
+        <svg
+          viewBox="0 0 24 24"
+          className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/35 pointer-events-none"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.2}
+          strokeLinecap="round"
         >
-          {shownTemplates.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-white/45 text-center">Nothing matches that.</p>
-          ) : (
-            shownTemplates.map((t) => (
-              <Link
-                key={t.slug}
-                href={`/tier-lists/${t.slug}`}
-                role="menuitem"
-                onClick={() => setOpenMenu(null)}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/5 transition-colors"
-              >
-                <MenuIcon src={t.icon} />
-                <span className="min-w-0">
-                  <span className="block text-sm truncate" style={{ fontFamily: "var(--font-display)" }}>
-                    {t.title.toUpperCase()}
-                  </span>
-                  <span className="block text-xs text-white/45 truncate">{t.tagline}</span>
-                </span>
-              </Link>
-            ))
-          )}
-        </TierListMenu>
-
-        <TierListMenu
-          label="MY TIER LISTS"
-          badge={savedCount}
-          open={openMenu === "saved"}
-          onOpenChange={(next) => {
-            setOpenMenu(next ? "saved" : null);
-            if (!next) setSavedQuery("");
-          }}
-          // Only once there is something to search: the panel otherwise
-          // holds a sign-in prompt or an empty state, and a filter box
-          // above either of those is a control that can do nothing.
-          query={user && (saved?.length ?? 0) > 0 ? savedQuery : undefined}
-          onQueryChange={user && (saved?.length ?? 0) > 0 ? setSavedQuery : undefined}
-          searchPlaceholder="Search your lists"
-        >
-          {authLoading || (user && saved === null) ? (
-            <div className="flex justify-center py-6">
-              <span className="h-5 w-5 rounded-full border-2 border-white/25 border-t-white animate-spin" />
-            </div>
-          ) : !user ? (
-            <div className="px-3 py-4 text-center">
-              <p className="text-sm text-white/60">Sign in to save tier lists and pick them back up later.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenMenu(null);
-                  requestSignIn();
-                }}
-                className="mt-3 rounded-full px-5 py-2 text-sm active:scale-95 transition-transform duration-150"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  background: "linear-gradient(135deg, #34d399, #059669)",
-                  color: "#ffffff",
-                }}
-              >
-                SIGN IN
-              </button>
-            </div>
-          ) : shownSaved.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-white/45 text-center">
-              {savedQuery ? "Nothing matches that." : "Nothing saved yet. Build one and hit Save."}
-            </p>
-          ) : (
-            shownSaved.map((row) => {
-              const template = getTierTemplate(row.template);
-              return (
-                <div key={row.id} className="flex items-center gap-1 rounded-xl hover:bg-white/5 transition-colors">
-                  <Link
-                    href={`/tier-lists/${row.template}?id=${row.id}`}
-                    role="menuitem"
-                    onClick={() => setOpenMenu(null)}
-                    className="flex items-center gap-3 px-3 py-2.5 min-w-0 flex-1"
-                  >
-                    <MenuIcon src={template?.icon} />
-                    <span className="min-w-0">
-                      <span className="block text-sm truncate" style={{ fontFamily: "var(--font-display)" }}>
-                        {row.title.toUpperCase()}
-                      </span>
-                      <span className="block text-xs text-white/45 truncate">
-                        {/* A saved list whose category no longer exists
-                            still has to render, so fall back to the slug. */}
-                        {template?.title ?? row.template} &middot; saved {whenTouched(row.updated_at)}
-                      </span>
-                    </span>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(row)}
-                    disabled={busyId === row.id}
-                    aria-label={`Delete ${row.title}`}
-                    className="shrink-0 mr-2 h-8 w-8 rounded-full text-white/40 hover:text-red-300 hover:bg-red-300/10 flex items-center justify-center transition-colors disabled:opacity-40"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 7h16" />
-                      <path d="M10 11v6M14 11v6" />
-                      <path d="M6 7l1 13h10l1-13" />
-                      <path d="M9 7V4h6v3" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </TierListMenu>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-3.5-3.5" />
+        </svg>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search tier lists"
+          aria-label="Search tier lists"
+          // 16px: iOS zooms the page when you focus anything smaller.
+          className="w-full rounded-full border border-white/15 bg-white/5 pl-11 pr-11 py-3 text-base text-white placeholder:text-white/35 outline-none focus:border-white/40 transition-colors"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-white/45 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
+              <path d="M6 6l12 12" />
+              <path d="M18 6L6 18" />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {loadError && <p className="text-xs text-red-400 mt-4 text-center">{loadError}</p>}
+      {/* Two tabs, one rail. A segmented control rather than a dropdown:
+          there are exactly two sets and both deserve to be visible. */}
+      <div className="flex p-1 rounded-full border border-white/15 bg-white/5 mb-6" role="tablist">
+        {([
+          ["all", "ALL TIER LISTS", shownTemplates.length],
+          ["mine", "MY TIER LISTS", savedCount],
+        ] as const).map(([id, label, count]) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(id)}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-full py-2.5 text-xs sm:text-sm transition-colors ${
+                active ? "bg-white/12 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28)]" : "text-white/50 hover:text-white"
+              }`}
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              <span className="truncate">{label}</span>
+              {typeof count === "number" && (
+                <span
+                  className={`shrink-0 rounded-full px-1.5 text-[10px] ${
+                    active ? "bg-white/20 text-white" : "bg-white/10 text-white/50"
+                  }`}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "all" ? (
+        shownTemplates.length === 0 ? (
+          <p className="text-sm text-white/45 text-center py-14">Nothing matches &ldquo;{query}&rdquo;.</p>
+        ) : shownTemplates.length === 1 ? (
+          <WideTemplateCard template={shownTemplates[0]} />
+        ) : (
+          <div className={grid}>
+            {shownTemplates.map((t) => (
+              <TemplateCard key={t.slug} template={t} />
+            ))}
+          </div>
+        )
+      ) : authLoading || (user && saved === null) ? (
+        <div className="flex justify-center py-14">
+          <span className="h-6 w-6 rounded-full border-2 border-white/25 border-t-white animate-spin" />
+        </div>
+      ) : !user ? (
+        <div className="rounded-2xl border border-white/15 bg-[#0b1730] p-8 text-center">
+          <p className="text-sm text-white/60">Sign in to save tier lists and pick them back up later.</p>
+          <button
+            type="button"
+            onClick={() => requestSignIn()}
+            className="mt-4 rounded-full px-6 py-2.5 text-sm active:scale-95 transition-transform duration-150"
+            style={{
+              fontFamily: "var(--font-display)",
+              background: "linear-gradient(135deg, #34d399, #059669)",
+              color: "#ffffff",
+            }}
+          >
+            SIGN IN
+          </button>
+        </div>
+      ) : shownSaved.length === 0 ? (
+        <div className="rounded-2xl border border-white/15 bg-[#0b1730] p-8 text-center flex flex-col items-center gap-4">
+          <p className="text-sm text-white/60">
+            {query ? `Nothing matches “${query}”.` : "Nothing saved yet. Build one and hit Save."}
+          </p>
+          {!query && (
+            <button
+              type="button"
+              onClick={() => setTab("all")}
+              className="rounded-full px-6 py-2.5 text-sm border border-white/20 hover:border-white/40 text-white/70 hover:text-white transition-colors"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              BROWSE TIER LISTS
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className={grid}>
+          {shownSaved.map((row) => (
+            <SavedCard
+              key={row.id}
+              row={row}
+              template={getTierTemplate(row.template)}
+              busy={busyId === row.id}
+              onDelete={() => handleDelete(row)}
+            />
+          ))}
+        </div>
+      )}
+
+      {loadError && <p className="text-xs text-red-400 mt-5 text-center">{loadError}</p>}
 
       {signInModal}
       {dialog}
