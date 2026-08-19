@@ -150,16 +150,31 @@ export default function TierListPageClient({
   // Solve chip size from real available width so two columns of logos
   // never overflow a 320px phone.
   const { chipSize, railWidth } = useMemo(() => {
-    const content = Math.min(viewportWidth, 896) - 32;
+    // 976 is the board's max width (max-w-[61rem] on the main below) and
+    // is chosen, not rounded to: at a 74px chip it leaves a track that
+    // holds exactly ten marks with ~16px to spare - the same comfortable
+    // margin the nine-across board used to have. Widening further would
+    // only add dead black to the right of every row, since the chip is
+    // capped and stops growing to meet it.
+    const content = Math.min(viewportWidth, 976) - 32;
     // The rail got wider to give tier names room, but a phone can't spare
     // it - a fixed 92 there would have cost the logos more than the label
     // gained.
     const base = viewportWidth < 768 ? 78 : 118;
     const track = content - base - 16;
-    const perRow = viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : 8;
+    // Ten across only once the board is actually wide enough to hold ten
+    // full-size marks. Widening to ten at the 768 breakpoint would have
+    // paid for the extra columns out of the chip - a 13" laptop would have
+    // dropped from a 70px logo to about 54 - so the tenth column waits for
+    // the width that can afford it.
+    const perRow =
+      viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : viewportWidth < 976 ? 8 : 10;
     const size = Math.floor((track - (perRow - 1) * 6) / perRow);
     // Desktop earns a bigger mark than the old 58px cap allowed - this
     // page IS the logos, so they should be what you actually look at.
+    // Don't raise this without re-measuring: the rail width below is
+    // derived from the chip, so a bigger chip widens the rail, which eats
+    // the very track the chips need and can cost a whole column.
     const chip = Math.max(34, Math.min(74, size));
     // The chevron has to read as a landscape tab, not a square - a name
     // like "SHOULD BE FIRED" needs horizontal room, and a rail narrower
@@ -493,7 +508,7 @@ export default function TierListPageClient({
 
   if (!loaded) {
     return (
-      <main className="flex-1 px-4 pb-16 pt-10 max-w-4xl w-full mx-auto">
+      <main className="flex-1 px-4 pb-16 pt-10 max-w-[61rem] w-full mx-auto">
         <div className="flex justify-center pt-16">
           <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
         </div>
@@ -501,8 +516,11 @@ export default function TierListPageClient({
     );
   }
 
+  // max-w-[61rem] is 976px, and the chip solver above hardcodes that same
+  // 976 as its ceiling and as its ten-across breakpoint - all three have
+  // to move together or the board stops holding exactly ten.
   return (
-    <main className="flex-1 px-4 pb-16 pt-5 max-w-4xl w-full mx-auto">
+    <main className="flex-1 px-4 pb-16 pt-5 max-w-[61rem] w-full mx-auto">
       {/* Scrolls away - it's brand dressing, not something you need while
           you're working. */}
       <div className="text-center text-xs text-white/45 tracking-[0.25em] mb-1.5">SIDELINE BREW &middot; TIER LIST</div>

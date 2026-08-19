@@ -35,12 +35,20 @@ export type TierShareParams = {
   authorLabel?: string | null;
 };
 
-// Fixed to match the live board rather than solved from the widest row.
-// Solving meant a tier holding 20 teams squeezed all 20 onto one line and
-// every other tier inherited those tiny logos - the exported image looked
-// nothing like the page it came from. Now the marks are a constant size
-// and long tiers wrap, exactly like the site, so what you share is what
-// you built.
+// Fixed rather than solved from the widest row. Solving meant a tier
+// holding 20 teams squeezed all 20 onto one line and every other tier
+// inherited those tiny logos - the exported image looked nothing like the
+// page it came from. A constant mark size with long tiers wrapping is the
+// behaviour that reads as "the list you built".
+//
+// These deliberately do NOT track the live board's column count. The board
+// is responsive (5/7/8/10 across depending on viewport) and the card is one
+// fixed 840px composition, so it can only ever match one viewport; it is
+// held at 840 to stay the same width as the picks and predictor cards, so
+// all three read as one family in a feed. Widening it to carry the desktop
+// board's ten columns at this chip size would take ~992px and break that.
+// Consequence to know about: a tier of ten sits on one line on a desktop
+// board and wraps to two here.
 const CHIP = 72;
 const PER_ROW = 8;
 
