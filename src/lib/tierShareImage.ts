@@ -238,13 +238,21 @@ function drawRow(
   ctx.fillStyle = o.muted ? "rgba(255,255,255,0.10)" : o.accent;
   ctx.fill();
 
-  const n = o.label.length;
-  const labelSize = n <= 2 ? 34 : n <= 5 ? 21 : n <= 9 ? 16 : 13;
-  ctx.font = `${labelSize}px ${displayFont}`;
+  // The rail wraps rather than ellipsising. A name is the whole point of
+  // renaming a tier, and on one line "SUPER BOWL CONTENDER" was shrunk to
+  // "SUPER BO…" - the card showed the ranking but not what it meant. The
+  // widest usable width is `point`, not RAIL_W: the chevron only reaches
+  // its full width at the vertical middle, so text sized to RAIL_W would
+  // spill out of the taper on the first and last lines.
+  const { size: labelSize, lines: labelLines } = layoutRailLabel(ctx, o.label, displayFont, point - 14);
   ctx.fillStyle = o.muted ? "rgba(255,255,255,0.45)" : "#0c1830";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(fitText(ctx, o.label, point - 14), o.x + point / 2, o.y + o.h / 2);
+  const lineH = labelSize * 1.12;
+  const firstY = o.y + o.h / 2 - ((labelLines.length - 1) * lineH) / 2;
+  labelLines.forEach((line, i) => {
+    ctx.fillText(line, o.x + point / 2, firstY + i * lineH);
+  });
 
   ctx.textBaseline = "alphabetic";
   const startX = o.x + RAIL_W + ROW_PAD;
@@ -262,8 +270,67 @@ function drawRow(
   });
 }
 
+// As many lines as the rail can hold before the type gets too small to
+// read at a glance. The board allows the same three.
+const RAIL_LABEL_MAX_LINES = 3;
+const RAIL_LABEL_MIN_PX = 9;
+
+// Greedy wrap at spaces. A single word longer than the line is left to
+// overflow here; the caller steps the type down until it stops doing so.
+function wrapWords(ctx: CanvasRenderingContext2D, words: string[], maxWidth: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (!line || ctx.measureText(next).width <= maxWidth) {
+      line = next;
+      continue;
+    }
+    lines.push(line);
+    line = word;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// Picks the largest size at which the name both wraps inside the line
+// budget AND has no single word too wide to wrap (wrapping can't rescue
+// one long word - only a smaller size can). Measured against the real
+// font rather than estimated from character counts, which is what the
+// old length-banded size did and why long names overflowed.
+function layoutRailLabel(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  displayFont: string,
+  maxWidth: number,
+): { size: number; lines: string[] } {
+  const n = label.length;
+  const band = n <= 2 ? 34 : n <= 5 ? 21 : n <= 9 ? 16 : n <= 14 ? 15 : n <= 22 ? 14 : 13;
+  const words = label.split(/\s+/).filter(Boolean);
+  if (!words.length) return { size: band, lines: [] };
+
+  let size = band;
+  let lines = words;
+  for (; size > RAIL_LABEL_MIN_PX; size -= 1) {
+    ctx.font = `${size}px ${displayFont}`;
+    lines = wrapWords(ctx, words, maxWidth);
+    const everyWordFits = words.every((w) => ctx.measureText(w).width <= maxWidth);
+    if (everyWordFits && lines.length <= RAIL_LABEL_MAX_LINES) break;
+  }
+  ctx.font = `${size}px ${displayFont}`;
+
+  // Only reachable if a name won't fit even at the floor, in which case
+  // showing most of it beats showing none of the last line.
+  if (lines.length > RAIL_LABEL_MAX_LINES) {
+    lines = lines.slice(0, RAIL_LABEL_MAX_LINES);
+    const last = RAIL_LABEL_MAX_LINES - 1;
+    lines[last] = fitText(ctx, `${lines[last]} …`, maxWidth);
+  }
+  return { size, lines: lines.map((l) => fitText(ctx, l, maxWidth)) };
+}
+
 // Shrinks a string until it fits, then ellipsises - a 60-char custom
-// title or a 14-char tier label must not run past the canvas edge.
+// title must not run past the canvas edge.
 function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
   let out = text;
