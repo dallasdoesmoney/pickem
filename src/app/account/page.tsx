@@ -84,7 +84,22 @@ function SignedInAccount({
 
   return (
     <main className="flex-1 px-4 pb-16 pt-10 max-w-md w-full mx-auto">
-      <div className="flex flex-col items-center">
+      {/* The identity block used to sit straight on the page, so the tiled
+          watermark ran behind the avatar and the name. It gets a surface
+          of its own now, washed with the player's own rank colour where
+          there is one, so the profile reads as a card rather than as text
+          floating over the wallpaper. */}
+      <div className="relative overflow-hidden rounded-3xl border border-white/12 bg-[#101d38] px-6 pt-8 pb-6">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-36"
+          style={{
+            background: `radial-gradient(130% 100% at 50% 0%, ${
+              myRecord ? `${getLevelInfo(myRecord.total_points).rankColor}2b` : "rgba(255,255,255,0.10)"
+            }, transparent 72%)`,
+          }}
+        />
+        <div className="relative flex flex-col items-center">
         <div className="relative">
           {authProfile?.avatar_url ? (
             <img
@@ -137,6 +152,7 @@ function SignedInAccount({
           </svg>
           EDIT PROFILE
         </button>
+        </div>
       </div>
 
       {/* Season record used to headline here as its own pill, but it's
@@ -172,7 +188,7 @@ function SignedInAccount({
           replaces the old standalone "MY REFERRALS" card - the
           Referrals tile below is the one entry point into that list now. */}
       {myRecord && (
-        <div className="mt-6 flex flex-col gap-3">
+        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#0b1730] p-4">
           <div className="text-[10px] text-white/45 tracking-[0.15em] mb-1">PICK&rsquo;EM</div>
           <div className="grid grid-cols-3 gap-2">
             <StatTile icon="🔗" value={stats ? String(stats.referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" onClick={() => setReferralsOpen(true)} />
