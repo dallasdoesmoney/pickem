@@ -462,11 +462,12 @@ export default function TierListPageClient({
         }}
         onDragEnd={handleDragEnd}
       >
-        {/* Solid panel behind the whole board. The site paints a tiled
-            logo watermark at the page level, and letting it show through
-            the tier rows made the list read as a translucent overlay
-            rather than the thing you're actually working on. */}
-        <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-[#101f3d] p-2">
+        {/* One solid block, not six cards. Rows sit flush against each
+            other and this clips the outer corners, so the chevrons form a
+            single continuous column and the board reads as one object.
+            Opaque black also stops the page's tiled logo watermark showing
+            through the rows. */}
+        <div className="flex flex-col rounded-2xl border border-white/10 overflow-hidden bg-black">
           {state.tiers.map((tier, i) => (
             <TierRow
               key={tier.id}
@@ -476,6 +477,7 @@ export default function TierListPageClient({
               template={template}
               chipSize={chipSize}
               railWidth={railWidth}
+              first={i === 0}
               editing={editing}
               selectedItemId={selectedId}
               landedItemId={landedId}
@@ -688,10 +690,11 @@ function UnrankedPool({
         style={{
           minHeight: chipSize + 20,
           borderColor: hot ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.10)",
-          // Opaque, same as the tier board above it. Lifts on drag-over
-          // exactly like a tier row does, so dropping a team back out
-          // feels like the same gesture in reverse.
-          background: hot ? "#16294d" : "#101f3d",
+          // Same black as the board above it, so the pool reads as part
+          // of the same surface. Lifts on drag-over exactly like a tier
+          // row does, so dropping a team back out is the same gesture in
+          // reverse.
+          background: hot ? "#141414" : "#000000",
           boxShadow: hot ? "0 0 0 2px rgba(255,255,255,0.5), 0 10px 30px -12px rgba(0,0,0,0.9)" : undefined,
           cursor: selectedItemId ? "pointer" : undefined,
         }}

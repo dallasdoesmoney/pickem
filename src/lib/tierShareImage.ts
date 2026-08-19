@@ -20,7 +20,8 @@ const HEADER_TITLE_GAP = 10;
 const HEADER_META_PX = 15;
 
 const RAIL_W = 118;
-const ROW_GAP = 12;
+// Rows butt straight into each other now - the board is one block.
+const ROW_GAP = 0;
 const ROW_PAD = 10;
 const CHIP_GAP = 6;
 const ROW_RADIUS = 18;
@@ -120,6 +121,18 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
 
   ctx.textAlign = "left";
 
+  // The board is a single rounded black block; rows are drawn inside one
+  // clip so the top and bottom chevrons get their outer corners cut by it,
+  // exactly like the live board.
+  const boardH = rows.reduce((h, r) => h + rowHeight(r.ids.length, chip, perRow), 0);
+  const boardR = { tl: ROW_RADIUS, tr: ROW_RADIUS, br: ROW_RADIUS, bl: ROW_RADIUS };
+  roundRectPath(ctx, PAD_X, cursorY, WIDTH - PAD_X * 2, boardH, boardR);
+  ctx.fillStyle = "#000000";
+  ctx.fill();
+
+  ctx.save();
+  roundRectPath(ctx, PAD_X, cursorY, WIDTH - PAD_X * 2, boardH, boardR);
+  ctx.clip();
   for (const [i, row] of rows.entries()) {
     const h = rowHeight(row.ids.length, chip, perRow);
     drawRow(ctx, displayFont, {
@@ -132,9 +145,17 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
       chip,
       perRow,
       logos,
+      first: i === 0,
     });
-    cursorY += h + ROW_GAP;
+    cursorY += h;
   }
+  ctx.restore();
+
+  roundRectPath(ctx, PAD_X, cursorY - boardH, WIDTH - PAD_X * 2, boardH, boardR);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.stroke();
+  cursorY += 14;
 
   if (showUnranked) {
     ctx.textAlign = "left";
@@ -179,26 +200,26 @@ function drawRow(
     perRow: number;
     logos: Map<string, HTMLImageElement | null>;
     muted?: boolean;
+    first?: boolean;
   }
 ) {
   const w = WIDTH - PAD_X * 2;
-  const r = { tl: ROW_RADIUS, tr: ROW_RADIUS, br: ROW_RADIUS, bl: ROW_RADIUS };
 
-  // Row well, matching the site's inset-on-panel treatment.
-  roundRectPath(ctx, o.x, o.y, w, o.h, r);
-  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.03)" : "#0c1830";
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = o.muted ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.08)";
-  ctx.stroke();
+  if (o.muted) {
+    roundRectPath(ctx, o.x, o.y, w, o.h, { tl: ROW_RADIUS, tr: ROW_RADIUS, br: ROW_RADIUS, bl: ROW_RADIUS });
+    ctx.fillStyle = "#000000";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.stroke();
+  } else if (!o.first) {
+    // Hairline is the only thing separating one tier from the next.
+    ctx.fillStyle = "rgba(255,255,255,0.09)";
+    ctx.fillRect(o.x, o.y, w, 1);
+  }
 
-  // Chevron rail: solid accent, dark type, point on the right - the same
-  // shape the live rows use. Clipped to the row so the left corners stay
-  // rounded with it.
+  // Chevron rail: solid accent, dark type, point on the right.
   const point = RAIL_W * 0.84;
-  ctx.save();
-  roundRectPath(ctx, o.x, o.y, w, o.h, r);
-  ctx.clip();
   ctx.beginPath();
   ctx.moveTo(o.x, o.y);
   ctx.lineTo(o.x + point, o.y);
@@ -208,10 +229,7 @@ function drawRow(
   ctx.closePath();
   ctx.fillStyle = o.muted ? "rgba(255,255,255,0.10)" : o.accent;
   ctx.fill();
-  ctx.restore();
 
-  // Same banding as the live rail so a renamed tier reads identically in
-  // both places.
   const n = o.label.length;
   const labelSize = n <= 2 ? 34 : n <= 5 ? 21 : n <= 9 ? 16 : 13;
   ctx.font = `${labelSize}px ${displayFont}`;

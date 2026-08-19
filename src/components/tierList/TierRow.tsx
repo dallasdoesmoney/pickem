@@ -13,6 +13,7 @@ export function TierRow({
   template,
   chipSize,
   railWidth,
+  first,
   editing,
   hot,
   selectedItemId,
@@ -34,6 +35,8 @@ export function TierRow({
   template: TierTemplate;
   chipSize: number;
   railWidth: number;
+  // Only the separator differs; the first row has the board's edge above it.
+  first: boolean;
   editing: boolean;
   // Resolved by the page, not by this row's own isOver: once a row has
   // items, dnd-kit reports the item under the cursor as the drop target
@@ -65,15 +68,22 @@ export function TierRow({
 
   return (
     <div
-      className="flex items-stretch rounded-2xl overflow-hidden border transition-[background,border-color,box-shadow] duration-150"
+      // No radius, no gap, no border of its own: rows butt straight into
+      // each other and the board clips the outer corners, so the whole
+      // thing reads as one object with a continuous chevron column down
+      // the side. A hairline is all that separates one tier from the next.
+      className="flex items-stretch transition-[background,box-shadow] duration-150"
       style={{
-        borderColor: hot || armed ? tier.accent : "rgba(255,255,255,0.08)",
-        // Darker than the panel it sits on, so each tier reads as an inset
-        // well rather than blending into the board.
-        background: hot ? `${tier.accent}33` : armed ? `${tier.accent}12` : "#0c1830",
-        // The row lifts off the board the moment a drag is over it - this
-        // is the single clearest "yes, here" signal on the page.
-        boxShadow: hot ? `0 0 0 2px ${tier.accent}, 0 10px 30px -12px ${tier.accent}` : undefined,
+        // Pure black. It's the highest-contrast ground the logos can sit
+        // on, and with 32 marks up there they should be the loudest thing
+        // on the page.
+        background: hot ? `${tier.accent}2e` : armed ? `${tier.accent}12` : "#000000",
+        // Inset rather than an outer ring - the board clips overflow, so an
+        // outer shadow would be sliced off at the top and bottom rows.
+        boxShadow: hot
+          ? `inset 0 0 0 2px ${tier.accent}, inset 0 0 34px -6px ${tier.accent}`
+          : undefined,
+        borderTop: first ? undefined : "1px solid rgba(255,255,255,0.09)",
       }}
     >
       {/* Label rail, cut to a chevron so the tiers read as a descending
