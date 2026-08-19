@@ -14,6 +14,7 @@ export function TierRow({
   chipSize,
   railWidth,
   first,
+  cascading,
   editing,
   hot,
   selectedItemId,
@@ -37,6 +38,8 @@ export function TierRow({
   railWidth: number;
   // Only the separator differs; the first row has the board's edge above it.
   first: boolean;
+  // Set for a beat when the board fills, so the rows can light in sequence.
+  cascading: boolean;
   editing: boolean;
   // Resolved by the page, not by this row's own isOver: once a row has
   // items, dnd-kit reports the item under the cursor as the drop target
@@ -72,7 +75,7 @@ export function TierRow({
       // each other and the board clips the outer corners, so the whole
       // thing reads as one object with a continuous chevron column down
       // the side. A hairline is all that separates one tier from the next.
-      className="flex items-stretch transition-[background,box-shadow] duration-150"
+      className={`flex items-stretch transition-[background,box-shadow] duration-150 ${cascading ? "tier-anim-cascade" : ""}`}
       style={{
         // Pure black. It's the highest-contrast ground the logos can sit
         // on, and with 32 marks up there they should be the loudest thing
@@ -84,6 +87,9 @@ export function TierRow({
           ? `inset 0 0 0 2px ${tier.accent}, inset 0 0 34px -6px ${tier.accent}`
           : undefined,
         borderTop: first ? undefined : "1px solid rgba(255,255,255,0.09)",
+        // Staggered so the light runs down the board rather than the whole
+        // thing blinking at once.
+        animationDelay: cascading ? `${index * 90}ms` : undefined,
       }}
     >
       {/* Label rail, cut to a chevron so the tiers read as a descending

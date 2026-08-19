@@ -33,6 +33,7 @@ import { buildReferralLink } from "@/lib/referralStorage";
 import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TierRow } from "@/components/tierList/TierRow";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
+import { TierCelebration } from "@/components/tierList/TierCelebration";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -58,6 +59,8 @@ export default function TierListPageClient({
   const [editing, setEditing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [landedId, setLandedId] = useState<string | null>(null);
+  const [celebrating, setCelebrating] = useState<TierItem | null>(null);
+  const [cascading, setCascading] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Which container the drag is currently over. undefined = no drag,
   // null = the unranked pool, otherwise a tier id.
@@ -108,7 +111,25 @@ export default function TierListPageClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, user, template.slug, initialState]);
 
-  const isCompact = viewportWidth < 768;
+  const wasComplete = useRef(false);
+  const sawFirstState = useRef(false);
+  useEffect(() => {
+    if (!loaded) return;
+    // Skip the first settled state so loading an already-finished list
+    // doesn't set off a celebration nobody earned.
+    if (!sawFirstState.current) {
+      sawFirstState.current = true;
+      wasComplete.current = rankedCount(state) === template.items.length;
+      return;
+    }
+    const nowComplete = rankedCount(state) === template.items.length;
+    if (nowComplete && !wasComplete.current) {
+      setCascading(true);
+      setTimeout(() => setCascading(false), 1400);
+    }
+    wasComplete.current = nowComplete;
+  }, [state, loaded, template.items.length]);
+
   const ranked = rankedCount(state);
   const total = template.items.length;
   const complete = ranked === total;
@@ -143,6 +164,18 @@ export default function TierListPageClient({
     // drag is the secondary one.
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const topTierId = state.tiers[0]?.id;
+
+  // Only for the top tier, only when the item wasn't already in it, and
+  // only on commit (drop or tap) - never mid-drag.
+  const maybeCelebrate = useCallback(
+    (itemId: string, toTier: string | null, from: string | null | undefined) => {
+      if (!toTier || toTier !== topTierId || from === topTierId) return;
+      setCelebrating(resolveItem(template, itemId));
+    },
+    [topTierId, template]
   );
 
   const flashLanded = useCallback((id: string) => {
@@ -186,6 +219,7 @@ export default function TierListPageClient({
     // Nothing to do if it's already sitting exactly where it would land.
     if (already && (index === null || list[index] === activeId)) return;
 
+    const from = currentTierOf(activeId);
     dispatch({
       type: "moveItem",
       itemId: activeId,
@@ -193,7 +227,10 @@ export default function TierListPageClient({
       toIndex: index,
       mergeToken: `${activeId}:${dragSession.current}`,
     });
-    if (flash && target.tier !== null) flashLanded(activeId);
+    if (flash && target.tier !== null) {
+      flashLanded(activeId);
+      maybeCelebrate(activeId, target.tier, from);
+    }
   }
 
   // Two jobs while a drag is in flight.
@@ -251,8 +288,12 @@ export default function TierListPageClient({
 
   function placeSelected(tierId: string | null) {
     if (!selectedId) return;
+    const from = currentTierOf(selectedId);
     dispatch({ type: "moveItem", itemId: selectedId, toTier: tierId, toIndex: null });
-    if (tierId !== null) flashLanded(selectedId);
+    if (tierId !== null) {
+      flashLanded(selectedId);
+      maybeCelebrate(selectedId, tierId, from);
+    }
     setSelectedId(null);
   }
 
@@ -478,6 +519,7 @@ export default function TierListPageClient({
               chipSize={chipSize}
               railWidth={railWidth}
               first={i === 0}
+              cascading={cascading}
               editing={editing}
               selectedItemId={selectedId}
               landedItemId={landedId}
@@ -601,6 +643,8 @@ export default function TierListPageClient({
         onCreateLink={handleCreateLink}
         shareUrl={shareUrl}
       />
+
+      <TierCelebration item={celebrating} onDone={() => setCelebrating(null)} />
 
       {dialog}
       {signInModal}

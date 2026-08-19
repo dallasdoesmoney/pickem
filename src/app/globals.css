@@ -82,14 +82,134 @@ body {
   animation: tier-target-pulse 1.6s ease-in-out infinite;
 }
 
+/* Fires down the board when the last item lands - the whole thing lights
+   up in sequence rather than the page just quietly reaching a state. */
+@keyframes tier-cascade {
+  0% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+  35% {
+    filter: brightness(2.2);
+    transform: scale(1.014);
+  }
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+
+/* Sending a team to the top tier is the loudest moment in the product, so
+   it gets the full treatment: a colour wash, the mark blooming out of the
+   middle, its name struck across the screen, and then it rains. */
+@keyframes tier-takeover-flash {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes tier-takeover-bloom {
+  0% {
+    transform: scale(0.3) rotate(-8deg);
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.95;
+  }
+  55% {
+    transform: scale(2.4) rotate(2deg);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(3.3) rotate(5deg);
+    opacity: 0;
+  }
+}
+
+@keyframes tier-takeover-banner {
+  0% {
+    transform: scale(0.72) translateY(14px);
+    opacity: 0;
+  }
+  22% {
+    transform: scale(1.06) translateY(0);
+    opacity: 1;
+  }
+  62% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.04) translateY(-10px);
+    opacity: 0;
+  }
+}
+
+/* Each drop carries its own --rain-x / --rain-rot / duration so no two
+   fall the same way; set inline where they're rendered. */
+@keyframes tier-rain-fall {
+  0% {
+    transform: translate3d(0, -18vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--rain-x), 112vh, 0) rotate(var(--rain-rot));
+    opacity: 0;
+  }
+}
+
+.tier-anim-cascade {
+  animation: tier-cascade 520ms ease-out both;
+}
+
+.tier-anim-flash {
+  animation: tier-takeover-flash 1100ms ease-out both;
+}
+
+.tier-anim-bloom {
+  animation: tier-takeover-bloom 1150ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.tier-anim-banner {
+  animation: tier-takeover-banner 1500ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.tier-anim-rain {
+  animation-name: tier-rain-fall;
+  animation-timing-function: cubic-bezier(0.3, 0.1, 0.5, 1);
+  animation-fill-mode: both;
+}
+
 /* Motion here is feedback, not decoration - honour the OS setting by
-   dropping straight to the resting state rather than removing the cue. */
+   dropping straight to the resting state rather than removing the cue.
+   The celebration is pure spectacle, so under reduced motion it doesn't
+   play at all rather than snapping through. */
 @media (prefers-reduced-motion: reduce) {
   .tier-anim-sheet,
   .tier-anim-scrim,
   .tier-anim-land,
-  .tier-anim-target {
+  .tier-anim-target,
+  .tier-anim-cascade {
     animation: none;
+  }
+
+  .tier-anim-flash,
+  .tier-anim-bloom,
+  .tier-anim-banner,
+  .tier-anim-rain {
+    display: none;
   }
 }
 
