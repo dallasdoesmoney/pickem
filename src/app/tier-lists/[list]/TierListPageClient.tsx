@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
-import { MAX_TIERS, TierListState, findItemTier, rankedCount, tierLabelFor } from "@/lib/tierList";
+import { MAX_TIERS, TierListAction, TierListState, findItemTier, rankedCount, tierListReducer, tierLabelFor } from "@/lib/tierList";
 import { useTierList } from "@/hooks/useTierList";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
@@ -59,7 +59,11 @@ export default function TierListPageClient({
   const [editing, setEditing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [landedId, setLandedId] = useState<string | null>(null);
-  const [celebrating, setCelebrating] = useState<TierItem | null>(null);
+  // Keyed so the overlay fully remounts each time - reusing the element
+  // would leave the CSS animations already finished, and this is meant to
+  // fire every single time, back to back if need be.
+  const [celebration, setCelebration] = useState<{ item: TierItem; key: number } | null>(null);
+  const celebrationKey = useRef(0);
   const [cascading, setCascading] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Which container the drag is currently over. undefined = no drag,
@@ -75,11 +79,11 @@ export default function TierListPageClient({
   // undo step, without merging into the *previous* drag of the same item.
   const dragSession = useRef(0);
   const suppressClick = useRef(false);
-  // Where the dragged item started. Captured at drag START because
-  // handleDragOver moves it across containers live - by the time the drop
-  // lands, "where did this come from" already answers with the
-  // destination, which silently killed the top-tier celebration.
-  const dragOrigin = useRef<string | null | undefined>(undefined);
+  // Whether the dragged item already held the #1 slot when the drag began.
+  // Captured at drag START because handleDragOver moves it live - asking at
+  // drop time can answer "it was already there" about a move this very drag
+  // just made, which silently swallows the celebration.
+  const dragStartedAtTop = useRef(false);
 
   useEffect(() => {
     function measure() {
@@ -173,14 +177,25 @@ export default function TierListPageClient({
 
   const topTierId = state.tiers[0]?.id;
 
-  // Only for the top tier, only when the item wasn't already in it, and
-  // only on commit (drop or tap) - never mid-drag.
-  const maybeCelebrate = useCallback(
-    (itemId: string, toTier: string | null, from: string | null | undefined) => {
-      if (!toTier || toTier !== topTierId || from === topTierId) return;
-      setCelebrating(resolveItem(template, itemId));
+  const holdsTopSpot = useCallback(
+    (s: TierListState, itemId: string) => !!topTierId && (s.placements[topTierId] ?? [])[0] === itemId,
+    [topTierId]
+  );
+
+  // The prize is the single #1 slot, not the top tier generally.
+  //
+  // Judged on the state the whole interaction ENDS in, against whether the
+  // item held #1 when it BEGAN - not on what the final move did. A drag
+  // moves the item live as it goes, so the drop itself is frequently a
+  // no-op even though the drag as a whole just took first place.
+  const celebrateIfTakesTopSpot = useCallback(
+    (finalState: TierListState, itemId: string, wasAlreadyFirst: boolean) => {
+      if (!topTierId || wasAlreadyFirst) return;
+      if (!holdsTopSpot(finalState, itemId)) return;
+      celebrationKey.current += 1;
+      setCelebration({ item: resolveItem(template, itemId), key: celebrationKey.current });
     },
-    [topTierId, template]
+    [topTierId, holdsTopSpot, template]
   );
 
   const flashLanded = useCallback((id: string) => {
@@ -212,11 +227,11 @@ export default function TierListPageClient({
     return state.unranked.includes(itemId) ? null : undefined;
   }
 
-  // Returns the container it landed in, so callers can decide whether that
-  // deserves a celebration - they know the real origin, this doesn't.
-  function applyMove(activeId: string, overId: string, flash: boolean): string | null | undefined {
+  // Returns the action it dispatched, or null when there was nothing to do,
+  // so callers can work out the resulting state for themselves.
+  function applyMove(activeId: string, overId: string, flash: boolean): TierListAction | null {
     const target = containerOf(overId);
-    if (!target) return undefined;
+    if (!target) return null;
 
     const list = target.tier === null ? state.unranked : state.placements[target.tier] ?? [];
     const overIsItem = !overId.startsWith("tier:") && overId !== "unranked";
@@ -224,17 +239,18 @@ export default function TierListPageClient({
 
     const already = currentTierOf(activeId) === target.tier;
     // Nothing to do if it's already sitting exactly where it would land.
-    if (already && (index === null || list[index] === activeId)) return target.tier;
+    if (already && (index === null || list[index] === activeId)) return null;
 
-    dispatch({
+    const action: TierListAction = {
       type: "moveItem",
       itemId: activeId,
       toTier: target.tier,
       toIndex: index,
       mergeToken: `${activeId}:${dragSession.current}`,
-    });
+    };
+    dispatch(action);
     if (flash && target.tier !== null) flashLanded(activeId);
-    return target.tier;
+    return action;
   }
 
   // Two jobs while a drag is in flight.
@@ -278,9 +294,12 @@ export default function TierListPageClient({
     }, 0);
     const { active, over } = e;
     if (!over) return;
-    const landed = applyMove(String(active.id), String(over.id), true);
-    maybeCelebrate(String(active.id), landed ?? null, dragOrigin.current);
-    dragOrigin.current = undefined;
+    const id = String(active.id);
+    const action = applyMove(id, String(over.id), true);
+    // A no-op drop still counts: the live moves during the drag may have
+    // already carried this item into first place.
+    celebrateIfTakesTopSpot(action ? tierListReducer(state, action) : state, id, dragStartedAtTop.current);
+    dragStartedAtTop.current = false;
   }
 
   // One interaction on every device: tap a team to arm it, then tap the
@@ -294,12 +313,10 @@ export default function TierListPageClient({
 
   function placeSelected(tierId: string | null) {
     if (!selectedId) return;
-    const from = currentTierOf(selectedId);
-    dispatch({ type: "moveItem", itemId: selectedId, toTier: tierId, toIndex: null });
-    if (tierId !== null) {
-      flashLanded(selectedId);
-      maybeCelebrate(selectedId, tierId, from);
-    }
+    const action: TierListAction = { type: "moveItem", itemId: selectedId, toTier: tierId, toIndex: null };
+    celebrateIfTakesTopSpot(tierListReducer(state, action), selectedId, holdsTopSpot(state, selectedId));
+    dispatch(action);
+    if (tierId !== null) flashLanded(selectedId);
     setSelectedId(null);
   }
 
@@ -499,7 +516,7 @@ export default function TierListPageClient({
         collisionDetection={collisionDetection}
         onDragStart={(e: DragStartEvent) => {
           dragSession.current += 1;
-          dragOrigin.current = currentTierOf(String(e.active.id));
+          dragStartedAtTop.current = holdsTopSpot(state, String(e.active.id));
           setDraggingId(String(e.active.id));
           setSelectedId(null);
         }}
@@ -651,7 +668,7 @@ export default function TierListPageClient({
         shareUrl={shareUrl}
       />
 
-      <TierCelebration item={celebrating} onDone={() => setCelebrating(null)} />
+      <TierCelebration key={celebration?.key} item={celebration?.item ?? null} onDone={() => setCelebration(null)} />
 
       {dialog}
       {signInModal}

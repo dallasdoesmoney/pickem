@@ -89,7 +89,7 @@ export function TierCelebration({ item, onDone }: { item: TierItem | null; onDon
             className="text-[clamp(0.7rem,2.4vw,1.1rem)] tracking-[0.34em] mt-3"
             style={{ fontFamily: "var(--font-display)", color: item.accent }}
           >
-            TOP TIER
+            &#35;1 OVERALL
           </div>
         </div>
       </div>
