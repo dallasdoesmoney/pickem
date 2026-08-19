@@ -33,7 +33,7 @@ import { buildReferralLink } from "@/lib/referralStorage";
 import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TierRow } from "@/components/tierList/TierRow";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
-import { TierCelebration } from "@/components/tierList/TierCelebration";
+import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -62,7 +62,7 @@ export default function TierListPageClient({
   // Keyed so the overlay fully remounts each time - reusing the element
   // would leave the CSS animations already finished, and this is meant to
   // fire every single time, back to back if need be.
-  const [celebration, setCelebration] = useState<{ item: TierItem; key: number } | null>(null);
+  const [celebration, setCelebration] = useState<{ item: TierItem; variant: CelebrationVariant; key: number } | null>(null);
   const celebrationKey = useRef(0);
   const [cascading, setCascading] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -84,6 +84,7 @@ export default function TierListPageClient({
   // asking at drop time can answer "it was already there" about a move
   // this very drag just made, which silently swallows the celebration.
   const dragStartedAtTop = useRef(false);
+  const dragStartedAtBottom = useRef(false);
   // Drives the reset sweep: chips fly out before the board actually clears.
   const [sweeping, setSweeping] = useState(false);
   const [scatterKey, setScatterKey] = useState(0);
@@ -180,9 +181,14 @@ export default function TierListPageClient({
 
   const topTierId = state.tiers[0]?.id;
 
-  const isInTopTier = useCallback(
-    (s: TierListState, itemId: string) => !!topTierId && (s.placements[topTierId] ?? []).includes(itemId),
-    [topTierId]
+  // Only a genuine bottom tier counts. With a single tier the top and the
+  // bottom are the same row, and a promotion should not also be a binning.
+  const bottomTierId = state.tiers.length > 1 ? state.tiers[state.tiers.length - 1]?.id : undefined;
+
+  const isInTier = useCallback(
+    (s: TierListState, itemId: string, tierId: string | undefined) =>
+      !!tierId && (s.placements[tierId] ?? []).includes(itemId),
+    []
   );
 
   // Any arrival into the top tier earns it, not just the #1 slot.
@@ -191,14 +197,19 @@ export default function TierListPageClient({
   // item was already up there when it BEGAN - not on what the final move
   // did. A drag moves the item live as it goes, so the drop itself is
   // frequently a no-op even though the drag as a whole just promoted it.
-  const celebrateIfPromoted = useCallback(
-    (finalState: TierListState, itemId: string, wasAlreadyTop: boolean) => {
-      if (!topTierId || wasAlreadyTop) return;
-      if (!isInTopTier(finalState, itemId)) return;
+  const celebrateMove = useCallback(
+    (finalState: TierListState, itemId: string, wasTop: boolean, wasBottom: boolean) => {
+      const variant: CelebrationVariant | null =
+        !wasTop && isInTier(finalState, itemId, topTierId)
+          ? "promote"
+          : !wasBottom && isInTier(finalState, itemId, bottomTierId)
+            ? "bin"
+            : null;
+      if (!variant) return;
       celebrationKey.current += 1;
-      setCelebration({ item: resolveItem(template, itemId), key: celebrationKey.current });
+      setCelebration({ item: resolveItem(template, itemId), variant, key: celebrationKey.current });
     },
-    [topTierId, isInTopTier, template]
+    [topTierId, bottomTierId, isInTier, template]
   );
 
   const flashLanded = useCallback((id: string) => {
@@ -301,8 +312,14 @@ export default function TierListPageClient({
     const action = applyMove(id, String(over.id), true);
     // A no-op drop still counts: the live moves during the drag may have
     // already carried this item into first place.
-    celebrateIfPromoted(action ? tierListReducer(state, action) : state, id, dragStartedAtTop.current);
+    celebrateMove(
+      action ? tierListReducer(state, action) : state,
+      id,
+      dragStartedAtTop.current,
+      dragStartedAtBottom.current
+    );
     dragStartedAtTop.current = false;
+    dragStartedAtBottom.current = false;
   }
 
   // One interaction on every device: tap a team to arm it, then tap the
@@ -317,7 +334,12 @@ export default function TierListPageClient({
   function placeSelected(tierId: string | null) {
     if (!selectedId) return;
     const action: TierListAction = { type: "moveItem", itemId: selectedId, toTier: tierId, toIndex: null };
-    celebrateIfPromoted(tierListReducer(state, action), selectedId, isInTopTier(state, selectedId));
+    celebrateMove(
+      tierListReducer(state, action),
+      selectedId,
+      isInTier(state, selectedId, topTierId),
+      isInTier(state, selectedId, bottomTierId)
+    );
     dispatch(action);
     if (tierId !== null) flashLanded(selectedId);
     setSelectedId(null);
@@ -532,7 +554,8 @@ export default function TierListPageClient({
         collisionDetection={collisionDetection}
         onDragStart={(e: DragStartEvent) => {
           dragSession.current += 1;
-          dragStartedAtTop.current = isInTopTier(state, String(e.active.id));
+          dragStartedAtTop.current = isInTier(state, String(e.active.id), topTierId);
+          dragStartedAtBottom.current = isInTier(state, String(e.active.id), bottomTierId);
           setDraggingId(String(e.active.id));
           setSelectedId(null);
         }}
@@ -686,7 +709,12 @@ export default function TierListPageClient({
         shareUrl={shareUrl}
       />
 
-      <TierCelebration key={celebration?.key} item={celebration?.item ?? null} onDone={() => setCelebration(null)} />
+      <TierCelebration
+        key={celebration?.key}
+        item={celebration?.item ?? null}
+        variant={celebration?.variant}
+        onDone={() => setCelebration(null)}
+      />
 
       {dialog}
       {signInModal}
