@@ -21,6 +21,7 @@ import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { fetchUserBadges } from "@/lib/supabase/badges";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
+import { RankPanel } from "@/components/RankPanel";
 
 export default function AccountPage() {
   const { user, profile: authProfile, loading: authLoading, signOut, refreshProfile } = useAuth();
@@ -80,6 +81,9 @@ function SignedInAccount({
       .catch(() => setIsCreator(false));
   }, [userId]);
 
+  // One derivation of the wash colour, shared by every panel on the page.
+  const rankColor = myRecord ? getLevelInfo(myRecord.total_points).rankColor : null;
+
   const label = authProfile?.display_name || authProfile?.username || "Your Profile";
 
   return (
@@ -89,17 +93,12 @@ function SignedInAccount({
           of its own now, washed with the player's own rank colour where
           there is one, so the profile reads as a card rather than as text
           floating over the wallpaper. */}
-      <div className="relative overflow-hidden rounded-3xl border border-white/12 bg-[#101d38] px-6 pt-8 pb-6">
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-36"
-          style={{
-            background: `radial-gradient(130% 100% at 50% 0%, ${
-              myRecord ? `${getLevelInfo(myRecord.total_points).rankColor}2b` : "rgba(255,255,255,0.10)"
-            }, transparent 72%)`,
-          }}
-        />
-        <div className="relative flex flex-col items-center">
+      <RankPanel
+        rankColor={rankColor}
+        tone="hero"
+        className="rounded-3xl border border-white/12 bg-[#101d38] px-6 pt-8 pb-6"
+        innerClassName="flex flex-col items-center"
+      >
         <div className="relative">
           {authProfile?.avatar_url ? (
             <img
@@ -152,8 +151,7 @@ function SignedInAccount({
           </svg>
           EDIT PROFILE
         </button>
-        </div>
-      </div>
+      </RankPanel>
 
       {/* Season record used to headline here as its own pill, but it's
           just the SEASON tile in the stats grid below now - showing it
@@ -188,7 +186,11 @@ function SignedInAccount({
           replaces the old standalone "MY REFERRALS" card - the
           Referrals tile below is the one entry point into that list now. */}
       {myRecord && (
-        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#0b1730] p-4">
+        <RankPanel
+          rankColor={rankColor}
+          className="mt-6 rounded-2xl border border-white/10 bg-[#0b1730]"
+          innerClassName="flex flex-col gap-3 p-4"
+        >
           <div className="text-[10px] text-white/45 tracking-[0.15em] mb-1">PICK&rsquo;EM</div>
           <div className="grid grid-cols-3 gap-2">
             <StatTile icon="🔗" value={stats ? String(stats.referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" onClick={() => setReferralsOpen(true)} />
@@ -206,7 +208,7 @@ function SignedInAccount({
               <StatDetailRow icon="📅" label="Weeks completed" value={stats ? String(stats.completedWeekCount) : "–"} href="/weekly" />
             </div>
           </div>
-        </div>
+        </RankPanel>
       )}
 
       {isCreator === false && (
