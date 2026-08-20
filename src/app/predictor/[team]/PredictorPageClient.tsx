@@ -19,6 +19,7 @@ import { saveSeasonPicks, syncOpponentSeasonPicks } from "@/lib/supabase/picks";
 import { syncPredictorAchievements } from "@/lib/supabase/achievements";
 import { renderPredictorShareImage } from "@/lib/predictorShareImage";
 import { buildReferralLink } from "@/lib/referralStorage";
+import { tintedGround } from "@/lib/pageGround";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -227,15 +228,11 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
     }
   }
 
-  // Textured page background tinted to the tracked team's own color,
-  // darkened since it's sitting behind everything else. Only the team
-  // data model has one color per team right now, so "the darkest team
-  // color" is just team.color - if a second (lighter/accent) color ever
-  // gets added, swap in whichever of the two is darker here.
-  // BG_DARKEN_FACTOR is compound: 0.55 was the original darkening pass,
-  // then another 30% darker on top (x0.7) per feedback.
-  const BG_DARKEN_FACTOR = 0.55 * 0.7;
-  const bgColor = darkenColor(team.color, BG_DARKEN_FACTOR, 1);
+  // Page background tinted to the tracked team, sitting at the same
+  // darkness as every other page on the site - see tintedGround for why
+  // that is a mix toward the ground rather than a fraction of the team
+  // colour.
+  const bgColor = tintedGround(team.color);
 
   return (
     // No isolate here - it trapped the giant logo's -z-10 inside this
