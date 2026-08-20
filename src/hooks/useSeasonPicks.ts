@@ -7,7 +7,9 @@ import { fetchSeasonPicks } from "@/lib/supabase/picks";
 
 type Picks = Record<number, TeamAbbr>; // week -> predicted winner
 
-export function useSeasonPicks(team: TeamAbbr) {
+// `sandbox` is streamer mode - see usePicks for why this is enforced in
+// the hook rather than at the call site.
+export function useSeasonPicks(team: TeamAbbr, sandbox = false) {
   const { user, loading: authLoading } = useAuth();
   const picksKey = `pickem:season-predictor:${team}`;
   const [picks, setPicks] = useState<Picks>({});
@@ -22,6 +24,13 @@ export function useSeasonPicks(team: TeamAbbr) {
     setLoaded(false);
 
     async function load() {
+      // A sandbox starts empty and reads nothing - not the account, not
+      // this device.
+      if (sandbox) {
+        setPicks({});
+        setLoaded(true);
+        return;
+      }
       if (user) {
         // Signed in: the database is authoritative, so predictions made
         // on another device show up here too. Local storage is kept in
@@ -53,12 +62,12 @@ export function useSeasonPicks(team: TeamAbbr) {
     return () => {
       cancelled = true;
     };
-  }, [picksKey, team, user, authLoading]);
+  }, [picksKey, team, user, authLoading, sandbox]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || sandbox) return;
     localStorage.setItem(picksKey, JSON.stringify(picks));
-  }, [picks, loaded, picksKey]);
+  }, [picks, loaded, picksKey, sandbox]);
 
   function setPick(week: number, winner: TeamAbbr) {
     setPicks((prev) => {

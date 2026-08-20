@@ -36,6 +36,18 @@ export type BoardViewState = {
 
 const DEFAULTS: BoardViewState = { columns: 2, zoom: 1, showTabs: true, compact: false, showRecordPill: true };
 const STORAGE_KEY = "pickem:board-view";
+// Streamer mode is deliberately NOT in that blob. The display settings
+// are a preference and belong to the device; this is a session state,
+// and a board that silently came up blank tomorrow because it was left
+// on last night is the exact accident the mode exists to prevent.
+// Session storage keeps it across a refresh mid-stream and drops it when
+// the tab closes.
+const STREAMER_KEY = "pickem:streamer-mode";
+
+// Desktop only for now. The mode is for someone with a capture window
+// and a guest beside them, and every control in it is about spending
+// horizontal room this width doesn't have.
+const STREAMER_MIN_WIDTH = 1024;
 export const ZOOM_MIN = 0.4;
 export const ZOOM_MAX = 1.5;
 
@@ -61,6 +73,7 @@ function columnsFit(viewportWidth: number, cols: number): boolean {
 
 export function useBoardView() {
   const [state, setState] = useState<BoardViewState>(DEFAULTS);
+  const [streamerMode, setStreamerModeState] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(390);
   const [viewportHeight, setViewportHeight] = useState(800);
 
@@ -72,6 +85,14 @@ export function useBoardView() {
       if (raw) setState({ ...DEFAULTS, ...JSON.parse(raw) });
     } catch {
       /* a corrupt or legacy value just means defaults */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(STREAMER_KEY) === "1") setStreamerModeState(true);
+    } catch {
+      /* private mode - the mode just starts off */
     }
   }, []);
 
@@ -177,8 +198,35 @@ export function useBoardView() {
     update({ zoom: next });
   }, [fitPasses, state.zoom, update]);
 
+  const streamerAvailable = viewportWidth >= STREAMER_MIN_WIDTH;
+  // Narrowing the window past the cutoff has to take the mode with it,
+  // or the board stays sandboxed with no visible control to turn it off.
+  useEffect(() => {
+    if (!streamerAvailable && streamerMode) {
+      setStreamerModeState(false);
+      try {
+        sessionStorage.removeItem(STREAMER_KEY);
+      } catch {
+        /* nothing to clean up */
+      }
+    }
+  }, [streamerAvailable, streamerMode]);
+
+  const setStreamerMode = useCallback((on: boolean) => {
+    setStreamerModeState(on);
+    try {
+      if (on) sessionStorage.setItem(STREAMER_KEY, "1");
+      else sessionStorage.removeItem(STREAMER_KEY);
+    } catch {
+      /* the mode still works, it just won't survive a refresh */
+    }
+  }, []);
+
   return {
     ...state,
+    streamerMode,
+    setStreamerMode,
+    streamerAvailable,
     setColumns: (columns: ColumnChoice) => update({ columns }),
     setZoom: (zoom: number) => update({ zoom: clampZoom(zoom) }),
     setShowTabs: (showTabs: boolean) => update({ showTabs }),

@@ -352,7 +352,9 @@ export default function Home() {
       fetchGameResults(activeWeek)
         .then(setResults)
         .catch(() => setResults({}));
-      if (authUser) syncLockBonus().catch((err) => console.error("Lock bonus sync failed", err));
+      // Not in streamer mode: nothing on this page writes to the
+      // account while a guest has the board.
+      if (authUser && !view.streamerMode) syncLockBonus().catch((err) => console.error("Lock bonus sync failed", err));
     } else {
       setResults({});
     }
@@ -360,7 +362,14 @@ export default function Home() {
   }, [activeWeek, currentWeekRow?.results_published, authUser]);
 
   const games = GAMES_BY_WEEK[activeWeek];
-  const { picks, setPick, resetPicks, loaded, lockedGameId, toggleLock } = usePicks(activeWeek);
+  const view = useBoardView();
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  // Streamer mode hands the board to a guest. The hook starts blank and
+  // touches neither the account nor this device; the guards below stop
+  // this page pushing the guest's picks anywhere. Both halves are needed
+  // - the hook cannot see the save calls, and the save calls cannot see
+  // local storage.
+  const { picks, setPick, resetPicks, loaded, lockedGameId, toggleLock } = usePicks(activeWeek, view.streamerMode);
   const { confirm, dialog } = useConfirmDialog();
   const { user, profile } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
@@ -418,6 +427,7 @@ export default function Home() {
     // the sign-in modal is also open stacked two overlays on top of each
     // other (the reported "have to exit out" bug).
     setShowSavePrompt(false);
+    if (view.streamerMode) return;
     const signedIn = await requestSignIn("signup");
     if (!signedIn) return;
     const { data } = await supabase.auth.getSession();
@@ -448,6 +458,10 @@ export default function Home() {
   }
 
   async function handleSaveAndSubmit() {
+    // Unreachable while the button is swapped out below, but this is the
+    // path a guest's picks would take to the host's account, so it is
+    // guarded rather than trusted.
+    if (view.streamerMode) return;
     if (saving) return;
     if (!(await confirmIfIncomplete("SAVE ANYWAY"))) return;
     setSaving(true);
@@ -483,7 +497,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!user || !loaded) return;
+    if (!user || !loaded || view.streamerMode) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
     saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId)
@@ -514,7 +528,7 @@ export default function Home() {
       skipNextAutoSaveRef.current = false;
       return;
     }
-    if (!user) return;
+    if (!user || view.streamerMode) return;
     const timeout = setTimeout(() => {
       saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId)
         .then(() => {
@@ -586,8 +600,6 @@ export default function Home() {
     }
   }
 
-  const view = useBoardView();
-  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const desktopRows = buildDesktopRows(games, view.cols);
 
   // Column count, gap and scale are all display settings now - see
@@ -847,7 +859,18 @@ export default function Home() {
               </button>
             </div>
 
-            {isEditable ? (
+            {view.streamerMode ? (
+              /* The save controls are replaced rather than disabled, and
+                 replaced by the reason - a greyed-out Save button invites
+                 a click and explains nothing. Occupies the same row, so
+                 turning the mode on does not move the board. */
+              <div className="flex flex-col items-center mt-3">
+                <div className="flex items-center justify-center gap-2 rounded-full border border-[#ef4444]/45 bg-[#1b0d12] px-4 py-2 text-[12px] text-[#fca5a5]" style={{ fontFamily: "var(--font-display)" }}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#ef4444]" />
+                  STREAMER MODE &middot; NOTHING IS SAVED
+                </div>
+              </div>
+            ) : isEditable ? (
               <div className="flex flex-col items-center mt-3">
                 <div className="flex items-center justify-center gap-3">
                   <button

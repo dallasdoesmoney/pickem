@@ -36,7 +36,12 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const teamIndex = TEAMS_SORTED.findIndex((t) => t.abbr === trackedTeam);
   const prevTeam = TEAMS_SORTED[(teamIndex - 1 + TEAMS_SORTED.length) % TEAMS_SORTED.length];
   const nextTeam = TEAMS_SORTED[(teamIndex + 1) % TEAMS_SORTED.length];
-  const { picks, setPick, resetPicks, loaded } = useSeasonPicks(trackedTeam);
+  const view = useBoardView();
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  // Streamer mode: blank board for a guest, and nothing from it reaches
+  // the account - see usePicks for why both the hook and the save calls
+  // have to be guarded.
+  const { picks, setPick, resetPicks, loaded } = useSeasonPicks(trackedTeam, view.streamerMode);
   const { confirm, dialog } = useConfirmDialog();
   const { user, profile } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
@@ -49,8 +54,6 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   // Column count, gap and scale are display settings now - see
   // useBoardView, which the weekly page shares. Eighteen weeks across
   // four columns is five rows instead of nine, at the same pill size.
-  const view = useBoardView();
-  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const gridColumnGap = view.gap;
   const contentWidth = view.contentWidth;
   const gridScale = view.scale;
@@ -84,6 +87,10 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const shareBtnIconPx = Math.max(14, 20 * gridScale);
 
   async function handleSaveAndSubmit() {
+    // Unreachable while the button is swapped out below, but this is the
+    // path a guest's predictions would take to the host's account, so it
+    // is guarded rather than trusted.
+    if (view.streamerMode) return;
     if (saving) return;
     setSaving(true);
     setSaveError(null);
@@ -118,7 +125,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   }
 
   useEffect(() => {
-    if (!user || !loaded) return;
+    if (!user || !loaded || view.streamerMode) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
     saveSeasonPicks(user.id, trackedTeam, picks)
@@ -150,7 +157,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       skipNextAutoSaveRef.current = false;
       return;
     }
-    if (!user) return;
+    if (!user || view.streamerMode) return;
     const timeout = setTimeout(() => {
       saveSeasonPicks(user.id, trackedTeam, picks)
         .then(() => {
@@ -519,6 +526,19 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             {/* Save and Reset sit side by side in one row at a shared
                 height, same as the weekly page - stacking them made three
                 separate button rows below the pills. */}
+            {view.streamerMode ? (
+              /* Replaced by the reason rather than disabled - a greyed
+                 out Save invites a click and explains nothing. */
+              <div className="flex flex-col items-center" style={{ marginTop: 12 * view.zoom }}>
+                <div
+                  className="flex items-center justify-center gap-2 rounded-full border border-[#ef4444]/45 bg-[#1b0d12] px-4 py-2 text-[12px] text-[#fca5a5]"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#ef4444]" />
+                  STREAMER MODE &middot; NOTHING IS SAVED
+                </div>
+              </div>
+            ) : (
             <div className="flex flex-col items-center" style={{ marginTop: 12 * view.zoom }}>
               <div className="flex items-center justify-center gap-3">
                 <button
@@ -576,6 +596,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               </div>
               {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
             </div>
+            )}
 
             <div className="flex items-center justify-between w-full max-w-xs gap-3" style={{ marginTop: 24 * view.zoom }}>
               <Link

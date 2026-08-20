@@ -27,6 +27,12 @@ export function StreamerSettings({
   const zoomPct = Math.round(view.zoom * 100);
   const isDefault =
     view.columns === 2 && view.zoom === 1 && view.showTabs && !view.compact && view.showRecordPill;
+  const on = view.streamerMode;
+
+  // Desktop only for now: the mode is for someone with a capture window
+  // and a guest beside them, and every control in it spends horizontal
+  // room a phone does not have.
+  if (!view.streamerAvailable) return null;
 
   return (
     <span className="relative">
@@ -37,9 +43,11 @@ export function StreamerSettings({
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
         className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] transition-colors ${
-          isDefault
-            ? "border-white/15 text-white/60 hover:border-white/35 hover:text-white"
-            : "border-white/45 bg-white/10 text-white"
+          on
+            ? "border-[#ef4444]/70 bg-[#1b0d12] text-[#fca5a5]"
+            : isDefault
+              ? "border-white/15 text-white/60 hover:border-white/35 hover:text-white"
+              : "border-white/45 bg-white/10 text-white"
         }`}
         style={{ fontFamily: "var(--font-display)" }}
       >
@@ -49,7 +57,9 @@ export function StreamerSettings({
         </svg>
         {/* The percentage stands in for the label once it is not 100 -
             so a board left zoomed says so without opening anything. */}
-        <span className="hidden sm:inline">{zoomPct === 100 ? "STREAMER" : `${zoomPct}%`}</span>
+        <span className="hidden sm:inline">
+          {on ? "STREAMER MODE" : zoomPct === 100 ? "STREAMER" : `${zoomPct}%`}
+        </span>
       </button>
 
       {open &&
@@ -62,6 +72,45 @@ export function StreamerSettings({
             style={{ top: coords.top, left: coords.left, width: PANEL_WIDTH }}
             className="fixed z-[100] rounded-2xl border border-white/10 bg-[#101d38] p-3 shadow-2xl shadow-black/60"
           >
+            {/* The switch is the whole panel until it is on. The
+                display settings only matter once there is a guest board
+                to arrange, and putting them behind it means the mode
+                reads as one decision rather than a page of options. */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={on}
+              onClick={() => view.setStreamerMode(!on)}
+              className={`mb-3 flex w-full items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors ${
+                on
+                  ? "border-[#ef4444]/45 bg-[#1b0d12] hover:border-[#ef4444]/70"
+                  : "border-white/15 hover:border-white/30"
+              }`}
+            >
+              <span
+                className={`mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors ${
+                  on ? "bg-[#ef4444]" : "bg-white/15"
+                }`}
+              >
+                <span className={`h-3 w-3 rounded-full bg-white transition-transform ${on ? "translate-x-3" : ""}`} />
+              </span>
+              <span className="min-w-0">
+                <span
+                  className={`block text-[12.5px] ${on ? "text-[#fca5a5]" : "text-white/85"}`}
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  STREAMER MODE
+                </span>
+                <span className="block text-[11px] leading-snug text-white/45">
+                  {on
+                    ? "Blank board for a guest. Nothing here is saved, and your own picks are untouched."
+                    : "Hands the board to a guest on a blank slate, without touching your picks."}
+                </span>
+              </span>
+            </button>
+
+            {on && (
+            <>
             <Section label="Columns">
               <div className="flex gap-1.5">
                 {(["auto", 2, 3, 4] as ColumnChoice[]).map((c) => (
@@ -149,6 +198,8 @@ export function StreamerSettings({
               >
                 RESET TO DEFAULTS
               </button>
+            )}
+            </>
             )}
           </div>,
           document.body,

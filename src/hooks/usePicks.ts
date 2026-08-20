@@ -7,7 +7,14 @@ import { fetchWeeklyPicks } from "@/lib/supabase/picks";
 
 type Picks = Record<string, TeamAbbr>;
 
-export function usePicks(week: number) {
+// `sandbox` is streamer mode: a scratch board for a guest to pick on.
+// It has to be enforced here rather than at the call site, because there
+// are two independent write paths out of this hook alone - local storage
+// on every change, and the database read that seeds it - and the page
+// adds three more on top. Anything less than "this hook cannot reach
+// either store" risks a guest's picks landing on the host's account,
+// which is the one failure that would make the mode unusable.
+export function usePicks(week: number, sandbox = false) {
   const { user, loading: authLoading } = useAuth();
   const picksKey = `pickem:picks:week-${week}`;
   const lockKey = `pickem:lock:week-${week}`;
@@ -24,6 +31,16 @@ export function usePicks(week: number) {
     setLoaded(false);
 
     async function load() {
+      // A sandbox starts empty and reads nothing: not the account, not
+      // this device. Turning the mode on therefore clears the board, and
+      // turning it off re-runs this effect and restores the real picks
+      // from the account, untouched by whatever the guest did.
+      if (sandbox) {
+        setPicks({});
+        setLockedGameId(null);
+        setLoaded(true);
+        return;
+      }
       if (user) {
         // Signed in: the database is authoritative, so picks made on
         // another device (or a past week's graded picks) show up here
@@ -60,18 +77,18 @@ export function usePicks(week: number) {
     return () => {
       cancelled = true;
     };
-  }, [picksKey, lockKey, week, user, authLoading]);
+  }, [picksKey, lockKey, week, user, authLoading, sandbox]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || sandbox) return;
     localStorage.setItem(picksKey, JSON.stringify(picks));
-  }, [picks, loaded, picksKey]);
+  }, [picks, loaded, picksKey, sandbox]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || sandbox) return;
     if (lockedGameId) localStorage.setItem(lockKey, lockedGameId);
     else localStorage.removeItem(lockKey);
-  }, [lockedGameId, loaded, lockKey]);
+  }, [lockedGameId, loaded, lockKey, sandbox]);
 
   // A locked game that's no longer picked (fully unpicked, not just
   // switched to the other team) can't stay the lock - keeps the two
