@@ -21,7 +21,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
+import { TierItem, TierTemplate, categoryLabel, resolveItem } from "@/data/tierTemplates";
 import {
   MAX_TIERS,
   MAX_TITLE,
@@ -680,28 +680,45 @@ export default function TierListPageClient({
   // have to move together or the board stops holding exactly ten.
   return (
     <main className="flex-1 px-4 pb-16 pt-5 max-w-[66rem] w-full mx-auto">
-      {/* Scrolls away - it's brand dressing, not something you need while
-          you're working. The way back out rides on the same line, pinned
-          left, so it costs no vertical room above the board: this page is
-          already taller than the viewport and the title below is sticky.
+      {/* The way back out, on its own pinned rail.
+          It used to ride the eyebrow line below as a bare 14px chevron
+          with its label hidden under 640px - and that line does not
+          stick, so 36px of scroll (less than one tier row) put the only
+          exit behind the site header. On a phone that left nothing.
+          So it gets its own bar, pinned under the site header at 72px,
+          and it keeps its label at every width. The category rides the
+          other end: with a board full of logos and a list name that is
+          whatever you called it, the rail is the only thing on screen
+          that says which category you are in.
           A real link, not history.back(), because you can arrive here
-          straight from a share link or a bookmark with nothing to go back
-          to. */}
-      <div className="relative flex items-center justify-center mb-1.5">
+          straight from a share link or a bookmark with nothing to go
+          back to. */}
+      <div className="sticky top-[72px] z-30 -mx-4 flex h-[34px] items-center justify-between gap-3 border-b border-white/10 bg-[#070e1c] px-4">
         <Link
           href="/tier-lists"
-          aria-label="All tier lists"
-          className="absolute left-0 flex items-center gap-1 text-xs text-white/45 hover:text-white transition-colors"
+          className="flex items-center gap-1 text-[11px] tracking-[0.15em] text-white/55 transition-colors hover:text-white"
           style={{ fontFamily: "var(--font-display)" }}
         >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
-          {/* The arrow alone carries it where the eyebrow would collide. */}
-          <span className="hidden sm:inline tracking-[0.15em]">ALL TIER LISTS</span>
+          TIER LISTS
         </Link>
-        <div className="text-center text-xs text-white/45 tracking-[0.25em]">SIDELINE BREW &middot; TIER LIST</div>
+        <span
+          className="truncate text-[11px] tracking-[0.15em] text-white/75"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          {categoryLabel(template).toUpperCase()}
+        </span>
       </div>
+
+      {/* The "SIDELINE BREW - TIER LIST" eyebrow that used to sit here is
+          gone. It was brand dressing carrying the exit as a passenger,
+          and once the rail above took the exit it was saying what the
+          rail says, one line lower, while holding the title away from the
+          rail it belongs under. Dropping it is what makes the rail nearly
+          free: 34px added, 25 recovered. The branding that matters is on
+          the exported share card, which was never this line. */}
 
       {/* Pinned directly above the board, and pinned literally: on a
           stream the board is taller than the viewport, so a title that
@@ -712,11 +729,14 @@ export default function TierListPageClient({
           101px gap down to about 30. */}
       {/* Nothing between the title and the board. Edit rides on the same
           line, pinned left, so the title sits directly on top of the
-          thing it names. Still sticky, offset by the site header's 72px:
-          the board is taller than the viewport, so without this the title
-          leaves the frame the moment you scroll to the lower tiers - and
-          on a stream that means most of the session is shot without one. */}
-      <header className="sticky top-[72px] z-20 -mx-4 px-4 pt-1 pb-2 bg-[#070e1c]">
+          thing it names. Still sticky, and now offset by the site
+          header's 72px plus the wayfinding rail's 34 - the two stack, so
+          the title has to come to rest under both rather than sliding
+          beneath the rail. The board is taller than the viewport, so
+          without this the title leaves the frame the moment you scroll to
+          the lower tiers - and on a stream that means most of the session
+          is shot without one. */}
+      <header className="sticky top-[106px] z-20 -mx-4 px-4 pt-1 pb-2 bg-[#070e1c]">
         <div className={editing ? "flex items-center gap-3" : "relative flex items-center justify-center"}>
           <button
             type="button"

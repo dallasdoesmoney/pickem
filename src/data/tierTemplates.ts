@@ -18,6 +18,11 @@ export type TierTemplate = {
   // Route segment AND the DB `template` discriminator - stable forever.
   slug: string;
   title: string;
+  // What to call the category where there is only room for a couple of
+  // words - the wayfinding rail above the board, for one. Optional: the
+  // fallback below reads well for anything named "<Something> Tier List",
+  // which is the shape these titles take.
+  shortTitle?: string;
   // Sits under the title. Voice is the site's: short, a little cocky.
   tagline: string;
   defaultListTitle: string;
@@ -33,6 +38,7 @@ export type TierTemplate = {
 const NFL_TEAMS: TierTemplate = {
   slug: "nfl-teams",
   title: "NFL Team Tier List",
+  shortTitle: "NFL Teams",
   tagline: "Rank all 32 NFL Teams",
   // Matches `title` above rather than personalising it: this is what the
   // exported image is captioned with, and a card that says something
@@ -58,6 +64,15 @@ export const TIER_TEMPLATES: Record<string, TierTemplate> = {
 
 export function getTierTemplate(slug: string): TierTemplate | null {
   return TIER_TEMPLATES[slug] ?? null;
+}
+
+// The category in two words, for places that have room for two words.
+// Falls back to the full title minus its "Tier List" suffix, which is
+// what every one of these titles ends in - a template that breaks the
+// pattern sets shortTitle instead of the fallback quietly mangling it.
+export function categoryLabel(template: TierTemplate): string {
+  if (template.shortTitle) return template.shortTitle;
+  return template.title.replace(/\s*tier list\s*$/i, "") || template.title;
 }
 
 // Item lookup for renderers that only carry ids (share snapshots, the
