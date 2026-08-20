@@ -9,7 +9,8 @@
 // Delete this route, and the noindex below, once a variant is chosen.
 
 import { useState } from "react";
-import { QUARTERBACKS, espnHeadshot } from "@/data/qbs";
+import { QUARTERBACKS } from "@/data/qbs";
+import { espnHeadshot } from "@/lib/espnImages";
 import { TEAMS } from "@/data/teams";
 
 type Variant = {

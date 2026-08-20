@@ -55,10 +55,3 @@ export const QUARTERBACKS: Quarterback[] = [
   { espnId: "4360689", name: "Tyler Shough", team: "NO" },
 ];
 
-// The headshot ESPN serves for a player id. The "full" cut is a 1040x760
-// transparent PNG framed at the shoulders, which is why these are drawn
-// cropped to a square rather than fitted inside one - see the portrait
-// branch in TierItemChip.
-export function espnHeadshot(espnId: string): string {
-  return `https://a.espncdn.com/i/headshots/nfl/players/full/${espnId}.png`;
-}

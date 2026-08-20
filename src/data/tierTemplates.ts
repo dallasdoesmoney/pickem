@@ -1,5 +1,8 @@
-import { TEAMS, TEAMS_SORTED } from "@/data/teams";
-import { QUARTERBACKS, espnHeadshot } from "@/data/qbs";
+import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
+import { QUARTERBACKS } from "@/data/qbs";
+import { RUNNING_BACKS } from "@/data/rbs";
+import { WIDE_RECEIVERS } from "@/data/wrs";
+import { espnHeadshot } from "@/lib/espnImages";
 
 // A tier-list template is "what's being ranked" - the item set plus the
 // copy that frames it. The engine (src/lib/tierList.ts) knows nothing
@@ -78,34 +81,87 @@ const NFL_TEAMS: TierTemplate = {
   })),
 };
 
-const NFL_QBS: TierTemplate = {
+// The three player categories differ only in their copy and their
+// roster, so they are built rather than written out three times - the
+// chip treatment, the id namespacing and the team-colour accent are
+// decisions that belong to "a category of players", not to quarterbacks
+// specifically.
+function playerTemplate({
+  slug,
+  title,
+  tagline,
+  noun,
+  idPrefix,
+  players,
+}: {
+  slug: string;
+  title: string;
+  tagline: string;
+  noun: [string, string];
+  idPrefix: string;
+  players: { espnId: string; name: string; team: TeamAbbr }[];
+}): TierTemplate {
+  return {
+    slug,
+    title,
+    tagline,
+    defaultListTitle: title,
+    itemNoun: noun,
+    itemStyle: "portrait",
+    icon: "https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png",
+    // Accent is the player's team colour, so a board of faces still reads
+    // as a board of teams at a glance - and so a headshot that fails to
+    // load falls back to something meaningful rather than a grey tile.
+    items: players.map((p) => ({
+      // Namespaced: resolveItem() falls back to a TEAMS lookup by raw id,
+      // and a bare ESPN id has no business colliding with that.
+      id: `${idPrefix}-${p.espnId}`,
+      label: p.name,
+      imageUrl: espnHeadshot(p.espnId),
+      backdropUrl: TEAMS[p.team].logo,
+      accent: TEAMS[p.team].color,
+    })),
+  };
+}
+
+const NFL_QBS = playerTemplate({
   slug: "nfl-quarterbacks",
   title: "NFL Quarterbacks",
   tagline: "Rank every starting QB",
-  defaultListTitle: "NFL Quarterbacks",
-  itemNoun: ["quarterback", "quarterbacks"],
-  itemStyle: "portrait",
-  icon: "https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png",
-  // Accent is the player's team colour, so a board of faces still reads
-  // as a board of teams at a glance - and so a headshot that fails to
-  // load falls back to something meaningful rather than a grey tile.
-  items: QUARTERBACKS.map((qb) => ({
-    // Namespaced: resolveItem() falls back to a TEAMS lookup by raw id,
-    // and a bare ESPN id has no business colliding with that.
-    id: `qb-${qb.espnId}`,
-    label: qb.name,
-    imageUrl: espnHeadshot(qb.espnId),
-    backdropUrl: TEAMS[qb.team].logo,
-    accent: TEAMS[qb.team].color,
-  })),
-};
+  noun: ["quarterback", "quarterbacks"],
+  idPrefix: "qb",
+  players: QUARTERBACKS,
+});
+
+const NFL_RBS = playerTemplate({
+  slug: "nfl-running-backs",
+  title: "NFL Running Backs",
+  tagline: "Rank every starting RB",
+  noun: ["running back", "running backs"],
+  idPrefix: "rb",
+  players: RUNNING_BACKS,
+});
+
+const NFL_WRS = playerTemplate({
+  slug: "nfl-wide-receivers",
+  // Two per team rather than one: a team lines up three receivers and
+  // ESPN ranks each slot separately, so there is no single starter to
+  // read off the chart the way there is at quarterback.
+  title: "NFL Wide Receivers",
+  tagline: "Rank the top 2 WRs on all 32 teams",
+  noun: ["wide receiver", "wide receivers"],
+  idPrefix: "wr",
+  players: WIDE_RECEIVERS,
+});
 
 export const TIER_TEMPLATES: Record<string, TierTemplate> = {
   [NFL_TEAMS.slug]: NFL_TEAMS,
-  // Registered only once the roster has actually been synced. An
-  // unsynced checkout offers one category rather than two, which is
-  // recoverable; offering an empty board is not - see qbs.ts.
-  ...(NFL_QBS.items.length > 0 ? { [NFL_QBS.slug]: NFL_QBS } : {}),
+  // Each registered only once its roster has actually been synced. An
+  // unsynced checkout offers fewer categories, which is recoverable;
+  // offering an empty board is not - see qbs.ts.
+  ...Object.fromEntries(
+    [NFL_QBS, NFL_RBS, NFL_WRS].filter((t) => t.items.length > 0).map((t) => [t.slug, t]),
+  ),
 };
 
 export function getTierTemplate(slug: string): TierTemplate | null {
@@ -120,15 +176,15 @@ export function resolveItem(template: TierTemplate, id: string): TierItem {
   if (found) return found;
   const team = TEAMS[id as keyof typeof TEAMS];
   if (team) return { id, label: `${team.city} ${team.name}`, imageUrl: team.logo, accent: team.color };
-  // A quarterback who has since left the roster the template is built
+  // A player who has since left the depth chart the template is built
   // from. Saved boards keep the ids they were ranked with, so this is not
-  // an edge case - it is what every saved QB list turns into the week a
-  // starter changes, and it gets likelier the more often the roster is
+  // an edge case - it is what every saved player list turns into the week
+  // a starter changes, and it gets likelier the more often the roster is
   // synced. The id carries ESPN's player id, and a headshot is keyed on
   // nothing else, so the face survives even when the row is gone. Only
   // the name is lost, and a face with no name still beats a grey tile
   // captioned "qb-3139477".
-  const espnId = id.startsWith("qb-") ? id.slice(3) : null;
-  if (espnId) return { id, label: "", imageUrl: espnHeadshot(espnId), accent: "#64748b" };
+  const player = /^(?:qb|rb|wr)-(\d+)$/.exec(id);
+  if (player) return { id, label: "", imageUrl: espnHeadshot(player[1]), accent: "#64748b" };
   return { id, label: id, imageUrl: "", accent: "#64748b" };
 }
