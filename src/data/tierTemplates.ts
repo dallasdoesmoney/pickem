@@ -31,6 +31,12 @@ export type TierItemStyle = "mark" | "portrait";
 export type TierTemplate = {
   // Route segment AND the DB `template` discriminator - stable forever.
   slug: string;
+  // What is being ranked, and nothing else: "NFL Teams", "NFL
+  // Quarterbacks". No "Tier List" suffix on the end of any of these.
+  // Everywhere a title appears, something beside it already says what
+  // kind of thing it is - the rail above the board, the eyebrow on the
+  // share card, the page it is a card on - so the suffix was the same
+  // two words repeated on every line of every screen.
   title: string;
   // Sits under the title. Voice is the site's: short, a little cocky.
   tagline: string;
@@ -48,12 +54,12 @@ export type TierTemplate = {
 
 const NFL_TEAMS: TierTemplate = {
   slug: "nfl-teams",
-  title: "NFL Team Tier List",
+  title: "NFL Teams",
   tagline: "Rank all 32 NFL Teams",
   // Matches `title` above rather than personalising it: this is what the
   // exported image is captioned with, and a card that says something
   // different from the page it was built on reads as a different thing.
-  defaultListTitle: "NFL Team Tier List",
+  defaultListTitle: "NFL Teams",
   itemNoun: ["team", "teams"],
   // Same CDN the 32 team logos already come from, so this needs no new
   // asset and no new host. If the league path ever moves, the menus fall
@@ -70,9 +76,9 @@ const NFL_TEAMS: TierTemplate = {
 
 const NFL_QBS: TierTemplate = {
   slug: "nfl-quarterbacks",
-  title: "NFL Quarterback Tier List",
+  title: "NFL Quarterbacks",
   tagline: "Rank every starting QB",
-  defaultListTitle: "NFL Quarterback Tier List",
+  defaultListTitle: "NFL Quarterbacks",
   itemNoun: ["quarterback", "quarterbacks"],
   itemStyle: "portrait",
   icon: "https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png",
