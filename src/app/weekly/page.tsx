@@ -23,7 +23,7 @@ import { TeamAbbr, TEAMS } from "@/data/teams";
 import { buildReferralLink } from "@/lib/referralStorage";
 import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
 import { useBoardView } from "@/hooks/useBoardView";
-import { BoardViewMenu } from "@/components/BoardViewMenu";
+import { StreamerSettings } from "@/components/StreamerSettings";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -143,15 +143,26 @@ function StatPills({
 // doubles as a sign-up pitch instead of only appearing once you already
 // have an account. Lives inside WeeklyRecordPill's own bordered pill (see
 // below) rather than sitting next to it as a separate circle.
-function ProfileAvatar({ url, initial, signedIn }: { url?: string | null; initial: string; signedIn: boolean }) {
-  const dims = "h-8 w-8 sm:h-10 sm:w-10 shrink-0 rounded-full flex items-center justify-center text-sm sm:text-base";
+function ProfileAvatar({
+  url,
+  initial,
+  signedIn,
+  kpi,
+}: {
+  url?: string | null;
+  initial: string;
+  signedIn: boolean;
+  kpi: (phone: number, desktop: number) => number;
+}) {
+  const dims = "shrink-0 rounded-full flex items-center justify-center";
+  const size = { width: kpi(32, 40), height: kpi(32, 40), fontSize: kpi(14, 16) };
   if (!signedIn) {
-    return <span className={`${dims} bg-white/5 border border-dashed border-white/25 text-white/40`}>?</span>;
+    return <span className={`${dims} bg-white/5 border border-dashed border-white/25 text-white/40`} style={size}>?</span>;
   }
   return url ? (
-    <img src={url} alt="" className={`${dims} object-cover border-2 border-white/20`} />
+    <img src={url} alt="" className={`${dims} object-cover border-2 border-white/20`} style={size} />
   ) : (
-    <span className={`${dims} bg-white/10 border-2 border-white/20`}>{initial}</span>
+    <span className={`${dims} bg-white/10 border-2 border-white/20`} style={size}>{initial}</span>
   );
 }
 
@@ -176,6 +187,7 @@ function WeeklyRecordPill({
   signedIn,
   onActivate,
   onOpenStandings,
+  kpi,
 }: {
   seasonCorrect: number;
   seasonGraded: number;
@@ -188,6 +200,7 @@ function WeeklyRecordPill({
   signedIn: boolean;
   onActivate?: () => void;
   onOpenStandings?: () => void;
+  kpi: (phone: number, desktop: number) => number;
 }) {
   const segments = [
     { icon: "🏆", value: `${seasonCorrect}-${seasonGraded - seasonCorrect}`, label: "SEASON RECORD", color: "#c084fc" },
@@ -197,35 +210,44 @@ function WeeklyRecordPill({
 
   const inner = (
     <>
-      <ProfileAvatar url={avatarUrl} initial={initial} signedIn={signedIn} />
-      <div className="w-px self-stretch bg-white/10 mx-1.5 sm:mx-2.5" />
+      <ProfileAvatar url={avatarUrl} initial={initial} signedIn={signedIn} kpi={kpi} />
+      <div className="w-px self-stretch bg-white/10" style={{ marginLeft: kpi(6, 10), marginRight: kpi(6, 10) }} />
       {segments.map((seg, i) => (
         <div key={seg.label} className="flex items-center">
-          {i > 0 && <div className="w-px self-stretch bg-white/10 mx-4 sm:mx-6" />}
-          <div className="flex flex-col items-center gap-0.5 px-1.5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs sm:text-sm leading-none">{seg.icon}</span>
-              <span className="text-base sm:text-lg leading-none whitespace-nowrap" style={{ fontFamily: "var(--font-display)", color: seg.color }}>
+          {i > 0 && (
+            <div className="w-px self-stretch bg-white/10" style={{ marginLeft: kpi(16, 24), marginRight: kpi(16, 24) }} />
+          )}
+          <div className="flex flex-col items-center" style={{ gap: kpi(2, 2), paddingLeft: kpi(6, 6), paddingRight: kpi(6, 6) }}>
+            <div className="flex items-center" style={{ gap: kpi(6, 6) }}>
+              <span className="leading-none" style={{ fontSize: kpi(12, 14) }}>{seg.icon}</span>
+              <span
+                className="leading-none whitespace-nowrap"
+                style={{ fontFamily: "var(--font-display)", color: seg.color, fontSize: kpi(16, 18) }}
+              >
                 {seg.value}
               </span>
             </div>
-            <span className="text-[8px] sm:text-[9px] text-white/50 tracking-wide whitespace-nowrap">{seg.label}</span>
+            <span className="text-white/50 tracking-wide whitespace-nowrap" style={{ fontSize: kpi(8, 9) }}>
+              {seg.label}
+            </span>
           </div>
         </div>
       ))}
     </>
   );
 
-  const pillClass = "flex items-stretch rounded-full border border-white/15 bg-[#1b2947] px-2.5 py-2 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]";
+  const pillClass = "flex items-stretch rounded-full border border-white/15 bg-[#1b2947] shadow-[0_6px_16px_-6px_rgba(0,0,0,0.5)]";
+  const pillStyle = { paddingLeft: kpi(10, 10), paddingRight: kpi(10, 10), paddingTop: kpi(8, 8), paddingBottom: kpi(8, 8) };
 
   return (
-    <div className="flex justify-center mb-5 lg:mb-7">
+    <div className="flex justify-center" style={{ marginBottom: kpi(20, 28) }}>
       {signedIn ? (
         <button
           type="button"
           onClick={onOpenStandings}
           aria-label="View standings"
           className={`${pillClass} hover:border-white/30 transition-colors cursor-pointer`}
+          style={pillStyle}
         >
           {inner}
         </button>
@@ -235,6 +257,7 @@ function WeeklyRecordPill({
           onClick={onActivate}
           aria-label="Sign in to track your record"
           className={`${pillClass} hover:border-white/30 transition-colors cursor-pointer`}
+          style={pillStyle}
         >
           {inner}
         </button>
@@ -683,7 +706,7 @@ export default function Home() {
             </div>
             {pageTab === "picks" && (
               <span className="absolute right-0 top-1/2 -translate-y-1/2">
-                <BoardViewMenu view={view} open={viewMenuOpen} onOpenChange={setViewMenuOpen} showWeeklyToggles />
+                <StreamerSettings view={view} open={viewMenuOpen} onOpenChange={setViewMenuOpen} showWeeklyToggles />
               </span>
             )}
           </div>
@@ -738,6 +761,7 @@ export default function Home() {
         )}
         {pageTab === "picks" && loaded && (
           <>
+            {view.showRecordPill && (
             <WeeklyRecordPill
               seasonCorrect={myRecord?.correct ?? 0}
               seasonGraded={myRecord?.graded ?? 0}
@@ -750,7 +774,9 @@ export default function Home() {
               signedIn={!!user}
               onActivate={!user ? () => requestSignIn() : undefined}
               onOpenStandings={() => setPageTab("leaderboard")}
+              kpi={kpi}
             />
+            )}
             {/* Explicit track width (not grid-cols-2's 1fr 1fr) - a 1fr
                 column doesn't shrink just because the card inside it does,
                 it just leaves dead space, which would visually read as a

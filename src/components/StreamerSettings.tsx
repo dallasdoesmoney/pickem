@@ -6,11 +6,11 @@ import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 
 const PANEL_WIDTH = 268;
 
-// Display controls for a board. A popover rather than a strip of
+// Layout controls for a board. A popover rather than a strip of
 // controls on the page, because the entire point of this menu is
 // recovering vertical space - a permanently visible toolbar would spend
 // some of what it is meant to save.
-export function BoardViewMenu({
+export function StreamerSettings({
   view,
   open,
   onOpenChange,
@@ -25,14 +25,15 @@ export function BoardViewMenu({
 }) {
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
   const zoomPct = Math.round(view.zoom * 100);
-  const isDefault = view.columns === 2 && view.zoom === 1 && view.showTabs && !view.compact;
+  const isDefault =
+    view.columns === 2 && view.zoom === 1 && view.showTabs && !view.compact && view.showRecordPill;
 
   return (
     <span className="relative">
       <button
         ref={buttonRef}
         type="button"
-        aria-label="Display options"
+        aria-label="Streamer settings"
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
         className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] transition-colors ${
@@ -48,7 +49,7 @@ export function BoardViewMenu({
         </svg>
         {/* The percentage stands in for the label once it is not 100 -
             so a board left zoomed says so without opening anything. */}
-        <span className="hidden sm:inline">{zoomPct === 100 ? "DISPLAY" : `${zoomPct}%`}</span>
+        <span className="hidden sm:inline">{zoomPct === 100 ? "STREAMER" : `${zoomPct}%`}</span>
       </button>
 
       {open &&
@@ -57,7 +58,7 @@ export function BoardViewMenu({
           <div
             ref={panelRef}
             role="dialog"
-            aria-label="Display options"
+            aria-label="Streamer settings"
             style={{ top: coords.top, left: coords.left, width: PANEL_WIDTH }}
             className="fixed z-[100] rounded-2xl border border-white/10 bg-[#101d38] p-3 shadow-2xl shadow-black/60"
           >
@@ -118,6 +119,12 @@ export function BoardViewMenu({
 
             {showWeeklyToggles && (
               <Section label="Trim">
+                <Toggle
+                  label="Your record pill"
+                  hint="Your own record and rank, above the board"
+                  on={view.showRecordPill}
+                  onChange={view.setShowRecordPill}
+                />
                 <Toggle
                   label="Kickoff tabs"
                   hint="The day and time above each matchup"

@@ -9,7 +9,7 @@ import { isSuspiciousPick } from "@/data/powerRankings";
 import { SeasonGameCard, SeasonByeCard, SEASON_PILL_WIDTH, COMPACT_SCALE } from "@/components/SeasonGameCard";
 import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
 import { useBoardView } from "@/hooks/useBoardView";
-import { BoardViewMenu } from "@/components/BoardViewMenu";
+import { StreamerSettings } from "@/components/StreamerSettings";
 import { darkenColor } from "@/components/TeamHalfPill";
 import { TeamSwitcher } from "@/components/TeamSwitcher";
 import { getTeamSchedule } from "@/lib/teamSchedule";
@@ -283,7 +283,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
       <div className="relative mb-3 flex items-center justify-center gap-5">
         <span className="absolute right-0 top-0">
-          <BoardViewMenu view={view} open={viewMenuOpen} onOpenChange={setViewMenuOpen} />
+          <StreamerSettings view={view} open={viewMenuOpen} onOpenChange={setViewMenuOpen} />
         </span>
         {/* Nudged up slightly - flexbox centers the boxes, but the title's
             display font carries extra space below its cap height, so true

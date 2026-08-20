@@ -28,9 +28,13 @@ export type BoardViewState = {
   // Weekly only - drops the spread/record line, which is a third of
   // every pill's height.
   compact: boolean;
+  // Weekly only - your own record/rank readout above the board. On a
+  // stream it is the host's account showing on someone else's screen,
+  // and it is 58px.
+  showRecordPill: boolean;
 };
 
-const DEFAULTS: BoardViewState = { columns: 2, zoom: 1, showTabs: true, compact: false };
+const DEFAULTS: BoardViewState = { columns: 2, zoom: 1, showTabs: true, compact: false, showRecordPill: true };
 const STORAGE_KEY = "pickem:board-view";
 export const ZOOM_MIN = 0.4;
 export const ZOOM_MAX = 1.5;
@@ -179,6 +183,7 @@ export function useBoardView() {
     setZoom: (zoom: number) => update({ zoom: clampZoom(zoom) }),
     setShowTabs: (showTabs: boolean) => update({ showTabs }),
     setCompact: (compact: boolean) => update({ compact }),
+    setShowRecordPill: (showRecordPill: boolean) => update({ showRecordPill }),
     reset: () => update(DEFAULTS),
     fitToScreen,
     fitting: fitPasses > 0,
