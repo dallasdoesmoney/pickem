@@ -109,5 +109,15 @@ export function resolveItem(template: TierTemplate, id: string): TierItem {
   if (found) return found;
   const team = TEAMS[id as keyof typeof TEAMS];
   if (team) return { id, label: `${team.city} ${team.name}`, imageUrl: team.logo, accent: team.color };
+  // A quarterback who has since left the roster the template is built
+  // from. Saved boards keep the ids they were ranked with, so this is not
+  // an edge case - it is what every saved QB list turns into the week a
+  // starter changes, and it gets likelier the more often the roster is
+  // synced. The id carries ESPN's player id, and a headshot is keyed on
+  // nothing else, so the face survives even when the row is gone. Only
+  // the name is lost, and a face with no name still beats a grey tile
+  // captioned "qb-3139477".
+  const espnId = id.startsWith("qb-") ? id.slice(3) : null;
+  if (espnId) return { id, label: "", imageUrl: espnHeadshot(espnId), accent: "#64748b" };
   return { id, label: id, imageUrl: "", accent: "#64748b" };
 }
