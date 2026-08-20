@@ -19,14 +19,21 @@ export type RankPanelTone = "hero" | "quiet";
 // with the one at the top. Without the split every panel shouts and the
 // hierarchy disappears - the effect works because it is not uniform.
 // Tuned by measuring the actual pixel lift at the top of each panel
-// against its own base colour rather than by eye. On the rank hue's
-// dominant channel hero lifts about +25 and quiet about +13 - half as
-// strong reads as "same family, lower billing". The first attempt at a
-// fifth as strong measured +1, which is not a subtle effect, it is a
-// missing one.
+// against its own base colour rather than by eye, then checked against
+// the rendered popup. Two earlier passes were both too timid: a fifth of
+// hero strength measured +1 and was simply invisible, and the first
+// "prominent" pass was still hard to distinguish from no wash at all.
+// These values pour further down the panel as well as sitting stronger
+// at the top - height does as much work as alpha here, because a bright
+// band that dies in 9rem reads as a rim light rather than a wash.
+//
+// The ceiling is legibility: past roughly alpha 73 the tint starts
+// competing with the white name sitting on top of it.
 const TONE = {
-  hero: { alpha: "2b", height: "9rem", spread: "130% 100%", fade: "72%" },
-  quiet: { alpha: "26", height: "8rem", spread: "125% 100%", fade: "76%" },
+  hero: { alpha: "59", height: "15rem", spread: "140% 100%", fade: "76%" },
+  // Still about half of hero, so the panels below read as the same family
+  // without competing with the identity block above them.
+  quiet: { alpha: "2d", height: "12rem", spread: "132% 100%", fade: "78%" },
 } as const;
 
 // The wash on its own, for surfaces that already have their own layout
