@@ -11,6 +11,10 @@ export type TierItem = {
   // screen readers and tooltips get.
   label: string;
   imageUrl: string;
+  // Optional mark to sit behind the picture. Portraits use it for the
+  // player's team logo; a category whose items are already logos has no
+  // use for it.
+  backdropUrl?: string;
   // Used for the item's glow/backdrop while dragging or selected.
   accent: string;
 };
@@ -91,6 +95,7 @@ const NFL_QBS: TierTemplate = {
     id: `qb-${qb.espnId}`,
     label: qb.name,
     imageUrl: espnHeadshot(qb.espnId),
+    backdropUrl: TEAMS[qb.team].logo,
     accent: TEAMS[qb.team].color,
   })),
 };
