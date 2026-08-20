@@ -8,6 +8,8 @@ import { WIN_TOTALS } from "@/data/winTotals";
 import { isSuspiciousPick } from "@/data/powerRankings";
 import { SeasonGameCard, SeasonByeCard, SEASON_PILL_WIDTH, COMPACT_SCALE } from "@/components/SeasonGameCard";
 import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
+import { useBoardView } from "@/hooks/useBoardView";
+import { BoardViewMenu } from "@/components/BoardViewMenu";
 import { darkenColor } from "@/components/TeamHalfPill";
 import { TeamSwitcher } from "@/components/TeamSwitcher";
 import { getTeamSchedule } from "@/lib/teamSchedule";
@@ -44,29 +46,14 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const [saveError, setSaveError] = useState<string | null>(null);
   const winTotal = WIN_TOTALS[trackedTeam];
 
-  // Same responsive sizing the weekly page uses - that page is the scale
-  // standard now, so this one solves for the identical card scale from the
-  // identical available width instead of running full-size on mobile and a
-  // fixed COMPACT_SCALE on desktop. Starts at a phone-sized guess (not
-  // null) so there's no flash of oversized cards before the first measure.
-  const [viewportWidth, setViewportWidth] = useState(390);
-  useEffect(() => {
-    function measure() {
-      setViewportWidth(window.innerWidth);
-    }
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  const gridPageX = 16; // matches main's px-4
-  const gridColumnGap = viewportWidth < 640 ? 10 : 32;
-  const contentWidth = Math.min(viewportWidth, 896) - gridPageX * 2;
-  const gridScale = useMemo(() => {
-    const columnWidth = (contentWidth - gridColumnGap) / 2;
-    const raw = columnWidth / SEASON_PILL_WIDTH;
-    return Math.min(COMPACT_SCALE, Math.max(0.42, raw));
-  }, [contentWidth, gridColumnGap]);
+  // Column count, gap and scale are display settings now - see
+  // useBoardView, which the weekly page shares. Eighteen weeks across
+  // four columns is five rows instead of nine, at the same pill size.
+  const view = useBoardView();
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const gridColumnGap = view.gap;
+  const contentWidth = view.contentWidth;
+  const gridScale = view.scale;
 
   // The three KPI pills used to size off an `lg:` breakpoint while
   // everything else on the page sized off gridScale, and the two don't
@@ -80,7 +67,10 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   // the weekly page's stat pills share because these were sized to match
   // that page's in the first place.
   const kpiT = kpiFraction(contentWidth);
-  const kpi = kpiSizer(kpiT);
+  const kpiBase = kpiSizer(kpiT);
+  // Zoom on top of the width-derived size, so the pills stay in
+  // proportion with the board rather than towering over a zoomed-out one.
+  const kpi = (phone: number, desktop: number) => Math.round(kpiBase(phone, desktop) * view.zoom);
   // One line of label only at full size, where the pill is tall and wide
   // enough to carry it - below that it stacks, as the breakpoint did.
   const kpiWideLabel = kpiT === 1;
@@ -176,12 +166,15 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picks, loaded, user]);
 
-  // Desktop's two columns should read top-to-bottom then wrap (weeks 1-9,
-  // then 10-18), not interleave left/right like CSS grid's default
-  // row-major auto-placement would.
-  const scheduleHalf = Math.ceil(schedule.length / 2);
-  const scheduleCol1 = schedule.slice(0, scheduleHalf);
-  const scheduleCol2 = schedule.slice(scheduleHalf);
+  // Columns read top-to-bottom then wrap (weeks 1-9, then 10-18), not
+  // interleaved left/right the way CSS grid's row-major auto-placement
+  // would. Each column is its own flex stack for exactly that reason,
+  // which is also why the split is done here rather than left to the
+  // grid. Column count is a display setting now - see useBoardView.
+  const scheduleColumns = useMemo(() => {
+    const per = Math.ceil(schedule.length / view.cols);
+    return Array.from({ length: view.cols }, (_, i) => schedule.slice(i * per, (i + 1) * per));
+  }, [schedule, view.cols]);
 
   const wins = Object.values(picks).filter((winner) => winner === trackedTeam).length;
   const losses = Object.values(picks).filter((winner) => winner !== trackedTeam).length;
@@ -288,7 +281,10 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
         className="fixed -z-10 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.17] h-[85vh] w-auto max-w-none left-[-15vh] lg:left-[20px]"
       />
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
-      <div className="mb-3 flex items-center justify-center gap-5">
+      <div className="relative mb-3 flex items-center justify-center gap-5">
+        <span className="absolute right-0 top-0">
+          <BoardViewMenu view={view} open={viewMenuOpen} onOpenChange={setViewMenuOpen} />
+        </span>
         {/* Nudged up slightly - flexbox centers the boxes, but the title's
             display font carries extra space below its cap height, so true
             box-centering reads as the logo sitting a touch low. */}
@@ -296,7 +292,13 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             single word in the league ("PHILADELPHIA" / "JACKSONVILLE" run
             ~242px at this type size, against a box that was only 243px
             wide on a 375px phone - no room at all on anything narrower). */}
-        <img src={team.logo} alt="" className="h-14 sm:h-20 lg:h-24 w-auto shrink-0 relative -top-1.5" crossOrigin="anonymous" />
+        <img
+          src={team.logo}
+          alt=""
+          className="w-auto shrink-0 relative -top-1.5"
+          style={{ height: (view.viewportWidth >= 1024 ? 96 : view.viewportWidth >= 640 ? 80 : 56) * view.zoom }}
+          crossOrigin="anonymous"
+        />
         {/* Sized to the room actually left beside the logo (a flex item
             shrinking from its max-content width), NOT min-content: at
             min-content the box collapses to the widest single word, which
@@ -306,7 +308,12 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             width (the longest word) by default, so without it the h1's
             break-words guard below can never actually take effect. */}
         <div className="text-left min-w-0">
-          <div className="text-xs text-white/45 tracking-[0.25em] mb-1 whitespace-nowrap">RECORD PREDICTOR</div>
+          <div
+            className="text-white/45 tracking-[0.25em] mb-1 whitespace-nowrap"
+            style={{ fontSize: 12 * view.zoom }}
+          >
+            RECORD PREDICTOR
+          </div>
           {/* A step below the weekly page's WEEK N title rather than
               matching it. This one has to fit a whole team name plus the
               switcher's chevron in the room left beside the logo, and at
@@ -316,7 +323,14 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
           {/* break-words is the last-resort guard on the very narrowest
               phones: a word with nowhere left to go breaks instead of
               running off the side of the page. */}
-          <h1 className="text-[clamp(1.4rem,5.6vw,2.25rem)] leading-none tracking-wide break-words" style={{ fontFamily: "var(--font-display)" }}>
+          <h1
+            className="leading-none tracking-wide break-words"
+            style={{
+              fontFamily: "var(--font-display)",
+              // The clamp this replaces, with the zoom folded in.
+              fontSize: `clamp(${1.4 * view.zoom}rem, ${5.6 * view.zoom}vw, ${2.25 * view.zoom}rem)`,
+            }}
+          >
             <TeamSwitcher currentTeam={trackedTeam} open={switcherOpen} onOpenChange={setSwitcherOpen}>
               {team.city.toUpperCase()} {team.name.toUpperCase()}
             </TeamSwitcher>
@@ -338,9 +352,9 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               interleaving left/right the way grid auto-placement would. */}
           <div
             className="grid items-start justify-center"
-            style={{ gridTemplateColumns: `repeat(2, ${SEASON_PILL_WIDTH * gridScale}px)`, columnGap: gridColumnGap }}
+            style={{ gridTemplateColumns: `repeat(${view.cols}, ${SEASON_PILL_WIDTH * gridScale}px)`, columnGap: gridColumnGap }}
           >
-            {[scheduleCol1, scheduleCol2].map((col, i) => (
+            {scheduleColumns.map((col, i) => (
               // The weekly page uses 32 here, but it is not spending 32 on
               // white space: each of its pills carries a day/time tab that
               // pokes 21.2 above the pill's top edge, so what a reader
@@ -356,7 +370,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             ))}
           </div>
 
-          <div className="flex flex-col items-center mt-5">
+          <div className="flex flex-col items-center" style={{ marginTop: 20 * view.zoom }}>
             {/* Suspicious Picks and Vegas Prediction share one explicit
                 width at each breakpoint (instead of sizing to their own
                 content) so they land as equal-size bookends - which is
@@ -471,8 +485,9 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               aria-label="Share your predicted schedule"
               onClick={handleShare}
               disabled={sharing}
-              className="flex items-center gap-2 rounded-full mt-5 active:scale-95 transition-transform duration-150 disabled:opacity-60"
+              className="flex items-center gap-2 rounded-full active:scale-95 transition-transform duration-150 disabled:opacity-60"
               style={{
+                marginTop: 20 * view.zoom,
                 fontFamily: "var(--font-display)",
                 background: team.color,
                 color: "#ffffff",
@@ -504,7 +519,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             {/* Save and Reset sit side by side in one row at a shared
                 height, same as the weekly page - stacking them made three
                 separate button rows below the pills. */}
-            <div className="flex flex-col items-center mt-3">
+            <div className="flex flex-col items-center" style={{ marginTop: 12 * view.zoom }}>
               <div className="flex items-center justify-center gap-3">
                 <button
                   aria-label="Save and submit your predictions"
@@ -562,7 +577,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               {saveError && <p className="text-xs text-red-400 mt-2">{saveError}</p>}
             </div>
 
-            <div className="flex items-center justify-between w-full max-w-xs mt-6 gap-3">
+            <div className="flex items-center justify-between w-full max-w-xs gap-3" style={{ marginTop: 24 * view.zoom }}>
               <Link
                 href={`/predictor/${prevTeam.abbr.toLowerCase()}`}
                 aria-label={`Previous team: ${prevTeam.city} ${prevTeam.name}`}

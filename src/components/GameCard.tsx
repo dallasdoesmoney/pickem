@@ -92,6 +92,7 @@ export function GameCard({
   hasLock,
   onToggleLock,
   scale = 1,
+  compact = false,
 }: {
   game: Game;
   picked?: TeamAbbr;
@@ -116,6 +117,10 @@ export function GameCard({
   // down to the smallest phone. Defaults to 1 (full size) for any other
   // caller.
   scale?: number;
+  // Drops the spread/record strip from both halves - see hideFooter on
+  // TeamHalfPill for why the pill loses that height rather than keeping
+  // a gap where the strip was.
+  compact?: boolean;
 }) {
   const away = TEAMS[game.away];
   const home = TEAMS[game.home];
@@ -170,6 +175,7 @@ export function GameCard({
         disabled={locked}
         isLockPick={picked === away.abbr && isLockPick && !hasResult}
         scale={scale}
+        hideFooter={compact}
         badge={
           picked === away.abbr ? (
             <>
@@ -198,6 +204,7 @@ export function GameCard({
         disabled={locked}
         isLockPick={picked === home.abbr && isLockPick && !hasResult}
         scale={scale}
+        hideFooter={compact}
         badge={
           picked === home.abbr ? (
             <>

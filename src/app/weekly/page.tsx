@@ -22,6 +22,8 @@ import { renderShareImage } from "@/lib/shareImage";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 import { buildReferralLink } from "@/lib/referralStorage";
 import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
+import { useBoardView } from "@/hooks/useBoardView";
+import { BoardViewMenu } from "@/components/BoardViewMenu";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -561,24 +563,23 @@ export default function Home() {
     }
   }
 
-  const desktopRows = buildDesktopRows(games);
+  const view = useBoardView();
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const desktopRows = buildDesktopRows(games, view.cols);
 
-  // The grid's own track width/gap, computed from whatever room is
-  // actually available - mirrors what the old fixed COMPACT_SCALE did for
-  // desktop only, just solved for instead of hardcoded, so two columns
-  // fit on any screen instead of collapsing to a single mobile column.
-  const gridPageX = 16; // matches main's px-4
-  const gridColumnGap = viewportWidth < 640 ? 10 : 32;
-  const contentWidth = Math.min(viewportWidth, 896) - gridPageX * 2;
-  const gridScale = useMemo(() => {
-    const columnWidth = (contentWidth - gridColumnGap) / 2;
-    const raw = columnWidth / PILL_WIDTH;
-    return Math.min(COMPACT_SCALE, Math.max(0.42, raw));
-  }, [contentWidth, gridColumnGap]);
+  // Column count, gap and scale are all display settings now - see
+  // useBoardView. Everything below sizes off `gridScale`, so the zoom
+  // rides through to the title, the stat pills and the share button
+  // without any of them needing to know it exists.
+  const gridColumnGap = view.gap;
+  const contentWidth = view.contentWidth;
+  const gridScale = view.scale;
 
-  // The stat pills below the grid follow the room the row has rather
-  // than a breakpoint - see kpiScale.ts.
-  const kpi = kpiSizer(kpiFraction(contentWidth));
+  // The stat pills follow the room the row has rather than a breakpoint
+  // (see kpiScale.ts), then take the zoom on top so they stay in
+  // proportion with the board instead of towering over a zoomed-out one.
+  const kpi = (phone: number, desktop: number) =>
+    Math.round(kpiSizer(kpiFraction(contentWidth))(phone, desktop) * view.zoom);
 
   // Share button used to be a fixed desktop size regardless of viewport,
   // which read as oversized once the matchup pills themselves started
@@ -610,6 +611,7 @@ export default function Home() {
   const renderGridGame = (cell: DesktopCell | null, key: string) => {
     if (!cell) return <div key={key} />;
     const { game, timeLabel } = cell;
+    const showTab = view.showTabs;
     const tabPadX = 11.8 * gridScale;
     // The visible (poked-up-above-the-pill) height stays exactly what it
     // was tuned to be - that's the tab's actual "size." Font size has a
@@ -626,6 +628,7 @@ export default function Home() {
     const tabPadSlack = Math.max(1, tabVisibleHeight - tabTextHeight);
     return (
       <div key={key} className="relative">
+        {showTab && (
         <div
           className="absolute left-1/2 -translate-x-1/2 rounded-t-md border border-b-0 border-white/15 bg-[#1b2947] tracking-wide text-white/55 whitespace-nowrap"
           style={{
@@ -640,6 +643,7 @@ export default function Home() {
         >
           {timeLabel}
         </div>
+        )}
         <GameCard
           game={game}
           picked={picks[game.id]}
@@ -651,6 +655,7 @@ export default function Home() {
           hasLock={lockedGameId !== null}
           onToggleLock={() => toggleLock(game.id)}
           scale={gridScale}
+          compact={view.compact}
         />
       </div>
     );
@@ -660,7 +665,7 @@ export default function Home() {
     <div className="flex flex-col flex-1">
       <header className="px-4 pt-5 pb-2 max-w-4xl w-full mx-auto relative">
         <div className="flex flex-col items-center">
-          <div className="flex justify-center mb-4">
+          <div className="relative flex w-full justify-center mb-4">
             <div className="inline-flex rounded-full border border-white/15 bg-[#1b2947] p-1">
               {(["picks", "leaderboard"] as const).map((tab) => (
                 <button
@@ -676,14 +681,31 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {pageTab === "picks" && (
+              <span className="absolute right-0 top-1/2 -translate-y-1/2">
+                <BoardViewMenu view={view} open={viewMenuOpen} onOpenChange={setViewMenuOpen} showWeeklyToggles />
+              </span>
+            )}
           </div>
 
           {pageTab === "picks" ? (
             <div className="text-center">
-              <div className="text-xs text-white/45 tracking-[0.25em] mb-1">SIDELINE BREW &middot; PICK&rsquo;EM</div>
+              {/* Eyebrow and title take the zoom too, so a board scaled
+                  down for a stream doesn't end up with a full-size
+                  heading towering over half-size pills. */}
+              <div
+                className="text-white/45 tracking-[0.25em] mb-1"
+                style={{ fontSize: 12 * view.zoom }}
+              >
+                SIDELINE BREW &middot; PICK&rsquo;EM
+              </div>
               <span
-                className="inline-flex items-center gap-2 text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide"
-                style={{ fontFamily: "var(--font-display)" }}
+                className="inline-flex items-center gap-2 leading-none tracking-wide"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  // The clamp this replaces, with the zoom folded in.
+                  fontSize: `clamp(${1.75 * view.zoom}rem, ${7 * view.zoom}vw, ${2.75 * view.zoom}rem)`,
+                }}
               >
                 WEEK {activeWeek}
                 <WeekSwitcher
@@ -739,16 +761,24 @@ export default function Home() {
                 separate single-column mobile layout anymore. */}
             <div
               className="grid items-stretch justify-center"
-              style={{ gridTemplateColumns: `repeat(2, ${PILL_WIDTH * gridScale}px)`, columnGap: gridColumnGap, rowGap: 32 * gridScale }}
+              style={{
+                gridTemplateColumns: `repeat(${view.cols}, ${PILL_WIDTH * gridScale}px)`,
+                columnGap: gridColumnGap,
+                // The tabs poke up above each pill and the gap has to
+                // swallow them; with the tabs off there is nothing to
+                // swallow, so the row gap collapses to what a reader
+                // actually sees between two cards.
+                rowGap: (view.showTabs ? 32 : 11) * gridScale,
+              }}
             >
-              {desktopRows.flatMap((row) => [renderGridGame(row.left, `${row.key}-l`), renderGridGame(row.right, `${row.key}-r`)])}
+              {desktopRows.flatMap((row, r) => row.cells.map((cell, c) => renderGridGame(cell, `${row.key}-${r}-${c}`)))}
             </div>
 
-            <div className="mt-5">
+            <div style={{ marginTop: 20 * view.zoom }}>
               {hasResults ? <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} /> : <StatPills stats={stats} lockedTeam={lockedTeam} kpi={kpi} />}
             </div>
 
-            <div className="flex justify-center mt-5">
+            <div className="flex justify-center" style={{ marginTop: 20 * view.zoom }}>
               <button
                 aria-label={hasResults ? "Share your results" : "Share your picks"}
                 onClick={handleShare}

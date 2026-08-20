@@ -515,8 +515,8 @@ export async function renderShareImage(params: ShareImageParams): Promise<Blob> 
 
   desktopRows.forEach((row, i) => {
     [
-      { cell: row.left, x: col1X },
-      { cell: row.right, x: col2X },
+      { cell: row.cells[0], x: col1X },
+      { cell: row.cells[1], x: col2X },
     ].forEach(({ cell, x }) => {
       if (!cell) return;
       const { game, timeLabel } = cell;

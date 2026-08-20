@@ -3,7 +3,7 @@ import { TEAMS, TeamAbbr } from "@/data/teams";
 import { gameTimeLabel } from "@/lib/groupGames";
 
 export type DesktopCell = { game: Game; timeLabel: string };
-export type DesktopRow = { key: string; left: DesktopCell; right: DesktopCell | null };
+export type DesktopRow = { key: string; cells: (DesktopCell | null)[] };
 
 // No more day-group dividers at all - every matchup carries its own
 // "WED · 8:20PM" tab instead (see the desktop grid's renderGridGame), so
@@ -11,14 +11,22 @@ export type DesktopRow = { key: string; left: DesktopCell; right: DesktopCell | 
 // at a time in kickoff order; sorted here rather than trusted from the
 // caller since groupGamesByDay's Map only preserves first-occurrence
 // order, not a true chronological sort.
-export function buildDesktopRows(games: Game[]): DesktopRow[] {
+// Kickoff order, chopped into rows of `cols`. The column count is a
+// display setting now (see useBoardView) rather than a constant: on a
+// wide screen four columns turn eight rows into four at exactly the same
+// pill size, which is the only way to buy height without shrinking
+// anything. A short last row is padded with nulls so the grid keeps its
+// tracks.
+export function buildDesktopRows(games: Game[], cols = 2): DesktopRow[] {
   const sorted = [...games].sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
   const rows: DesktopRow[] = [];
-  for (let i = 0; i < sorted.length; i += 2) {
-    const left: DesktopCell = { game: sorted[i], timeLabel: gameTimeLabel(sorted[i].kickoff) };
-    const rightGame = sorted[i + 1];
-    const right: DesktopCell | null = rightGame ? { game: rightGame, timeLabel: gameTimeLabel(rightGame.kickoff) } : null;
-    rows.push({ key: sorted[i].id, left, right });
+  for (let i = 0; i < sorted.length; i += cols) {
+    const cells: (DesktopCell | null)[] = [];
+    for (let c = 0; c < cols; c++) {
+      const game = sorted[i + c];
+      cells.push(game ? { game, timeLabel: gameTimeLabel(game.kickoff) } : null);
+    }
+    rows.push({ key: sorted[i].id, cells });
   }
   return rows;
 }

@@ -12,6 +12,11 @@ export const PILL_HEIGHT = 80; // px
 export const FOOTER_HEIGHT = 26; // px
 export const LOGO_AREA_HEIGHT = PILL_HEIGHT - FOOTER_HEIGHT; // logo centers in this region, not the full card
 
+// What a pill actually stands at, once scale and compact mode are known.
+export function pillHeight(scale: number, compact = false): number {
+  return (compact ? PILL_HEIGHT - FOOTER_HEIGHT : PILL_HEIGHT) * scale;
+}
+
 const BORDER_WIDTH = 4;
 const OUTCOME_BORDER_WIDTH = 5;
 export const WIN_COLOR = "#64e066";
@@ -42,6 +47,7 @@ export function TeamHalfPill({
   isFaded,
   onClick,
   footer,
+  hideFooter,
   badge,
   disabled,
   isLockPick,
@@ -53,6 +59,11 @@ export function TeamHalfPill({
   isFaded: boolean;
   onClick: () => void;
   footer?: React.ReactNode;
+  // Compact mode: the footer strip is a third of the pill's height, and
+  // on a board that has to fit a stream that third is worth more than
+  // the spread it carries. The pill loses the strip AND the height it
+  // occupied, rather than keeping a gap where it was.
+  hideFooter?: boolean;
   badge?: React.ReactNode;
   disabled?: boolean;
   // Full gold wash + "LOCK" stamp, same visual slot as the win/loss
@@ -82,8 +93,8 @@ export function TeamHalfPill({
   const borderColor = showLockTreatment ? LOCK_COLOR : (outcomeColor ?? (isFaded ? FADED_BORDER_COLOR : "white"));
   const borderWidth = (showOutcomeTreatment || showLockTreatment ? OUTCOME_BORDER_WIDTH : BORDER_WIDTH) * scale;
   const fadedFilter = isFaded ? "grayscale(0.5) brightness(0.55)" : undefined;
-  const height = PILL_HEIGHT * scale;
-  const footerHeight = FOOTER_HEIGHT * scale;
+  const footerHeight = hideFooter ? 0 : FOOTER_HEIGHT * scale;
+  const height = PILL_HEIGHT * scale - (hideFooter ? FOOTER_HEIGHT * scale : 0);
   const logoAreaHeight = height - footerHeight;
   const logoHeightPx = 117 * scale;
   const outcomeFontPx = 60 * scale;
@@ -113,12 +124,14 @@ export function TeamHalfPill({
               style={{ height: logoHeightPx, WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
             />
           </div>
-          <div
-            className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5"
-            style={{ height: footerHeight, backgroundColor: isFaded ? team.color : darkenColor(team.color, 0.6, 0.93) }}
-          >
-            {footer}
-          </div>
+          {!hideFooter && (
+            <div
+              className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5"
+              style={{ height: footerHeight, backgroundColor: isFaded ? team.color : darkenColor(team.color, 0.6, 0.93) }}
+            >
+              {footer}
+            </div>
+          )}
           {showOutcomeTreatment && (
             <div className="pointer-events-none absolute inset-0 z-[35]" style={{ backgroundColor: `rgba(${outcomeColorRgb},0.34)` }} />
           )}
