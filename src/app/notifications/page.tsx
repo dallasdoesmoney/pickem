@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchFollowersNotFollowingBack, followUser, FollowerRow } from "@/lib/supabase/follows";
+import { dismissFollowBack, fetchFollowersNotFollowingBack, followUser, FollowerRow } from "@/lib/supabase/follows";
 import { fetchAllNotifications, markAllNotificationsRead, NotificationRow } from "@/lib/supabase/notifications";
 import { fetchProfilesByIds, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { buildActivityGroups, relativeTime, activityHref, ActivityGroup } from "@/lib/activity";
@@ -100,6 +100,24 @@ export default function NotificationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups]);
 
+  // Seeing a follower and deciding not to follow back is a real answer,
+  // and it used to have nowhere to go: the list and the header's red
+  // badge are both "followers minus following", so the only way to clear
+  // either was to follow someone you did not want to follow.
+  async function handleDismiss(row: FollowerRow) {
+    if (!user) return;
+    setBusyId(row.user_id);
+    // Removed first: this is a suggestion disappearing, not a
+    // transaction, and it should feel instant. A failure puts it back.
+    setFollowers((prev) => prev?.filter((f) => f.user_id !== row.user_id) ?? null);
+    const { error } = await dismissFollowBack(user.id, row.user_id);
+    setBusyId(null);
+    if (error) {
+      setError(error);
+      setFollowers((prev) => (prev ? [row, ...prev] : [row]));
+    }
+  }
+
   async function handleFollowBack(row: FollowerRow) {
     if (!user) return;
     setBusyId(row.user_id);
@@ -157,6 +175,20 @@ export default function NotificationsPage() {
                         style={{ fontFamily: "var(--font-display)", background: "rgba(192,132,252,0.14)", borderColor: "rgba(192,132,252,0.4)", color: "#d8b4fe" }}
                       >
                         {busyId === f.user_id ? "…" : "Follow Back"}
+                      </button>
+                      {/* The other answer. Not a block - they still
+                          follow you and are never told; it only stops
+                          this being offered. */}
+                      <button
+                        onClick={() => handleDismiss(f)}
+                        disabled={busyId === f.user_id}
+                        aria-label={`Dismiss ${f.display_name || f.username}`}
+                        title="Not now"
+                        className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full text-white/35 transition-colors hover:bg-white/10 hover:text-white/80 disabled:opacity-50"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
                       </button>
                     </div>
                   );

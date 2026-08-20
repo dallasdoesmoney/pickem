@@ -44,6 +44,33 @@ export type FollowerRow = {
 // page's "FOLLOW BACK" section. follows is public RLS, so this is two
 // plain reads + a client-side set-difference, same two-request shape as
 // fetchMyFriends below (not a security-definer anti-join).
+// Who this user has said they don't want to be nudged about.
+//
+// Returns an empty set rather than throwing when the table isn't there.
+// The dismissals migration can lag the deploy, and the two callers below
+// are the notifications page and the header's unread badge - neither is
+// worth breaking over a feature that simply hasn't been switched on yet.
+// Without the table nothing is dismissed, which is exactly how it
+// behaved before it existed.
+async function fetchDismissedFollowerIds(myId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from("follow_back_dismissals").select("follower_id").eq("user_id", myId);
+  if (error) {
+    console.error("Follow-back dismissals unavailable, treating none as dismissed", error);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r) => r.follower_id));
+}
+
+// Stop offering a follower in the follow-back list. Not a block: they
+// still follow you, they still show in your followers, and they are
+// never told.
+export async function dismissFollowBack(myId: string, followerId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("follow_back_dismissals").insert({ user_id: myId, follower_id: followerId });
+  // Already dismissed is the state we wanted anyway.
+  if (error && !error.message.toLowerCase().includes("duplicate")) return { error: error.message };
+  return { error: null };
+}
+
 export async function fetchFollowersNotFollowingBack(myId: string): Promise<FollowerRow[]> {
   const [{ data: followers, error: e1 }, { data: following, error: e2 }] = await Promise.all([
     supabase.from("follows").select("follower_id, created_at").eq("followee_id", myId).order("created_at", { ascending: false }),
@@ -52,7 +79,10 @@ export async function fetchFollowersNotFollowingBack(myId: string): Promise<Foll
   if (e1) throw e1;
   if (e2) throw e2;
   const followingIds = new Set((following ?? []).map((r) => r.followee_id));
-  const unreciprocated = (followers ?? []).filter((r) => !followingIds.has(r.follower_id));
+  const dismissed = await fetchDismissedFollowerIds(myId);
+  const unreciprocated = (followers ?? []).filter(
+    (r) => !followingIds.has(r.follower_id) && !dismissed.has(r.follower_id),
+  );
   if (unreciprocated.length === 0) return [];
 
   const ids = unreciprocated.map((r) => r.follower_id);
@@ -113,7 +143,11 @@ export async function fetchUnreciprocatedFollowerCount(myId: string): Promise<nu
   if (e1) throw e1;
   if (e2) throw e2;
   const followingIds = new Set((following ?? []).map((r) => r.followee_id));
-  return (followers ?? []).filter((r) => !followingIds.has(r.follower_id)).length;
+  // Same exclusion as the list this badge counts. Without it the badge
+  // counted rows the page no longer shows, so dismissing everything left
+  // a red dot pointing at an empty section.
+  const dismissed = await fetchDismissedFollowerIds(myId);
+  return (followers ?? []).filter((r) => !followingIds.has(r.follower_id) && !dismissed.has(r.follower_id)).length;
 }
 
 // The "other" user_id for each mutual pair - used to filter the (already
