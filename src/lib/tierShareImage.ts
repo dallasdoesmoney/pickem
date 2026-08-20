@@ -1,6 +1,7 @@
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { TierListState, tierLabelFor } from "@/lib/tierList";
 import { BRAND_LOGO_SRC, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
+import { BACKDROP_OPACITY, BACKDROP_SCALE } from "@/components/tierList/TierItemChip";
 
 // Same canvas approach and the same 840px width as the picks/predictor
 // share cards, so all three read as one family in a feed. Purpose-built
@@ -86,12 +87,21 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
   const totalHeight = PAD_TOP + headerH + bodyH + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const logos = new Map<string, HTMLImageElement | null>();
+  const backdrops = new Map<string, HTMLImageElement | null>();
   const usedIds = [...rows.flatMap((r) => r.ids), ...state.unranked];
+  // Backdrops are loaded in the same pass rather than lazily: the canvas
+  // draws in one synchronous sweep, so anything not resolved by here is
+  // simply missing from the card.
   const [brandLogo, ...loaded] = await Promise.all([
     loadImage(BRAND_LOGO_SRC),
     ...usedIds.map((id) => loadImage(resolveItem(template, id).imageUrl)),
+    ...usedIds.map((id) => {
+      const url = resolveItem(template, id).backdropUrl;
+      return url ? loadImage(url) : Promise.resolve(null);
+    }),
   ]);
   usedIds.forEach((id, i) => logos.set(id, loaded[i]));
+  usedIds.forEach((id, i) => backdrops.set(id, loaded[usedIds.length + i]));
 
   const pixelRatio = 2;
   const canvas = document.createElement("canvas");
@@ -153,6 +163,7 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
       chip,
       perRow,
       logos,
+      backdrops,
       template,
       first: i === 0,
     });
@@ -183,6 +194,7 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
       chip,
       perRow,
       logos,
+      backdrops,
       template,
       muted: true,
     });
@@ -209,6 +221,7 @@ function drawRow(
     chip: number;
     perRow: number;
     logos: Map<string, HTMLImageElement | null>;
+    backdrops: Map<string, HTMLImageElement | null>;
     template: TierTemplate;
     muted?: boolean;
     first?: boolean;
@@ -269,7 +282,7 @@ function drawRow(
     ctx.save();
     if (o.muted) ctx.globalAlpha = 0.45;
     if (o.template.itemStyle === "portrait") {
-      drawPortraitChip(ctx, displayFont, logo, resolveItem(o.template, id), cx, cy, o.chip);
+      drawPortraitChip(ctx, displayFont, logo, o.backdrops.get(id) ?? null, resolveItem(o.template, id), cx, cy, o.chip);
     } else {
       // Logos are square, so stretching to the chip and fitting inside it
       // are the same operation. Left as-is rather than routed through the
@@ -356,6 +369,7 @@ function drawPortraitChip(
   ctx: CanvasRenderingContext2D,
   displayFont: string,
   img: CanvasImageSource,
+  backdrop: CanvasImageSource | null,
   item: TierItem,
   x: number,
   y: number,
@@ -374,6 +388,17 @@ function drawPortraitChip(
   plate.addColorStop(1, `${item.accent}66`);
   ctx.fillStyle = plate;
   ctx.fillRect(x, y, size, size);
+
+  // The team mark, ghosted behind the player. Same scale, same opacity
+  // and same centring as the board's chip - a card that frames the
+  // backdrop differently from the board reads as a different list.
+  if (backdrop) {
+    const bw = size * BACKDROP_SCALE;
+    ctx.save();
+    ctx.globalAlpha = BACKDROP_OPACITY;
+    ctx.drawImage(backdrop, x + (size - bw) / 2, y + (size - bw) / 2, bw, bw);
+    ctx.restore();
+  }
 
   // object-cover, object-top: fill the square from the source's centre
   // horizontally and its top edge vertically, which is where ESPN frames

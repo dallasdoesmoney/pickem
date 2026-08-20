@@ -16,9 +16,14 @@ type Variant = {
   key: string;
   name: string;
   note: string;
-  // Everything that differs between treatments lives here, so the rest
-  // of the chip is byte-identical to the real one.
-  logo: React.CSSProperties | null;
+  // Size as a multiple of the chip, and where its centre sits as a
+  // fraction of the chip from the chip's own centre. Stated this way
+  // rather than as raw CSS because the first version of this page set
+  // insets on a box that already had a width and a height - which CSS
+  // resolves by keeping the size and honouring only left/top, so every
+  // mark was shifted up and left instead of enlarged. That is what made
+  // them look off-centre.
+  logo: { scale: number; dx?: number; dy?: number; filter?: string; opacity: number } | null;
 };
 
 const VARIANTS: Variant[] = [
@@ -26,32 +31,32 @@ const VARIANTS: Variant[] = [
   {
     key: "watermark",
     name: "B — Centred watermark",
-    note: "Logo a little larger than the chip, centred, low opacity.",
-    logo: { inset: "-10%", opacity: 0.22 },
+    note: "Logo a little larger than the chip, centred, low opacity. This is what now ships.",
+    logo: { scale: 1.2, opacity: 0.22 },
   },
   {
     key: "corner",
     name: "C — Corner mark",
     note: "Half size, bottom left, stronger. Reads as a badge.",
-    logo: { width: "52%", height: "52%", left: "4%", bottom: "16%", opacity: 0.38 },
+    logo: { scale: 0.52, dx: -0.2, dy: 0.14, opacity: 0.38 },
   },
   {
     key: "bleed",
     name: "D — Oversized bleed",
     note: "Much larger and pushed off the top-left corner, so only part of it is in frame.",
-    logo: { width: "150%", height: "150%", left: "-38%", top: "-30%", opacity: 0.25 },
+    logo: { scale: 1.5, dx: -0.32, dy: -0.28, opacity: 0.25 },
   },
   {
     key: "white",
     name: "E — White silhouette",
     note: "Desaturated to white. Looks the same on every team rather than fighting each one's colours.",
-    logo: { inset: "-8%", opacity: 0.3, filter: "grayscale(1) brightness(3)" },
+    logo: { scale: 1.16, opacity: 0.3, filter: "grayscale(1) brightness(3)" },
   },
   {
     key: "halo",
     name: "F — Behind the head",
     note: "Sized and lifted to sit behind the player's head like a halo.",
-    logo: { width: "92%", height: "92%", left: "4%", top: "-4%", opacity: 0.34 },
+    logo: { scale: 0.92, dy: -0.08, opacity: 0.34 },
   },
 ];
 
@@ -88,8 +93,16 @@ function Chip({ name, size, variant }: { name: string; size: number; variant: Va
           src={team.logo}
           alt=""
           crossOrigin="anonymous"
-          className="pointer-events-none absolute select-none object-contain"
-          style={{ width: "100%", height: "100%", ...variant.logo }}
+          className="pointer-events-none absolute max-w-none select-none object-contain"
+          style={{
+            width: `${variant.logo.scale * 100}%`,
+            height: `${variant.logo.scale * 100}%`,
+            left: "50%",
+            top: "50%",
+            transform: `translate(calc(-50% + ${(variant.logo.dx ?? 0) * 100}%), calc(-50% + ${(variant.logo.dy ?? 0) * 100}%))`,
+            opacity: variant.logo.opacity,
+            filter: variant.logo.filter,
+          }}
         />
       )}
       <img

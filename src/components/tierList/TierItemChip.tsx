@@ -90,6 +90,35 @@ export function TierItemChip({
               IS the chip. Team colour keeps a board of faces readable as
               a board of teams, and covers the gap when one fails. */}
           <span className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${item.accent}, ${item.accent}66)` }} />
+          {/* The team's mark, ghosted behind the player.
+              Centred by translate rather than by insets: setting all four
+              insets on a box that also has a width and a height is
+              over-constrained, and CSS resolves that by keeping the size
+              and honouring only left/top - which silently shifts the mark
+              up and to the left instead of enlarging it. That is what
+              made these look off-centre. This way the size and the centre
+              are stated separately and cannot fight.
+              max-w-none because Tailwind's preflight caps every img at
+              max-width:100% of its container, which silently clamped
+              this back to the chip's own width - the scale below did
+              nothing horizontally and the mark came out 80x96. */}
+          {item.backdropUrl && (
+            <img
+              src={item.backdropUrl}
+              alt=""
+              crossOrigin="anonymous"
+              draggable={false}
+              className="pointer-events-none absolute max-w-none select-none object-contain"
+              style={{
+                width: `${BACKDROP_SCALE * 100}%`,
+                height: `${BACKDROP_SCALE * 100}%`,
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                opacity: BACKDROP_OPACITY,
+              }}
+            />
+          )}
           {/* object-cover with the frame pushed to the top: ESPN's cut is
               1040x760 with the head in the upper middle, so fitting it
               whole leaves the face about a third of the chip, and
@@ -142,6 +171,12 @@ export function TierItemChip({
 // father and son indistinguishable, which is the exact job this caption
 // has.
 const SUFFIXES = new Set(["jr.", "sr.", "ii", "iii", "iv", "v"]);
+
+// Slightly larger than the chip so the mark bleeds past the corners
+// rather than sitting in the middle of a frame, and faint enough to stay
+// behind the player instead of competing with him.
+export const BACKDROP_SCALE = 1.2;
+export const BACKDROP_OPACITY = 0.22;
 
 const BUNGEE_ADVANCE = 0.72; // em per character, measured off the face
 function captionSize(fullName: string, chip: number): number {
