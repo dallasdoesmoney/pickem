@@ -215,15 +215,27 @@ function SignedInAccount({
         <button
           type="button"
           onClick={() => setCreatorRequestOpen(true)}
-          className="w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors mt-6"
+          className="mt-6 w-full text-left"
         >
-          <span className="text-2xl shrink-0">🎥</span>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
-              BECOME A CREATOR
+          {/* Red, and washed like the profile cards - the one thing on
+              this page that isn't about you yet, so it shouldn't wear the
+              same navy as everything that is. */}
+          <RankPanel
+            rankColor="#ef4444"
+            tone="hero"
+            className="rounded-2xl border border-[#ef4444]/45 bg-[#1b0d12] transition-colors hover:border-[#ef4444]/70"
+            innerClassName="flex items-center gap-3 p-4"
+          >
+            <span className="text-2xl shrink-0">🎥</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+                BECOME A CREATOR
+              </div>
+              <div className="text-[11px] text-white/50 mt-0.5">
+                Badge, linked socials, and a spot in every new signup&rsquo;s recommendations &rarr;
+              </div>
             </div>
-            <div className="text-[11px] text-white/45 mt-0.5">Stream or make content? Request the Creator badge &rarr;</div>
-          </div>
+          </RankPanel>
         </button>
       )}
 
@@ -231,15 +243,22 @@ function SignedInAccount({
         <button
           type="button"
           onClick={() => setSocialLinksOpen(true)}
-          className="w-full flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-left hover:bg-white/10 hover:border-white/20 transition-colors mt-6"
+          className="mt-6 w-full text-left"
         >
-          <span className="text-2xl shrink-0">🔗</span>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
-              SOCIAL LINKS
+          <RankPanel
+            rankColor="#ef4444"
+            tone="hero"
+            className="rounded-2xl border border-[#ef4444]/45 bg-[#1b0d12] transition-colors hover:border-[#ef4444]/70"
+            innerClassName="flex items-center gap-3 p-4"
+          >
+            <span className="text-2xl shrink-0">🔗</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+                SOCIAL LINKS
+              </div>
+              <div className="text-[11px] text-white/50 mt-0.5">Edit the channels shown on your profile &rarr;</div>
             </div>
-            <div className="text-[11px] text-white/45 mt-0.5">Add your channels/socials to your public profile &rarr;</div>
-          </div>
+          </RankPanel>
         </button>
       )}
 

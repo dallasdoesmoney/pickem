@@ -392,9 +392,48 @@ function AdminDashboard() {
                           <div className="text-[11px] text-white/40">View profile &rarr;</div>
                         </div>
                       </Link>
-                      <a href={req.content_url} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-300/80 hover:text-sky-300 truncate block">
-                        {req.content_url}
-                      </a>
+                      {/* The whole application, not just a link - these
+                          fields exist so a decision can be made from this
+                          card without opening five tabs. */}
+                      {(req.socials ?? []).length > 0 && (
+                        <div className="flex flex-col gap-1">
+                          {(req.socials ?? []).map((social) => (
+                            <a
+                              key={`${social.platform}-${social.url}`}
+                              href={social.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-xs text-sky-300/80 hover:text-sky-300"
+                            >
+                              <span className="w-16 shrink-0 text-[10px] uppercase tracking-[0.1em] text-white/35">{social.platform}</span>
+                              <span className="truncate">{social.url}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          req.audience_size && `${req.audience_size} audience`,
+                          req.primary_platform && `mainly ${req.primary_platform}`,
+                          req.cadence,
+                          req.nfl_focus && `NFL: ${req.nfl_focus}`,
+                          ...(req.content_types ?? []),
+                        ]
+                          .filter(Boolean)
+                          .map((chip) => (
+                            <span key={String(chip)} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">
+                              {chip}
+                            </span>
+                          ))}
+                      </div>
+
+                      {req.content_url && (
+                        <a href={req.content_url} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-300/80 hover:text-sky-300 truncate block">
+                          Example: {req.content_url}
+                        </a>
+                      )}
+                      {req.contact_handle && <p className="text-xs text-white/50">Contact: {req.contact_handle}</p>}
                       {req.note && <p className="text-xs text-white/50">{req.note}</p>}
                       <div className="flex gap-2">
                         <button
