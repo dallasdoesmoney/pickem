@@ -17,6 +17,16 @@
   --font-display: var(--font-bungee);
 }
 
+/* The header's own breakpoint, which is not any of Tailwind's.
+   The top nav is pinned at left-6 and ends at a fixed 506px; the logo is
+   centered, so its left edge is (viewport - 192) / 2. Those cross at
+   1204px, which means on lg (1024px) the nav spent the whole 1024-1204
+   band running underneath the logo. This is that crossover plus room to
+   breathe, so the hamburger takes over before anything can touch. */
+@theme {
+  --breakpoint-navbar: 1240px;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

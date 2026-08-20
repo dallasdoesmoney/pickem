@@ -180,7 +180,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full">
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-[60] flex">
+        <div className="navbar:hidden fixed inset-0 z-[60] flex">
           <div className="w-64 bg-[#0b1730] border-r border-white/10 flex flex-col">
             <div className="flex items-center justify-between h-16 px-4">
               <img src="/press-logo.png" alt="Sideline Brew" className="h-12 w-auto" />
@@ -264,16 +264,16 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="sticky top-0 z-50 relative flex items-center justify-center px-4 lg:px-6 h-[72px] border-b border-white/10 bg-[#070e1c]/90 backdrop-blur">
+        <div className="sticky top-0 z-50 relative flex items-center justify-center px-4 navbar:px-6 h-[72px] border-b border-white/10 bg-[#070e1c]/90 backdrop-blur">
           <button
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}
-            className="lg:hidden absolute left-4 h-9 w-9 shrink-0 rounded-full border border-white/15 text-white/70 flex items-center justify-center"
+            className="navbar:hidden absolute left-4 h-9 w-9 shrink-0 rounded-full border border-white/15 text-white/70 flex items-center justify-center"
           >
             <HamburgerIcon className="h-5 w-5" />
           </button>
 
-          <div className="hidden lg:flex items-center gap-0.5 absolute left-6">
+          <div className="hidden navbar:flex items-center gap-0.5 absolute left-6">
             {NAV_ITEMS.map((item) => (
               <TopNavLink key={item.href} href={item.href} label={item.label} />
             ))}

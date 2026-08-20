@@ -7,6 +7,7 @@ import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { WIN_TOTALS } from "@/data/winTotals";
 import { isSuspiciousPick } from "@/data/powerRankings";
 import { SeasonGameCard, SeasonByeCard, SEASON_PILL_WIDTH, COMPACT_SCALE } from "@/components/SeasonGameCard";
+import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
 import { darkenColor } from "@/components/TeamHalfPill";
 import { TeamSwitcher } from "@/components/TeamSwitcher";
 import { getTeamSchedule } from "@/lib/teamSchedule";
@@ -60,12 +61,29 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
 
   const gridPageX = 16; // matches main's px-4
   const gridColumnGap = viewportWidth < 640 ? 10 : 32;
+  const contentWidth = Math.min(viewportWidth, 896) - gridPageX * 2;
   const gridScale = useMemo(() => {
-    const contentWidth = Math.min(viewportWidth, 896) - gridPageX * 2;
     const columnWidth = (contentWidth - gridColumnGap) / 2;
     const raw = columnWidth / SEASON_PILL_WIDTH;
     return Math.min(COMPACT_SCALE, Math.max(0.42, raw));
-  }, [viewportWidth, gridColumnGap]);
+  }, [contentWidth, gridColumnGap]);
+
+  // The three KPI pills used to size off an `lg:` breakpoint while
+  // everything else on the page sized off gridScale, and the two don't
+  // line up: gridScale is already pinned at its 0.85 ceiling by ~647px,
+  // so from 1023px down to 647px the schedule cards stayed identical
+  // while the pills dropped from 190x88 to 92x56 in a single step. On a
+  // 1000px window that reads as the page deciding you're on a phone when
+  // nothing else about it has changed.
+  //
+  // So they interpolate instead - see kpiScale.ts for the rule, which
+  // the weekly page's stat pills share because these were sized to match
+  // that page's in the first place.
+  const kpiT = kpiFraction(contentWidth);
+  const kpi = kpiSizer(kpiT);
+  // One line of label only at full size, where the pill is tall and wide
+  // enough to carry it - below that it stacks, as the breakpoint did.
+  const kpiWideLabel = kpiT === 1;
 
   // Share button multipliers solved to reproduce the old fixed desktop size
   // at gridScale 0.85 and shrink proportionally below it, with tap-target
@@ -353,25 +371,31 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
                 their natural content heights differed by up to 18px since
                 each has a different icon/text/padding combination, which
                 read as visibly uneven despite the widths already matching. */}
-            {/* Heights and the breakpoint match the weekly page's stat
-                pills exactly (56px, then 88px at lg) - these used to jump
+            {/* Heights match the weekly page's stat pills at both ends
+                (56px on a phone, 88px at full size) - these used to jump
                 to a much taller 108px all the way down at sm, which is a
                 big part of what made this page read as oversized next to
                 weekly. Widths still differ from that page's by design:
                 these lay their icon and label out side by side rather than
                 stacked, so they need more horizontal room at the same
                 height. */}
-            <div className="flex gap-2 lg:gap-5 justify-center items-center flex-wrap">
+            <div className="flex justify-center items-center flex-wrap" style={{ gap: kpi(8, 20) }}>
               <div
-                className="w-[92px] h-[56px] lg:w-[190px] lg:h-[88px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center gap-1.5 lg:gap-3"
-                style={{ background: "transparent", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+                className="shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center"
+                style={{
+                  width: kpi(92, 190),
+                  height: kpi(56, 88),
+                  gap: kpi(6, 12),
+                  background: "transparent",
+                  boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)",
+                }}
               >
-                <img src="/suspicious-dog.png" alt="" className="h-7 lg:h-10 w-auto select-none shrink-0" />
+                <img src="/suspicious-dog.png" alt="" className="w-auto select-none shrink-0" style={{ height: kpi(28, 40) }} />
                 <div className="text-left">
-                  <div className="text-base lg:text-2xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                  <div className="leading-none" style={{ fontFamily: "var(--font-display)", fontSize: kpi(16, 24) }}>
                     {suspiciousCount}
                   </div>
-                  <div className="text-[7px] lg:text-[11px] leading-tight text-white/55 mt-0.5 lg:mt-1 tracking-wide">
+                  <div className="leading-tight text-white/55 tracking-wide" style={{ fontSize: kpi(7, 11), marginTop: kpi(2, 4) }}>
                     SUSPICIOUS
                     <br />
                     PICKS
@@ -380,35 +404,50 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
               </div>
 
               <div
-                className="h-[56px] lg:h-[88px] shrink-0 rounded-full border-2 border-white text-center pl-3.5 pr-4.5 lg:pl-6 lg:pr-8 flex items-center gap-1.5 lg:gap-3"
-                style={{ background: team.color, boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+                className="shrink-0 rounded-full border-2 border-white text-center flex items-center"
+                style={{
+                  height: kpi(56, 88),
+                  gap: kpi(6, 12),
+                  paddingLeft: kpi(14, 24),
+                  paddingRight: kpi(18, 32),
+                  background: team.color,
+                  boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)",
+                }}
               >
-                <img src={team.logo} alt="" className="h-7 lg:h-[44px] w-auto shrink-0" crossOrigin="anonymous" />
+                <img src={team.logo} alt="" className="w-auto shrink-0" style={{ height: kpi(28, 44) }} crossOrigin="anonymous" />
                 <div className="text-left">
-                  <div className="text-lg lg:text-3xl leading-none text-white" style={{ fontFamily: "var(--font-display)" }}>
+                  <div className="leading-none text-white" style={{ fontFamily: "var(--font-display)", fontSize: kpi(18, 30) }}>
                     {wins}-{losses}
                   </div>
-                  <div className="text-[7px] lg:text-[11px] leading-tight text-white/55 mt-0.5 lg:mt-1 tracking-wide">
-                    <span className="lg:hidden">
-                      MY
-                      <br />
-                      PREDICTION
-                    </span>
-                    <span className="hidden lg:inline whitespace-nowrap">MY PREDICTION</span>
+                  <div className="leading-tight text-white/55 tracking-wide" style={{ fontSize: kpi(7, 11), marginTop: kpi(2, 4) }}>
+                    {kpiWideLabel ? (
+                      <span className="whitespace-nowrap">MY PREDICTION</span>
+                    ) : (
+                      <span>
+                        MY
+                        <br />
+                        PREDICTION
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
               {winTotal !== undefined && (
                 <div
-                  className="w-[92px] h-[56px] lg:w-[190px] lg:h-[88px] shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center"
-                  style={{ background: "transparent", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" }}
+                  className="shrink-0 rounded-full border-2 border-white text-center flex items-center justify-center"
+                  style={{
+                    width: kpi(92, 190),
+                    height: kpi(56, 88),
+                    background: "transparent",
+                    boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)",
+                  }}
                 >
                   <div className="text-center">
-                    <div className="text-base lg:text-3xl leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                    <div className="leading-none" style={{ fontFamily: "var(--font-display)", fontSize: kpi(16, 30) }}>
                       {winTotal}
                     </div>
-                    <div className="text-[7px] lg:text-[11px] leading-tight text-white/55 mt-0.5 lg:mt-1 tracking-wide">
+                    <div className="leading-tight text-white/55 tracking-wide" style={{ fontSize: kpi(7, 11), marginTop: kpi(2, 4) }}>
                       VEGAS
                       <br />
                       PREDICTION

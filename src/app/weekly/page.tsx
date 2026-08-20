@@ -21,6 +21,7 @@ import { PickStats, DesktopCell, buildDesktopRows, computePickStats, computePick
 import { renderShareImage } from "@/lib/shareImage";
 import { TeamAbbr, TEAMS } from "@/data/teams";
 import { buildReferralLink } from "@/lib/referralStorage";
+import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -45,69 +46,91 @@ function PillTexture() {
 
 const PILL_STYLE = { background: "#1b2947", boxShadow: "0 6px 16px -6px rgba(0,0,0,0.5)" };
 
-function StatPills({ stats, lockedTeam }: { stats: PickStats; lockedTeam: (typeof TEAMS)[TeamAbbr] | null }) {
+// `kpi` interpolates every size that used to jump at the lg breakpoint -
+// see kpiScale.ts. These pills and the predictor's were sized to match
+// each other, and they had the same defect for the same reason, so they
+// share the fix as well.
+function StatPills({
+  stats,
+  lockedTeam,
+  kpi,
+}: {
+  stats: PickStats;
+  lockedTeam: (typeof TEAMS)[TeamAbbr] | null;
+  kpi: (phone: number, desktop: number) => number;
+}) {
+  const labelStyle = { fontSize: kpi(8, 11), marginTop: kpi(2, 2) };
   return (
-    <div className="flex gap-2 lg:gap-5 justify-center flex-wrap">
+    <div className="flex justify-center flex-wrap" style={{ gap: kpi(8, 20) }}>
       <div
-        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center w-[88px] h-[56px] lg:w-[172px] lg:h-[88px]"
-        style={PILL_STYLE}
+        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center"
+        style={{ ...PILL_STYLE, width: kpi(88, 172), height: kpi(56, 88) }}
       >
         <PillTexture />
         <img
           src="/underdog-bulldog.png"
           alt=""
-          className="absolute -top-2 -left-1 lg:-top-3 lg:-left-1.5 h-8 lg:h-16 w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
+          className="absolute w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
+          style={{ top: -kpi(8, 12), left: -kpi(4, 6), height: kpi(32, 64) }}
         />
-        <div className="relative z-10 text-base lg:text-2xl" style={{ fontFamily: "var(--font-display)" }}>
+        <div className="relative z-10" style={{ fontFamily: "var(--font-display)", fontSize: kpi(16, 24) }}>
           {stats.underdogCount}
         </div>
-        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">UNDERDOGS</div>
+        <div className="relative z-10 text-white/55" style={labelStyle}>UNDERDOGS</div>
       </div>
       {/* Center slot - the most prominent pill (widest, emerald border),
           previously Boldest Pick. Lock of the Week took over this spot
           since it's the more important tag; Boldest Pick moved to the
           slot Chalk used to occupy below. */}
       <div
-        className="relative shrink-0 rounded-full border-2 text-center flex flex-col items-center justify-center w-[144px] h-[56px] lg:w-[250px] lg:h-[88px]"
-        style={{ ...PILL_STYLE, borderColor: LOCK_COLOR, background: lockedTeam ? lockedTeam.color : PILL_STYLE.background }}
+        className="relative shrink-0 rounded-full border-2 text-center flex flex-col items-center justify-center"
+        style={{
+          ...PILL_STYLE,
+          borderColor: LOCK_COLOR,
+          background: lockedTeam ? lockedTeam.color : PILL_STYLE.background,
+          width: kpi(144, 250),
+          height: kpi(56, 88),
+        }}
       >
         <PillTexture />
         <img
           src="/lock-of-week.png"
           alt=""
-          className="absolute -top-2 -left-1 lg:-top-3 lg:-left-1.5 h-8 lg:h-16 w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
+          className="absolute w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
+          style={{ top: -kpi(8, 12), left: -kpi(4, 6), height: kpi(32, 64) }}
         />
         <div
-          className="relative z-10 text-base lg:text-2xl flex items-center justify-center gap-1 lg:gap-1.5"
-          style={{ fontFamily: "var(--font-display)", color: "#4ade80" }}
+          className="relative z-10 flex items-center justify-center"
+          style={{ fontFamily: "var(--font-display)", color: "#4ade80", fontSize: kpi(16, 24), gap: kpi(4, 6) }}
         >
-          {lockedTeam ? <img src={lockedTeam.logo} alt="" crossOrigin="anonymous" className="h-8 lg:h-[64px] w-auto" /> : "-"}
+          {lockedTeam ? <img src={lockedTeam.logo} alt="" crossOrigin="anonymous" className="w-auto" style={{ height: kpi(32, 64) }} /> : "-"}
         </div>
-        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">LOCK OF THE WEEK</div>
+        <div className="relative z-10 text-white/55" style={labelStyle}>LOCK OF THE WEEK</div>
       </div>
       <div
-        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center w-[88px] h-[56px] lg:w-[172px] lg:h-[88px]"
-        style={PILL_STYLE}
+        className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center"
+        style={{ ...PILL_STYLE, width: kpi(88, 172), height: kpi(56, 88) }}
       >
         <PillTexture />
         <img
           src="/boldest-pick-alarm.png"
           alt=""
-          className="absolute -top-2.5 -left-1 lg:-top-4 lg:-left-1.5 h-7 lg:h-14 w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
+          className="absolute w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
+          style={{ top: -kpi(10, 16), left: -kpi(4, 6), height: kpi(28, 56) }}
         />
         <div
-          className="relative z-10 text-sm lg:text-xl flex items-center justify-center gap-1"
-          style={{ fontFamily: "var(--font-display)" }}
+          className="relative z-10 flex items-center justify-center gap-1"
+          style={{ fontFamily: "var(--font-display)", fontSize: kpi(14, 20) }}
         >
           {stats.boldestTeam ? (
             <>
-              <img src={stats.boldestTeam.logo} alt="" crossOrigin="anonymous" className="h-6 lg:h-10 w-auto" />+{stats.boldestSpread}
+              <img src={stats.boldestTeam.logo} alt="" crossOrigin="anonymous" className="w-auto" style={{ height: kpi(24, 40) }} />+{stats.boldestSpread}
             </>
           ) : (
             "-"
           )}
         </div>
-        <div className="relative z-10 text-[8px] lg:text-[11px] text-white/55 mt-0.5">BOLDEST PICK</div>
+        <div className="relative z-10 text-white/55" style={labelStyle}>BOLDEST PICK</div>
       </div>
     </div>
   );
@@ -546,12 +569,16 @@ export default function Home() {
   // fit on any screen instead of collapsing to a single mobile column.
   const gridPageX = 16; // matches main's px-4
   const gridColumnGap = viewportWidth < 640 ? 10 : 32;
+  const contentWidth = Math.min(viewportWidth, 896) - gridPageX * 2;
   const gridScale = useMemo(() => {
-    const contentWidth = Math.min(viewportWidth, 896) - gridPageX * 2;
     const columnWidth = (contentWidth - gridColumnGap) / 2;
     const raw = columnWidth / PILL_WIDTH;
     return Math.min(COMPACT_SCALE, Math.max(0.42, raw));
-  }, [viewportWidth, gridColumnGap]);
+  }, [contentWidth, gridColumnGap]);
+
+  // The stat pills below the grid follow the room the row has rather
+  // than a breakpoint - see kpiScale.ts.
+  const kpi = kpiSizer(kpiFraction(contentWidth));
 
   // Share button used to be a fixed desktop size regardless of viewport,
   // which read as oversized once the matchup pills themselves started
@@ -718,7 +745,7 @@ export default function Home() {
             </div>
 
             <div className="mt-5">
-              {hasResults ? <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} /> : <StatPills stats={stats} lockedTeam={lockedTeam} />}
+              {hasResults ? <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} /> : <StatPills stats={stats} lockedTeam={lockedTeam} kpi={kpi} />}
             </div>
 
             <div className="flex justify-center mt-5">
