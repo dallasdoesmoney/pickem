@@ -259,7 +259,16 @@ export function tierLabelFor(tier: Tier, index: number): string {
 // today's default instead - otherwise every list made before the default
 // changed would keep exporting the old wording. Only an exact match is
 // rewritten, so a title someone actually typed is left alone.
-const LEGACY_DEFAULT_TITLES = new Set(["My NFL Team Tier List"]);
+const LEGACY_DEFAULT_TITLES = new Set([
+  "My NFL Team Tier List",
+  // Dropped when categories stopped being named "<thing> Tier List" -
+  // see the title field in tierTemplates.ts. Without these, everyone who
+  // had already opened a board kept the old wording on the heading and
+  // on every card they exported, because the title was written into
+  // their saved state the first time they touched it.
+  "NFL Team Tier List",
+  "NFL Quarterback Tier List",
+]);
 
 function restoreTitle(raw: unknown, template: TierTemplate): string {
   if (typeof raw !== "string" || !raw.trim()) return template.defaultListTitle;
