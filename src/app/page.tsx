@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchWeeks, WeekRow } from "@/lib/supabase/admin";
 import { fetchWeeklyPicks } from "@/lib/supabase/picks";
@@ -8,6 +8,7 @@ import { fetchPredictorProgress } from "@/lib/supabase/achievements";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { CURRENT_WEEK, GAMES_BY_WEEK, Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
+import { PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
 import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
 import { getTierTemplate } from "@/data/tierTemplates";
 import { BoardThumb, previewFor } from "@/components/tierList/BoardThumb";
@@ -47,32 +48,72 @@ function Meta({ color, children }: { color?: string; children: React.ReactNode }
 
 // ---------------------------------------------------------------- weekly
 
-// A matchup at thumbnail scale: the two team colors butted together with
-// the abbreviations, and a white ring on whichever half you picked. Not
-// TeamHalfPill - that one is a fixed 80px interactive control built for
-// the picks page, and shrinking it to fit here would drag its logo,
-// footer and outcome layers along for no benefit at 26px tall.
-function MatchupThumb({ game, picked }: { game: Game; picked?: TeamAbbr }) {
-  const away = TEAMS[game.away];
-  const home = TEAMS[game.home];
+const PILL_GAP = 6;
+
+// The real pill from the picks page, at preview size. Stretched to full
+// card width it stopped reading as a pill at all - the two halves became
+// bands and the rounded ends disappeared - so it goes two-up on a phone
+// and five-up once there is room.
+function Matchup({ game, picked, scale }: { game: Game; picked?: TeamAbbr; scale: number }) {
   return (
-    <div className="mb-[5px] flex h-[26px] overflow-hidden rounded-md last:mb-0">
-      {[
-        { team: away, side: "left" as const },
-        { team: home, side: "right" as const },
-      ].map(({ team, side }) => (
-        <span
-          key={team.abbr}
-          className={`flex h-full flex-1 items-center px-[7px] text-[9px] font-bold tracking-[0.06em] text-white ${
-            side === "right" ? "justify-end" : ""
-          }`}
-          style={{
-            background: team.color,
-            boxShadow: picked === team.abbr ? "inset 0 0 0 2px rgba(255,255,255,0.85)" : undefined,
-          }}
-        >
-          {team.abbr}
-        </span>
+    <div className="relative flex items-center" style={{ width: PILL_WIDTH * scale }}>
+      {([
+        [game.away, "left"],
+        [game.home, "right"],
+      ] as const).map(([abbr, side]) => (
+        <TeamHalfPill
+          key={side}
+          team={TEAMS[abbr]}
+          side={side}
+          outcome={null}
+          // Dimming the team you passed on says "you chose" without a
+          // ring, a tick or a legend. Nothing is faded until a pick
+          // exists, so an untouched week reads as all still open.
+          isFaded={!!picked && picked !== abbr}
+          onClick={() => {}}
+          disabled
+          scale={scale}
+          footer={<span style={{ fontSize: 14 * scale, fontFamily: "var(--font-display)", color: "#fff" }}>{abbr}</span>}
+        />
+      ))}
+    </div>
+  );
+}
+
+// TeamHalfPill is a fixed-width component, so a plain grid leaves
+// whatever the column is wider than the pill as dead space - which on a
+// wide card is most of it. Measuring the panel and solving the scale from
+// the column count makes the pills fill their columns exactly at any
+// width instead.
+function MatchupGrid({ games, picks }: { games: Game[]; picks: Record<string, TeamAbbr> | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState(2);
+  const [scale, setScale] = useState(0.47);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const nextCols = window.innerWidth >= 640 ? 5 : 2;
+      const column = (el.clientWidth - PILL_GAP * (nextCols - 1)) / nextCols;
+      setCols(nextCols);
+      setScale(column / PILL_WIDTH);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Rows are chosen per breakpoint rather than derived from the column
+  // count: four rows of two on a phone, two rows of five on a wide card.
+  // Both fill every cell, and both stop short of a half-empty last row.
+  const shown = games.slice(0, cols === 2 ? 8 : 10);
+
+  return (
+    <div ref={ref} className="grid w-full" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: PILL_GAP }}>
+      {shown.map((game) => (
+        <Matchup key={game.id} game={game} picked={picks?.[game.id]} scale={scale} />
       ))}
     </div>
   );
@@ -92,36 +133,25 @@ function WeeklyHero({
   const madeCount = picks ? games.filter((g) => picks[g.id]).length : 0;
   const left = games.length - madeCount;
 
-  const line = !signedIn
-    ? `Pick a winner in every Week ${week} game and climb the leaderboard.`
-    : left === 0 && games.length > 0
-      ? `All ${games.length} picks are in for Week ${week}. Change them any time before kickoff.`
-      : `Pick a winner in every Week ${week} game and climb the leaderboard. ${left} ${left === 1 ? "game" : "games"} still open.`;
+  // Same shape as every other card on the page: name, then one meta line.
+  // No subtitle and no button - the whole card is the link, exactly like
+  // the three below it.
+  const meta = !signedIn
+    ? `WEEK ${week} · ${games.length} GAMES`
+    : madeCount === 0
+      ? `WEEK ${week} · ${games.length} GAMES OPEN`
+      : left === 0
+        ? `${games.length} OF ${games.length} PICKED`
+        : `${madeCount} OF ${games.length} PICKED`;
 
   return (
-    <Link href="/weekly" className={`${CARD} lg:flex-row lg:items-stretch`}>
-      <div className={`${ART} lg:w-[46%]`}>
-        <div className="w-full">
-          {games.slice(0, 4).map((game) => (
-            <MatchupThumb key={game.id} game={game} picked={picks?.[game.id]} />
-          ))}
-        </div>
+    <Link href="/weekly" className={CARD}>
+      <div className={ART}>
+        <MatchupGrid games={games} picks={picks} />
       </div>
-      <div className="flex flex-1 flex-col justify-center px-5 py-5">
-        <Meta color="#4ade80">{madeCount > 0 ? `${madeCount} OF ${games.length} PICKED` : "LIVE NOW"}</Meta>
-        <Name className="mt-2 text-[22px] lg:text-[26px]">WEEKLY PICK&rsquo;EM</Name>
-        <p className="mt-2 max-w-[46ch] text-[13px] leading-snug text-white/45">{line}</p>
-        <div className="mt-4">
-          {/* Not a button: the whole card is the link, and nesting a second
-              interactive element inside it would be invalid and would give
-              keyboard users two stops for one destination. */}
-          <span
-            className="inline-block rounded-full px-4 py-[9px] text-[11px] tracking-[0.1em] transition-transform duration-200 group-hover:scale-[1.03]"
-            style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
-          >
-            {madeCount > 0 ? "REVIEW PICKS" : "MAKE PICKS"}
-          </span>
-        </div>
+      <div className="px-3 pt-2.5 pb-3">
+        <Name>WEEKLY PICK&rsquo;EM</Name>
+        <Meta color="#4ade80">{meta}</Meta>
       </div>
     </Link>
   );
