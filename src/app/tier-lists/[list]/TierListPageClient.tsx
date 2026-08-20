@@ -37,7 +37,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { supabase } from "@/lib/supabase/client";
-import { createTierListShare, fetchTierList, listMyTierLists, saveTierList } from "@/lib/supabase/tierLists";
+import {
+  createTierListShare,
+  fetchTierList,
+  listMyTierLists,
+  recordTierListView,
+  saveTierList,
+} from "@/lib/supabase/tierLists";
 import { renderTierShareImage } from "@/lib/tierShareImage";
 import { shareBlob } from "@/lib/shareBlob";
 import { buildReferralLink } from "@/lib/referralStorage";
@@ -110,6 +116,14 @@ export default function TierListPageClient({
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
+
+  // Count the open. Not gated on being signed in - the board is usable
+  // signed out, and a count that skipped those people would undercount
+  // the categories strangers arrive on most. Arriving through a share
+  // link counts too: it is still somebody looking at this category.
+  useEffect(() => {
+    recordTierListView(template.slug);
+  }, [template.slug]);
 
   // Seed from a shared snapshot exactly once, after local state has
   // hydrated so it isn't immediately overwritten by the effect in the hook.

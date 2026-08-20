@@ -9,8 +9,9 @@ import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import {
   SavedTierListSummary,
+  TierListStats,
   deleteTierList,
-  fetchTierListRankCounts,
+  fetchTierListStats,
   listMyTierLists,
 } from "@/lib/supabase/tierLists";
 
@@ -48,8 +49,24 @@ function matches(haystack: string, query: string): boolean {
 const CARD =
   "group flex flex-col rounded-2xl border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/40";
 
-function TemplateCard({ template, people }: { template: TierTemplate; people?: number }) {
+// How far up the hub a category sits. A save is worth ten opens: it took
+// a sign-in and a finished board, and it is the number nobody can inflate
+// by reloading a page. Views break the ties between categories nobody has
+// saved yet, which is exactly where a fixed order has nothing to say.
+export function popularity(stats?: TierListStats): number {
+  if (!stats) return 0;
+  return stats.people * 10 + stats.views;
+}
+
+function TemplateCard({ template, stats }: { template: TierTemplate; stats?: TierListStats }) {
   const preview = useMemo(() => previewFor(template), [template]);
+  // Hidden at zero rather than shown as "0 RANKED" - a counter is social
+  // proof, and an empty one is the opposite. Each half drops out on its
+  // own, so a brand-new category shows its views without claiming saves.
+  const counters = [
+    stats?.views ? `${abbreviate(stats.views)} OPENED` : null,
+    stats?.people ? `${abbreviate(stats.people)} RANKED` : null,
+  ].filter(Boolean);
   return (
     <Link href={`/tier-lists/${template.slug}`} className={CARD}>
       <span className="block p-2.5 pb-0">
@@ -60,14 +77,12 @@ function TemplateCard({ template, people }: { template: TierTemplate; people?: n
           {template.title.toUpperCase()}
         </span>
         <span className="text-[11.5px] text-white/45 leading-snug">{template.tagline}</span>
-        {/* Hidden at zero rather than shown as "0 RANKED" - a counter is
-            social proof, and an empty one is the opposite. */}
-        {!!people && (
+        {counters.length > 0 && (
           <span
             className="text-[10px] tracking-[0.14em] text-white/40 mt-0.5"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            {abbreviate(people)} RANKED
+            {counters.join(" · ")}
           </span>
         )}
       </span>
@@ -129,7 +144,7 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
   const [saved, setSaved] = useState<SavedTierListSummary[] | null>(null);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [stats, setStats] = useState<Record<string, TierListStats>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -153,15 +168,24 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
     load(user.id);
   }, [user, load]);
 
-  // Public: the counter shows for signed-out visitors too.
+  // Public: the counters show for signed-out visitors too.
   useEffect(() => {
-    fetchTierListRankCounts().then(setCounts);
+    fetchTierListStats().then(setStats);
   }, []);
 
-  const shownTemplates = useMemo(
-    () => (query ? templates.filter((t) => matches(`${t.title} ${t.tagline}`, query)) : templates),
-    [templates, query],
-  );
+  // Most popular first. Sorted rather than switchable: there is one
+  // sensible order for a wall of categories and a control to change it
+  // would be more chrome than the four cards under it. Ties keep the
+  // declared order, so an empty database looks exactly like the hand-
+  // written list - and the sort only reorders once real usage separates
+  // them.
+  const shownTemplates = useMemo(() => {
+    const rows = query ? templates.filter((t) => matches(`${t.title} ${t.tagline}`, query)) : templates;
+    return rows
+      .map((t, i) => ({ t, i }))
+      .sort((a, b) => popularity(stats[b.t.slug]) - popularity(stats[a.t.slug]) || a.i - b.i)
+      .map(({ t }) => t);
+  }, [templates, query, stats]);
 
   const shownSaved = useMemo(() => {
     const rows = saved ?? [];
@@ -283,7 +307,7 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
         ) : (
           <div className={grid}>
             {shownTemplates.map((t) => (
-              <TemplateCard key={t.slug} template={t} people={counts[t.slug]} />
+              <TemplateCard key={t.slug} template={t} stats={stats[t.slug]} />
             ))}
           </div>
         )

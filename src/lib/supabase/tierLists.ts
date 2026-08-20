@@ -68,6 +68,57 @@ export async function fetchTierListRankCounts(): Promise<Record<string, number>>
   return out;
 }
 
+// Both counters for one category. `people` is trustworthy - it is a
+// distinct count of rows someone had to be signed in to write. `views`
+// is not; see 0035. Treat it as a popularity signal, never as a fact.
+export type TierListStats = { people: number; views: number };
+
+// Keyed by template slug, for the hub's cards and their ordering.
+//
+// Falls back to the older rank-counts RPC when 0035 hasn't been run, and
+// to an empty map when neither exists: a counter is a nice-to-have on a
+// card, and the hub has to render on any database.
+export async function fetchTierListStats(): Promise<Record<string, TierListStats>> {
+  const { data, error } = await supabase.rpc("tier_list_stats");
+  if (error) {
+    console.warn("Tier list stats unavailable, falling back to rank counts", error.message);
+    const counts = await fetchTierListRankCounts();
+    return Object.fromEntries(Object.entries(counts).map(([slug, people]) => [slug, { people, views: 0 }]));
+  }
+  const out: Record<string, TierListStats> = {};
+  for (const row of (data as { template: string; people: number; views: number }[]) ?? []) {
+    out[row.template] = { people: Number(row.people) || 0, views: Number(row.views) || 0 };
+  }
+  return out;
+}
+
+// Which categories this tab has already been counted for. Session, not
+// local: a view is "someone opened this today", so a refresh or a bounce
+// back from a share link shouldn't each count again, but coming back
+// tomorrow should. It is an honesty measure on our own side rather than
+// a defence - a determined caller can hit the RPC directly.
+const VIEWED_KEY = "pickem:tier-views";
+
+function alreadyViewed(slug: string): boolean {
+  try {
+    const seen = JSON.parse(sessionStorage.getItem(VIEWED_KEY) || "[]") as string[];
+    if (seen.includes(slug)) return true;
+    sessionStorage.setItem(VIEWED_KEY, JSON.stringify([...seen, slug]));
+    return false;
+  } catch {
+    // Private mode or a corrupt value. Counting is better than not.
+    return false;
+  }
+}
+
+// Fire-and-forget: nothing on the page waits for it and nothing on the
+// page changes if it fails. A counter must never be able to break a board.
+export async function recordTierListView(slug: string): Promise<void> {
+  if (alreadyViewed(slug)) return;
+  const { error } = await supabase.rpc("record_tier_list_view", { p_template: slug });
+  if (error) console.warn("View not recorded", error.message);
+}
+
 export async function deleteTierList(userId: string, id: string): Promise<{ error: string | null }> {
   const { error } = await supabase.from("tier_lists").delete().eq("user_id", userId).eq("id", id);
   if (error) {
