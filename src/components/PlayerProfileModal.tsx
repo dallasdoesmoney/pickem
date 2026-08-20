@@ -3,6 +3,8 @@
 import { LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { ProfileCard } from "@/components/ProfileCard";
+import { rankWashStyle } from "@/components/RankPanel";
+import { getLevelInfo } from "@/lib/levels";
 
 // The whole profile in one scrollable popup - no more "view full profile
 // page" hop to a separate route. The standalone /leaderboard/[username]
@@ -31,7 +33,17 @@ export function PlayerProfileModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1730] shadow-2xl shadow-black/50 flex flex-col max-h-[85vh]">
+      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/15 bg-[#0b1730] shadow-2xl shadow-black/50 flex flex-col max-h-[85vh]">
+        {/* Same rank wash the account page and the public profile page
+            carry. It sits on the panel rather than inside the scrolling
+            body, so it stays pinned behind the avatar instead of sliding
+            away with the stats - this popup is where most people see
+            someone else's profile, so it is the one that matters most. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0"
+          style={rankWashStyle(getLevelInfo(row.total_points).rankColor)}
+        />
         <button
           aria-label="Close"
           onClick={onClose}
@@ -43,7 +55,7 @@ export function PlayerProfileModal({
           </svg>
         </button>
 
-        <div className="overflow-y-auto px-6 pb-6 pt-8">
+        <div className="relative overflow-y-auto px-6 pb-6 pt-8">
           <ProfileCard row={row} stats={stats} myId={myId} onFollowChange={onFollowChange} />
         </div>
       </div>

@@ -29,6 +29,16 @@ const TONE = {
   quiet: { alpha: "26", height: "8rem", spread: "125% 100%", fade: "76%" },
 } as const;
 
+// The wash on its own, for surfaces that already have their own layout
+// and can't be wrapped - the profile popup, whose panel has to stay a
+// flex column with a pinned close button and a scrolling body. Same
+// numbers, so the popup and the two pages can't drift apart.
+export function rankWashStyle(rankColor: string | null, tone: RankPanelTone = "hero"): React.CSSProperties {
+  const { alpha, height, spread, fade } = TONE[tone];
+  const tint = rankColor ? `${rankColor}${alpha}` : "rgba(255,255,255,0.08)";
+  return { height, background: `radial-gradient(${spread} at 50% 0%, ${tint}, transparent ${fade})` };
+}
+
 export function RankPanel({
   rankColor,
   tone = "quiet",
@@ -45,16 +55,9 @@ export function RankPanel({
   innerClassName?: string;
   children: React.ReactNode;
 }) {
-  const { alpha, height, spread, fade } = TONE[tone];
-  const tint = rankColor ? `${rankColor}${alpha}` : "rgba(255,255,255,0.08)";
-
   return (
     <div className={`relative overflow-hidden ${className}`}>
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0"
-        style={{ height, background: `radial-gradient(${spread} at 50% 0%, ${tint}, transparent ${fade})` }}
-      />
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0" style={rankWashStyle(rankColor, tone)} />
       <div className={`relative ${innerClassName}`}>{children}</div>
     </div>
   );
