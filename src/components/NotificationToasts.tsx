@@ -7,6 +7,7 @@ import { fetchUnreadNotifications, markNotificationRead, syncLevelUpNotification
 import { fetchMyReferrals, ReferralRow } from "@/lib/supabase/referrals";
 import { fetchProfilesByIds, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { ALL_LEVELS, subLevelRoman } from "@/lib/levels";
+import { activityHref } from "@/lib/activity";
 
 type Actor = Pick<LeaderboardRow, "username" | "display_name" | "avatar_url">;
 
@@ -18,6 +19,9 @@ type ToastContent = {
   title: string;
   subtitle: string;
   accentColor: string;
+  // Where tapping it goes. Same helper the activity feed uses, so a
+  // toast and the feed row for the same event land in the same place.
+  href: string;
 };
 
 function buildToastContent(n: NotificationRow, referrals: ReferralRow[], actors: Map<string, Actor>): ToastContent {
@@ -29,21 +33,24 @@ function buildToastContent(n: NotificationRow, referrals: ReferralRow[], actors:
       avatarUrl: follower?.avatar_url ?? null,
       initial: label.charAt(0).toUpperCase(),
       title: isMutual ? `${label} followed you back — you're now friends!` : `${label} started following you`,
-      subtitle: isMutual ? "You're now friends" : "Tap to view",
+      subtitle: isMutual ? "You're now friends" : "Tap to view their profile",
       accentColor: isMutual ? "#4ade80" : "#c084fc",
+      href: activityHref("new_follower", follower?.username) ?? "/notifications",
     };
   }
 
   if (n.type === "level_up") {
     const level = Number(n.data.level);
     const entry = ALL_LEVELS[level - 1];
-    if (!entry) return { avatarUrl: null, initial: "🎉", title: "You leveled up!", subtitle: `Level ${level}`, accentColor: "#4ade80" };
+    if (!entry)
+      return { avatarUrl: null, initial: "🎉", title: "You leveled up!", subtitle: `Level ${level}`, accentColor: "#4ade80", href: "/account" };
     return {
       avatarUrl: null,
       initial: entry.rankEmoji,
       title: `Level ${entry.level} — ${entry.rankName} ${subLevelRoman(entry.subLevel)}`,
       subtitle: "You leveled up!",
       accentColor: entry.rankColor,
+      href: activityHref("level_up"),
     };
   }
 
@@ -54,6 +61,7 @@ function buildToastContent(n: NotificationRow, referrals: ReferralRow[], actors:
       title: "You're now a Creator!",
       subtitle: "Your badge is live on your profile",
       accentColor: "#ef4444",
+      href: activityHref("creator_request_approved"),
     };
   }
 
@@ -66,6 +74,7 @@ function buildToastContent(n: NotificationRow, referrals: ReferralRow[], actors:
     title: `${label} joined using your invite!`,
     subtitle: "You both earned 1,000 pts",
     accentColor: "#4ade80",
+    href: activityHref("referral_joined", referee?.username) ?? "/notifications",
   };
 }
 
@@ -128,14 +137,18 @@ export function NotificationToasts() {
     setCurrent(null);
   }
 
-  // Tapping anywhere on the toast (besides the dismiss button) takes you
-  // to the notifications/activity page - same "mark read" as a plain
-  // dismiss, just followed by navigating there instead of staying put.
+  // Tapping anywhere on the toast (besides the dismiss button) goes to
+  // whatever the toast is actually about - the person who followed you,
+  // or your own profile for a level-up. It used to go to the activity
+  // feed regardless, which meant a toast naming someone couldn't take
+  // you to them. The feed is still the fallback when an actor's profile
+  // hasn't resolved.
   function handleOpen() {
     if (!current) return;
     markNotificationRead(current.id).catch((err) => console.error("Failed to mark notification read", err));
+    const target = buildToastContent(current, referrals, actors).href;
     setCurrent(null);
-    router.push("/notifications");
+    router.push(target);
   }
 
   if (!current) return null;

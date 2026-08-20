@@ -24,6 +24,27 @@ export type ActivityGroup = {
   level?: number; // level_up only
 };
 
+// Where an activity row goes when it is tapped.
+//
+// Shared by the feed and the toasts so the two cannot disagree about
+// what a notification is about - a toast that says someone followed you
+// and a feed row saying the same thing should land in the same place.
+//
+// Anything about you goes to your own profile, which is where the level
+// card and the creator badge both live. Anything about somebody else
+// goes to them. Returns null when there is nowhere honest to send
+// someone - an actor whose profile has not resolved yet - so the caller
+// renders a plain row rather than a link that 404s.
+// Overloaded because the null case is real but narrow: only a row about
+// somebody else can fail to resolve. The two that are about you always
+// have somewhere to go, and callers shouldn't have to prove that.
+export function activityHref(kind: "level_up" | "creator_request_approved"): string;
+export function activityHref(kind: ActivityKind, actorUsername?: string | null): string | null;
+export function activityHref(kind: ActivityKind, actorUsername?: string | null): string | null {
+  if (kind === "level_up" || kind === "creator_request_approved") return "/account";
+  return actorUsername ? `/leaderboard/${actorUsername}` : null;
+}
+
 const GROUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Builds the grouped, newest-first activity feed from raw notification

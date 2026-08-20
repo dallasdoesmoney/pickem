@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchFollowersNotFollowingBack, followUser, FollowerRow } from "@/lib/supabase/follows";
 import { fetchAllNotifications, markAllNotificationsRead, NotificationRow } from "@/lib/supabase/notifications";
 import { fetchProfilesByIds, LeaderboardRow } from "@/lib/supabase/leaderboard";
-import { buildActivityGroups, relativeTime, ActivityGroup } from "@/lib/activity";
+import { buildActivityGroups, relativeTime, activityHref, ActivityGroup } from "@/lib/activity";
 import { ALL_LEVELS, subLevelRoman } from "@/lib/levels";
 import { errorMessage } from "@/lib/errorMessage";
 
@@ -66,6 +66,10 @@ export default function NotificationsPage() {
   const [profiles, setProfiles] = useState<Map<string, Pick<LeaderboardRow, "username" | "display_name" | "avatar_url">>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Which grouped row is showing its members. A group of several people
+  // has no single profile to open, so instead of picking one and hoping,
+  // tapping it lists them and each of those is a real link.
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -194,22 +198,104 @@ export default function NotificationsPage() {
               {groups.map((group) => {
                 const actors = group.actorIds.map((id) => profiles.get(id));
                 const { text, accentColor, avatarUrl, initial } = describeGroup(group, actors);
-                return (
-                  <div key={group.ids[0]} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
-                    ) : (
-                      <span
-                        className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-base"
-                        style={{ background: `${accentColor}26`, boxShadow: `0 0 10px -4px ${accentColor}` }}
-                      >
-                        {initial}
-                      </span>
-                    )}
-                    <div className="flex-1 min-w-0">
+                const key = group.ids[0];
+                const multiple = group.actorIds.length > 1;
+                const href = multiple ? null : activityHref(group.kind, actors[0]?.username);
+                const expanded = expandedGroup === key;
+
+                const face = avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover shrink-0" />
+                ) : (
+                  <span
+                    className="h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-base"
+                    style={{ background: `${accentColor}26`, boxShadow: `0 0 10px -4px ${accentColor}` }}
+                  >
+                    {initial}
+                  </span>
+                );
+                const body = (
+                  <>
+                    {face}
+                    <div className="flex-1 min-w-0 text-left">
                       <p className="text-sm">{text}</p>
                       <p className="text-[11px] text-white/40 mt-0.5">{relativeTime(group.createdAt)}</p>
                     </div>
+                    {/* Every row that goes somewhere says so. Without it
+                        the feed reads as a wall of static text, which is
+                        exactly what it was. */}
+                    {(href || multiple) && (
+                      <svg
+                        viewBox="0 0 24 24"
+                        className={`h-4 w-4 shrink-0 text-white/30 transition-transform ${expanded ? "rotate-90" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M9 6l6 6-6 6" />
+                      </svg>
+                    )}
+                  </>
+                );
+                const rowClass =
+                  "flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 transition-colors";
+
+                if (href) {
+                  return (
+                    <Link key={key} href={href} className={`${rowClass} hover:border-white/25 hover:bg-white/[0.08]`}>
+                      {body}
+                    </Link>
+                  );
+                }
+                if (multiple) {
+                  return (
+                    <div key={key} className="flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedGroup(expanded ? null : key)}
+                        aria-expanded={expanded}
+                        className={`${rowClass} hover:border-white/25 hover:bg-white/[0.08]`}
+                      >
+                        {body}
+                      </button>
+                      {expanded && (
+                        <div className="flex flex-col gap-1 pl-6">
+                          {group.actorIds.map((id) => {
+                            const actor = profiles.get(id);
+                            const label = actor?.display_name || actor?.username || "Someone";
+                            if (!actor?.username) {
+                              return (
+                                <span key={id} className="px-3 py-2 text-sm text-white/40">
+                                  {label}
+                                </span>
+                              );
+                            }
+                            return (
+                              <Link
+                                key={id}
+                                href={`/leaderboard/${actor.username}`}
+                                className="flex items-center gap-2.5 rounded-lg border border-white/10 px-3 py-2 transition-colors hover:border-white/25 hover:bg-white/5"
+                              >
+                                {actor.avatar_url ? (
+                                  <img src={actor.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover shrink-0" />
+                                ) : (
+                                  <span className="h-7 w-7 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-[11px]">
+                                    {label.charAt(0).toUpperCase()}
+                                  </span>
+                                )}
+                                <span className="truncate text-sm">{label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={key} className={rowClass}>
+                    {body}
                   </div>
                 );
               })}
