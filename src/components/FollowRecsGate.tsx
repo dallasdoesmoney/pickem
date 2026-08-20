@@ -53,13 +53,15 @@ export function FollowRecsGate() {
         // Pre-selected, which is the whole point of the design: the easy
         // path follows everyone, and opting out is one visible tap.
         setSelected(new Set(rows.map((r) => r.user_id)));
-        // Nothing to recommend - burn the flag rather than showing an
-        // empty box, so this doesn't re-query on every page load forever.
-        if (rows.length === 0) {
-          markFollowRecsPrompted(user.id)
-            .then(refreshProfile)
-            .catch(() => {});
-        }
+        // Deliberately does NOT mark the prompt as seen when the list
+        // comes back empty. "No creators to recommend" is a temporary
+        // state - nobody holds the Creator badge yet, or the only ones
+        // who do are people you already follow - and burning the flag on
+        // it would spend everyone's single shot before there was
+        // anything to show them, so nobody would ever see the modal once
+        // creators did exist. The cost of not burning it is one small
+        // indexed read per session load until there is something to
+        // show, which is the cheaper mistake by a wide margin.
       })
       .catch(() => {
         if (!cancelled) setCreators([]);
@@ -67,7 +69,7 @@ export function FollowRecsGate() {
     return () => {
       cancelled = true;
     };
-  }, [eligible, user, refreshProfile]);
+  }, [eligible, user]);
 
   if (!eligible || !creators || creators.length === 0) return null;
 
