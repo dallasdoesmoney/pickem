@@ -1,4 +1,5 @@
 import { TEAMS, TEAMS_SORTED } from "@/data/teams";
+import { QUARTERBACKS, espnHeadshot } from "@/data/qbs";
 
 // A tier-list template is "what's being ranked" - the item set plus the
 // copy that frames it. The engine (src/lib/tierList.ts) knows nothing
@@ -14,6 +15,19 @@ export type TierItem = {
   accent: string;
 };
 
+// How an item's picture wants to be drawn.
+//
+// "mark" is a logo: a square, transparent, already-composed graphic that
+// is fitted whole inside its chip and needs no caption, because the
+// picture IS the name.
+//
+// "portrait" is a photograph of a person: wide, framed at the shoulders,
+// and useless fitted whole into a small square - the head ends up a
+// third of the chip. Those are cropped to fill instead, and they carry a
+// caption, because thirty-two faces with no names is a memory test
+// rather than a ranking.
+export type TierItemStyle = "mark" | "portrait";
+
 export type TierTemplate = {
   // Route segment AND the DB `template` discriminator - stable forever.
   slug: string;
@@ -23,6 +37,8 @@ export type TierTemplate = {
   defaultListTitle: string;
   // Singular/plural noun for progress + warning copy ("7 unranked teams").
   itemNoun: [singular: string, plural: string];
+  // Defaults to "mark" - every category before quarterbacks was logos.
+  itemStyle?: TierItemStyle;
   // Mark for the category itself, shown beside it in the tier list menus.
   // Optional because a category is perfectly usable without one - callers
   // fall back to a neutral glyph rather than a broken image.
@@ -52,8 +68,33 @@ const NFL_TEAMS: TierTemplate = {
   })),
 };
 
+const NFL_QBS: TierTemplate = {
+  slug: "nfl-quarterbacks",
+  title: "NFL Quarterback Tier List",
+  tagline: "Rank every starting QB",
+  defaultListTitle: "NFL Quarterback Tier List",
+  itemNoun: ["quarterback", "quarterbacks"],
+  itemStyle: "portrait",
+  icon: "https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png",
+  // Accent is the player's team colour, so a board of faces still reads
+  // as a board of teams at a glance - and so a headshot that fails to
+  // load falls back to something meaningful rather than a grey tile.
+  items: QUARTERBACKS.map((qb) => ({
+    // Namespaced: resolveItem() falls back to a TEAMS lookup by raw id,
+    // and a bare ESPN id has no business colliding with that.
+    id: `qb-${qb.espnId}`,
+    label: qb.name,
+    imageUrl: espnHeadshot(qb.espnId),
+    accent: TEAMS[qb.team].color,
+  })),
+};
+
 export const TIER_TEMPLATES: Record<string, TierTemplate> = {
   [NFL_TEAMS.slug]: NFL_TEAMS,
+  // Registered only once the roster has actually been synced. An
+  // unsynced checkout offers one category rather than two, which is
+  // recoverable; offering an empty board is not - see qbs.ts.
+  ...(NFL_QBS.items.length > 0 ? { [NFL_QBS.slug]: NFL_QBS } : {}),
 };
 
 export function getTierTemplate(slug: string): TierTemplate | null {

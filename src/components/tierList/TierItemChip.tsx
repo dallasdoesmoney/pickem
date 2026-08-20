@@ -2,15 +2,21 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TierItem } from "@/data/tierTemplates";
+import { TierItem, TierItemStyle } from "@/data/tierTemplates";
 
-// Items render as a bare logo by product decision, so the accessible name
-// has to come from somewhere else entirely: aria-label carries the full
-// team name for screen readers, `title` gives sighted users a hover
-// tooltip, and the img itself stays alt="" so the name isn't announced
-// twice.
+// Marks render bare, by product decision, so the accessible name has to
+// come from somewhere else entirely: aria-label carries the full name
+// for screen readers, `title` gives sighted users a hover tooltip, and
+// the img itself stays alt="" so the name isn't announced twice.
+//
+// Portraits keep all of that and add a visible caption, because a hover
+// tooltip is not a thing on a phone and a board of thirty-two faces with
+// nothing written on it is a memory test. The caption is the surname
+// only: at this chip size a full name sets at about five pixels, and the
+// surname is what anyone says out loud anyway.
 export function TierItemChip({
   item,
+  style = "mark",
   size,
   selected,
   landed,
@@ -22,6 +28,7 @@ export function TierItemChip({
   dragging,
 }: {
   item: TierItem;
+  style?: TierItemStyle;
   size: number;
   selected?: boolean;
   // Set for one beat right after a placement so the chip can pop.
@@ -72,16 +79,80 @@ export function TierItemChip({
           : {}),
       }}
     >
-      <img
-        src={item.imageUrl}
-        alt=""
-        crossOrigin="anonymous"
-        draggable={false}
-        className="w-full h-full object-contain select-none pointer-events-none transition-opacity duration-150"
-        style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.45))", opacity: dragging ? 0.3 : 1 }}
-      />
+      {style === "portrait" ? (
+        <span
+          aria-hidden
+          className="absolute inset-0 overflow-hidden rounded-xl"
+          style={{ opacity: dragging ? 0.3 : 1 }}
+        >
+          {/* The team colour behind the cut-out, not a grey plate: these
+              headshots are transparent PNGs, so whatever is behind them
+              IS the chip. Team colour keeps a board of faces readable as
+              a board of teams, and covers the gap when one fails. */}
+          <span className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${item.accent}, ${item.accent}66)` }} />
+          {/* object-cover with the frame pushed to the top: ESPN's cut is
+              1040x760 with the head in the upper middle, so fitting it
+              whole leaves the face about a third of the chip, and
+              centring the crop cuts the forehead off. */}
+          <img
+            src={item.imageUrl}
+            alt=""
+            crossOrigin="anonymous"
+            draggable={false}
+            className="absolute inset-0 h-full w-full select-none object-cover object-top pointer-events-none"
+          />
+          {/* Bottom-anchored so the name sits over the shoulders rather
+              than the face, and gradient-backed so it stays legible over
+              a light jersey or a dark one. */}
+          <span
+            className="absolute inset-x-0 bottom-0 flex items-end justify-center whitespace-nowrap px-1 pb-0.5 text-white"
+            style={{
+              fontFamily: "var(--font-display)",
+              // Solved rather than fixed, and never clipped: a surname cut
+              // in half names nobody, and this caption exists precisely to
+              // tell two faces apart. 0.72em per character is Bungee's
+              // rough advance width, so the second term is the largest size
+              // at which the whole name still fits the chip.
+              fontSize: captionSize(item.label, size),
+              lineHeight: 1.1,
+              background: "linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.45) 55%, transparent)",
+              paddingTop: size * 0.22,
+              textShadow: "0 1px 2px rgba(0,0,0,0.9)",
+            }}
+          >
+            {surname(item.label)}
+          </span>
+        </span>
+      ) : (
+        <img
+          src={item.imageUrl}
+          alt=""
+          crossOrigin="anonymous"
+          draggable={false}
+          className="w-full h-full object-contain select-none pointer-events-none transition-opacity duration-150"
+          style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.45))", opacity: dragging ? 0.3 : 1 }}
+        />
+      )}
     </button>
   );
+}
+
+// "Patrick Mahomes" -> "Mahomes". Suffixes ride along with the surname
+// ("Michael Penix Jr." -> "Penix Jr.") because dropping one can leave a
+// father and son indistinguishable, which is the exact job this caption
+// has.
+const SUFFIXES = new Set(["jr.", "sr.", "ii", "iii", "iv", "v"]);
+
+const BUNGEE_ADVANCE = 0.72; // em per character, measured off the face
+function captionSize(fullName: string, chip: number): number {
+  const chars = Math.max(1, surname(fullName).length);
+  return Math.max(6, Math.min(chip * 0.17, (chip - 4) / (BUNGEE_ADVANCE * chars)));
+}
+function surname(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName;
+  const tail = parts.length - (SUFFIXES.has(parts[parts.length - 1].toLowerCase()) ? 2 : 1);
+  return parts.slice(tail).join(" ");
 }
 
 // Sortable wrapper. Kept separate from the presentational chip so the
@@ -89,6 +160,7 @@ export function TierItemChip({
 // pulling in dnd-kit context (useSortable throws outside a DndContext).
 export function SortableTierItem({
   item,
+  style,
   size,
   selected,
   landed,
@@ -100,6 +172,7 @@ export function SortableTierItem({
   disabled,
 }: {
   item: TierItem;
+  style?: TierItemStyle;
   size: number;
   selected?: boolean;
   landed?: boolean;
@@ -124,6 +197,7 @@ export function SortableTierItem({
     >
       <TierItemChip
         item={item}
+        style={style}
         size={size}
         selected={selected}
         landed={landed}

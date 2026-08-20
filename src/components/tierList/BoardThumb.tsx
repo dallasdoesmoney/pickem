@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
+import { TierItem, TierItemStyle, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { TierListState, createInitialState } from "@/lib/tierList";
 
 // Shared by the tier-list hub and the home page, which both front a
@@ -12,7 +12,7 @@ import { TierListState, createInitialState } from "@/lib/tierList";
 // A mark, falling back to a plain tile rather than a broken image - these
 // are remote, and a card full of broken icons is worse than a card of
 // blanks.
-export function Mark({ item, size }: { item: TierItem; size: number }) {
+export function Mark({ item, size, style = "mark" }: { item: TierItem; size: number; style?: TierItemStyle }) {
   const [failed, setFailed] = useState(false);
   if (failed || !item.imageUrl) {
     return (
@@ -21,6 +21,28 @@ export function Mark({ item, size }: { item: TierItem; size: number }) {
         className="shrink-0 rounded-[3px]"
         style={{ width: size, height: size, background: item.accent, opacity: 0.85 }}
       />
+    );
+  }
+  // Portraits crop to fill on a team-coloured plate, the same as the
+  // board's own chips - fitted whole at thumbnail size a headshot is a
+  // speck in a letterbox. No caption here: at eight pixels a surname is
+  // a smudge, and these previews are read as a shape, not a roster.
+  if (style === "portrait") {
+    return (
+      <span
+        aria-hidden
+        className="shrink-0 overflow-hidden rounded-[3px]"
+        style={{ width: size, height: size, background: item.accent }}
+      >
+        <img
+          src={item.imageUrl}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+          crossOrigin="anonymous"
+          className="h-full w-full object-cover object-top"
+        />
+      </span>
     );
   }
   return (
@@ -100,7 +122,7 @@ export function BoardThumb({
               style={{ minHeight: size + 7 }}
             >
               {ids.map((id) => (
-                <Mark key={id} item={resolveItem(template, id)} size={size} />
+                <Mark key={id} item={resolveItem(template, id)} size={size} style={template.itemStyle} />
               ))}
             </span>
           </div>

@@ -1,4 +1,4 @@
-import { TierTemplate, resolveItem } from "@/data/tierTemplates";
+import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { TierListState, tierLabelFor } from "@/lib/tierList";
 import { BRAND_LOGO_SRC, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
 
@@ -153,6 +153,7 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
       chip,
       perRow,
       logos,
+      template,
       first: i === 0,
     });
     cursorY += h;
@@ -182,6 +183,7 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
       chip,
       perRow,
       logos,
+      template,
       muted: true,
     });
     cursorY += h + ROW_GAP;
@@ -207,6 +209,7 @@ function drawRow(
     chip: number;
     perRow: number;
     logos: Map<string, HTMLImageElement | null>;
+    template: TierTemplate;
     muted?: boolean;
     first?: boolean;
   }
@@ -265,7 +268,15 @@ function drawRow(
     if (!logo) return;
     ctx.save();
     if (o.muted) ctx.globalAlpha = 0.45;
-    ctx.drawImage(logo, cx, cy, o.chip, o.chip);
+    if (o.template.itemStyle === "portrait") {
+      drawPortraitChip(ctx, displayFont, logo, resolveItem(o.template, id), cx, cy, o.chip);
+    } else {
+      // Logos are square, so stretching to the chip and fitting inside it
+      // are the same operation. Left as-is rather than routed through the
+      // cover path, which would only add rounding differences to a card
+      // that has looked like this since it shipped.
+      ctx.drawImage(logo, cx, cy, o.chip, o.chip);
+    }
     ctx.restore();
   });
 }
@@ -336,4 +347,72 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number):
   let out = text;
   while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) out = out.slice(0, -1);
   return `${out}…`;
+}
+
+// The portrait chip from TierItemChip, in canvas terms. Kept deliberately
+// in step with it: a share card that frames or captions a face
+// differently from the board it came from reads as a different list.
+function drawPortraitChip(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  img: CanvasImageSource,
+  item: TierItem,
+  x: number,
+  y: number,
+  size: number,
+) {
+  const radius = size * 0.17;
+  ctx.save();
+  ctx.beginPath();
+  // roundRect is available in every browser that can render this card at
+  // all - it is the same canvas the board already exports through.
+  ctx.roundRect(x, y, size, size, radius);
+  ctx.clip();
+
+  const plate = ctx.createLinearGradient(x, y, x + size, y + size);
+  plate.addColorStop(0, item.accent);
+  plate.addColorStop(1, `${item.accent}66`);
+  ctx.fillStyle = plate;
+  ctx.fillRect(x, y, size, size);
+
+  // object-cover, object-top: fill the square from the source's centre
+  // horizontally and its top edge vertically, which is where ESPN frames
+  // the head.
+  const sw = (img as HTMLImageElement).naturalWidth || size;
+  const sh = (img as HTMLImageElement).naturalHeight || size;
+  const scale = Math.max(size / sw, size / sh);
+  const dw = sw * scale;
+  const dh = sh * scale;
+  ctx.drawImage(img, x + (size - dw) / 2, y, dw, dh);
+
+  const fade = ctx.createLinearGradient(x, y + size * 0.5, x, y + size);
+  fade.addColorStop(0, "rgba(0,0,0,0)");
+  fade.addColorStop(0.55, "rgba(0,0,0,0.45)");
+  fade.addColorStop(1, "rgba(0,0,0,0.85)");
+  ctx.fillStyle = fade;
+  ctx.fillRect(x, y + size * 0.5, size, size * 0.5);
+
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  const name = shareSurname(item.label);
+  let fontPx = Math.max(8, size * 0.17);
+  ctx.font = `${fontPx}px ${displayFont}`;
+  // Shrink rather than clip: a surname cut in half names nobody.
+  while (fontPx > 7 && ctx.measureText(name).width > size - 6) {
+    fontPx -= 1;
+    ctx.font = `${fontPx}px ${displayFont}`;
+  }
+  ctx.fillText(name, x + size / 2, y + size - size * 0.06);
+  ctx.restore();
+}
+
+// Same rule as the chip's own surname(): suffixes ride along, because
+// dropping one can leave a father and son indistinguishable.
+const SHARE_SUFFIXES = new Set(["jr.", "sr.", "ii", "iii", "iv", "v"]);
+function shareSurname(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName;
+  const tail = parts.length - (SHARE_SUFFIXES.has(parts[parts.length - 1].toLowerCase()) ? 2 : 1);
+  return parts.slice(tail).join(" ");
 }

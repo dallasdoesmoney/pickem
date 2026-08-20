@@ -856,7 +856,7 @@ export default function TierListPageClient({
         />
 
         <DragOverlay dropAnimation={null}>
-          {activeItem ? <TierItemChip item={activeItem} size={chipSize * 1.15} /> : null}
+          {activeItem ? <TierItemChip item={activeItem} style={template.itemStyle} size={chipSize * 1.15} /> : null}
         </DragOverlay>
       </DndContext>
 
@@ -1069,6 +1069,7 @@ function UnrankedPool({
             <SortableTierItem
               key={item.id}
               item={item}
+              style={template.itemStyle}
               size={chipSize}
               selected={selectedItemId === item.id}
               landed={landedItemId === item.id}

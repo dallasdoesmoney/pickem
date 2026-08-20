@@ -176,6 +176,7 @@ export function TierRow({
             <SortableTierItem
               key={item.id}
               item={item}
+              style={template.itemStyle}
               size={chipSize}
               selected={selectedItemId === item.id}
               landed={landedItemId === item.id}
