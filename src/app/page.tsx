@@ -105,15 +105,19 @@ function MatchupGrid({ games, picks }: { games: Game[]; picks: Record<string, Te
     return () => observer.disconnect();
   }, []);
 
-  // Rows are chosen per breakpoint rather than derived from the column
-  // count: four rows of two on a phone, two rows of five on a wide card.
-  // Both fill every cell, and both stop short of a half-empty last row.
-  const shown = games.slice(0, cols === 2 ? 8 : 10);
+  // Two rows either way, so the art panel is the same shape at both
+  // breakpoints and neither one ends on a half-empty row.
+  const shown = games.slice(0, cols * 2);
 
   return (
     <div ref={ref} className="grid w-full" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: PILL_GAP }}>
       {shown.map((game) => (
-        <Matchup key={game.id} game={game} picked={picks?.[game.id]} scale={scale} />
+        // Only four pills fit on a phone, so the ones that are dimmed
+        // read as a broken image rather than as a record of your picks.
+        // With that little on screen the matchups are the point; the
+        // picked state is left to the wide card, where there is enough
+        // of it for the pattern to be legible.
+        <Matchup key={game.id} game={game} picked={cols === 2 ? undefined : picks?.[game.id]} scale={scale} />
       ))}
     </div>
   );
