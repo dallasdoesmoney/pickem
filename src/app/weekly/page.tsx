@@ -773,7 +773,7 @@ export default function Home() {
         )}
         {pageTab === "picks" && loaded && (
           <>
-            {view.showRecordPill && (
+            {view.showRecordPill ? (
             <WeeklyRecordPill
               seasonCorrect={myRecord?.correct ?? 0}
               seasonGraded={myRecord?.graded ?? 0}
@@ -788,6 +788,23 @@ export default function Home() {
               onOpenStandings={() => setPageTab("leaderboard")}
               kpi={kpi}
             />
+            ) : (
+              /* With the record pill hidden the board sat almost against
+                 the WEEK title - the pill's own height and margin were
+                 what held the first row's kickoff tab clear of it. The
+                 mark fills that space instead of an empty margin, and on
+                 a stream it puts the brand in the capture, which is the
+                 one thing worth having in the gap. Same asset as the
+                 header's, small, and it takes the zoom like everything
+                 else. */
+              <div className="flex justify-center" style={{ marginBottom: kpi(20, 28) }}>
+                <img
+                  src="/header-logo.png"
+                  alt="Sideline Brew"
+                  className="w-auto select-none"
+                  style={{ height: kpi(30, 40) }}
+                />
+              </div>
             )}
             {/* Explicit track width (not grid-cols-2's 1fr 1fr) - a 1fr
                 column doesn't shrink just because the card inside it does,
@@ -802,14 +819,11 @@ export default function Home() {
               style={{
                 gridTemplateColumns: `repeat(${view.cols}, ${PILL_WIDTH * gridScale}px)`,
                 columnGap: gridColumnGap,
-                // The first row's kickoff tab pokes above the grid box
-                // and has nothing above it to sit in. That clearance was
-                // coming from the record pill's bottom margin, so hiding
-                // the pill dropped the gap from 93px to 9 and put the tab
-                // on top of the WEEK title. The board now owns the space
-                // it needs instead of borrowing it from a sibling that
-                // can be turned off.
-                marginTop: view.showRecordPill ? 0 : (view.showTabs ? 21.2 * gridScale : 0) + 20 * view.zoom,
+                // Nothing here: whichever of the record pill or the mark
+                // above the board is showing carries the clearance the
+                // first row's kickoff tab needs, since that tab pokes
+                // above the grid's own box and has nothing else to sit
+                // in. See the mark below.
                 // The tabs poke up above each pill and the gap has to
                 // swallow them; with the tabs off there is nothing to
                 // swallow, so the row gap collapses to what a reader
