@@ -21,7 +21,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { TierItem, TierTemplate, categoryLabel, resolveItem } from "@/data/tierTemplates";
+import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import {
   MAX_TIERS,
   MAX_TITLE,
@@ -679,37 +679,35 @@ export default function TierListPageClient({
   // same 1000 as its ceiling and as its ten-across breakpoint - all three
   // have to move together or the board stops holding exactly ten.
   return (
-    <main className="flex-1 px-4 pb-16 pt-5 max-w-[66rem] w-full mx-auto">
+    <main className="flex-1 px-4 pb-16 max-w-[66rem] w-full mx-auto">
       {/* The way back out, on its own pinned rail.
           It used to ride the eyebrow line below as a bare 14px chevron
           with its label hidden under 640px - and that line does not
           stick, so 36px of scroll (less than one tier row) put the only
           exit behind the site header. On a phone that left nothing.
           So it gets its own bar, pinned under the site header at 72px,
-          and it keeps its label at every width. The category rides the
-          other end: with a board full of logos and a list name that is
-          whatever you called it, the rail is the only thing on screen
-          that says which category you are in.
+          and it keeps its label at every width.
+          Flush against the header, with no page padding above it: this
+          rail is chrome continuing the header, not the start of the
+          page, and a gap between them made it read as a stray control
+          floating over the board.
+          Nothing rides the other end. The category name was there
+          briefly and said nothing the title underneath doesn't - "NFL
+          TEAMS" above "NFL TEAM TIER LIST" is the same words twice.
           A real link, not history.back(), because you can arrive here
           straight from a share link or a bookmark with nothing to go
           back to. */}
-      <div className="sticky top-[72px] z-30 -mx-4 flex h-[34px] items-center justify-between gap-3 border-b border-white/10 bg-[#070e1c] px-4">
+      <div className="sticky top-[72px] z-30 -mx-4 flex h-[34px] items-center border-b border-white/10 bg-[#070e1c] px-4">
         <Link
           href="/tier-lists"
-          className="flex items-center gap-1 text-[11px] tracking-[0.15em] text-white/55 transition-colors hover:text-white"
+          className="flex items-center gap-1.5 text-[12.5px] tracking-[0.15em] text-white/60 transition-colors hover:text-white"
           style={{ fontFamily: "var(--font-display)" }}
         >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6" />
           </svg>
           TIER LISTS
         </Link>
-        <span
-          className="truncate text-[11px] tracking-[0.15em] text-white/75"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {categoryLabel(template).toUpperCase()}
-        </span>
       </div>
 
       {/* The "SIDELINE BREW - TIER LIST" eyebrow that used to sit here is
