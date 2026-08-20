@@ -348,8 +348,16 @@ export default function HomePage() {
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-3.5 px-4 pt-10 pb-16">
       <div className="text-center">
         <div className="mb-1 text-xs tracking-[0.25em] text-white/45">SIDELINE BREW</div>
+        {/* Not "PICK'EM" any more. This page fronts four things and
+            Pick'em is one of them, so titling the whole page after one
+            of its own children read as though you had already arrived
+            somewhere - the same reason the old Pick'em hub had to go.
+            These three name what you can actually do here, in the order
+            the cards run: pick this week, predict a season, rank the
+            league. The leaderboard underneath is where all three land,
+            which is why it isn't a fourth verb. */}
         <h1 className="text-[clamp(2rem,8vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-          PICK&rsquo;EM
+          PICK. PREDICT. RANK.
         </h1>
       </div>
 

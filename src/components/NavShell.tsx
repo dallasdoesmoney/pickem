@@ -25,6 +25,10 @@ type NavItem = {
 // menu of the same four links was a stop on the way to nowhere. Every
 // entry here goes straight to the thing it names.
 const NAV_ITEMS: NavItem[] = [
+  // Home earns a slot of its own. The logo has always linked here, but a
+  // logo is a thing you learn, not a thing you see - and home is where
+  // all four of the others are laid out side by side.
+  { href: "/", label: "Home", icon: HomeIcon, matchPrefix: "/" },
   { href: "/weekly", label: "Pick’em", icon: PicksIcon, matchPrefix: "/weekly" },
   { href: "/predictor", label: "Record Predictor", icon: TeamIcon, matchPrefix: "/predictor" },
   { href: "/tier-lists", label: "Tier Lists", icon: TierListIcon, matchPrefix: "/tier-lists" },
@@ -32,6 +36,15 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const MOBILE_STANDALONE_ITEMS: NavItem[] = [{ href: "/account", label: "Profile", icon: AccountIcon, matchPrefix: "/account" }];
+
+function HomeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5.5 9.5V20h13V9.5" />
+    </svg>
+  );
+}
 
 function PicksIcon({ className }: { className?: string }) {
   return (
@@ -135,7 +148,9 @@ function TopNavLink({ href, label }: { href: string; label: string }) {
 
 function MobileNavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const pathname = usePathname();
-  const active = pathname.startsWith(item.matchPrefix);
+  // Exact-or-child, not a bare prefix test: "/" is a prefix of every
+  // path on the site, so a prefix test lights Home up on every page.
+  const active = pathname === item.matchPrefix || pathname.startsWith(`${item.matchPrefix}/`);
   const Icon = item.icon;
   return (
     <Link
