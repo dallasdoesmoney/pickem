@@ -54,7 +54,7 @@ const PILL_GAP = 6;
 // card width it stopped reading as a pill at all - the two halves became
 // bands and the rounded ends disappeared - so it goes two-up on a phone
 // and five-up once there is room.
-function Matchup({ game, picked, scale }: { game: Game; picked?: TeamAbbr; scale: number }) {
+function Matchup({ game, scale }: { game: Game; scale: number }) {
   return (
     <div className="relative flex items-center" style={{ width: PILL_WIDTH * scale }}>
       {([
@@ -66,10 +66,14 @@ function Matchup({ game, picked, scale }: { game: Game; picked?: TeamAbbr; scale
           team={TEAMS[abbr]}
           side={side}
           outcome={null}
-          // Dimming the team you passed on says "you chose" without a
-          // ring, a tick or a legend. Nothing is faded until a pick
-          // exists, so an untouched week reads as all still open.
-          isFaded={!!picked && picked !== abbr}
+          // Never faded. The preview used to dim the team you passed on,
+          // which meant your picks were on screen the moment the home
+          // page loaded - readable by anyone standing behind you, and
+          // shoulder-surfable in a group where the whole point is that
+          // nobody knows your card yet. The preview is an advert for the
+          // week's matchups, so it shows the matchups and nothing about
+          // you: identical signed in or out.
+          isFaded={false}
           onClick={() => {}}
           disabled
           scale={scale}
@@ -85,7 +89,7 @@ function Matchup({ game, picked, scale }: { game: Game; picked?: TeamAbbr; scale
 // wide card is most of it. Measuring the panel and solving the scale from
 // the column count makes the pills fill their columns exactly at any
 // width instead.
-function MatchupGrid({ games, picks }: { games: Game[]; picks: Record<string, TeamAbbr> | null }) {
+function MatchupGrid({ games }: { games: Game[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(2);
   const [scale, setScale] = useState(0.47);
@@ -112,12 +116,7 @@ function MatchupGrid({ games, picks }: { games: Game[]; picks: Record<string, Te
   return (
     <div ref={ref} className="grid w-full" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: PILL_GAP }}>
       {shown.map((game) => (
-        // Only four pills fit on a phone, so the ones that are dimmed
-        // read as a broken image rather than as a record of your picks.
-        // With that little on screen the matchups are the point; the
-        // picked state is left to the wide card, where there is enough
-        // of it for the pattern to be legible.
-        <Matchup key={game.id} game={game} picked={cols === 2 ? undefined : picks?.[game.id]} scale={scale} />
+        <Matchup key={game.id} game={game} scale={scale} />
       ))}
     </div>
   );
@@ -140,6 +139,10 @@ function WeeklyHero({
   // Same shape as every other card on the page: name, then one meta line.
   // No subtitle and no button - the whole card is the link, exactly like
   // the three below it.
+  //
+  // A count is the only thing your picks are allowed to say here. "3 OF
+  // 16 PICKED" is the reason to tap the card and gives away nothing about
+  // which three; the board above it is the same for everyone.
   const meta = !signedIn
     ? `WEEK ${week} · ${games.length} GAMES`
     : madeCount === 0
@@ -151,7 +154,7 @@ function WeeklyHero({
   return (
     <Link href="/weekly" className={CARD}>
       <div className={ART}>
-        <MatchupGrid games={games} picks={picks} />
+        <MatchupGrid games={games} />
       </div>
       <div className="px-3 pt-2.5 pb-3">
         <Name>WEEKLY PICK&rsquo;EM</Name>
