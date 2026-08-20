@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Bungee } from "next/font/google";
 import { NavShell } from "@/components/NavShell";
 import { UsernameGate } from "@/components/UsernameGate";
 import { AvatarPromptGate } from "@/components/AvatarPromptGate";
+import { FollowRecsGate } from "@/components/FollowRecsGate";
 import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
 
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <NavShell>{children}</NavShell>
           <UsernameGate />
           <AvatarPromptGate />
+          <FollowRecsGate />
         </AuthProvider>
       </body>
     </html>

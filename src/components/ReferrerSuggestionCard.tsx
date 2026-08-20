@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { followUser } from "@/lib/supabase/follows";
+import { fetchFollowStatus, followUser } from "@/lib/supabase/follows";
 
 // The post-signup counterpart to ReferralBanner - same card shape, but
 // this one needs an action button (Follow) rather than just an
@@ -11,9 +11,37 @@ import { followUser } from "@/lib/supabase/follows";
 // one-shot already: useAuth only ever populates pendingReferrerSuggestion
 // on the single session load right after signup (see useAuth.tsx).
 export function ReferrerSuggestionCard() {
-  const { user, pendingReferrerSuggestion, clearPendingReferrerSuggestion } = useAuth();
+  const { user, profile, pendingReferrerSuggestion, clearPendingReferrerSuggestion } = useAuth();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+
+  // "Follow the person who invited you" is nonsense once you already do.
+  // That happens whenever the referrer is one of the top creators in
+  // FollowRecsGate and the new account followed them there - but it also
+  // covers someone who simply went and found the profile themselves, so
+  // the check is the follow itself rather than a flag saying which
+  // surface did it. Runs before the card ever renders; the state is
+  // cleared rather than just hidden so nothing re-shows it later.
+  //
+  // Keyed on follow_recs_prompted as well as the ids: that flag flipping
+  // true is precisely "FollowRecsGate just closed", which is the one
+  // moment the answer can change while this card is already mounted -
+  // otherwise the check runs once at mount, before the modal has had a
+  // chance to follow anyone, and concludes wrongly.
+  const referrerId = pendingReferrerSuggestion?.userId ?? null;
+  const recsDone = profile?.follow_recs_prompted ?? false;
+  useEffect(() => {
+    if (!user || !referrerId) return;
+    let cancelled = false;
+    fetchFollowStatus(user.id, referrerId)
+      .then((status) => {
+        if (!cancelled && status.iFollow) clearPendingReferrerSuggestion();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, referrerId, recsDone, clearPendingReferrerSuggestion]);
 
   if (!user || !pendingReferrerSuggestion) return null;
 

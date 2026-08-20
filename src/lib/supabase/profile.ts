@@ -36,6 +36,11 @@ export async function markAvatarPrompted(userId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function markFollowRecsPrompted(userId: string): Promise<void> {
+  const { error } = await supabase.from("profiles").update({ follow_recs_prompted: true }).eq("id", userId);
+  if (error) throw error;
+}
+
 // Runs through a security-definer RPC (see supabase/schema.sql) rather
 // than a plain select, since the profiles_select_own RLS policy only
 // lets someone read their OWN row - checking whether a name is taken
