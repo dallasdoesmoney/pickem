@@ -7,21 +7,16 @@ import { useAuth, type Profile } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
-import { LevelBadge } from "@/components/LevelBadge";
-import { PlayerBadges } from "@/components/PlayerBadges";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 import { MyReferralsModal } from "@/components/MyReferralsModal";
-import { FriendsListModal } from "@/components/FriendsListModal";
-import { FollowersListModal } from "@/components/FollowersListModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
 import { CreatorRequestModal } from "@/components/CreatorRequestModal";
 import { SocialLinksModal } from "@/components/SocialLinksModal";
-import { StatTile, StatDetailRow } from "@/components/StatTile";
-import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { fetchUserBadges } from "@/lib/supabase/badges";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 import { RankPanel } from "@/components/RankPanel";
+import { ProfileCard } from "@/components/ProfileCard";
 
 export default function AccountPage() {
   const { user, profile: authProfile, loading: authLoading, signOut, refreshProfile } = useAuth();
@@ -68,8 +63,6 @@ function SignedInAccount({
   const [progressModalOpen, setProgressModalOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [referralsOpen, setReferralsOpen] = useState(false);
-  const [friendsOpen, setFriendsOpen] = useState(false);
-  const [followersOpen, setFollowersOpen] = useState(false);
   const [creatorRequestOpen, setCreatorRequestOpen] = useState(false);
   const [socialLinksOpen, setSocialLinksOpen] = useState(false);
   const [isCreator, setIsCreator] = useState<boolean | null>(null);
@@ -93,75 +86,44 @@ function SignedInAccount({
           of its own now, washed with the player's own rank colour where
           there is one, so the profile reads as a card rather than as text
           floating over the wallpaper. */}
+      {/* The same card a stranger sees, so your profile and your public
+          profile are recognisably one object. `self` is what makes the
+          difference: every number becomes a page you can go to, and the
+          follow button becomes Edit profile. */}
       <RankPanel
         rankColor={rankColor}
         tone="hero"
-        className="rounded-3xl border border-white/12 bg-[#101d38] px-6 pt-8 pb-6"
-        innerClassName="flex flex-col items-center"
+        className="rounded-3xl border border-white/12 bg-[#101d38] px-5 pt-8 pb-6"
       >
-        <div className="relative">
-          {authProfile?.avatar_url ? (
-            <img
-              src={authProfile.avatar_url}
-              alt=""
-              className="h-28 w-28 rounded-full object-cover"
-              style={myRecord ? { boxShadow: `0 0 0 2px ${getLevelInfo(myRecord.total_points).rankColor}, 0 0 10px -2px ${getLevelInfo(myRecord.total_points).rankColor}` } : { boxShadow: "0 0 0 2px rgba(255,255,255,0.2)" }}
-            />
-          ) : (
-            <span
-              className="h-28 w-28 rounded-full bg-white/10 flex items-center justify-center text-4xl"
-              style={myRecord ? { boxShadow: `0 0 0 2px ${getLevelInfo(myRecord.total_points).rankColor}, 0 0 10px -2px ${getLevelInfo(myRecord.total_points).rankColor}` } : { boxShadow: "0 0 0 2px rgba(255,255,255,0.2)" }}
-            >
+        {myRecord ? (
+          <ProfileCard
+            row={myRecord}
+            stats={stats}
+            myId={userId}
+            variant="page"
+            self={{ onEditProfile: () => setEditOpen(true), onReferrals: () => setReferralsOpen(true) }}
+          />
+        ) : (
+          /* No leaderboard row yet, which in practice only happens in the
+             gap before UsernameGate has been satisfied - there is no
+             username to build a public card from. */
+          <div className="flex flex-col items-center">
+            <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white/10 text-4xl" style={{ boxShadow: "0 0 0 2px rgba(255,255,255,0.2)" }}>
               {label.charAt(0).toUpperCase()}
             </span>
-          )}
-          {myRecord && (
-            <button
-              type="button"
-              onClick={() => setProgressModalOpen(true)}
-              aria-label="View all levels"
-              className="absolute left-1/2 -bottom-2 w-max -translate-x-1/2 active:scale-95 transition-transform"
-            >
-              <LevelBadge totalPoints={myRecord.total_points} size="sm" />
+            <h1 className="mt-4 text-center text-3xl" style={{ fontFamily: "var(--font-display)" }}>
+              {label}
+            </h1>
+            <button type="button" onClick={() => setEditOpen(true)} className="mt-1 text-sm text-amber-300/80 transition-colors hover:text-amber-300">
+              Set a username &rarr;
             </button>
-          )}
-        </div>
-
-        <h1 className="text-3xl text-center mt-4" style={{ fontFamily: "var(--font-display)" }}>
-          {label}
-        </h1>
-
-        {authProfile?.username ? (
-          <p className="text-white/45 text-sm mt-1">@{authProfile.username}</p>
-        ) : (
-          <button type="button" onClick={() => setEditOpen(true)} className="text-sm mt-1 text-amber-300/80 hover:text-amber-300 transition-colors">
-            Set a username &rarr;
-          </button>
+          </div>
         )}
-
-        <button
-          type="button"
-          onClick={() => setEditOpen(true)}
-          className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs mt-4 border border-white/15 hover:border-white/30 text-white/70 hover:text-white transition-colors"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-          </svg>
-          EDIT PROFILE
-        </button>
       </RankPanel>
 
       {/* Season record used to headline here as its own pill, but it's
           just the SEASON tile in the stats grid below now - showing it
           twice was redundant. */}
-      {myRecord && (
-        <div className="flex flex-col items-center mt-8">
-          <PlayerBadges userId={userId} />
-        </div>
-      )}
-
       {/* This card + the achievements link below are deliberately stacked
           and cross-referenced (same badge as the header, explicit "earn
           points" copy) so the chain - achievements earn points, points
@@ -177,39 +139,6 @@ function SignedInAccount({
         </div>
       )}
 
-      {/* Every stat here is a real navigation target for your own
-          profile (tap Referrals to see who joined, Friends to browse and
-          search them, Season/Teams Predicted/etc. to jump to the page
-          behind that number) - the public profile popup shows the same
-          stats but leaves them inert, since there's nowhere useful to
-          send a viewer looking at someone else's data. This also
-          replaces the old standalone "MY REFERRALS" card - the
-          Referrals tile below is the one entry point into that list now. */}
-      {myRecord && (
-        <RankPanel
-          rankColor={rankColor}
-          className="mt-6 rounded-2xl border border-white/10 bg-[#0b1730]"
-          innerClassName="flex flex-col gap-3 p-4"
-        >
-          <div className="text-[10px] text-white/45 tracking-[0.15em] mb-1">PICK&rsquo;EM</div>
-          <div className="grid grid-cols-3 gap-2">
-            <StatTile icon="🔗" value={stats ? String(stats.referralCount) : "–"} label="REFERRALS" accentColor="#c084fc" onClick={() => setReferralsOpen(true)} />
-            <StatTile icon="🔥" value="–" label="STREAK SOON" accentColor="rgba(255,255,255,0.35)" />
-            <StatTile icon="🏆" value={`${myRecord.correct}-${myRecord.graded - myRecord.correct}`} label="SEASON" accentColor="#4ade80" href="/weekly" />
-          </div>
-
-          <div className="mt-2">
-            <div className="text-[10px] text-white/45 tracking-[0.15em] mb-2">MORE STATS</div>
-            <div className="flex flex-col gap-1.5">
-              <StatDetailRow icon="👀" label="Followers" value={stats ? String(stats.followerCount) : "–"} onClick={() => setFollowersOpen(true)} />
-              <StatDetailRow icon="👥" label="Friends" value={stats ? String(stats.friendCount) : "–"} onClick={() => setFriendsOpen(true)} />
-              <TeamsPredictedRow completedCount={stats?.completedTeamCount} href="/predictor" />
-              <StatDetailRow icon="🔒" label="Lock bonuses hit" value={stats ? String(stats.lockBonusCount) : "–"} href="/weekly" />
-              <StatDetailRow icon="📅" label="Weeks completed" value={stats ? String(stats.completedWeekCount) : "–"} href="/weekly" />
-            </div>
-          </div>
-        </RankPanel>
-      )}
 
       {isCreator === false && (
         <button
@@ -295,13 +224,6 @@ function SignedInAccount({
         onClose={() => setProgressModalOpen(false)}
       />
       <MyReferralsModal open={referralsOpen} onClose={() => setReferralsOpen(false)} />
-      <FriendsListModal
-        userId={userId}
-        open={friendsOpen}
-        onClose={() => setFriendsOpen(false)}
-        emptyHint="No friends yet - add some from the leaderboard."
-      />
-      <FollowersListModal userId={userId} open={followersOpen} onClose={() => setFollowersOpen(false)} />
       <CreatorRequestModal userId={userId} open={creatorRequestOpen} onClose={() => setCreatorRequestOpen(false)} />
       <SocialLinksModal userId={userId} open={socialLinksOpen} onClose={() => setSocialLinksOpen(false)} />
     </main>
