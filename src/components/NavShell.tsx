@@ -317,7 +317,13 @@ export function NavShell({ children }: { children: React.ReactNode }) {
             squash it - the predictor's team pages crushed it from 34px
             to 19.75, and the label with it. */}
         {parent && (
-          <div className="sticky top-[72px] z-30 flex h-[34px] shrink-0 items-center border-b border-white/10 bg-[#070e1c] px-4 navbar:px-6">
+          /* z-50, not z-30, and for the same reason the header above it
+             is: the pick'em and predictor cards paint their own layers up
+             to z-40 - the border ring at z-30, the outcome wash at 35,
+             the lock and suspicious badges at 40 - so at z-30 this rail
+             was scrolled under by pill borders and badges. It never
+             overlaps the header, so sharing the level is safe. */
+          <div className="sticky top-[72px] z-50 flex h-[34px] shrink-0 items-center border-b border-white/10 bg-[#070e1c] px-4 navbar:px-6">
             <Link
               href={parent.href}
               className="flex items-center gap-1.5 text-[12.5px] tracking-[0.15em] text-white/60 transition-colors hover:text-white"

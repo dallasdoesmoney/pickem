@@ -87,8 +87,9 @@ export function SeasonGameCard({
     // to escape this card's own box to render above EVERY other card on
     // the page, not just within a locally-scoped stacking context. That's
     // safe now that the sticky header (NavShell) sits at z-50, above
-    // every in-card z-index (badge z-40, border z-30, label z-20) - see
-    // NavShell.tsx for the other half of this.
+    // every in-card z-index (badge z-40, border z-30, label z-20) - as
+    // does the back rail under it. See NavShell.tsx for the other half
+    // of this.
     <div className="relative flex items-center mx-auto shrink-0" style={{ width: SEASON_PILL_WIDTH * scale }}>
       <TeamHalfPill
         team={awayTeam}

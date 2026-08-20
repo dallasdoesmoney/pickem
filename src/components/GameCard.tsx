@@ -164,7 +164,8 @@ export function GameCard({
     // card on the page, not just within a locally-scoped stacking
     // context. That's safe now that the sticky header (NavShell) sits at
     // z-50, above every in-card z-index (badge z-40, border z-30, label
-    // z-20) - see NavShell.tsx for the other half of this.
+    // z-20) - as does the back rail under it, for the same reason. See
+    // NavShell.tsx for the other half of this.
     <div className="relative flex items-center mx-auto shrink-0" style={{ width: PILL_WIDTH * scale }}>
       <TeamHalfPill
         team={away}
