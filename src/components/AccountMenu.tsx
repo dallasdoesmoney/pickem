@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchPendingCreatorRequestCount } from "@/lib/supabase/creatorRequests";
 import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 
@@ -29,6 +30,10 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
   const { user, profile, signOut } = useAuth();
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
   const [pendingCount, setPendingCount] = useState(0);
+  // Admin's own queue, separate from the follower count above it. Fetched
+  // here rather than only inside /admin so an admin sees work waiting
+  // without having to go looking for it.
+  const [adminTaskCount, setAdminTaskCount] = useState(0);
 
   useEffect(() => {
     if (!user) {
@@ -39,6 +44,16 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
       .then(setPendingCount)
       .catch(() => {});
   }, [user, open]);
+
+  useEffect(() => {
+    if (!profile?.is_admin) {
+      setAdminTaskCount(0);
+      return;
+    }
+    fetchPendingCreatorRequestCount()
+      .then(setAdminTaskCount)
+      .catch(() => {});
+  }, [profile?.is_admin, open]);
 
   if (!user) {
     return (
@@ -73,7 +88,9 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
           ) : (
             <span className="h-8 w-8 lg:h-7 lg:w-7 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{initial}</span>
           )}
-          {pendingCount > 0 && (
+          {/* Fires for either queue: without this the admin count is only
+              visible once the menu is already open, which defeats it. */}
+          {pendingCount + adminTaskCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-500 border border-[#070e1c]" />
           )}
         </span>
@@ -118,10 +135,18 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
                 href="/admin"
                 role="menuitem"
                 onClick={() => onOpenChange(false)}
-                className="block rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
                 style={{ fontFamily: "var(--font-display)" }}
               >
                 Admin
+                {adminTaskCount > 0 && (
+                  <span
+                    aria-label={`${adminTaskCount} waiting for review`}
+                    className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] text-white"
+                  >
+                    {adminTaskCount}
+                  </span>
+                )}
               </Link>
             )}
             <button

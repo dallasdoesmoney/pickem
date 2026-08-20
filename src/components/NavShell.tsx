@@ -9,6 +9,7 @@ import { NotificationToasts } from "@/components/NotificationToasts";
 import { ReferrerSuggestionCard } from "@/components/ReferrerSuggestionCard";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
+import { fetchPendingCreatorRequestCount } from "@/lib/supabase/creatorRequests";
 
 type NavItem = {
   href: string;
@@ -154,6 +155,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [adminTaskCount, setAdminTaskCount] = useState(0);
 
   useEffect(() => {
     if (!user) {
@@ -164,6 +166,16 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       .then(setPendingCount)
       .catch(() => {});
   }, [user, mobileOpen]);
+
+  useEffect(() => {
+    if (!profile?.is_admin) {
+      setAdminTaskCount(0);
+      return;
+    }
+    fetchPendingCreatorRequestCount()
+      .then(setAdminTaskCount)
+      .catch(() => {});
+  }, [profile?.is_admin, mobileOpen]);
 
   return (
     <div className="flex min-h-full">
@@ -219,7 +231,15 @@ export function NavShell({ children }: { children: React.ReactNode }) {
                         onClick={() => setMobileOpen(false)}
                         className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/55 hover:text-white hover:bg-white/5 transition-colors"
                       >
-                        <span className="text-sm">Admin</span>
+                        <span className="text-sm flex-1">Admin</span>
+                        {adminTaskCount > 0 && (
+                          <span
+                            aria-label={`${adminTaskCount} waiting for review`}
+                            className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] text-white"
+                          >
+                            {adminTaskCount}
+                          </span>
+                        )}
                       </Link>
                     )}
                     <button

@@ -39,6 +39,19 @@ export type PendingCreatorRequest = CreatorRequest & { user_id: string; username
 // Admin-only in practice - creator_requests_select_own_or_admin only
 // returns other people's rows to an actual admin, so a non-admin caller
 // just gets their own (or none).
+// Count only, for the badge on the Admin menu entry. head:true means
+// PostgREST returns the count in a header and no rows at all, so the nav
+// doesn't drag every pending request's payload around on every page load
+// just to render a number.
+export async function fetchPendingCreatorRequestCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from("creator_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending");
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function fetchPendingCreatorRequests(): Promise<PendingCreatorRequest[]> {
   const { data: requests, error } = await supabase
     .from("creator_requests")
