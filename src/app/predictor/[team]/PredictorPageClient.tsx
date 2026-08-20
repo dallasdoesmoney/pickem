@@ -270,7 +270,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
         className="fixed -z-10 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.17] h-[85vh] w-auto max-w-none left-[-15vh] lg:left-[20px]"
       />
       <main className="flex-1 px-4 pb-10 pt-8 max-w-4xl w-full mx-auto">
-      <div className="mb-6 flex items-center justify-center gap-5">
+      <div className="mb-3 flex items-center justify-center gap-5">
         {/* Nudged up slightly - flexbox centers the boxes, but the title's
             display font carries extra space below its cap height, so true
             box-centering reads as the logo sitting a touch low. */}
@@ -289,42 +289,19 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             break-words guard below can never actually take effect. */}
         <div className="text-left min-w-0">
           <div className="text-xs text-white/45 tracking-[0.25em] mb-1 whitespace-nowrap">RECORD PREDICTOR</div>
-          {/* The switcher lives INSIDE the h1's own text flow (not as a
-              flex sibling in a separate row) so it wraps along with the
-              title text on mobile instead of overflowing past whichever
-              wrapped line happens to be narrower than the full row. The
-              team name itself also opens it - clicking the small chevron
-              specifically isn't an obvious enough target - by toggling the
-              same lifted-up open state the chevron button controls. */}
-          {/* Same clamp as the weekly page's WEEK N title - that page sets
-              the scale standard, so this one matches it rather than
-              running a size larger. */}
+          {/* A step below the weekly page's WEEK N title rather than
+              matching it. This one has to fit a whole team name plus the
+              switcher's chevron in the room left beside the logo, and at
+              the weekly size the chevron was pushed off the visible line
+              on the longer names - the only cue that the team is
+              changeable, gone exactly where the page is most cramped. */}
           {/* break-words is the last-resort guard on the very narrowest
-              phones - the type size is pinned to match the weekly page
-              rather than shrinking further, so a word with nowhere left to
-              go breaks instead of running off the side of the page. */}
-          <h1 className="text-[clamp(1.75rem,7vw,2.75rem)] leading-none tracking-wide break-words" style={{ fontFamily: "var(--font-display)" }}>
-            {/* A plain inline span, not a <button> - Chrome computes any
-                button as inline-block no matter what display it's given,
-                and as an atomic inline-block box a wrapped team name
-                claims the whole line width, stranding the switcher chevron
-                on a line of its own. Truly inline, the chevron sits right
-                after the last word. Nothing is lost for keyboard users:
-                the chevron beside it is a real focusable button that
-                toggles the same state, so this is a redundant pointer
-                affordance on top of it. */}
-            <span
-              onClick={() => setSwitcherOpen((v) => !v)}
-              className="hover:opacity-80 transition-opacity cursor-pointer"
-            >
+              phones: a word with nowhere left to go breaks instead of
+              running off the side of the page. */}
+          <h1 className="text-[clamp(1.4rem,5.6vw,2.25rem)] leading-none tracking-wide break-words" style={{ fontFamily: "var(--font-display)" }}>
+            <TeamSwitcher currentTeam={trackedTeam} open={switcherOpen} onOpenChange={setSwitcherOpen}>
               {team.city.toUpperCase()} {team.name.toUpperCase()}
-            </span>{" "}
-            <TeamSwitcher
-              currentTeam={trackedTeam}
-              open={switcherOpen}
-              onOpenChange={setSwitcherOpen}
-              className="inline-flex align-middle -translate-y-1"
-            />
+            </TeamSwitcher>
           </h1>
         </div>
       </div>
@@ -346,7 +323,14 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
             style={{ gridTemplateColumns: `repeat(2, ${SEASON_PILL_WIDTH * gridScale}px)`, columnGap: gridColumnGap }}
           >
             {[scheduleCol1, scheduleCol2].map((col, i) => (
-              <div key={i} className="flex flex-col" style={{ gap: 32 * gridScale }}>
+              // The weekly page uses 32 here, but it is not spending 32 on
+              // white space: each of its pills carries a day/time tab that
+              // pokes 21.2 above the pill's top edge, so what a reader
+              // actually sees between two cards there is ~11. These pills
+              // have no tab, so the same 32 read as roughly three times
+              // the weekly page's gap. Matching the visible result rather
+              // than the number is what keeps the two pages in step.
+              <div key={i} className="flex flex-col" style={{ gap: 11 * gridScale }}>
                 {col.map((row) => (
                   <SeasonRow key={row.week} row={row} trackedTeam={trackedTeam} picks={picks} setPick={setPick} scale={gridScale} />
                 ))}
