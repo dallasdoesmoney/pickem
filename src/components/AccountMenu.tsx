@@ -10,6 +10,10 @@ import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 
 const PANEL_WIDTH = 200;
 
+// One size for every state of this control, so the header's right edge
+// never shifts as the session resolves or as you sign in and out.
+const AVATAR_SIZE = "h-8 w-8 lg:h-7 lg:w-7";
+
 function AccountIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
@@ -19,15 +23,25 @@ function AccountIcon({ className }: { className?: string }) {
   );
 }
 
-// Account control in the header. Signed-out stays desktop-only (a plain
-// link to /account, same as before accounts existed - mobile already has
-// a "Profile" row in the hamburger drawer). Signed-in shows an anchored
-// dropdown (same portal pattern as PickemMenu/TeamSwitcher) on every
-// breakpoint - avatar only on mobile, avatar + name on desktop - so
-// signing out or jumping to the profile doesn't require opening the
-// hamburger menu first.
+// Account control in the header, in every state.
+//
+// One shape in one place at every width - a 32px circle in the top right
+// corner - and only the amount of detail inside it changes: your photo,
+// or your initial, or a dashed outline held open for you. The word
+// beside it appears wherever there is room for it, which is the same
+// rule signed-in already followed (avatar alone on a phone, avatar plus
+// your username on a desktop).
+//
+// Signed-out used to be desktop-only, which meant that on a phone the
+// corner was empty - a zero-pixel-wide slot - and the only route to an
+// account was buried in the hamburger drawer. That was the whole reason
+// to touch this.
+//
+// Signed-in shows an anchored dropdown (same portal pattern as
+// PickemMenu/TeamSwitcher) on every breakpoint, so signing out or
+// jumping to the profile doesn't require opening the hamburger first.
 export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
   const [pendingCount, setPendingCount] = useState(0);
   // Admin's own queue, separate from the follower count above it. Fetched
@@ -55,15 +69,45 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
       .catch(() => {});
   }, [profile?.is_admin, open]);
 
+  // Hold the slot with a plain disc until the session resolves. Without
+  // this the header renders the signed-out control first and swaps it a
+  // moment later, so every signed-in visit began with the corner
+  // flickering from "sign in" to your own face.
+  if (loading) {
+    return <span aria-hidden className={`${AVATAR_SIZE} block rounded-full bg-white/[0.07]`} />;
+  }
+
   if (!user) {
     return (
       <Link
         href="/account"
-        className="hidden lg:flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
+        aria-label="Sign in"
+        className="flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
         style={{ fontFamily: "var(--font-display)" }}
       >
-        <AccountIcon className="h-5 w-5" />
-        Profile
+        <span className="relative shrink-0">
+          {/* Dashed, not solid: a solid disc with a glyph in it reads as
+              somebody's account - a broken image, or a stranger's. An
+              outline reads as a shape nobody has filled in yet. */}
+          <span
+            className={`${AVATAR_SIZE} flex items-center justify-center rounded-full border-[1.5px] border-dashed border-white/30 bg-white/[0.04] text-white/45`}
+          >
+            <AccountIcon className="h-4 w-4" />
+          </span>
+          {/* Sits in the same corner the unread dot uses when you're
+              signed in. The two never appear together - one belongs to
+              having an account and the other to not having one - and it
+              is what keeps the empty circle reading as somewhere to go
+              rather than as something that failed to load. */}
+          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-[#070e1c] bg-emerald-400 text-[#070e1c]">
+            <svg viewBox="0 0 24 24" className="h-2 w-2" fill="none" stroke="currentColor" strokeWidth={5} strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </span>
+        </span>
+        {/* Same rule as the username beside your avatar once you're in:
+            shown wherever the header has room to spell it out. */}
+        <span className="hidden lg:inline">Sign in</span>
       </Link>
     );
   }
@@ -84,9 +128,9 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
       >
         <span className="relative shrink-0">
           {profile?.avatar_url ? (
-            <img src={profile.avatar_url} alt="" className="h-8 w-8 lg:h-7 lg:w-7 rounded-full object-cover" />
+            <img src={profile.avatar_url} alt="" className={`${AVATAR_SIZE} rounded-full object-cover`} />
           ) : (
-            <span className="h-8 w-8 lg:h-7 lg:w-7 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs">{initial}</span>
+            <span className={`${AVATAR_SIZE} shrink-0 rounded-full bg-white/10 flex items-center justify-center text-xs`}>{initial}</span>
           )}
           {/* Fires for either queue: without this the admin count is only
               visible once the menu is already open, which defeats it. */}
