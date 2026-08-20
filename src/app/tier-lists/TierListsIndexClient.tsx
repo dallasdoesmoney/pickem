@@ -62,29 +62,23 @@ export function popularity(stats?: TierListStats): number {
 
 function TemplateCard({ template, stats }: { template: TierTemplate; stats?: TierListStats }) {
   const preview = useMemo(() => previewFor(template), [template]);
-  // Two numbers, not three. "Ranked" is builds rather than saves: it is
-  // what a reader already assumes the word means, and it is the one that
-  // counts the signed-out people who make up most of the ranking. Saves
-  // are a strict subset of it - showing both put the smallest and most
-  // confusing number on every card to say something the bigger one
-  // already said.
+  // One number, and it is the number of people who used this - not how
+  // many landed on it. Opens are still recorded, because they are the
+  // only thing separating two categories nobody has used yet, but they
+  // sort the grid rather than appear on it: two counters side by side
+  // made the reader work out which one mattered, and the answer was
+  // always this one.
   //
-  // Hidden at zero rather than shown as "0 RANKED" - a counter is social
-  // proof, and an empty one is the opposite. Each half drops out on its
-  // own, so a category people are opening but not finishing still shows
-  // the number it has earned.
+  // The larger of builds and saves, because they are the same quantity
+  // measured in two eras: build tracking starts at zero today, while
+  // saves have been accumulating since 0030. A category with 40 savers
+  // and 3 builds has had at least 40 people use it, and dropping to "3"
+  // on the day this shipped would be a visible lie. Builds overtake saves
+  // quickly and permanently, since every saver is also a builder now.
   //
-  // The larger of the two, because they are the same quantity measured in
-  // two eras: build tracking starts at zero today, while saves have been
-  // accumulating since 0030. A category with 40 savers and 3 builds has
-  // had at least 40 people rank it, and dropping to "3 RANKED" on the day
-  // this shipped would be a visible lie. Builds overtake saves quickly and
-  // permanently, since every saver is also a builder from here on.
-  const ranked = Math.max(stats?.builds ?? 0, stats?.people ?? 0);
-  const counters = [
-    stats?.views ? `${abbreviate(stats.views)} OPENED` : null,
-    ranked ? `${abbreviate(ranked)} RANKED` : null,
-  ].filter(Boolean);
+  // Hidden at zero rather than shown as "0 people used this" - a counter
+  // is social proof, and an empty one is the opposite.
+  const used = Math.max(stats?.builds ?? 0, stats?.people ?? 0);
   return (
     <Link href={`/tier-lists/${template.slug}`} className={CARD}>
       <span className="block p-2.5 pb-0">
@@ -95,12 +89,13 @@ function TemplateCard({ template, stats }: { template: TierTemplate; stats?: Tie
           {template.title.toUpperCase()}
         </span>
         <span className="text-[11.5px] text-white/45 leading-snug">{template.tagline}</span>
-        {counters.length > 0 && (
-          <span
-            className="text-[10px] tracking-[0.14em] text-white/40 mt-0.5"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {counters.join(" · ")}
+        {/* Plain body text, not the display face. This is a quiet aside
+            under the tagline, and setting it in the same heavy condensed
+            font as the title made it shout the least important line on
+            the card. */}
+        {used > 0 && (
+          <span className="text-[11px] text-white/40 mt-0.5">
+            {abbreviate(used)} {used === 1 ? "person has" : "people have"} used this
           </span>
         )}
       </span>
