@@ -1,4 +1,4 @@
-// Writes src/data/qbs.ts from ESPN's own roster data.
+// Writes src/data/qbs.ts from ESPN's own depth charts.
 //
 //   node scripts/sync-qbs.mjs
 //
@@ -6,18 +6,25 @@
 // different schedules and neither fails loudly. Starters change week to
 // week. A player id typed in wrong renders a different person's face
 // under the right name - which is worse than a broken image, because
-// nothing about it looks broken.
+// nothing about it looks broken. So neither half is ever written by
+// hand: every id in the output comes from the same response as the name
+// beside it.
 //
-// So neither half is ever written by hand. This asks ESPN for each
-// team's roster, takes the quarterbacks in the order ESPN lists them
-// (which is depth-chart order), and keeps the first. Every id in the
-// output came from the same response as the name beside it, so the two
-// cannot disagree.
+// The first version of this read the team roster and took the first
+// quarterback in it, on the assumption that ESPN lists them by depth.
+// It does not - that run returned Tommy DeVito for New England and Andy
+// Dalton for Philadelphia, both backups. Roster order is roughly jersey
+// number, which has nothing to do with who starts. So this asks the
+// depth chart endpoint, which ranks them, and only falls back to roster
+// order when a team has no published chart - shouting about it when it
+// does, because a silent fallback here is how the wrong 32 faces ship.
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data", "qbs.ts");
+const CORE = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl";
+const SITE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl";
 
 // ESPN's team abbreviations differ from ours in one place, the same way
 // they do for the logos in teams.ts.
@@ -29,38 +36,103 @@ async function json(url) {
   return res.json();
 }
 
+// Every quarterback on the roster, in the order ESPN returns them. Used
+// as the fallback, and as the sanity check on whatever the depth chart
+// says - a chart naming somebody who is not on the roster is stale.
+async function rosterQbs(teamId) {
+  const roster = await json(`${SITE}/teams/${teamId}/roster`);
+  return (roster.athletes ?? [])
+    .flatMap((g) => g.items ?? g.athletes ?? [g])
+    .filter(Boolean)
+    .filter((a) => (a.position?.abbreviation ?? a.position?.name) === "QB")
+    .map((a) => ({ espnId: String(a.id), name: a.fullName ?? a.displayName }));
+}
+
+// The QB the depth chart ranks first. Returns null rather than throwing
+// so a team with no published chart falls through to the roster.
+async function depthChartQb(season, teamId) {
+  let charts;
+  try {
+    charts = await json(`${CORE}/seasons/${season}/teams/${teamId}/depthcharts`);
+  } catch {
+    return null;
+  }
+  const ranked = [];
+  for (const item of charts.items ?? []) {
+    // Formation-keyed, and the key's case has moved around over the
+    // years, so match on the position rather than trusting "qb".
+    for (const slot of Object.values(item.positions ?? {})) {
+      const abbr = slot.position?.abbreviation ?? slot.position?.name;
+      if (abbr !== "QB") continue;
+      for (const entry of slot.athletes ?? []) {
+        if (typeof entry.rank === "number" && entry.athlete?.$ref) {
+          ranked.push({ rank: entry.rank, ref: entry.athlete.$ref });
+        }
+      }
+    }
+  }
+  if (!ranked.length) return null;
+  ranked.sort((a, b) => a.rank - b.rank);
+  // $ref comes back http:// on some responses, which redirects.
+  const athlete = await json(ranked[0].ref.replace(/^http:/, "https:"));
+  return { espnId: String(athlete.id), name: athlete.fullName ?? athlete.displayName };
+}
+
 async function main() {
-  const teams = (await json("https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams"))
-    .sports[0].leagues[0].teams.map((t) => t.team);
+  const season = (await json(`${SITE}/scoreboard`)).season?.year;
+  if (!season) throw new Error("Could not determine the current season from the scoreboard");
+  console.log(`Season ${season}\n`);
+
+  const teams = (await json(`${SITE}/teams`)).sports[0].leagues[0].teams.map((t) => t.team);
   if (teams.length !== 32) throw new Error(`Expected 32 teams, got ${teams.length}`);
 
   const rows = [];
+  const guessed = [];
   const missing = [];
+
   for (const team of teams) {
     const abbr = (ESPN_TO_OURS[team.abbreviation] ?? team.abbreviation).toUpperCase();
-    const roster = await json(
-      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${team.id}/roster`,
-    );
-    const groups = roster.athletes ?? [];
-    const athletes = groups.flatMap((g) => g.items ?? g.athletes ?? [g]).filter(Boolean);
-    const qb = athletes.find((a) => (a.position?.abbreviation ?? a.position?.name) === "QB");
-    if (!qb) {
+    const roster = await rosterQbs(team.id);
+    const charted = await depthChartQb(season, team.id);
+
+    let pick = charted;
+    let source = "depth chart";
+    if (!pick) {
+      pick = roster[0] ?? null;
+      source = "ROSTER ORDER - NOT A DEPTH CHART";
+      if (pick) guessed.push(abbr);
+    }
+    if (!pick) {
       missing.push(abbr);
       continue;
     }
-    rows.push({ espnId: String(qb.id), name: qb.fullName ?? qb.displayName, team: abbr });
-    process.stdout.write(`${abbr.padEnd(4)} ${String(qb.id).padEnd(9)} ${qb.fullName}\n`);
+
+    rows.push({ espnId: pick.espnId, name: pick.name, team: abbr });
+    // Every candidate is printed beside the pick, so a wrong one is
+    // obvious in the PR diff instead of being something you find out
+    // about from the site.
+    const others = roster.filter((q) => q.espnId !== pick.espnId).map((q) => q.name);
+    console.log(
+      `${abbr.padEnd(4)} ${pick.espnId.padEnd(9)} ${pick.name.padEnd(22)} ` +
+        `[${source}]${others.length ? `  behind: ${others.join(", ")}` : ""}`,
+    );
   }
 
   // A partial file is worse than none: a category quietly missing five
   // teams looks like a finished list to everyone who didn't run this.
   if (missing.length) throw new Error(`No quarterback found for: ${missing.join(", ")}`);
+  if (guessed.length) {
+    console.log(
+      `\nWARNING: no depth chart for ${guessed.join(", ")} - those fell back to ` +
+        `roster order, which is not who starts. Check them before merging.`,
+    );
+  }
 
   rows.sort((a, b) => a.name.localeCompare(b.name));
 
   const header = `// Generated by scripts/sync-qbs.mjs - do not edit by hand.
 //
-// One starting quarterback per team, with the ESPN player id its headshot
+// The starting quarterback per team, with the ESPN player id its headshot
 // is keyed on. Generated rather than typed out because both halves of a
 // row go stale on their own schedule: starters change week to week, and a
 // player id guessed wrong doesn't fail loudly - it renders a different
