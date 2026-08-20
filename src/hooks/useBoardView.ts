@@ -34,7 +34,21 @@ export type BoardViewState = {
   showRecordPill: boolean;
 };
 
-const DEFAULTS: BoardViewState = { columns: 2, zoom: 1, showTabs: true, compact: false, showRecordPill: true };
+// How the board looks to everyone who is not mid-stream. Not a starting
+// point that can be edited - there is no settings UI outside streamer
+// mode, and this is what the page falls back to the moment the mode is
+// switched off.
+const NORMAL: BoardViewState = { columns: 2, zoom: 1, showTabs: true, compact: false, showRecordPill: true };
+
+// What streamer mode starts from. The record pill is off by default
+// because it is the host's own account showing on a board a guest is
+// picking on - the one piece of chrome that is actively wrong in the
+// mode, so it should not need turning off every time.
+const STREAMER_DEFAULTS: BoardViewState = { ...NORMAL, showRecordPill: false };
+
+// Only the streamer settings are stored. A layout someone tuned for
+// their capture is worth keeping for next time; leaking it into their
+// normal browsing is not, which is what a single shared blob did.
 const STORAGE_KEY = "pickem:board-view";
 // Streamer mode is deliberately NOT in that blob. The display settings
 // are a preference and belong to the device; this is a session state,
@@ -72,7 +86,7 @@ function columnsFit(viewportWidth: number, cols: number): boolean {
 }
 
 export function useBoardView() {
-  const [state, setState] = useState<BoardViewState>(DEFAULTS);
+  const [streamerState, setStreamerState] = useState<BoardViewState>(STREAMER_DEFAULTS);
   const [streamerMode, setStreamerModeState] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(390);
   const [viewportHeight, setViewportHeight] = useState(800);
@@ -82,7 +96,7 @@ export function useBoardView() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setState({ ...DEFAULTS, ...JSON.parse(raw) });
+      if (raw) setStreamerState({ ...STREAMER_DEFAULTS, ...JSON.parse(raw) });
     } catch {
       /* a corrupt or legacy value just means defaults */
     }
@@ -107,7 +121,7 @@ export function useBoardView() {
   }, []);
 
   const update = useCallback((patch: Partial<BoardViewState>) => {
-    setState((prev) => {
+    setStreamerState((prev) => {
       const next = { ...prev, ...patch };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -117,6 +131,12 @@ export function useBoardView() {
       return next;
     });
   }, []);
+
+  // The single switch that keeps the two apart: off means NORMAL, full
+  // stop, whatever is stored. Turning the mode off therefore restores the
+  // ordinary board in one step rather than needing every setting undone
+  // by hand.
+  const state = streamerMode ? streamerState : NORMAL;
 
   // "auto" takes the most columns that still fit at full pill size, so
   // it never trades legibility for width. Everything else is honoured
@@ -232,7 +252,7 @@ export function useBoardView() {
     setShowTabs: (showTabs: boolean) => update({ showTabs }),
     setCompact: (compact: boolean) => update({ compact }),
     setShowRecordPill: (showRecordPill: boolean) => update({ showRecordPill }),
-    reset: () => update(DEFAULTS),
+    reset: () => update(STREAMER_DEFAULTS),
     fitToScreen,
     fitting: fitPasses > 0,
     // Derived, for the pages to lay out with.

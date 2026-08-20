@@ -25,8 +25,9 @@ export function StreamerSettings({
 }) {
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
   const zoomPct = Math.round(view.zoom * 100);
-  const isDefault =
-    view.columns === 2 && view.zoom === 1 && view.showTabs && !view.compact && view.showRecordPill;
+  // Measured against what streamer mode starts from, since that is what
+  // RESET returns to - the record pill starts off in this mode.
+  const isDefault = view.columns === 2 && view.zoom === 1 && view.showTabs && !view.compact && !view.showRecordPill;
   const on = view.streamerMode;
 
   // Desktop only for now: the mode is for someone with a capture window
@@ -180,11 +181,15 @@ export function StreamerSettings({
                   on={view.showTabs}
                   onChange={view.setShowTabs}
                 />
+                {/* Stated as the thing you keep rather than the thing
+                    you lose: every other switch here is on when its
+                    element is showing, and "Compact pills" was the one
+                    that ran backwards. Same setting underneath. */}
                 <Toggle
-                  label="Compact pills"
-                  hint="Drops the spread line — a third of each pill's height"
-                  on={view.compact}
-                  onChange={view.setCompact}
+                  label="Spread & record"
+                  hint="The odds line on each half — a third of every pill's height"
+                  on={!view.compact}
+                  onChange={(next) => view.setCompact(!next)}
                 />
               </Section>
             )}

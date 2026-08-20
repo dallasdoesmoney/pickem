@@ -797,12 +797,23 @@ export default function Home() {
                  one thing worth having in the gap. Same asset as the
                  header's, small, and it takes the zoom like everything
                  else. */
-              <div className="flex justify-center" style={{ marginBottom: kpi(20, 28) }}>
+              <div
+                className="flex justify-center"
+                style={{
+                  // Tighter than the pill it stands in for, on both
+                  // sides. The negative top eats the display font's
+                  // descender space under the WEEK title, which is empty
+                  // and reads as gap; the bottom keeps just enough for
+                  // the first kickoff tab, which hangs above the grid.
+                  marginTop: -kpi(4, 6),
+                  marginBottom: kpi(16, 22),
+                }}
+              >
                 <img
                   src="/header-logo.png"
                   alt="Sideline Brew"
                   className="w-auto select-none"
-                  style={{ height: kpi(30, 40) }}
+                  style={{ height: kpi(24, 32) }}
                 />
               </div>
             )}
