@@ -10,6 +10,7 @@ import { ReferrerSuggestionCard } from "@/components/ReferrerSuggestionCard";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 import { fetchPendingCreatorRequestCount } from "@/lib/supabase/creatorRequests";
+import { navParent } from "@/lib/navParent";
 
 type NavItem = {
   href: string;
@@ -152,6 +153,7 @@ function MobileNavLink({ item, onClick }: { item: NavItem; onClick?: () => void 
 
 export function NavShell({ children }: { children: React.ReactNode }) {
   const { user, profile, signOut } = useAuth();
+  const parent = navParent(usePathname());
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -264,7 +266,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <div className="sticky top-0 z-50 relative flex items-center justify-center px-4 navbar:px-6 h-[72px] border-b border-white/10 bg-[#070e1c]/90 backdrop-blur">
+        <div className="sticky top-0 z-50 relative flex shrink-0 items-center justify-center px-4 navbar:px-6 h-[72px] border-b border-white/10 bg-[#070e1c]/90 backdrop-blur">
           <button
             aria-label="Open menu"
             onClick={() => setMobileOpen(true)}
@@ -287,6 +289,32 @@ export function NavShell({ children }: { children: React.ReactNode }) {
             <AccountMenu open={accountMenuOpen} onOpenChange={setAccountMenuOpen} />
           </div>
         </div>
+        {/* The way back up, on a rail pinned under the header.
+            Started on the tier list page, where the only exit was a bare
+            chevron on a row that scrolled away. It turns out every page
+            had the same problem in a milder form: the four sections and
+            home were reachable only through the hamburger, which is an
+            overlay you have to open before you can even see your
+            options. This is always on screen and costs one tap.
+            Hidden on home, which has no parent - see navParent.
+            shrink-0 is load-bearing: this is a fixed-height child of a
+            flex column, so the default flex-shrink:1 let a tall page
+            squash it - the predictor's team pages crushed it from 34px
+            to 19.75, and the label with it. */}
+        {parent && (
+          <div className="sticky top-[72px] z-30 flex h-[34px] shrink-0 items-center border-b border-white/10 bg-[#070e1c] px-4 navbar:px-6">
+            <Link
+              href={parent.href}
+              className="flex items-center gap-1.5 text-[12.5px] tracking-[0.15em] text-white/60 transition-colors hover:text-white"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+              {parent.label.toUpperCase()}
+            </Link>
+          </div>
+        )}
         <ReferralBanner />
         <ReferrerSuggestionCard />
         <NotificationToasts />

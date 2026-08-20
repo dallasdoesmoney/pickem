@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
 import {
@@ -680,44 +679,10 @@ export default function TierListPageClient({
   // have to move together or the board stops holding exactly ten.
   return (
     <main className="flex-1 px-4 pb-16 max-w-[66rem] w-full mx-auto">
-      {/* The way back out, on its own pinned rail.
-          It used to ride the eyebrow line below as a bare 14px chevron
-          with its label hidden under 640px - and that line does not
-          stick, so 36px of scroll (less than one tier row) put the only
-          exit behind the site header. On a phone that left nothing.
-          So it gets its own bar, pinned under the site header at 72px,
-          and it keeps its label at every width.
-          Flush against the header, with no page padding above it: this
-          rail is chrome continuing the header, not the start of the
-          page, and a gap between them made it read as a stray control
-          floating over the board.
-          Nothing rides the other end. The category name was there
-          briefly and said nothing the title underneath doesn't - "NFL
-          TEAMS" above "NFL TEAM TIER LIST" is the same words twice.
-          A real link, not history.back(), because you can arrive here
-          straight from a share link or a bookmark with nothing to go
-          back to. */}
-      <div className="sticky top-[72px] z-30 -mx-4 flex h-[34px] items-center border-b border-white/10 bg-[#070e1c] px-4">
-        <Link
-          href="/tier-lists"
-          className="flex items-center gap-1.5 text-[12.5px] tracking-[0.15em] text-white/60 transition-colors hover:text-white"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-          TIER LISTS
-        </Link>
-      </div>
-
-      {/* The "SIDELINE BREW - TIER LIST" eyebrow that used to sit here is
-          gone. It was brand dressing carrying the exit as a passenger,
-          and once the rail above took the exit it was saying what the
-          rail says, one line lower, while holding the title away from the
-          rail it belongs under. Dropping it is what makes the rail nearly
-          free: 34px added, 25 recovered. The branding that matters is on
-          the exported share card, which was never this line. */}
-
+      {/* The rail that used to live here - the way back to all tier
+          lists - is in NavShell now, on every page. It started here
+          because this page's exit was the worst, and it turned out every
+          page had the same problem in a milder form. */}
       {/* Pinned directly above the board, and pinned literally: on a
           stream the board is taller than the viewport, so a title that
           scrolls away means the shot has no title on it for most of the
