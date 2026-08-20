@@ -68,10 +68,19 @@ export async function fetchTierListRankCounts(): Promise<Record<string, number>>
   return out;
 }
 
-// Both counters for one category. `people` is trustworthy - it is a
-// distinct count of rows someone had to be signed in to write. `views`
-// is not; see 0035. Treat it as a popularity signal, never as a fact.
-export type TierListStats = { people: number; views: number };
+// The three counters for one category, from narrowest to widest:
+//
+//   people - signed in, finished, pressed Save. Trustworthy: a distinct
+//            count of rows nobody could write without an account.
+//   builds - made at least one real change to the board. No account
+//            needed, which is why it is the number that best answers
+//            "how many people used this".
+//   views  - landed on the page.
+//
+// Only `people` is a fact. The other two are callable signed out by
+// design (see 0035/0036) and can be padded by anyone willing to script
+// the endpoint. Popularity signals, never stakes.
+export type TierListStats = { people: number; views: number; builds: number };
 
 // Keyed by template slug, for the hub's cards and their ordering.
 //
@@ -83,40 +92,65 @@ export async function fetchTierListStats(): Promise<Record<string, TierListStats
   if (error) {
     console.warn("Tier list stats unavailable, falling back to rank counts", error.message);
     const counts = await fetchTierListRankCounts();
-    return Object.fromEntries(Object.entries(counts).map(([slug, people]) => [slug, { people, views: 0 }]));
+    return Object.fromEntries(
+      Object.entries(counts).map(([slug, people]) => [slug, { people, views: 0, builds: 0 }]),
+    );
   }
   const out: Record<string, TierListStats> = {};
-  for (const row of (data as { template: string; people: number; views: number }[]) ?? []) {
-    out[row.template] = { people: Number(row.people) || 0, views: Number(row.views) || 0 };
+  // `builds` is read defensively rather than destructured: on a database
+  // with 0035 but not 0036 the RPC returns two counters, and a missing
+  // column has to read as zero rather than NaN.
+  for (const row of (data as { template: string; people: number; views: number; builds?: number }[]) ?? []) {
+    out[row.template] = {
+      people: Number(row.people) || 0,
+      views: Number(row.views) || 0,
+      builds: Number(row.builds) || 0,
+    };
   }
   return out;
 }
 
-// Which categories this tab has already been counted for. Session, not
-// local: a view is "someone opened this today", so a refresh or a bounce
-// back from a share link shouldn't each count again, but coming back
-// tomorrow should. It is an honesty measure on our own side rather than
-// a defence - a determined caller can hit the RPC directly.
-const VIEWED_KEY = "pickem:tier-views";
-
-function alreadyViewed(slug: string): boolean {
+// Take a slug's slot in a list of already-counted categories, returning
+// false if it was already taken. The two counters use different stores
+// on purpose, which is the whole difference in what they mean:
+//
+//   views  - sessionStorage. "Someone opened this today". A refresh or a
+//            bounce back from a share link shouldn't each count again,
+//            but coming back tomorrow should.
+//   builds - localStorage. "Someone built one of these", counted once
+//            per device, ever. Signed-out people have no other identity,
+//            and this is the closest thing to counting a person.
+//
+// Neither is a defence - a determined caller can hit the RPC directly.
+// They keep OUR OWN numbers honest, which is all a client-side guard can
+// ever do. Clearing site data starts a device over.
+function claimOnce(store: Storage, key: string, slug: string): boolean {
   try {
-    const seen = JSON.parse(sessionStorage.getItem(VIEWED_KEY) || "[]") as string[];
-    if (seen.includes(slug)) return true;
-    sessionStorage.setItem(VIEWED_KEY, JSON.stringify([...seen, slug]));
-    return false;
+    const seen = JSON.parse(store.getItem(key) || "[]") as string[];
+    if (seen.includes(slug)) return false;
+    store.setItem(key, JSON.stringify([...seen, slug]));
+    return true;
   } catch {
     // Private mode or a corrupt value. Counting is better than not.
-    return false;
+    return true;
   }
 }
 
-// Fire-and-forget: nothing on the page waits for it and nothing on the
-// page changes if it fails. A counter must never be able to break a board.
+// Both are fire-and-forget: nothing on the page waits for them and
+// nothing changes if they fail. A counter must never break a board.
+
 export async function recordTierListView(slug: string): Promise<void> {
-  if (alreadyViewed(slug)) return;
+  if (!claimOnce(sessionStorage, "pickem:tier-views", slug)) return;
   const { error } = await supabase.rpc("record_tier_list_view", { p_template: slug });
   if (error) console.warn("View not recorded", error.message);
+}
+
+// Called the first time someone actually changes a board - see the
+// caller for what counts as a change. No sign-in required, deliberately.
+export async function recordTierListBuild(slug: string): Promise<void> {
+  if (!claimOnce(localStorage, "pickem:tier-builds", slug)) return;
+  const { error } = await supabase.rpc("record_tier_list_build", { p_template: slug });
+  if (error) console.warn("Build not recorded", error.message);
 }
 
 export async function deleteTierList(userId: string, id: string): Promise<{ error: string | null }> {

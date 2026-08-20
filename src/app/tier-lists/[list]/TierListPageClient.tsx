@@ -41,6 +41,7 @@ import {
   createTierListShare,
   fetchTierList,
   listMyTierLists,
+  recordTierListBuild,
   recordTierListView,
   saveTierList,
 } from "@/lib/supabase/tierLists";
@@ -119,11 +120,31 @@ export default function TierListPageClient({
 
   // Count the open. Not gated on being signed in - the board is usable
   // signed out, and a count that skipped those people would undercount
-  // the categories strangers arrive on most. Arriving through a share
-  // link counts too: it is still somebody looking at this category.
+  // the categories strangers arrive on most.
+  //
+  // A share link counts from "Make Your Own", not from landing on it: the
+  // read-only preview is its own page and never mounts this editor. That
+  // is the right line anyway - looking at one person's finished list is
+  // not the same as opening the category.
   useEffect(() => {
     recordTierListView(template.slug);
   }, [template.slug]);
+
+  // Count the first real change, signed in or not - saves alone miss
+  // everyone who ranks a board, screenshots it and leaves, which on a
+  // page that works fine signed out is most people.
+  //
+  // canUndo is exactly the right signal and needs no new bookkeeping: the
+  // history only grows on a dispatch the reducer actually acted on, so
+  // hovers, no-op drops and the tier cap don't count. Crucially replace()
+  // clears it, so seeding from a share link or opening a saved list -
+  // both of which land a fully ranked board on screen without anyone
+  // touching it - does not read as an edit. Latched by the storage guard
+  // in recordTierListBuild, so undoing back to an empty history doesn't
+  // arm it a second time.
+  useEffect(() => {
+    if (canUndo) recordTierListBuild(template.slug);
+  }, [canUndo, template.slug]);
 
   // Seed from a shared snapshot exactly once, after local state has
   // hydrated so it isn't immediately overwritten by the effect in the hook.

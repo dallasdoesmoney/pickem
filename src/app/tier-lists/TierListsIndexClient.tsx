@@ -49,23 +49,41 @@ function matches(haystack: string, query: string): boolean {
 const CARD =
   "group flex flex-col rounded-2xl border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/40";
 
-// How far up the hub a category sits. A save is worth ten opens: it took
-// a sign-in and a finished board, and it is the number nobody can inflate
-// by reloading a page. Views break the ties between categories nobody has
-// saved yet, which is exactly where a fixed order has nothing to say.
+// How far up the hub a category sits, weighted by how much each signal
+// cost the person and how hard it is to fake. A save took a sign-in and a
+// finished board and nobody can inflate it by reloading; building a board
+// took real work but no account; opening a page took nothing. Views only
+// ever break ties between categories nobody has used yet, which is
+// exactly where a fixed order has nothing to say.
 export function popularity(stats?: TierListStats): number {
   if (!stats) return 0;
-  return stats.people * 10 + stats.views;
+  return stats.people * 10 + stats.builds * 4 + stats.views;
 }
 
 function TemplateCard({ template, stats }: { template: TierTemplate; stats?: TierListStats }) {
   const preview = useMemo(() => previewFor(template), [template]);
+  // Two numbers, not three. "Ranked" is builds rather than saves: it is
+  // what a reader already assumes the word means, and it is the one that
+  // counts the signed-out people who make up most of the ranking. Saves
+  // are a strict subset of it - showing both put the smallest and most
+  // confusing number on every card to say something the bigger one
+  // already said.
+  //
   // Hidden at zero rather than shown as "0 RANKED" - a counter is social
   // proof, and an empty one is the opposite. Each half drops out on its
-  // own, so a brand-new category shows its views without claiming saves.
+  // own, so a category people are opening but not finishing still shows
+  // the number it has earned.
+  //
+  // The larger of the two, because they are the same quantity measured in
+  // two eras: build tracking starts at zero today, while saves have been
+  // accumulating since 0030. A category with 40 savers and 3 builds has
+  // had at least 40 people rank it, and dropping to "3 RANKED" on the day
+  // this shipped would be a visible lie. Builds overtake saves quickly and
+  // permanently, since every saver is also a builder from here on.
+  const ranked = Math.max(stats?.builds ?? 0, stats?.people ?? 0);
   const counters = [
     stats?.views ? `${abbreviate(stats.views)} OPENED` : null,
-    stats?.people ? `${abbreviate(stats.people)} RANKED` : null,
+    ranked ? `${abbreviate(ranked)} RANKED` : null,
   ].filter(Boolean);
   return (
     <Link href={`/tier-lists/${template.slug}`} className={CARD}>
