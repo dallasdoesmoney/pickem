@@ -31,7 +31,6 @@ import { TierItemChip } from "./TierItemChip";
 // rows themselves step out into the triangle.
 export const CAPS = [1, 3, 5, 7] as const;
 export const RANKED = CAPS.reduce((a, b) => a + b, 0);
-const WIDEST = CAPS[CAPS.length - 1];
 const LABELS = ["S", "A", "B", "C"] as const;
 
 const storageKey = (slug: string) => `pickem:pyramid:${slug}`;
@@ -58,29 +57,39 @@ function readSlots(slug: string, valid: Set<string>): (string | null)[] {
   }
 }
 
-// The board's own solver, with one substitution: the real board wraps, so
-// it picks a per-row count from the viewport. A pyramid cannot wrap - a
-// wrapped row is a different shape - so the widest tier's capacity IS the
-// per-row count, and the chip solves down to whatever makes seven fit.
-function solveSize(viewportWidth: number) {
-  const content = Math.min(viewportWidth, 1056) - 32;
-  const base = viewportWidth < 768 ? 86 : 136;
-  const gap = viewportWidth < 768 ? 4 : 6;
-  // p-2 either side of the marks, exactly as a tier row, plus the row's
-  // own 1px side borders - which are part of its width now that each row
-  // is its own object.
-  const pad = 16 + 2;
+// The shape, solved from the width available.
+//
+// Every proportion is a fraction of the base, so the triangle looks
+// identical at any size and only the marks change:
+//
+//   T    - the colour band's thickness, measured horizontally
+//   top  - the flat width at the apex
+//
+// `top` is not a style choice. A band thick enough to carry its own
+// letter needs T + chip + padding of clear width at the apex row's mid
+// height, and on a straight slope that height is only an eighth of the
+// base. Solving it gives top >= 0.1 * w; below that the triangle would
+// have to get dramatically wider to keep the same band.
+const BAND_FRACTION = 0.12;
+const TIP_FRACTION = 0.1375;
 
-  // The bottom row is the whole board's width, and everything solves
-  // backwards from it. Nothing is reserved past the last slot: a row ends
-  // where its tier ends, so the black never runs on into space a team
-  // could not go.
-  const track = content - base - pad;
-  const chipSize = Math.max(22, Math.min(80, Math.floor((track - (WIDEST - 1) * gap) / WIDEST)));
-  // Same derivation as the board. In practice this lands on `base` at
-  // every size the pyramid solves to, so a row's rail is the board's rail.
-  const railWidth = Math.max(base, Math.round((chipSize + 16) * 1.28));
-  return { chipSize, railWidth, gap };
+function solveShape(viewportWidth: number) {
+  const w = Math.min(viewportWidth, 1056) - 32;
+  const T = Math.round(w * BAND_FRACTION);
+  const top = Math.round(w * TIP_FRACTION);
+  // The base row binds: seven marks have to sit between the band and the
+  // right-hand slope, and at that height the slope has taken 0.108w off
+  // each side. Working it through leaves the marks 0.664w, which at ~7.8
+  // mark-widths across is 0.085w each. 0.082 keeps a little slack.
+  const chipSize = Math.max(22, Math.min(80, Math.floor(w * 0.082)));
+  const gap = Math.max(4, Math.round(chipSize * 0.13));
+  const rowH = chipSize + 24;
+  const H = rowH * CAPS.length;
+  // Where the triangle's left edge sits at height Y. Every band corner
+  // comes out of this, so the two edges are parallel by construction
+  // rather than by arithmetic that could drift.
+  const leftEdgeAt = (Y: number) => ((w - top) / 2) * (1 - Y / H);
+  return { w, T, top, chipSize, gap, rowH, H, leftEdgeAt };
 }
 
 // --------------------------------------------------------------- pieces
@@ -253,7 +262,7 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     else if (over.startsWith("slot:")) place(id, Number(over.slice(5)));
   }
 
-  const { chipSize, railWidth, gap } = solveSize(viewportWidth);
+  const { w, T, top, chipSize, gap, rowH, H, leftEdgeAt } = solveShape(viewportWidth);
   const { setNodeRef: poolRef, isOver: overPool } = useDroppable({ id: "pool" });
   const draggingItem = dragging ? byId.get(dragging) : null;
 
@@ -274,88 +283,119 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
       onDragCancel={() => setDragging(null)}
       onDragEnd={onDragEnd}
     >
-      {/* Still the board - pure black, the chevron rail, a hairline between
-          tiers, the outer corners rounded - but each row is only as wide as
-          its own tier holds, and they stack dead centre with no gap. Every
-          row is wider than the one above by exactly two marks, so the sides
-          step out evenly and the stack itself is the pyramid. */}
-      <div className="flex flex-col items-center">
-        {rows.map(({ tier, from, cap }) => (
-          <div
-            key={tier}
-            className="flex items-stretch overflow-hidden"
-            style={{
-              // Pure black, exactly as TierRow: the highest-contrast ground
-              // the marks can sit on.
-              background: "#000000",
-              // The sides are the pyramid's edge, so they carry the board's
-              // border; the top of each row is the hairline that separates
-              // it from the tier above, and where the row sticks out past
-              // that tier the same hairline reads as the step's edge.
-              borderLeft: "1px solid rgba(255,255,255,0.10)",
-              borderRight: "1px solid rgba(255,255,255,0.10)",
-              borderTop: tier === 0 ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(255,255,255,0.09)",
-              borderBottom: tier === CAPS.length - 1 ? "1px solid rgba(255,255,255,0.10)" : undefined,
-              borderTopLeftRadius: tier === 0 ? 16 : undefined,
-              borderTopRightRadius: tier === 0 ? 16 : undefined,
-              borderBottomLeftRadius: tier === CAPS.length - 1 ? 16 : undefined,
-              borderBottomRightRadius: tier === CAPS.length - 1 ? 16 : undefined,
-            }}
-          >
-            <div
-              className="flex shrink-0 items-center justify-center"
-              style={{
-                width: railWidth,
-                background: accents[tier],
-                clipPath: "polygon(0 0, 84% 0, 100% 50%, 84% 100%, 0 100%)",
-                paddingRight: 14,
-                paddingLeft: 4,
-              }}
-            >
-              <span
-                className="w-full min-w-0 text-center leading-[1.12]"
-                style={{ fontFamily: "var(--font-display)", color: "#0c1830", fontSize: 30 }}
+      {/* One shape, sliced into tiers. The clip is what makes the edges
+          true diagonals rather than a staircase: each tier is a full-width
+          band and the shape cuts it to whatever the slope allows at that
+          height, so the corners fill themselves with the row's own black. */}
+      <div className="relative mx-auto" style={{ width: w, height: H }}>
+        <div
+          className="absolute inset-0"
+          style={{
+            clipPath: `polygon(${(w - top) / 2}px 0, ${(w + top) / 2}px 0, ${w}px ${H}px, 0 ${H}px)`,
+          }}
+        >
+          {rows.map(({ tier, from, cap }) => {
+            const yTop = tier * rowH;
+            const x1 = leftEdgeAt(yTop);
+            const x4 = leftEdgeAt(yTop + rowH);
+            const mid = leftEdgeAt(yTop + rowH / 2);
+            return (
+              <div
+                key={tier}
+                className="absolute left-0 flex items-center justify-center"
+                style={{
+                  top: yTop,
+                  width: w,
+                  height: rowH,
+                  // Pure black, exactly as TierRow: the highest-contrast
+                  // ground the marks can sit on.
+                  background: "#000000",
+                  borderTop: tier === 0 ? undefined : "1px solid rgba(255,255,255,0.09)",
+                  // Centres the marks in what the band leaves rather than
+                  // in the whole row. Both bounds move with the slope by
+                  // the same amount, so this lands on the same x for every
+                  // tier and the marks stay a symmetric triangle.
+                  paddingLeft: T,
+                  gap,
+                }}
               >
-                {LABELS[tier]}
-              </span>
-            </div>
+                {/* The tier's colour, cut at the slope's angle on BOTH
+                    sides - a band lying along the triangle's edge rather
+                    than a wedge that thickens as it falls. */}
+                <span
+                  aria-hidden
+                  className="absolute inset-0"
+                  style={{
+                    background: accents[tier],
+                    clipPath: `polygon(${x1}px 0, ${x1 + T}px 0, ${x4 + T}px 100%, ${x4}px 100%)`,
+                  }}
+                />
+                <span
+                  aria-hidden
+                  className="absolute"
+                  style={{
+                    left: mid + T / 2,
+                    top: "50%",
+                    transform: "translate(-50%, -50%)",
+                    fontFamily: "var(--font-display)",
+                    fontSize: Math.max(13, Math.round(chipSize * 0.42)),
+                    color: "#0c1830",
+                    lineHeight: 1,
+                  }}
+                >
+                  {LABELS[tier]}
+                </span>
 
-            {/* Same padding and min-height as a tier row. The row is sized
-                to exactly this tier's capacity, so there is nothing to
-                centre within - the slots ARE the row. */}
-            <div
-              className="flex items-center p-2"
-              style={{ gap, minHeight: chipSize + 16 }}
-            >
-              {Array.from({ length: cap }, (_, k) => {
-                const index = from + k;
-                const id = slots[index];
-                const item = id ? byId.get(id) : null;
-                return (
-                  <Slot
-                    key={index}
-                    index={index}
-                    size={chipSize}
-                    accent={accents[tier]}
-                    armed={!!selected}
-                    onTap={() => selected && place(selected, index)}
-                  >
-                    {item && (
-                      <Draggable
-                        item={item}
-                        style={template.itemStyle}
-                        size={chipSize}
-                        selected={selected === item.id}
-                        onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
-                      />
-                    )}
-                  </Slot>
-                );
-              })}
-            </div>
+                {Array.from({ length: cap }, (_, k) => {
+                  const index = from + k;
+                  const id = slots[index];
+                  const item = id ? byId.get(id) : null;
+                  return (
+                    <Slot
+                      key={index}
+                      index={index}
+                      size={chipSize}
+                      accent={accents[tier]}
+                      armed={!!selected}
+                      onTap={() => selected && place(selected, index)}
+                    >
+                      {item && (
+                        <Draggable
+                          item={item}
+                          style={template.itemStyle}
+                          size={chipSize}
+                          selected={selected === item.id}
+                          onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
+                        />
+                      )}
+                    </Slot>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
 
-          </div>
-        ))}
+        {/* The shape's own edge. #000 on the page's ground is almost no
+            contrast, so without this the triangle has no visible boundary
+            at all. One polygon rather than four borders, so each diagonal
+            is a single unbroken line. */}
+        <svg
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          width={w}
+          height={H}
+          viewBox={`0 0 ${w} ${H}`}
+        >
+          <polygon
+            points={`${(w - top) / 2},0 ${(w + top) / 2},0 ${w},${H} 0,${H}`}
+            fill="none"
+            stroke="rgba(255,255,255,0.17)"
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
       </div>
 
       {/* The pool, in the board's own treatment - same black, same radius,
