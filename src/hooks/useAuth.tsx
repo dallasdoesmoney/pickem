@@ -19,6 +19,7 @@ export type Profile = {
   referred_by: string | null;
   onboarding_avatar_prompted: boolean;
   follow_recs_prompted: boolean;
+  onboarding_referral_prompted: boolean;
   // Read by FollowRecsGate to tell a genuine onboarding walk-through
   // apart from an existing account being backfilled.
   created_at: string | null;

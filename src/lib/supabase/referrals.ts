@@ -1,12 +1,36 @@
 import { supabase } from "@/lib/supabase/client";
 import { withRetry } from "@/lib/withRetry";
 
-// Idempotent (see claim_referral in supabase/schema.sql) - safe to call
-// speculatively any time a pending code is found, no risk of double
-// crediting a referrer.
-export async function claimReferral(referrerUsername: string): Promise<void> {
-  const { error } = await supabase.rpc("claim_referral", { p_referrer_username: referrerUsername });
+// What claim_referral says happened. Only "ok" paid anybody; the rest
+// are the reasons it didn't, so a dialog waiting on the answer can say
+// which. The background caller ignores all of them.
+export type ClaimResult = "ok" | "already_claimed" | "no_such_user" | "self" | "not_signed_in";
+
+// Idempotent (see 0037) - safe to call speculatively any time a pending
+// code is found, no risk of double crediting anyone.
+export async function claimReferral(referrerUsername: string): Promise<ClaimResult> {
+  const { data, error } = await supabase.rpc("claim_referral", { p_referrer_username: referrerUsername });
   if (error) throw error;
+  return (data as ClaimResult) ?? "no_such_user";
+}
+
+export type ReferrerMatch = {
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  total_points: number;
+};
+
+// Who you can name as your referrer. Typed rather than remembered: the
+// point of the dropdown is that nobody has to know a username exactly,
+// and that the only thing you can submit is somebody it offered.
+export async function searchReferrers(query: string, limit = 6): Promise<ReferrerMatch[]> {
+  const term = query.trim();
+  if (!term) return [];
+  const { data, error } = await supabase.rpc("search_referrers", { p_query: term, p_limit: limit });
+  if (error) throw error;
+  return (data as ReferrerMatch[]) ?? [];
 }
 
 export async function fetchReferralCount(userId: string): Promise<number> {

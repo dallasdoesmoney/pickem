@@ -4,6 +4,7 @@ import { NavShell } from "@/components/NavShell";
 import { UsernameGate } from "@/components/UsernameGate";
 import { AvatarPromptGate } from "@/components/AvatarPromptGate";
 import { FollowRecsGate } from "@/components/FollowRecsGate";
+import { ReferralPromptGate } from "@/components/ReferralPromptGate";
 import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
 
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <UsernameGate />
           <AvatarPromptGate />
           <FollowRecsGate />
+          <ReferralPromptGate />
         </AuthProvider>
       </body>
     </html>

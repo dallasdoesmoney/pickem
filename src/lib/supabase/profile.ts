@@ -36,6 +36,13 @@ export async function markAvatarPrompted(userId: string): Promise<void> {
   if (error) throw error;
 }
 
+// Marks ReferralPromptGate as seen - answered or skipped, both count -
+// so nobody is asked twice who invited them.
+export async function markReferralPrompted(userId: string): Promise<void> {
+  const { error } = await supabase.from("profiles").update({ onboarding_referral_prompted: true }).eq("id", userId);
+  if (error) throw error;
+}
+
 export async function markFollowRecsPrompted(userId: string): Promise<void> {
   const { error } = await supabase.from("profiles").update({ follow_recs_prompted: true }).eq("id", userId);
   if (error) throw error;
