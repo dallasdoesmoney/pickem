@@ -760,10 +760,13 @@ export default function TierListPageClient({
     // Shared under the name the board is showing, so renaming a list in
     // Edit Tiers changes the caption on the exported card too.
     const shared = { ...state, title: listTitleFor(state, template) };
+    // Whatever is on screen is what gets shared. A card that came back
+    // as tiers after you had built a pyramid read as the button being
+    // broken.
     const blob = await renderTierShareImage({
       state: shared,
       template,
-      authorLabel: profile?.display_name || profile?.username || null,
+      pyramid: view === "pyramid" ? pyrSlots : null,
     });
     await shareBlob({
       blob,

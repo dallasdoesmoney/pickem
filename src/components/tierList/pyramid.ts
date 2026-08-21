@@ -48,21 +48,36 @@ export function pyramidBands(tiers: Tier[]): { label: string; accent: string }[]
 //
 //   T    - the colour band's thickness, measured across the band rather
 //          than along the row, so it stays even as the sides close in.
-//   apex - the flat width at the top. Not a style choice: a band thick
-//          enough to carry its own name needs T + mark + padding of clear
-//          width at the top row's mid height, and that height is only an
-//          eighth of the base.
+//   apex - the flat width at the top. Not a style choice: it is SOLVED,
+//          because the top row is where the triangle is narrowest and it
+//          still has to hold the band, a mark, and clear space either
+//          side of it. Solving it at the row's mid height - which an
+//          earlier version did - is wrong by exactly the amount a mark is
+//          tall: the mark reaches up to where the row is narrower still,
+//          and the apex mark ended up lying over the band on one side and
+//          across the slope on the other.
+const CLEAR = 12; // breathing room between the band, the mark and the slope
+
 export function solvePyramid(boardWidth: number) {
   const w = Math.max(240, boardWidth);
   const T = Math.round(w * 0.12);
-  const apex = Math.round(w * 0.1375);
-  // The base row binds: seven marks between the band and the right-hand
-  // slope, where the slope has already taken 0.108w per side.
+  // The base row binds the mark size: seven of them plus their gaps have
+  // to fit the track the slopes leave at that height.
   const chip = Math.max(20, Math.min(80, Math.floor(w * 0.082)));
   const gap = Math.max(4, Math.round(chip * 0.13));
   const rowH = chip + 24;
   const height = rowH * CAPS.length;
-  // How far in the left edge has come by the time it reaches Y.
+
+  // How far down the pyramid the top edge of a mark sits, as a fraction.
+  // The clear width across any row at that depth is
+  //     apex + (w - apex) * t
+  // so the smallest apex that still leaves room for band + mark + air is
+  // this, and the proportional 0.1375 is only a floor for wide boards.
+  const t = (rowH - chip) / 2 / height;
+  const need = T + chip + CLEAR * 2;
+  const apex = Math.round(Math.max(w * 0.1375, (need - w * t) / (1 - t)));
+
+  // How far in the left edge has come by the time it reaches y.
   const leftEdgeAt = (y: number) => ((w - apex) / 2) * (1 - y / height);
   return { w, T, apex, chip, gap, rowH, height, leftEdgeAt };
 }
@@ -75,12 +90,11 @@ export function slotRect(shape: PyramidShape, slot: number) {
   const place = slot - FIRST_SLOT_OF[row];
   const cap = CAPS[row];
   const span = cap * shape.chip + (cap - 1) * shape.gap;
-  // Centred on the track that is left once the band has taken its share,
-  // which is what keeps the marks inside the slopes on every row.
-  const startX = (shape.w + shape.T) / 2 - span / 2;
-  return {
-    x: startX + place * (shape.chip + shape.gap),
-    y: row * shape.rowH + (shape.rowH - shape.chip) / 2,
-    size: shape.chip,
-  };
+  const y = row * shape.rowH + (shape.rowH - shape.chip) / 2;
+  // Centred on the track the row actually has at the mark's TOP edge,
+  // where it is narrowest - a mark is a square, so the row's mid height
+  // is not where it can run out of room.
+  const edge = shape.leftEdgeAt(y);
+  const startX = (edge + shape.T + (shape.w - edge)) / 2 - span / 2;
+  return { x: startX + place * (shape.chip + shape.gap), y, size: shape.chip };
 }

@@ -2,6 +2,7 @@ import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { TierListState, tierLabelFor } from "@/lib/tierList";
 import { BRAND_LOGO_SRC, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
 import { BACKDROP_OPACITY, BACKDROP_SCALE } from "@/components/tierList/TierItemChip";
+import { CAPS, RANKED, ROW_OF, pyramidBands, slotRect, solvePyramid } from "@/components/tierList/pyramid";
 
 // Same canvas approach and the same 840px width as the picks/predictor
 // share cards, so all three read as one family in a feed. Purpose-built
@@ -18,11 +19,18 @@ const HEADER_EYEBROW_PX = 15;
 const HEADER_EYEBROW_GAP = 14;
 const HEADER_TITLE_PX = 44;
 const HEADER_TITLE_GAP = 10;
-const HEADER_META_PX = 15;
 
 const RAIL_W = 118;
 // Rows butt straight into each other now - the board is one block.
 const ROW_GAP = 0;
+// 2 rather than 1: this card renders at 2x and is looked at scaled down
+// in a feed, where a single device pixel disappears.
+const ROW_LINE = 2;
+
+// The rail's face. The board sets its tier names in the body face at 600
+// - the display face is a poster face and at this size it turned a name
+// into a slab you read letter by letter - so the card does the same.
+const railFont = (px: number) => `600 ${px}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
 const ROW_PAD = 10;
 const CHIP_GAP = 6;
 const ROW_RADIUS = 18;
@@ -32,8 +40,10 @@ const BRAND_FOOTER_H = 12 + 104 + 10 + 18 + 10;
 export type TierShareParams = {
   state: TierListState;
   template: TierTemplate;
-  // Rendered under the title as attribution when we have one.
-  authorLabel?: string | null;
+  // The pyramid's sixteen places, when the board is showing the pyramid.
+  // Absent means the card renders the tier list, which is the default and
+  // what every caller outside the editor wants.
+  pyramid?: (string | null)[] | null;
 };
 
 // Fixed rather than solved from the widest row. Solving meant a tier
@@ -58,7 +68,7 @@ function rowHeight(count: number, chip: number, perRow: number): number {
   return ROW_PAD * 2 + lines * chip + (lines - 1) * CHIP_GAP;
 }
 
-export async function renderTierShareImage({ state, template, authorLabel }: TierShareParams): Promise<Blob> {
+export async function renderTierShareImage({ state, template, pyramid }: TierShareParams): Promise<Blob> {
   const displayFont = resolveDisplayFont();
   if (typeof document !== "undefined" && "fonts" in document) {
     try {
@@ -78,17 +88,29 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
   const showUnranked = state.unranked.length > 0;
 
   const rows = state.tiers.map((t) => ({ tier: t, ids: state.placements[t.id] ?? [] }));
-  const bodyH =
-    rows.reduce((h, r) => h + rowHeight(r.ids.length, chip, perRow) + ROW_GAP, 0) +
-    (showUnranked ? rowHeight(state.unranked.length, chip, perRow) + ROW_GAP + 26 : 0);
 
-  const headerH =
-    HEADER_EYEBROW_PX + HEADER_EYEBROW_GAP + HEADER_TITLE_PX + HEADER_TITLE_GAP + HEADER_META_PX + 20;
+  // Pyramid mode is a different composition, not a variant of the rows:
+  // its own geometry, its own mark size, and a cut instead of an unranked
+  // strip. Everything below branches on it once and then goes its own way.
+  const shape = pyramid ? solvePyramid(WIDTH - PAD_X * 2) : null;
+  const placed = new Set((pyramid ?? []).filter(Boolean) as string[]);
+  const missed = pyramid ? template.items.map((i) => i.id).filter((id) => !placed.has(id)) : [];
+
+  const bodyH = shape
+    ? shape.height + 26 + rowHeight(missed.length, shape.chip, PER_ROW) + ROW_GAP
+    : rows.reduce((h, r) => h + rowHeight(r.ids.length, chip, perRow) + ROW_GAP, 0) +
+      (showUnranked ? rowHeight(state.unranked.length, chip, perRow) + ROW_GAP + 26 : 0);
+
+  const headerH = HEADER_EYEBROW_PX + HEADER_EYEBROW_GAP + HEADER_TITLE_PX + HEADER_TITLE_GAP + 20;
   const totalHeight = PAD_TOP + headerH + bodyH + BRAND_FOOTER_H + PAD_BOTTOM;
 
   const logos = new Map<string, HTMLImageElement | null>();
   const backdrops = new Map<string, HTMLImageElement | null>();
-  const usedIds = [...rows.flatMap((r) => r.ids), ...state.unranked];
+  // Every mark on the card, whichever layout it is in. The pyramid shows
+  // all thirty-two too - sixteen placed and sixteen below the cut.
+  const usedIds = pyramid
+    ? template.items.map((i) => i.id)
+    : [...rows.flatMap((r) => r.ids), ...state.unranked];
   // Backdrops are loaded in the same pass rather than lazily: the canvas
   // draws in one synchronous sweep, so anything not resolved by here is
   // simply missing from the card.
@@ -128,19 +150,54 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
   ctx.fillText(fitText(ctx, state.title, WIDTH - PAD_X * 2), WIDTH / 2, cursorY + HEADER_TITLE_PX * 0.86);
   cursorY += HEADER_TITLE_PX + HEADER_TITLE_GAP;
 
-  const ranked = usedIds.length - state.unranked.length;
-  const meta = authorLabel
-    ? `${authorLabel}  ·  ${ranked}/${template.items.length} ranked`
-    : `${ranked}/${template.items.length} ranked`;
-  ctx.font = `${HEADER_META_PX}px system-ui, sans-serif`;
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillText(meta, WIDTH / 2, cursorY + HEADER_META_PX);
-  cursorY += HEADER_META_PX + 20;
+  // Nothing between the title and the board. The name and the count that
+  // used to sit here said nothing the card doesn't already show - the
+  // ranking IS the count - and put a username on an image whose whole job
+  // is to be posted somewhere else.
+  cursorY += 20;
 
   ctx.textAlign = "left";
 
+  if (shape) {
+    drawPyramid(ctx, displayFont, {
+      x: PAD_X,
+      y: cursorY,
+      shape,
+      bands: pyramidBands(state.tiers),
+      slots: pyramid!,
+      logos,
+      backdrops,
+      template,
+    });
+    cursorY += shape.height + 14;
+
+    ctx.textAlign = "left";
+    ctx.font = `13px system-ui, sans-serif`;
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillText(`MISSED THE CUT (${missed.length})`, PAD_X, cursorY + 13);
+    cursorY += 26;
+    const cutH = rowHeight(missed.length, shape.chip, PER_ROW);
+    drawPool(ctx, {
+      x: PAD_X,
+      y: cursorY,
+      h: cutH,
+      ids: missed,
+      chip: shape.chip,
+      perRow: PER_ROW,
+      logos,
+      backdrops,
+      template,
+    });
+    cursorY += cutH + ROW_GAP;
+
+    drawBrandFooter(ctx, displayFont, cursorY, brandLogo, WIDTH);
+    return new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("canvas.toBlob returned null"))), "image/png");
+    });
+  }
+
   // The board is a single rounded black block; rows are drawn inside one
-  // clip so the top and bottom chevrons get their outer corners cut by it,
+  // clip so the top and bottom rows get their outer corners cut by it,
   // exactly like the live board.
   const boardH = rows.reduce((h, r) => h + rowHeight(r.ids.length, chip, perRow), 0);
   const boardR = { tl: ROW_RADIUS, tr: ROW_RADIUS, br: ROW_RADIUS, bl: ROW_RADIUS };
@@ -184,20 +241,7 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
     ctx.fillText(`STILL UNRANKED (${state.unranked.length})`, PAD_X, cursorY + 13);
     cursorY += 26;
     const h = rowHeight(state.unranked.length, chip, perRow);
-    drawRow(ctx, displayFont, {
-      x: PAD_X,
-      y: cursorY,
-      h,
-      label: "—",
-      accent: "#64748b",
-      ids: state.unranked,
-      chip,
-      perRow,
-      logos,
-      backdrops,
-      template,
-      muted: true,
-    });
+    drawPool(ctx, { x: PAD_X, y: cursorY, h, ids: state.unranked, chip, perRow, logos, backdrops, template });
     cursorY += h + ROW_GAP;
   }
 
@@ -206,6 +250,148 @@ export async function renderTierShareImage({ state, template, authorLabel }: Tie
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("canvas.toBlob returned null"))), "image/png");
   });
+}
+
+// The pyramid: four bands narrowing to a point, sixteen places, and the
+// same black ground and hairline separators as the rows. Drawn from the
+// same solvePyramid the board uses, so the card is the board's geometry
+// at a different size rather than a second guess at it.
+function drawPyramid(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  o: {
+    x: number;
+    y: number;
+    shape: ReturnType<typeof solvePyramid>;
+    bands: { label: string; accent: string }[];
+    slots: (string | null)[];
+    logos: Map<string, HTMLImageElement | null>;
+    backdrops: Map<string, HTMLImageElement | null>;
+    template: TierTemplate;
+  },
+) {
+  const { w, T, apex, rowH, height, leftEdgeAt } = o.shape;
+
+  CAPS.forEach((_, row) => {
+    const yTop = o.y + row * rowH;
+    const a = leftEdgeAt(row * rowH);
+    const b = leftEdgeAt((row + 1) * rowH);
+
+    // The row, black, cut to the slope on both sides.
+    ctx.beginPath();
+    ctx.moveTo(o.x + a, yTop);
+    ctx.lineTo(o.x + w - a, yTop);
+    ctx.lineTo(o.x + w - b, yTop + rowH);
+    ctx.lineTo(o.x + b, yTop + rowH);
+    ctx.closePath();
+    ctx.fillStyle = "#000000";
+    ctx.fill();
+
+    // The band, flush with the left slope and running parallel to it.
+    ctx.beginPath();
+    ctx.moveTo(o.x + a, yTop);
+    ctx.lineTo(o.x + a + T, yTop);
+    ctx.lineTo(o.x + b + T, yTop + rowH);
+    ctx.lineTo(o.x + b, yTop + rowH);
+    ctx.closePath();
+    ctx.fillStyle = o.bands[row].accent;
+    ctx.fill();
+
+    // Clipped to the band, because the band is a parallelogram and a name
+    // tall enough to wrap reaches past its slanted edges.
+    ctx.save();
+    ctx.clip();
+    drawRailLabel(ctx, o.bands[row].label, o.x + leftEdgeAt(row * rowH + rowH / 2), yTop, rowH, false, T);
+    ctx.restore();
+
+    // Same hairline as the rows, across the row AND its band.
+    if (row > 0) {
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(o.x + a, yTop, w - a * 2, ROW_LINE);
+      ctx.fillStyle = "rgba(255,255,255,0.09)";
+      ctx.fillRect(o.x + a, yTop, w - a * 2, ROW_LINE);
+    }
+  });
+
+  for (let slot = 0; slot < RANKED; slot++) {
+    const id = o.slots[slot];
+    if (!id) continue;
+    const logo = o.logos.get(id) ?? null;
+    if (!logo) continue;
+    const { x, y, size } = slotRect(o.shape, slot);
+    drawMark(ctx, displayFont, logo, o.backdrops.get(id) ?? null, o.template, id, o.x + x, o.y + y, size);
+  }
+
+  // The silhouette. Pure black on this ground has almost no contrast, so
+  // without it the shape has no visible boundary at all.
+  ctx.beginPath();
+  ctx.moveTo(o.x + (w - apex) / 2, o.y);
+  ctx.lineTo(o.x + (w + apex) / 2, o.y);
+  ctx.lineTo(o.x + w, o.y + height);
+  ctx.lineTo(o.x, o.y + height);
+  ctx.closePath();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.17)";
+  ctx.stroke();
+  // ROW_OF is imported for the band a slot belongs to; referenced here so
+  // the shared module stays the single source for it.
+  void ROW_OF;
+}
+
+// The strip under the board - unranked in the tier list, missed the cut
+// in the pyramid. Same treatment either way.
+function drawPool(
+  ctx: CanvasRenderingContext2D,
+  o: {
+    x: number;
+    y: number;
+    h: number;
+    ids: string[];
+    chip: number;
+    perRow: number;
+    logos: Map<string, HTMLImageElement | null>;
+    backdrops: Map<string, HTMLImageElement | null>;
+    template: TierTemplate;
+  },
+) {
+  const w = WIDTH - PAD_X * 2;
+  roundRectPath(ctx, o.x, o.y, w, o.h, { tl: ROW_RADIUS, tr: ROW_RADIUS, br: ROW_RADIUS, bl: ROW_RADIUS });
+  ctx.fillStyle = "#000000";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.stroke();
+
+  o.ids.forEach((id, i) => {
+    const logo = o.logos.get(id) ?? null;
+    if (!logo) return;
+    const cx = o.x + ROW_PAD + (i % o.perRow) * (o.chip + CHIP_GAP);
+    const cy = o.y + ROW_PAD + Math.floor(i / o.perRow) * (o.chip + CHIP_GAP);
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    drawMark(ctx, `${o.chip}px sans-serif`, logo, o.backdrops.get(id) ?? null, o.template, id, cx, cy, o.chip);
+    ctx.restore();
+  });
+}
+
+function drawMark(
+  ctx: CanvasRenderingContext2D,
+  displayFont: string,
+  logo: HTMLImageElement,
+  backdrop: HTMLImageElement | null,
+  template: TierTemplate,
+  id: string,
+  x: number,
+  y: number,
+  size: number,
+) {
+  if (template.itemStyle === "portrait") {
+    drawPortraitChip(ctx, displayFont, logo, backdrop, resolveItem(template, id), x, y, size);
+  } else {
+    // Logos are square, so stretching to the chip and fitting inside it
+    // are the same operation.
+    ctx.drawImage(logo, x, y, size, size);
+  }
 }
 
 function drawRow(
@@ -236,39 +422,26 @@ function drawRow(
     ctx.lineWidth = 2;
     ctx.strokeStyle = "rgba(255,255,255,0.10)";
     ctx.stroke();
-  } else if (!o.first) {
-    // Hairline is the only thing separating one tier from the next.
-    ctx.fillStyle = "rgba(255,255,255,0.09)";
-    ctx.fillRect(o.x, o.y, w, 1);
   }
 
-  // Chevron rail: solid accent, dark type, point on the right.
-  const point = RAIL_W * 0.84;
-  ctx.beginPath();
-  ctx.moveTo(o.x, o.y);
-  ctx.lineTo(o.x + point, o.y);
-  ctx.lineTo(o.x + RAIL_W, o.y + o.h / 2);
-  ctx.lineTo(o.x + point, o.y + o.h);
-  ctx.lineTo(o.x, o.y + o.h);
-  ctx.closePath();
+  // A plain block of accent, matching the board: the chevron's point ate
+  // the right-hand sixth of the rail, which is the part a wrapped name
+  // needs most.
   ctx.fillStyle = o.muted ? "rgba(255,255,255,0.10)" : o.accent;
-  ctx.fill();
+  ctx.fillRect(o.x, o.y, RAIL_W, o.h);
 
-  // The rail wraps rather than ellipsising. A name is the whole point of
-  // renaming a tier, and on one line "SUPER BOWL CONTENDER" was shrunk to
-  // "SUPER BO…" - the card showed the ranking but not what it meant. The
-  // widest usable width is `point`, not RAIL_W: the chevron only reaches
-  // its full width at the vertical middle, so text sized to RAIL_W would
-  // spill out of the taper on the first and last lines.
-  const { size: labelSize, lines: labelLines } = layoutRailLabel(ctx, o.label, displayFont, point - 14);
-  ctx.fillStyle = o.muted ? "rgba(255,255,255,0.45)" : "#0c1830";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const lineH = labelSize * 1.12;
-  const firstY = o.y + o.h / 2 - ((labelLines.length - 1) * lineH) / 2;
-  labelLines.forEach((line, i) => {
-    ctx.fillText(line, o.x + point / 2, firstY + i * lineH);
-  });
+  drawRailLabel(ctx, o.label, o.x, o.y, o.h, o.muted);
+
+  // The separator goes on LAST, over the rail as well as the row. On the
+  // board it is a border on the row and the rail sits inside it, so the
+  // colour blocks are parted by a dark line too - drawing it first meant
+  // the rail painted straight over it and the blocks ran together.
+  if (!o.muted && !o.first) {
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(o.x, o.y, w, ROW_LINE);
+    ctx.fillStyle = "rgba(255,255,255,0.09)";
+    ctx.fillRect(o.x, o.y, w, ROW_LINE);
+  }
 
   ctx.textBaseline = "alphabetic";
   const startX = o.x + RAIL_W + ROW_PAD;
@@ -294,27 +467,81 @@ function drawRow(
   });
 }
 
+// The rail's type, matching the board: the body face at 600 rather than
+// the display face, a few points smaller, and wrapping rather than
+// ellipsising. A name is the whole point of renaming a tier, and on one
+// line "SUPER BOWL CONTENDER" came out as "SUPER BO…" - the card showed
+// the ranking but not what it meant.
+function drawRailLabel(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  x: number,
+  y: number,
+  h: number,
+  muted?: boolean,
+  // The rows' rail is a fixed width and `x` is its left edge; the
+  // pyramid's band is the shape's thickness and `x` is where its left
+  // edge crosses this row's middle. Same drawing either way.
+  bandW?: number,
+) {
+  const w = bandW ?? RAIL_W;
+  const { size, lines } = layoutRailLabel(ctx, label.toUpperCase(), w - 16);
+  ctx.fillStyle = muted ? "rgba(255,255,255,0.45)" : "#0c1830";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const lineH = size * 1.18;
+  const firstY = y + h / 2 - ((lines.length - 1) * lineH) / 2;
+  lines.forEach((line, i) => ctx.fillText(line, x + w / 2, firstY + i * lineH));
+}
+
 // As many lines as the rail can hold before the type gets too small to
 // read at a glance. The board allows the same three.
 const RAIL_LABEL_MAX_LINES = 3;
 const RAIL_LABEL_MIN_PX = 9;
 
-// Greedy wrap at spaces. A single word longer than the line is left to
-// overflow here; the caller steps the type down until it stops doing so.
+// Greedy wrap at spaces, and inside a word when the word alone is wider
+// than the line. That last part is what the board does too (break-words),
+// and without it the only remaining move was an ellipsis - which on the
+// pyramid's much narrower band turned "CHAMPIONSHIP" into "CHAMPIONS…",
+// naming nothing.
 function wrapWords(ctx: CanvasRenderingContext2D, words: string[], maxWidth: number): string[] {
   const lines: string[] = [];
   let line = "";
+  const flush = () => {
+    if (line) lines.push(line);
+    line = "";
+  };
   for (const word of words) {
-    const next = line ? `${line} ${word}` : word;
-    if (!line || ctx.measureText(next).width <= maxWidth) {
-      line = next;
-      continue;
+    for (const piece of breakWord(ctx, word, maxWidth)) {
+      const next = line ? `${line} ${piece}` : piece;
+      if (!line || ctx.measureText(next).width <= maxWidth) {
+        line = next;
+        continue;
+      }
+      flush();
+      line = piece;
     }
-    lines.push(line);
-    line = word;
   }
-  if (line) lines.push(line);
+  flush();
   return lines;
+}
+
+// One word, cut into the widest chunks that fit. A word that already fits
+// comes back untouched, which is every ordinary tier name.
+function breakWord(ctx: CanvasRenderingContext2D, word: string, maxWidth: number): string[] {
+  if (ctx.measureText(word).width <= maxWidth) return [word];
+  const pieces: string[] = [];
+  let piece = "";
+  for (const ch of word) {
+    if (piece && ctx.measureText(piece + ch).width > maxWidth) {
+      pieces.push(piece);
+      piece = ch;
+    } else {
+      piece += ch;
+    }
+  }
+  if (piece) pieces.push(piece);
+  return pieces;
 }
 
 // Picks the largest size at which the name both wraps inside the line
@@ -325,23 +552,23 @@ function wrapWords(ctx: CanvasRenderingContext2D, words: string[], maxWidth: num
 function layoutRailLabel(
   ctx: CanvasRenderingContext2D,
   label: string,
-  displayFont: string,
   maxWidth: number,
 ): { size: number; lines: string[] } {
   const n = label.length;
-  const band = n <= 2 ? 34 : n <= 5 ? 21 : n <= 9 ? 16 : n <= 14 ? 15 : n <= 22 ? 14 : 13;
+  // The same bands the board uses, scaled for this card's wider rail.
+  const band = n <= 2 ? 26 : n <= 5 ? 19 : n <= 9 ? 16 : n <= 14 ? 15 : n <= 22 ? 14 : 13;
   const words = label.split(/\s+/).filter(Boolean);
   if (!words.length) return { size: band, lines: [] };
 
   let size = band;
   let lines = words;
-  for (; size > RAIL_LABEL_MIN_PX; size -= 1) {
-    ctx.font = `${size}px ${displayFont}`;
+  for (; size >= RAIL_LABEL_MIN_PX; size -= 1) {
+    ctx.font = railFont(size);
     lines = wrapWords(ctx, words, maxWidth);
-    const everyWordFits = words.every((w) => ctx.measureText(w).width <= maxWidth);
-    if (everyWordFits && lines.length <= RAIL_LABEL_MAX_LINES) break;
+    if (lines.length <= RAIL_LABEL_MAX_LINES) break;
   }
-  ctx.font = `${size}px ${displayFont}`;
+  size = Math.max(RAIL_LABEL_MIN_PX, size);
+  ctx.font = railFont(size);
 
   // Only reachable if a name won't fit even at the floor, in which case
   // showing most of it beats showing none of the last line.

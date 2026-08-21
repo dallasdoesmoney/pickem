@@ -111,11 +111,11 @@ export function BoardThumb({
           >
             <span
               className="shrink-0"
-              style={{
-                width: size,
-                background: tier.accent,
-                clipPath: "polygon(0 0, 78% 0, 100% 50%, 78% 100%, 0 100%)",
-              }}
+              // A plain block, like the board and the share card. The
+              // chevron went with them - a thumbnail that still had points
+              // on it would not read as a smaller version of the thing it
+              // is a thumbnail of.
+              style={{ width: size, background: tier.accent }}
             />
             <span
               className="flex-1 min-w-0 flex flex-wrap gap-[3px] p-1 content-start"
