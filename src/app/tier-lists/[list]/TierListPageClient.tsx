@@ -63,7 +63,7 @@ import {
   solvePyramid,
 } from "@/components/tierList/pyramid";
 import { readBoard, runCascade } from "@/components/tierList/cascade";
-import { sharedTierLabelSize } from "@/components/tierList/tierLabel";
+import { tierLabelSizes } from "@/components/tierList/tierLabel";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
@@ -249,7 +249,14 @@ export default function TierListPageClient({
     // enough for a phrase like "SUPER BOWL CONTENDER" to wrap across two
     // or three readable lines. A phone still can't spare as much as a
     // desktop can, so it gets a narrower one and wraps sooner.
-    const base = viewportWidth < 768 ? 86 : 136;
+    //
+    // 104 rather than 86 on a phone, which is what buys the name size its
+    // floor: a twelve-letter word has to fit the rail on ONE line, and at
+    // 86 the only size that managed it was 8px. Measured cost at 390: the
+    // mark goes 46px to 42, and the same five still fit a line. At 320 it
+    // is already at its 34px floor, so nothing changes there but the
+    // track.
+    const base = viewportWidth < 768 ? 104 : 136;
     const track = content - base - 16;
     // Ten across from 1024 up - any normal laptop - rather than only once
     // the board hits its own max width. Between the two the chip solves a
@@ -342,12 +349,12 @@ export default function TierListPageClient({
     [pyrShape],
   );
 
-  // One size for every rail on the board - the smallest any of its tiers
-  // needs. Solved here because no single row can know what the others are
+  // Two sizes for the whole board - one for letters, one shared by every
+  // name. Solved here because no single row can know what the others are
   // called.
-  const labelSize = useMemo(
+  const labelSizes = useMemo(
     () =>
-      sharedTierLabelSize(
+      tierLabelSizes(
         state.tiers.map((t, i) => tierLabelFor(t, i)),
         railWidth - 12,
         // The shortest a row can be. A tier holding two rows of marks is
@@ -1007,7 +1014,7 @@ export default function TierListPageClient({
               template={template}
               chipSize={chipSize}
               railWidth={railWidth}
-              labelSize={labelSize}
+              labelSizes={labelSizes}
               first={i === 0}
               cascading={cascading}
               sweeping={sweeping}

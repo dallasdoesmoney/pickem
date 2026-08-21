@@ -196,7 +196,7 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
     });
   }
 
-  const railLabelSize = sharedRailSize(
+  const railLabelSizes = railSizes(
     ctx,
     rows.map((r, i) => tierLabelFor(r.tier, i).toUpperCase()),
     RAIL_W - 16
@@ -222,7 +222,7 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
       h,
       label: tierLabelFor(row.tier, i),
       accent: row.tier.accent,
-      labelSize: railLabelSize,
+      labelSize: pickRailSize(tierLabelFor(row.tier, i).toUpperCase(), railLabelSizes),
       ids: row.ids,
       chip,
       perRow,
@@ -278,7 +278,7 @@ function drawPyramid(
   },
 ) {
   const { w, T, apex, rowH, height, leftEdgeAt } = o.shape;
-  const labelSize = sharedRailSize(ctx, o.bands.map((b) => b.label.toUpperCase()), T - 16);
+  const labelSizes = railSizes(ctx, o.bands.map((b) => b.label.toUpperCase()), T - 16);
 
   CAPS.forEach((_, row) => {
     const yTop = o.y + row * rowH;
@@ -309,7 +309,7 @@ function drawPyramid(
     // tall enough to wrap reaches past its slanted edges.
     ctx.save();
     ctx.clip();
-    drawRailLabel(ctx, o.bands[row].label, o.x + leftEdgeAt(row * rowH + rowH / 2), yTop, rowH, labelSize, false, T);
+    drawRailLabel(ctx, o.bands[row].label, o.x + leftEdgeAt(row * rowH + rowH / 2), yTop, rowH, pickRailSize(o.bands[row].label.toUpperCase(), labelSizes), false, T);
     ctx.restore();
 
     // Same hairline as the rows, across the row AND its band.
@@ -511,7 +511,7 @@ function drawRailLabel(
 // As many lines as the rail can hold before the type gets too small to
 // read at a glance. The board allows the same three.
 const RAIL_LABEL_MAX_LINES = 3;
-const RAIL_LABEL_MIN_PX = 9;
+const RAIL_LABEL_MIN_PX = 11;
 
 // Greedy wrap at spaces, and inside a word when the word alone is wider
 // than the line. That last part is what the board does too (break-words),
@@ -558,18 +558,36 @@ function breakWord(ctx: CanvasRenderingContext2D, word: string, maxWidth: number
   return pieces;
 }
 
-// One size for every rail on the card - the smallest any of its names
-// needs. Measured against the real font rather than estimated from
-// character counts, which is what the old length-banded size did and why
-// long names overflowed.
-function sharedRailSize(ctx: CanvasRenderingContext2D, labels: string[], maxWidth: number): number {
-  return labels.reduce((smallest, label) => Math.min(smallest, railSize(ctx, label, maxWidth)), 26);
+// Two sizes for the whole card, same rule as the board: one for letters,
+// and one shared by every NAME - the smallest any of them needs. Solved
+// per rail, "S / A / CHAMPIONSHIP / F" set three at 26px and one at 14,
+// and the four read as unrelated labels. A letter and a name are
+// different kinds of label, so those two differing reads as deliberate;
+// two names differing does not.
+//
+// Measured against the real font rather than estimated from character
+// counts, which is what the old length-banded size did and why long
+// names overflowed.
+const LETTER_PX = 26;
+const isLetter = (label: string) => label.trim().length <= 2 && !/\s/.test(label.trim());
+
+function railSizes(ctx: CanvasRenderingContext2D, labels: string[], maxWidth: number) {
+  const names = labels.filter((l) => !isLetter(l));
+  return {
+    letter: Math.min(LETTER_PX, railSize(ctx, "MM", maxWidth)),
+    word: names.length
+      ? names.reduce((smallest, l) => Math.min(smallest, railSize(ctx, l, maxWidth)), LETTER_PX)
+      : LETTER_PX,
+  };
 }
+
+const pickRailSize = (label: string, sizes: { letter: number; word: number }) =>
+  isLetter(label) ? sizes.letter : sizes.word;
 
 function railSize(ctx: CanvasRenderingContext2D, label: string, maxWidth: number): number {
   const n = label.length;
   // The same bands the board uses, scaled for this card's wider rail.
-  const band = n <= 2 ? 26 : n <= 5 ? 19 : n <= 9 ? 16 : n <= 14 ? 15 : n <= 22 ? 14 : 13;
+  const band = n <= 2 ? LETTER_PX : n <= 5 ? 20 : n <= 9 ? 18 : n <= 14 ? 17 : n <= 22 ? 15 : 14;
   const words = label.split(/\s+/).filter(Boolean);
   if (!words.length) return band;
 

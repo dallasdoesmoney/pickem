@@ -5,7 +5,7 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { Tier, MAX_TIER_LABEL, tierLabelFor } from "@/lib/tierList";
 import { SortableTierItem } from "@/components/tierList/TierItemChip";
-import { TIER_LABEL_FONT } from "@/components/tierList/tierLabel";
+import { TIER_LABEL_FONT, TierLabelSizes, pickTierLabelSize } from "@/components/tierList/tierLabel";
 
 export function TierRow({
   tier,
@@ -14,7 +14,7 @@ export function TierRow({
   template,
   chipSize,
   railWidth,
-  labelSize,
+  labelSizes,
   first,
   cascading,
   sweeping,
@@ -39,9 +39,10 @@ export function TierRow({
   template: TierTemplate;
   chipSize: number;
   railWidth: number;
-  // Solved once for the whole board and handed down, so every rail sets
-  // its name at the same size however long or short that one name is.
-  labelSize: number;
+  // Solved once for the whole board and handed down: one size for a
+  // letter, one shared by every name, so no two names ever set at
+  // different sizes however long or short one of them is.
+  labelSizes: TierLabelSizes;
   // Only the separator differs; the first row has the board's edge above it.
   first: boolean;
   // Set for a beat when the board fills, so the rows can light in sequence.
@@ -131,7 +132,7 @@ export function TierRow({
           // flex item the span sizes to its content instead, so a long
           // name overflowed the rail.
           className="w-full min-w-0 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
-          style={{ ...TIER_LABEL_FONT, fontSize: labelSize }}
+          style={{ ...TIER_LABEL_FONT, fontSize: pickTierLabelSize(tierLabelFor(tier, index), labelSizes) }}
         >
           {tierLabelFor(tier, index)}
         </span>

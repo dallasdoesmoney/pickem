@@ -26,31 +26,49 @@ const ADVANCE = 0.73;
 
 // Small, but not so small that a name is decoration. Below this the rail
 // would be showing that a tier is named rather than what it is named.
-const FLOOR = 8;
-const MAX_SIZE = 22;
+const FLOOR = 10;
+const LETTER_SIZE = 22;
 
-// ONE SIZE FOR THE WHOLE BOARD: the smallest any of its tiers needs.
+// A letter is not a name. "S" and "CHAMPIONSHIP" are different KINDS of
+// label, so they get different sizes and that reads as deliberate; two
+// names at two sizes reads as a bug. So there are exactly two sizes on a
+// board, never more: this one, and whatever the names settle on.
+const isLetter = (label: string) => {
+  const t = label.trim();
+  return t.length > 0 && t.length <= 2 && !/\s/.test(t);
+};
+
+export type TierLabelSizes = { letter: number; word: number };
+
+// ONE SIZE FOR EVERY NAME ON THE BOARD: the smallest any of them needs.
 //
-// Sized per tier, a board of "S / A / CHAMPIONSHIP / F" set three of them
-// at 22px and one at 9, which reads as four unrelated labels rather than
-// one scale. Renaming a single tier is not supposed to be a typographic
-// event for that row alone.
-export function sharedTierLabelSize(
+// Solved per tier, a board of "S / A / CHAMPIONSHIP / F" set three of
+// them at 22px and one at 11, which reads as four unrelated labels rather
+// than one scale. Renaming a single tier is not supposed to be a
+// typographic event for that row alone.
+export function tierLabelSizes(
   labels: string[],
   innerWidth: number,
   maxHeight: number,
   maxLines = 3,
-): number {
-  // Seeded at the largest band rather than at infinity, so a board with
-  // no tiers still answers with a real size.
-  return labels.reduce(
-    (smallest, label) => Math.min(smallest, tierLabelSize(label, innerWidth, maxHeight, maxLines)),
-    MAX_SIZE,
-  );
+): TierLabelSizes {
+  const names = labels.filter((l) => !isLetter(l));
+  return {
+    // Capped by the rail as well, so a two-character label on a very
+    // narrow rail still fits.
+    letter: Math.min(LETTER_SIZE, tierLabelSize("MM", innerWidth, maxHeight, 1)),
+    word: names.length
+      ? names.reduce((smallest, l) => Math.min(smallest, tierLabelSize(l, innerWidth, maxHeight, maxLines)), LETTER_SIZE)
+      : LETTER_SIZE,
+  };
 }
 
-// What one name on its own would take. Only sharedTierLabelSize should
-// call this - a rail rendering at its own answer is the thing above.
+export const pickTierLabelSize = (label: string, sizes: TierLabelSizes): number =>
+  isLetter(label) ? sizes.letter : sizes.word;
+
+// What one name on its own would take. Only the two above should call
+// this - a rail rendering at its own answer is the thing they exist to
+// prevent.
 //
 // A NAME WRAPS BETWEEN WORDS AND NEVER INSIDE ONE. A word split across
 // two lines is not a shorter word, it is two wrong ones, and on a rail
@@ -66,7 +84,7 @@ export function tierLabelSize(
 ): number {
   const words = label.trim().split(/\s+/).filter(Boolean);
   const n = Math.max(1, label.trim().length);
-  const band = n <= 2 ? MAX_SIZE : n <= 5 ? 16 : n <= 9 ? 14 : n <= 14 ? 13 : n <= 22 ? 12 : 11;
+  const band = n <= 2 ? LETTER_SIZE : n <= 5 ? 17 : n <= 9 ? 15 : n <= 14 ? 14 : n <= 22 ? 13 : 12;
   const width = Math.max(1, innerWidth);
 
   const longest = words.reduce((m, w) => Math.max(m, w.length), 1);
