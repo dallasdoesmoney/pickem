@@ -13,90 +13,87 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { TierItem, TierTemplate } from "@/data/tierTemplates";
-import { createInitialState } from "@/lib/tierList";
+import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
+import { tierLabelFor } from "@/lib/tierList";
+import { useTierList } from "@/hooks/useTierList";
 import { TierItemChip } from "./TierItemChip";
 
-// The pyramid: sixteen ranked in four rows, everything else below a cut
-// line. 1 + 3 + 5 + 7 is the only four-row triangle that lands on exactly
-// sixteen, so the shape IS the rule - there is no separate "top 16"
-// setting that could disagree with the rows on screen.
+// Two boards, one animation layer.
 //
-// Two views of the same sixteen. ROWS is the tier board's own shape -
-// full-width bands, the rail down the left, marks packed from the left
-// edge. PYRAMID clips each band to the slope and centres the marks. The
-// data does not move between them; only the drawing does, which is what
-// makes the switch a view rather than a mode.
+// TIER LIST is the real thing - the user's own tiers, however many they
+// have made, items packed from the left edge, no capacity and therefore
+// no empty squares. It is the actual draft from useTierList, so what is
+// here is what is in the editor.
 //
-// The morph works because a rectangle and a trapezoid are the same four
-// points. Nothing resizes and nothing reflows - each band keeps its full
-// width the whole time and only its clip-path interpolates, and the
-// marks ride on transforms the compositor can handle. See the animation
-// block further down for the choreography.
+// PYRAMID is a different ranking with its own rules: sixteen places in
+// four rows, 1 + 3 + 5 + 7, everything else below a cut.
+//
+// Keeping them separate is the point. A pyramid cannot represent six
+// free-form tiers, so deriving each from the other would lose work every
+// time you switched. Instead neither writes to the other: the pyramid is
+// seeded once from the board's reading order, and toggling back returns
+// the tier list exactly as it was - extra tiers, empty tiers and all.
 export const CAPS = [1, 3, 5, 7] as const;
 export const RANKED = CAPS.reduce((a, b) => a + b, 0);
-const LABELS = ["S", "A", "B", "C"] as const;
 
 const storageKey = (slug: string) => `pickem:pyramid:${slug}`;
 
-function readSlots(slug: string, valid: Set<string>): (string | null)[] {
-  const empty = Array<string | null>(RANKED).fill(null);
+function readSlots(slug: string, valid: Set<string>): (string | null)[] | null {
   try {
     const raw = localStorage.getItem(storageKey(slug));
-    if (!raw) return empty;
+    if (!raw) return null;
     const saved = JSON.parse(raw);
-    if (!Array.isArray(saved)) return empty;
+    if (!Array.isArray(saved)) return null;
     const seen = new Set<string>();
-    return empty.map((_, i) => {
+    return Array.from({ length: RANKED }, (_, i) => {
       const id = saved[i];
-      // Drop anything that isn't a real item of this template, and never
-      // let one id hold two slots - a stale or hand-edited value must not
-      // be able to duplicate a mark.
+      // Never let one id hold two places, and drop anything that is not
+      // an item of this template - a stale value must not be able to
+      // duplicate a mark.
       if (typeof id !== "string" || !valid.has(id) || seen.has(id)) return null;
       seen.add(id);
       return id;
     });
   } catch {
-    return empty;
+    return null;
   }
 }
 
-// The shape, solved from the width available.
+// ---------------------------------------------------------------- shape
 //
-// Every proportion is a fraction of the base, so the triangle looks
-// identical at any size and only the marks change:
+// Every proportion is a fraction of the width, so the triangle looks the
+// same at any size and only the mark changes.
 //
-//   T    - the colour band's thickness, measured horizontally. It is
-//          also the rows view's rail width, so the two states are the
-//          same shape at different angles and the morph is honest.
-//   top  - the flat width at the apex
-//
-// `top` is not a style choice. A band thick enough to carry its own
-// letter needs T + chip + padding of clear width at the apex row's mid
-// height, and on a straight slope that height is only an eighth of the
-// base. Solving it gives top >= 0.1 * w; below that the triangle would
-// have to get dramatically wider to keep the same band.
-const BAND_FRACTION = 0.12;
-const TIP_FRACTION = 0.1375;
-
+//   T    - the colour band's thickness. It is also the tier list's rail
+//          width, so the two states are the same shape at different
+//          angles and the morph between them is honest.
+//   top  - the flat width at the apex. Not a style choice: a band thick
+//          enough to carry its own letter needs T + mark + padding of
+//          clear width at the apex row's mid height, and that height is
+//          only an eighth of the base.
 function solveShape(viewportWidth: number) {
   const w = Math.min(viewportWidth, 1056) - 32;
-  const T = Math.round(w * BAND_FRACTION);
-  const top = Math.round(w * TIP_FRACTION);
-  // The base row binds: seven marks have to sit between the band and the
-  // right-hand slope, and at that height the slope has taken 0.108w off
-  // each side. Working it through leaves the marks 0.664w, which at ~7.8
-  // mark-widths across is 0.085w each. 0.082 keeps a little slack.
-  const chipSize = Math.max(22, Math.min(80, Math.floor(w * 0.082)));
-  const gap = Math.max(4, Math.round(chipSize * 0.13));
-  const rowH = chipSize + 24;
-  const H = rowH * CAPS.length;
-  // Where the triangle's left edge sits at height Y. Every band corner
-  // comes out of this, so the two edges are parallel by construction
-  // rather than by arithmetic that could drift.
+  const T = Math.round(w * 0.12);
+  const top = Math.round(w * 0.1375);
+  // The pyramid's base row binds: seven marks between the band and the
+  // right-hand slope, where the slope has already taken 0.108w per side.
+  const chip = Math.max(22, Math.min(80, Math.floor(w * 0.082)));
+  const gap = Math.max(4, Math.round(chip * 0.13));
+  const pyrRowH = chip + 24;
+  const H = pyrRowH * CAPS.length;
   const leftEdgeAt = (Y: number) => ((w - top) / 2) * (1 - Y / H);
-  return { w, T, top, chipSize, gap, rowH, H, leftEdgeAt };
+  return { w, T, top, chip, gap, pyrRowH, H, leftEdgeAt };
 }
+
+// "Cascade": bands narrow from the bottom up, marks travel with their own
+// band rather than after it. Slower and heavier than a snap - it reads as
+// the board folding itself rather than a control being flipped.
+const CASCADE = {
+  duration: 900,
+  ease: "cubic-bezier(.65,0,.35,1)",
+  rowStagger: 95,
+  markStagger: 16,
+};
 
 // --------------------------------------------------------------- pieces
 
@@ -105,12 +102,18 @@ function Draggable({
   style,
   size,
   selected,
+  x,
+  y,
+  transition,
   onActivate,
 }: {
   item: TierItem;
   style?: TierTemplate["itemStyle"];
   size: number;
   selected: boolean;
+  x: number;
+  y: number;
+  transition: string;
   onActivate: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id });
@@ -119,122 +122,116 @@ function Draggable({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      style={{ touchAction: "none", opacity: isDragging ? 0.25 : 1 }}
+      className="absolute left-0 top-0"
+      style={{
+        width: size,
+        height: size,
+        // Absolute + transform rather than flex: moving thirty-two marks
+        // costs the compositor about what moving one does, and nothing
+        // reflows while they travel.
+        transform: `translate(${x}px, ${y}px)`,
+        transition,
+        touchAction: "none",
+        opacity: isDragging ? 0.25 : 1,
+        zIndex: isDragging ? 30 : 2,
+      }}
     >
       <TierItemChip item={item} style={style} size={size} selected={selected} onActivate={onActivate} />
     </div>
   );
 }
 
-// An empty slot is the drop target, so the triangle keeps its shape on a
-// board nobody has finished and the gaps say where things go. Sized and
-// cornered like a chip, so a filled row and an empty one are the same
-// grid.
-function Slot({
-  index,
-  size,
+// An invisible drop target. In the pyramid these are the sixteen places;
+// in the tier list there is one per tier, covering it. Never drawn: a
+// tier list has no capacity, so it has no empty squares to show. The
+// only feedback is the zone lighting up under a drag.
+function Zone({
+  id,
+  x,
+  y,
+  w,
+  h,
   accent,
   armed,
-  motion,
-  children,
   onTap,
 }: {
-  index: number;
-  size: number;
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
   accent: string;
   armed: boolean;
-  // Where this slot sits in the current view, and how it should travel
-  // there. Absolute + transform rather than flex, so moving sixteen of
-  // them costs the compositor about what moving one does.
-  motion: { x: number; y: number; transition: string };
-  children?: React.ReactNode;
   onTap: () => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `slot:${index}` });
-  const empty = !children;
+  const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
       onClick={onTap}
-      className="absolute left-0 top-0 grid place-items-center rounded-xl"
+      className="absolute left-0 top-0 rounded-xl transition-[background,box-shadow] duration-150"
       style={{
-        width: size,
-        height: size,
-        transform: `translate(${motion.x}px, ${motion.y}px)`,
-        transition: `${motion.transition}, background 150ms, box-shadow 150ms`,
+        width: w,
+        height: h,
+        transform: `translate(${x}px, ${y}px)`,
         cursor: armed ? "pointer" : undefined,
-        background: isOver ? `${accent}2e` : empty ? "rgba(255,255,255,0.04)" : undefined,
-        boxShadow: isOver
-          ? `inset 0 0 0 2px ${accent}`
-          : empty
-            ? `inset 0 0 0 1px ${armed ? `${accent}88` : "rgba(255,255,255,0.09)"}`
-            : undefined,
+        background: isOver ? `${accent}2e` : undefined,
+        boxShadow: isOver ? `inset 0 0 0 2px ${accent}` : undefined,
+        zIndex: 1,
       }}
-    >
-      {children}
-    </div>
+    />
   );
 }
 
-// ------------------------------------------------------------- motion
-//
-// "Cascade": the bands narrow from the bottom up, the marks travel with
-// their own band rather than after it, and the cut line arrives last.
-// Slower and heavier than a snap - it reads as the board folding itself
-// rather than as a control being flipped.
-const CASCADE = {
-  duration: 900,
-  ease: "cubic-bezier(.65,0,.35,1)",
-  bezier: [0.65, 0, 0.35, 1] as const,
-  rowStagger: 95,
-  markStagger: 22,
-};
-
-// The outline cannot be a CSS transition - SVG points are not
-// animatable - but it must not re-time the animation either. Staggering
-// the rows and separately easing one polygon put the two out of register
-// mid-flight, with the outline wider than the row it was supposed to be
-// tracing.
-//
-// So it traces instead of predicting: every frame it reads each row's
-// CURRENT computed clip-path and stitches the silhouette out of those
-// corners. Whatever the rows are doing, the edge is doing, by
-// construction - including the steps between rows that the stagger
-// creates, which are the cascade rather than a defect.
-function readClipXs(el: HTMLElement): [number, number, number, number] | null {
-  const m = getComputedStyle(el).clipPath.match(/-?[\d.]+px/g);
-  if (!m || m.length < 4) return null;
-  const [a, b, c, d] = m.slice(0, 4).map(parseFloat);
-  return [a, b, c, d];
+function PoolBox({
+  height,
+  width,
+  armed,
+  onTap,
+}: {
+  height: number;
+  width: number;
+  armed: boolean;
+  onTap: () => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: "pool" });
+  return (
+    <div
+      ref={setNodeRef}
+      onClick={onTap}
+      className="rounded-2xl border transition-[background,border-color] duration-150"
+      style={{
+        width,
+        height,
+        borderColor: isOver ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.10)",
+        background: isOver ? "#141414" : "#000000",
+        cursor: armed ? "pointer" : undefined,
+      }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------- board
 
 export function PyramidBoard({ template }: { template: TierTemplate }) {
+  // The real draft, shared with the editor. The tier list view IS the
+  // tier list - not a copy of it, and not a four-tier stand-in.
+  const { state, loaded: boardLoaded, dispatch } = useTierList(template);
+
   const byId = useMemo(() => new Map(template.items.map((i) => [i.id, i])), [template]);
   const validIds = useMemo(() => new Set(template.items.map((i) => i.id)), [template]);
 
-  // Accents come from the engine's own default tiers rather than a copy,
-  // so retuning the palette in levels.ts moves this with it.
-  const accents = useMemo(
-    () => createInitialState(template).tiers.slice(0, CAPS.length).map((t) => t.accent),
-    [template],
-  );
-
   const [slots, setSlots] = useState<(string | null)[]>(() => Array<string | null>(RANKED).fill(null));
-  const [loaded, setLoaded] = useState(false);
+  const [pyrLoaded, setPyrLoaded] = useState(false);
+  const [view, setView] = useState<"rows" | "pyramid">("rows");
+  // False on the first paint: the board should arrive in its shape, not
+  // assemble itself on every page load.
+  const [animate, setAnimate] = useState(false);
+  const [reduced, setReduced] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(390);
-  const [view, setView] = useState<"rows" | "pyramid">("pyramid");
-  // False on the first paint: the board should arrive in its shape, not
-  // assemble itself every time the page loads.
-  const [animate, setAnimate] = useState(false);
-  const [reduced, setReduced] = useState(false);
 
-  // Sixteen marks flying across the screen is exactly the motion the OS
-  // setting exists for, so honour it: the switch still works, it just
-  // cuts straight to the end state.
   useEffect(() => {
     const mq = matchMedia("(prefers-reduced-motion: reduce)");
     const sync = () => setReduced(mq.matches);
@@ -250,29 +247,47 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // Read after mount, never during render: the server has no local
-  // storage and seeding from it directly tears on hydration.
+  // Reading order: top tier first, then left to right inside it. It is
+  // the only ranking a free-form board already contains, so it is what
+  // seeds the pyramid.
+  const readingOrder = useMemo(
+    () => state.tiers.flatMap((t) => state.placements[t.id] ?? []),
+    [state],
+  );
+  // Held in a ref so seeding and refilling can read the board's current
+  // order without either of them re-running every time the board changes.
+  const readingRef = useRef(readingOrder);
   useEffect(() => {
-    setSlots(readSlots(template.slug, validIds));
-    setLoaded(true);
-    setSelected(null);
-  }, [template.slug, validIds]);
+    readingRef.current = readingOrder;
+  }, [readingOrder]);
+
+  // Seeded once, then independent. Read after mount, never during render:
+  // the server has no local storage and seeding from it during render
+  // tears on hydration.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!boardLoaded || seeded.current) return;
+    seeded.current = true;
+    const saved = readSlots(template.slug, validIds);
+    setSlots(saved ?? Array.from({ length: RANKED }, (_, i) => readingRef.current[i] ?? null));
+    setPyrLoaded(true);
+  }, [boardLoaded, template.slug, validIds]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (!pyrLoaded) return;
     try {
       localStorage.setItem(storageKey(template.slug), JSON.stringify(slots));
     } catch {
-      /* private mode - the board works, it just won't survive a reload */
+      /* private mode - it works, it just won't survive a reload */
     }
-  }, [slots, loaded, template.slug]);
+  }, [slots, pyrLoaded, template.slug]);
 
   const placed = useMemo(() => new Set(slots.filter(Boolean) as string[]), [slots]);
-  const pool = useMemo(() => template.items.filter((i) => !placed.has(i.id)), [template.items, placed]);
+  const pyrPool = useMemo(
+    () => template.items.filter((i) => !placed.has(i.id)),
+    [template.items, placed],
+  );
 
-  // Put an item in a slot. Whatever was there goes back to the pool -
-  // unless the item came from another slot, in which case the two trade
-  // places, which is what a drag onto an occupied slot obviously means.
   const place = useCallback((itemId: string, slot: number) => {
     setSlots((prev) => {
       const next = [...prev];
@@ -285,29 +300,15 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     setSelected(null);
   }, []);
 
-  const toPool = useCallback((itemId: string) => {
+  const toPyrPool = useCallback((itemId: string) => {
     setSlots((prev) => prev.map((id) => (id === itemId ? null : id)));
     setSelected(null);
   }, []);
 
-  const clear = useCallback(() => {
-    setSlots(Array<string | null>(RANKED).fill(null));
+  const reseed = useCallback(() => {
+    setSlots(Array.from({ length: RANKED }, (_, i) => readingRef.current[i] ?? null));
     setSelected(null);
   }, []);
-
-  // Fills the sixteen from the pool in order - a fast way to get a full
-  // board to look at without dragging sixteen things.
-  const fill = useCallback(() => {
-    setSlots((prev) => {
-      const next = [...prev];
-      const taken = new Set(next.filter(Boolean) as string[]);
-      const rest = template.items.filter((i) => !taken.has(i.id));
-      let p = 0;
-      for (let i = 0; i < next.length && p < rest.length; i++) if (!next[i]) next[i] = rest[p++].id;
-      return next;
-    });
-    setSelected(null);
-  }, [template.items]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -319,62 +320,95 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     const id = String(e.active.id);
     const over = e.over ? String(e.over.id) : null;
     if (!over) return;
-    if (over === "pool") toPool(id);
-    else if (over.startsWith("slot:")) place(id, Number(over.slice(5)));
+    if (view === "pyramid") {
+      if (over === "pool") toPyrPool(id);
+      else if (over.startsWith("slot:")) place(id, Number(over.slice(5)));
+      return;
+    }
+    // The tier list view edits the real board, exactly as the editor does.
+    if (over === "pool") dispatch({ type: "moveItem", itemId: id, toTier: null, toIndex: null });
+    else if (over.startsWith("tier:"))
+      dispatch({ type: "moveItem", itemId: id, toTier: over.slice(5), toIndex: null });
   }
 
-  const { w, T, chipSize, gap, rowH, H, leftEdgeAt } = solveShape(viewportWidth);
-  const { setNodeRef: poolRef, isOver: overPool } = useDroppable({ id: "pool" });
-  const draggingItem = dragging ? byId.get(dragging) : null;
+  // ------------------------------------------------------------ layout
+  const { w, T, chip, gap, pyrRowH, H, leftEdgeAt } = solveShape(viewportWidth);
+  const PAD = 10;
+  const perRow = Math.max(1, Math.floor((w - T - PAD * 2 + gap) / (chip + gap)));
+  const poolPerRow = Math.max(1, Math.floor((w - PAD * 2 + gap) / (chip + gap)));
 
-  // Where every piece sits in each view. Both are pure functions of the
-  // solved shape, so the two states can never disagree about geometry -
-  // which is what lets them be interpolated rather than cross-faded.
   const layout = useMemo(() => {
-    const rowsOf = (view: "rows" | "pyramid") => {
-      let at = 0;
-      return CAPS.map((cap, tier) => {
-        const from = at;
-        at += cap;
-        const yTop = tier * rowH;
-        const yBot = yTop + rowH;
-        const a = leftEdgeAt(yTop);
-        const b = leftEdgeAt(yBot);
-        const total = cap * chipSize + (cap - 1) * gap;
-        // ROWS packs from the left edge, past the rail, exactly as a tier
-        // row does. PYRAMID centres in what the band leaves - both bounds
-        // move with the slope by the same amount, so the marks land on
-        // the same x for every tier.
-        const startX = view === "rows" ? T + 12 : (w + T) / 2 - total / 2;
-        return {
-          tier,
-          from,
-          cap,
-          yTop,
-          // A rectangle and a trapezoid are the same four points.
-          rowClip:
-            view === "rows"
-              ? `polygon(0px 0%, ${w}px 0%, ${w}px 100%, 0px 100%)`
-              : `polygon(${a}px 0%, ${w - a}px 0%, ${w - b}px 100%, ${b}px 100%)`,
-          // The rail is a band standing straight up; the pyramid's is the
-          // same band lying along the slope.
-          bandClip:
-            view === "rows"
-              ? `polygon(0px 0%, ${T}px 0%, ${T}px 100%, 0px 100%)`
-              : `polygon(${a}px 0%, ${a + T}px 0%, ${b + T}px 100%, ${b}px 100%)`,
-          letterX: view === "rows" ? T / 2 : leftEdgeAt(yTop + rowH / 2) + T / 2,
-          slotX: (k: number) => startX + k * (chipSize + gap),
-          slotY: yTop + (rowH - chipSize) / 2,
-        };
+    const cell = chip + gap;
+    const boxH = (n: number) => Math.max(1, n) * cell - gap + PAD * 2;
+
+    // ---- the tier list: tiers of whatever height they need ----
+    const rowsTiers: { top: number; height: number }[] = [];
+    const rowsPos = new Map<string, { x: number; y: number }>();
+    let y = 0;
+    state.tiers.forEach((tier) => {
+      const ids = state.placements[tier.id] ?? [];
+      const height = boxH(Math.ceil(ids.length / perRow));
+      ids.forEach((id, k) => {
+        rowsPos.set(id, {
+          x: T + PAD + (k % perRow) * cell,
+          y: y + PAD + Math.floor(k / perRow) * cell,
+        });
       });
+      rowsTiers.push({ top: y, height });
+      y += height;
+    });
+    const rowsPoolY = y + 46;
+    const rowsPoolH = boxH(Math.ceil(state.unranked.length / poolPerRow));
+    state.unranked.forEach((id, k) => {
+      rowsPos.set(id, {
+        x: PAD + (k % poolPerRow) * cell,
+        y: rowsPoolY + PAD + Math.floor(k / poolPerRow) * cell,
+      });
+    });
+
+    // ---- the pyramid: four fixed rows, then the cut ----
+    const pyrPos = new Map<string, { x: number; y: number }>();
+    const pyrTiers: { top: number; height: number }[] = [];
+    let at = 0;
+    CAPS.forEach((cap, tier) => {
+      const yTop = tier * pyrRowH;
+      pyrTiers.push({ top: yTop, height: pyrRowH });
+      const total = cap * chip + (cap - 1) * gap;
+      const startX = (w + T) / 2 - total / 2;
+      for (let k = 0; k < cap; k++) {
+        const id = slots[at + k];
+        if (id) pyrPos.set(id, { x: startX + k * cell, y: yTop + (pyrRowH - chip) / 2 });
+      }
+      at += cap;
+    });
+    const pyrPoolY = H + 46;
+    const pyrPoolH = boxH(Math.ceil(pyrPool.length / poolPerRow));
+    pyrPool.forEach((item, k) => {
+      pyrPos.set(item.id, {
+        x: PAD + (k % poolPerRow) * cell,
+        y: pyrPoolY + PAD + Math.floor(k / poolPerRow) * cell,
+      });
+    });
+
+    return {
+      rows: { tiers: rowsTiers, pos: rowsPos, poolY: rowsPoolY, poolH: rowsPoolH, height: rowsPoolY + rowsPoolH },
+      pyramid: { tiers: pyrTiers, pos: pyrPos, poolY: pyrPoolY, poolH: pyrPoolH, height: pyrPoolY + pyrPoolH },
     };
-    return { rows: rowsOf("rows"), pyramid: rowsOf("pyramid") };
-  }, [w, T, chipSize, gap, rowH, leftEdgeAt]);
+  }, [state, slots, pyrPool, w, T, chip, gap, perRow, poolPerRow, pyrRowH, H]);
 
-  const shown = layout[view];
+  const L = layout[view];
+  const dur = animate && !reduced ? CASCADE.duration : 0;
+  // Bottom row first: the base settles and the tiers fold in above it.
+  const rowDelay = (tier: number) =>
+    dur ? Math.max(0, Math.min(CAPS.length - 1, CAPS.length - 1 - tier)) * CASCADE.rowStagger : 0;
+  const ease = CASCADE.ease;
 
-  // Redrawn from the rows themselves, every frame while anything is
-  // moving, and once whenever the solved shape changes.
+  // ------------------------------------------------------- the outline
+  //
+  // SVG points are not CSS-animatable, and easing one polygon alongside
+  // staggered rows put the two out of register mid-flight. So it traces
+  // rather than predicts: every frame it reads each tier's CURRENT
+  // computed clip-path and stitches the silhouette from those corners.
   const edgeRef = useRef<SVGPolygonElement>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const traceEdge = useCallback(() => {
@@ -382,37 +416,51 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     if (!poly) return;
     const left: string[] = [];
     const right: string[] = [];
-    for (let i = 0; i < CAPS.length; i++) {
+    let base: [string, string] | null = null;
+    for (let i = 0; i < state.tiers.length; i++) {
       const el = rowRefs.current[i];
-      if (!el) return;
-      const xs = readClipXs(el);
-      if (!xs) return;
-      const [topL, topR, botR, botL] = xs;
-      const yTop = i * rowH;
-      const yBot = yTop + rowH;
-      left.push(`${topL},${yTop}`, `${botL},${yBot}`);
-      right.unshift(`${topR},${yTop}`, `${botR},${yBot}`);
+      // A tier collapsed out of the pyramid has no edge to contribute.
+      // It still measures 1px, because its own separator is a border.
+      if (!el || el.offsetHeight < 2) continue;
+      const m = getComputedStyle(el).clipPath.match(/-?[\d.]+px/g);
+      if (!m || m.length < 4) continue;
+      const [topL, topR, botR, botL] = m.slice(0, 4).map(parseFloat);
+      const yTop = el.offsetTop;
+      const yBot = yTop + el.offsetHeight;
+      // One corner per row on the way down, one on the way back up, and
+      // the last row's bottom closes it. Taking both corners of every row
+      // instead drew a kink wherever a row's bottom and the next row's
+      // top were mid-transition and a pixel out of step - staggered rows
+      // are never in register while they are moving.
+      left.push(`${topL},${yTop}`);
+      right.unshift(`${topR},${yTop}`);
+      base = [`${botL},${yBot}`, `${botR},${yBot}`];
+    }
+    if (base) {
+      left.push(base[0]);
+      right.unshift(base[1]);
     }
     poly.setAttribute("points", [...left, ...right].join(" "));
-  }, [rowH]);
+  }, [state.tiers.length]);
 
   useEffect(() => {
     let raf = 0;
-    // Long enough to cover the last row's delay plus its duration.
-    const until =
-      performance.now() +
-      (animate && !reduced ? CASCADE.duration + CAPS.length * CASCADE.rowStagger + 60 : 0);
+    const until = performance.now() + (dur ? dur + state.tiers.length * CASCADE.rowStagger + 60 : 0);
     const step = () => {
       traceEdge();
       if (performance.now() < until) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [view, animate, reduced, traceEdge, w, H]);
+  }, [view, dur, traceEdge, w, L.height, state.tiers.length]);
 
-  const dur = animate && !reduced ? CASCADE.duration : 0;
-  // Bottom row first: the base settles and the tiers fold in above it.
-  const rowDelay = (tier: number) => (dur ? (CAPS.length - 1 - tier) * CASCADE.rowStagger : 0);
+  const draggingItem = dragging ? byId.get(dragging) : null;
+  const poolLabel = view === "pyramid" ? "MISSED THE CUT" : "UNRANKED";
+  const poolCount = view === "pyramid" ? pyrPool.length : state.unranked.length;
+
+  // Nothing to draw until the draft has been read; rendering the default
+  // board first and swapping would flash somebody else's ranking.
+  if (!boardLoaded) return <div style={{ height: 420 }} />;
 
   return (
     <DndContext
@@ -424,7 +472,7 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
       onDragCancel={() => setDragging(null)}
       onDragEnd={onDragEnd}
     >
-      <div className="mb-5 flex justify-center">
+      <div className="mb-5 flex flex-wrap items-center justify-center gap-3">
         <div className="flex gap-1 rounded-full border border-white/12 bg-black/40 p-1">
           {(["rows", "pyramid"] as const).map((v) => (
             <button
@@ -441,103 +489,99 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
               }`}
               style={{ fontFamily: "var(--font-display)" }}
             >
-              {v === "rows" ? "ROWS" : "PYRAMID"}
+              {v === "rows" ? "TIER LIST" : "PYRAMID"}
             </button>
           ))}
         </div>
+        {view === "pyramid" && (
+          <button
+            type="button"
+            onClick={reseed}
+            className="rounded-full border border-white/15 px-4 py-2 text-[10px] text-white/50 transition-colors hover:border-white/35 hover:text-white"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            REFILL FROM TIER LIST
+          </button>
+        )}
       </div>
 
-      <div className="relative mx-auto" style={{ width: w, height: H }}>
-        {shown.map(({ tier, yTop, rowClip, bandClip, letterX }) => {
-          const d = rowDelay(tier);
+      <div
+        className="relative mx-auto"
+        style={{ width: w, height: L.height, transition: `height ${dur}ms ${ease}` }}
+      >
+        {/* Every tier the board has. The pyramid only has room for four,
+            so the rest collapse to nothing - and come straight back when
+            you switch away, because the board was never edited. */}
+        {state.tiers.map((tier, i) => {
+          const inPyramid = i < CAPS.length;
+          const pyr = view === "pyramid";
+          const geo = pyr && inPyramid ? layout.pyramid.tiers[i] : layout.rows.tiers[i];
+          const height = pyr && !inPyramid ? 0 : geo.height;
+          const topPx = pyr && !inPyramid ? H : geo.top;
+          const a = inPyramid ? leftEdgeAt(i * pyrRowH) : 0;
+          const b = inPyramid ? leftEdgeAt((i + 1) * pyrRowH) : 0;
+          const d = rowDelay(i);
+          const shaped = pyr && inPyramid;
           return (
             <div
-              key={tier}
+              key={tier.id}
               ref={(el) => {
-                rowRefs.current[tier] = el;
+                rowRefs.current[i] = el;
               }}
-              className="absolute left-0"
+              className="absolute left-0 overflow-hidden"
               style={{
-                top: yTop,
+                top: topPx,
                 width: w,
-                height: rowH,
+                height,
+                opacity: height === 0 ? 0 : 1,
                 background: "#000000",
-                borderTop: tier === 0 ? undefined : "1px solid rgba(255,255,255,0.09)",
-                clipPath: rowClip,
-                transition: `clip-path ${dur}ms ${CASCADE.ease} ${d}ms`,
+                borderTop: i === 0 ? undefined : "1px solid rgba(255,255,255,0.09)",
+                clipPath: shaped
+                  ? `polygon(${a}px 0%, ${w - a}px 0%, ${w - b}px 100%, ${b}px 100%)`
+                  : `polygon(0px 0%, ${w}px 0%, ${w}px 100%, 0px 100%)`,
+                transition: `clip-path ${dur}ms ${ease} ${d}ms, top ${dur}ms ${ease} ${d}ms, height ${dur}ms ${ease} ${d}ms, opacity ${dur}ms ${ease} ${d}ms`,
               }}
             >
               <span
                 aria-hidden
                 className="absolute inset-0"
                 style={{
-                  background: accents[tier],
-                  clipPath: bandClip,
-                  transition: `clip-path ${dur}ms ${CASCADE.ease} ${d}ms`,
+                  background: tier.accent,
+                  clipPath: shaped
+                    ? `polygon(${a}px 0%, ${a + T}px 0%, ${b + T}px 100%, ${b}px 100%)`
+                    : `polygon(0px 0%, ${T}px 0%, ${T}px 100%, 0px 100%)`,
+                  transition: `clip-path ${dur}ms ${ease} ${d}ms`,
                 }}
               />
               <span
                 aria-hidden
-                className="absolute top-1/2"
+                className="absolute top-1/2 whitespace-nowrap"
                 style={{
                   left: 0,
-                  transform: `translate(${letterX}px, -50%) translateX(-50%)`,
-                  transition: `transform ${dur}ms ${CASCADE.ease} ${d}ms`,
+                  transform: `translate(${
+                    shaped ? leftEdgeAt(i * pyrRowH + pyrRowH / 2) + T / 2 : T / 2
+                  }px, -50%) translateX(-50%)`,
+                  transition: `transform ${dur}ms ${ease} ${d}ms`,
                   fontFamily: "var(--font-display)",
-                  fontSize: Math.max(13, Math.round(chipSize * 0.42)),
+                  fontSize: Math.max(13, Math.round(chip * 0.42)),
                   color: "#0c1830",
                   lineHeight: 1,
                 }}
               >
-                {LABELS[tier]}
+                {tierLabelFor(tier, i)}
               </span>
             </div>
           );
         })}
 
-        {/* Slots live above the bands rather than inside them: a clipped
-            row would cut a mark in half mid-flight, and a drop target you
-            cannot see is a drop target you cannot hit. */}
-        {shown.map(({ tier, from, cap, slotX, slotY }) =>
-          Array.from({ length: cap }, (_, k) => {
-            const index = from + k;
-            const id = slots[index];
-            const item = id ? byId.get(id) : null;
-            const d = dur ? rowDelay(tier) + index * CASCADE.markStagger : 0;
-            return (
-              <Slot
-                key={index}
-                index={index}
-                size={chipSize}
-                accent={accents[tier]}
-                armed={!!selected}
-                motion={{ x: slotX(k), y: slotY, transition: `transform ${dur}ms ${CASCADE.ease} ${d}ms` }}
-                onTap={() => selected && place(selected, index)}
-              >
-                {item && (
-                  <Draggable
-                    item={item}
-                    style={template.itemStyle}
-                    size={chipSize}
-                    selected={selected === item.id}
-                    onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
-                  />
-                )}
-              </Slot>
-            );
-          }),
-        )}
-
-        {/* The shape's own edge. #000 on the page's ground is almost no
-            contrast, so without this the triangle has no visible boundary
-            at all. One polygon rather than four borders, so each diagonal
-            is a single unbroken line. */}
+        {/* The silhouette. #000 on this ground has almost no contrast, so
+            without it the shape has no visible boundary at all. */}
         <svg
           aria-hidden
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute left-0 top-0"
           width={w}
-          height={H}
-          viewBox={`0 0 ${w} ${H}`}
+          height={L.height}
+          style={{ zIndex: 3 }}
         >
           <polygon
             ref={edgeRef}
@@ -548,85 +592,122 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
             vectorEffect="non-scaling-stroke"
           />
         </svg>
-      </div>
 
-      {/* The pool, in the board's own treatment - same black, same radius,
-          same border, same heading shape as UNRANKED. The dashed rule is
-          the one addition: it says the line these missed, which "unranked"
-          never had to. */}
-      <section className="mt-6">
-        <div className="mb-2 flex items-center gap-3 px-0.5">
-          <span className="h-px flex-1 bg-[repeating-linear-gradient(90deg,rgba(148,163,184,0.55)_0_6px,transparent_6px_12px)]" />
-          <h2
-            className="shrink-0 text-sm tracking-wide text-white/70"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            MISSED THE CUT <span className="text-white/35">({pool.length})</span>
-          </h2>
-          <span className="h-px flex-1 bg-[repeating-linear-gradient(90deg,rgba(148,163,184,0.55)_0_6px,transparent_6px_12px)]" />
-        </div>
-
+        {/* The pool, in the board's own treatment. */}
         <div
-          ref={poolRef}
-          onClick={() => selected && toPool(selected)}
-          className="flex flex-wrap content-start gap-1.5 rounded-2xl border p-2.5 transition-[background,border-color,box-shadow] duration-150"
+          className="absolute left-0"
           style={{
-            minHeight: chipSize + 20,
-            borderColor: overPool ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.10)",
-            background: overPool ? "#141414" : "#000000",
-            boxShadow: overPool
-              ? "0 0 0 2px rgba(255,255,255,0.5), 0 10px 30px -12px rgba(0,0,0,0.9)"
-              : undefined,
-            cursor: selected ? "pointer" : undefined,
+            top: 0,
+            transform: `translateY(${L.poolY}px)`,
+            width: w,
+            transition: `transform ${dur}ms ${ease}`,
+            zIndex: 1,
           }}
         >
-          {pool.map((item) => (
+          <div className="flex items-center gap-3 px-0.5" style={{ height: 34, marginTop: -34 }}>
+            <span className="h-px flex-1 bg-[repeating-linear-gradient(90deg,rgba(148,163,184,0.55)_0_6px,transparent_6px_12px)]" />
+            <h2
+              className="shrink-0 text-sm tracking-wide text-white/70"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {poolLabel} <span className="text-white/35">({poolCount})</span>
+            </h2>
+            <span className="h-px flex-1 bg-[repeating-linear-gradient(90deg,rgba(148,163,184,0.55)_0_6px,transparent_6px_12px)]" />
+          </div>
+          <PoolBox
+            width={w}
+            height={L.poolH}
+            armed={!!selected}
+            onTap={() => {
+              if (!selected) return;
+              if (view === "pyramid") toPyrPool(selected);
+              else dispatch({ type: "moveItem", itemId: selected, toTier: null, toIndex: null });
+              setSelected(null);
+            }}
+          />
+        </div>
+
+        {/* Drop targets, never drawn. */}
+        {view === "pyramid"
+          ? (() => {
+              let at = 0;
+              return CAPS.flatMap((cap, tier) => {
+                const total = cap * chip + (cap - 1) * gap;
+                const startX = (w + T) / 2 - total / 2;
+                const yTop = tier * pyrRowH + (pyrRowH - chip) / 2;
+                const zones = Array.from({ length: cap }, (_, k) => {
+                  const index = at + k;
+                  return (
+                    <Zone
+                      key={index}
+                      id={`slot:${index}`}
+                      x={startX + k * (chip + gap)}
+                      y={yTop}
+                      w={chip}
+                      h={chip}
+                      accent={state.tiers[tier]?.accent ?? "#ffffff"}
+                      armed={!!selected}
+                      onTap={() => selected && place(selected, index)}
+                    />
+                  );
+                });
+                at += cap;
+                return zones;
+              });
+            })()
+          : state.tiers.map((tier, i) => (
+              <Zone
+                key={tier.id}
+                id={`tier:${tier.id}`}
+                x={T}
+                y={layout.rows.tiers[i].top}
+                w={w - T}
+                h={layout.rows.tiers[i].height}
+                accent={tier.accent}
+                armed={!!selected}
+                onTap={() => {
+                  if (!selected) return;
+                  dispatch({ type: "moveItem", itemId: selected, toTier: tier.id, toIndex: null });
+                  setSelected(null);
+                }}
+              />
+            ))}
+
+        {/* Every mark, present in both views. */}
+        {template.items.map((item, n) => {
+          const p = L.pos.get(item.id);
+          if (!p) return null;
+          // Staggered by where it is going, so a tier's marks travel with
+          // their own band rather than in template order.
+          const tierOf = Math.min(CAPS.length - 1, Math.floor(p.y / Math.max(1, pyrRowH)));
+          const d = dur ? rowDelay(tierOf) + (n % 12) * CASCADE.markStagger : 0;
+          return (
             <Draggable
               key={item.id}
               item={item}
               style={template.itemStyle}
-              size={chipSize}
+              size={chip}
               selected={selected === item.id}
+              x={p.x}
+              y={p.y}
+              transition={`transform ${dur}ms ${ease} ${d}ms`}
               onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
             />
-          ))}
-          {pool.length === 0 && (
-            <span className="self-center px-1 text-[11px] tracking-wide text-white/30">
-              EVERY {template.itemNoun[0].toUpperCase()} MADE THE CUT
-            </span>
-          )}
-        </div>
-      </section>
-
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
-        <button
-          type="button"
-          onClick={fill}
-          className="rounded-full border border-white/15 px-5 py-2 text-[11px] text-white/60 transition-colors hover:border-white/30 hover:text-white"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          FILL FROM POOL
-        </button>
-        <button
-          type="button"
-          onClick={clear}
-          className="rounded-full border border-white/15 px-5 py-2 text-[11px] text-white/60 transition-colors hover:border-red-300/50 hover:text-red-200"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          CLEAR
-        </button>
+          );
+        })}
       </div>
 
       {selected && (
-        <p className="mt-3 text-center text-xs text-white/50">
-          Now tap a slot to drop <span className="text-white/80">{byId.get(selected)?.label}</span> in —
-          or tap it again to cancel.
+        <p className="mt-4 text-center text-xs text-white/50">
+          Now tap {view === "pyramid" ? "a slot" : "a tier"} to drop{" "}
+          <span className="text-white/80">{resolveItem(template, selected).label}</span> in — or tap it
+          again to cancel.
         </p>
       )}
 
       <DragOverlay dropAnimation={null}>
         {draggingItem ? (
-          <TierItemChip item={draggingItem} style={template.itemStyle} size={chipSize * 1.15} />
+          <TierItemChip item={draggingItem} style={template.itemStyle} size={chip * 1.15} />
         ) : null}
       </DragOverlay>
     </DndContext>
