@@ -32,16 +32,6 @@ function whenTouched(iso: string): string {
   return new Date(then).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-// Exact up to a thousand, then one decimal: 999, 1k, 1.4k, 15.4k, 115.3k,
-// 1.1M. The decimal is dropped when it would read ".0", so a round
-// thousand is "1k" rather than "1.0k".
-function abbreviate(n: number): string {
-  if (n < 1000) return String(n);
-  const [value, suffix] = n < 1_000_000 ? [n / 1000, "k"] : [n / 1_000_000, "M"];
-  const rounded = Math.floor(value * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}${suffix}`;
-}
-
 function matches(haystack: string, query: string): boolean {
   return haystack.toLowerCase().includes(query.trim().toLowerCase());
 }
@@ -60,44 +50,28 @@ export function popularity(stats?: TierListStats): number {
   return stats.people * 10 + stats.builds * 4 + stats.views;
 }
 
-function TemplateCard({ template, stats }: { template: TierTemplate; stats?: TierListStats }) {
+function TemplateCard({ template }: { template: TierTemplate }) {
   const preview = useMemo(() => previewFor(template), [template]);
-  // One number, and it is the number of people who used this - not how
-  // many landed on it. Opens are still recorded, because they are the
-  // only thing separating two categories nobody has used yet, but they
-  // sort the grid rather than appear on it: two counters side by side
-  // made the reader work out which one mattered, and the answer was
-  // always this one.
-  //
-  // The larger of builds and saves, because they are the same quantity
-  // measured in two eras: build tracking starts at zero today, while
-  // saves have been accumulating since 0030. A category with 40 savers
-  // and 3 builds has had at least 40 people use it, and dropping to "3"
-  // on the day this shipped would be a visible lie. Builds overtake saves
-  // quickly and permanently, since every saver is also a builder now.
-  //
-  // Hidden at zero rather than shown as "0 people used this" - a counter
-  // is social proof, and an empty one is the opposite.
-  const used = Math.max(stats?.builds ?? 0, stats?.people ?? 0);
   return (
     <Link href={`/tier-lists/${template.slug}`} className={CARD}>
       <span className="block p-2.5 pb-0">
         <BoardThumb state={preview} template={template} />
       </span>
-      <span className="flex flex-col gap-1 p-3">
-        <span className="text-[12.5px] leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+      {/* The name, and nothing else.
+          The tagline said in a sentence what the board above it already
+          shows and the title already names - thirty-two quarterback
+          headshots under the words "NFL QUARTERBACKS" do not need "rank
+          every starting QB" as well - and the counter under it was a
+          third line competing with the one line that matters. With both
+          gone the title gets the room, which is what makes a wall of
+          these scannable. */}
+      <span className="block px-3 pt-2.5 pb-3">
+        <span
+          className="block text-[17px] leading-[1.15]"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
           {template.title.toUpperCase()}
         </span>
-        <span className="text-[11.5px] text-white/45 leading-snug">{template.tagline}</span>
-        {/* Plain body text, not the display face. This is a quiet aside
-            under the tagline, and setting it in the same heavy condensed
-            font as the title made it shout the least important line on
-            the card. */}
-        {used > 0 && (
-          <span className="text-[11px] text-white/40 mt-0.5">
-            {abbreviate(used)} {used === 1 ? "person has" : "people have"} used this
-          </span>
-        )}
       </span>
     </Link>
   );
@@ -320,7 +294,7 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
         ) : (
           <div className={grid}>
             {shownTemplates.map((t) => (
-              <TemplateCard key={t.slug} template={t} stats={stats[t.slug]} />
+              <TemplateCard key={t.slug} template={t} />
             ))}
           </div>
         )
