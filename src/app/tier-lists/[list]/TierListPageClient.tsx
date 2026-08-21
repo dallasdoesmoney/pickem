@@ -52,7 +52,16 @@ import { buildReferralLink } from "@/lib/referralStorage";
 import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TierRow } from "@/components/tierList/TierRow";
 import { PyramidView, POOL_ID as PYRAMID_POOL } from "@/components/tierList/PyramidView";
-import { RANKED, fillSlots, pyramidBands, readingOrder, solvePyramid } from "@/components/tierList/pyramid";
+import {
+  CAPS,
+  RANKED,
+  ROW_OF,
+  fillSlots,
+  insertionForRank,
+  pyramidBands,
+  readingOrder,
+  solvePyramid,
+} from "@/components/tierList/pyramid";
 import { readBoard, runCascade } from "@/components/tierList/cascade";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
@@ -267,52 +276,44 @@ export default function TierListPageClient({
   // ------------------------------------------------------- pyramid mode
   //
   // The same board, laid out as sixteen places in four rows instead of as
-  // tiers. It is a view, not a second editor: it renders inside the
-  // DndContext below and reports through the same handlers, so undo,
-  // clear, reset, share and save all still apply while it is on screen.
+  // tiers. It is a VIEW: it holds no state of its own and every move made
+  // in it is made on the board, so switching back shows the arrangement
+  // you just built rather than the one you started with. Slot n is
+  // reading position n, and insertionForRank turns that back into a tier
+  // and a place in it.
   const pyrShape = useMemo(() => solvePyramid(Math.min(viewportWidth, 1056) - 32), [viewportWidth]);
-  const [pyrSlots, setPyrSlots] = useState<(string | null)[]>(() => fillSlots([]));
   // Which container a pyramid drag is over: a slot index, "pool", or null.
   const [pyrOver, setPyrOver] = useState<number | "pool" | null>(null);
 
   const order = useMemo(() => readingOrder(state), [state]);
-  // Only the top sixteen can reach the pyramid, so only they can make it
-  // stale - reordering the tail of the board must not throw away an
-  // arrangement made up here.
-  const orderKey = useMemo(() => order.slice(0, RANKED).join(","), [order]);
-  const filledFrom = useRef<string | null>(null);
-  useEffect(() => {
-    if (!loaded || filledFrom.current === orderKey) return;
-    filledFrom.current = orderKey;
-    setPyrSlots(fillSlots(order));
-  }, [loaded, orderKey, order]);
-
+  const pyrSlots = useMemo(() => fillSlots(order), [order]);
   const bands = useMemo(() => pyramidBands(state.tiers), [state.tiers]);
-  const placedInPyramid = useMemo(
-    () => new Set(pyrSlots.filter(Boolean) as string[]),
-    [pyrSlots]
-  );
+  // Below the cut, in the order the board has them: the ranked ones that
+  // did not make the top sixteen first, then everything unranked.
   const missedTheCut = useMemo(
-    () => template.items.map((i) => i.id).filter((id) => !placedInPyramid.has(id)),
-    [template.items, placedInPyramid]
+    () => [...order.slice(RANKED), ...state.unranked],
+    [order, state.unranked]
   );
 
-  const placeInSlot = useCallback((itemId: string, slot: number) => {
-    setPyrSlots((prev) => {
-      const next = [...prev];
-      const from = prev.indexOf(itemId);
-      const evicted = next[slot];
-      next[slot] = itemId;
-      // Swap rather than displace: the row it came from would otherwise
-      // be left a place short with nothing to fill it.
-      if (from >= 0 && from !== slot) next[from] = evicted ?? null;
-      return next;
-    });
-  }, []);
+  const placeInSlot = useCallback(
+    (itemId: string, slot: number) => {
+      const { tier, index } = insertionForRank(state, itemId, slot, ROW_OF[slot]);
+      dispatch({ type: "moveItem", itemId, toTier: tier, toIndex: index });
+    },
+    [state, dispatch]
+  );
 
-  const dropFromPyramid = useCallback((itemId: string) => {
-    setPyrSlots((prev) => prev.map((id) => (id === itemId ? null : id)));
-  }, []);
+  // Out of the pyramid is not out of the list: the cut already holds
+  // ranked teams that placed seventeenth and lower, so this drops the
+  // team to exactly there rather than unranking it. Unranking is what the
+  // tier list's own pool is for.
+  const dropFromPyramid = useCallback(
+    (itemId: string) => {
+      const { tier, index } = insertionForRank(state, itemId, RANKED, CAPS.length - 1);
+      dispatch({ type: "moveItem", itemId, toTier: tier, toIndex: index });
+    },
+    [state, dispatch]
+  );
 
   // ------------------------------------------------------- the cascade
   //

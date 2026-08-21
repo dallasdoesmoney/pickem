@@ -83,7 +83,7 @@ export function TierRow({
       // slope when the view returns. The row is a fresh element then, so
       // the animation has to find it by position rather than by identity.
       data-tier-row={index}
-      className={`flex items-stretch transition-[background,box-shadow] duration-150 ${cascading ? "tier-anim-cascade" : ""}`}
+      className={`flex flex-wrap items-stretch transition-[background,box-shadow] duration-150 ${cascading ? "tier-anim-cascade" : ""}`}
       style={{
         // Pure black. It's the highest-contrast ground the logos can sit
         // on, and with 32 marks up there they should be the loudest thing
@@ -111,61 +111,32 @@ export function TierRow({
         data-tier-rail
         className="shrink-0 flex items-center justify-center transition-[width,filter] duration-150"
         style={{
-          width: editing ? railWidth + 40 : hot ? railWidth + 14 : railWidth,
+          // No longer widens to edit: the field is out in the row now,
+          // so the rail has nothing to make room for.
+          width: hot ? railWidth + 14 : railWidth,
           background: tier.accent,
           filter: hot ? "brightness(1.18)" : undefined,
           paddingLeft: 6,
           paddingRight: 6,
         }}
       >
-        {editing ? (
-          <input
-            value={tier.label}
-            onChange={(e) => onRename(e.target.value)}
-            maxLength={MAX_TIER_LABEL}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                e.currentTarget.blur();
-                onCommitRename();
-              }
-            }}
-            // Caret to the end rather than wherever the tap landed. The
-            // field is centre-aligned, so tapping it usually put the caret
-            // in front of the existing name and backspace did nothing.
-            onFocus={(e) => {
-              const end = e.currentTarget.value.length;
-              e.currentTarget.setSelectionRange(end, end);
-            }}
-            aria-label={`Rename ${tierLabelFor(tier, index)} tier`}
-            className="w-full min-w-0 bg-black/35 rounded-md text-center text-white py-1 px-1 outline-none border border-black/25 focus:border-black/50"
-            // 16px: iOS zooms the page when you focus anything smaller,
-            // and there is no reason renaming a tier should leave you
-            // zoomed in. Set here rather than as a text-* class because
-            // the label below scales with the rail and this must not.
-            style={{ fontFamily: "var(--font-display)", fontSize: 16 }}
-          />
-        ) : (
-          <span
-            // leading-none stacks wrapped lines right on top of each
-            // other; a name long enough to wrap needs the gap back.
-            // w-full/min-w-0 are what make break-words actually bite: as a
-            // bare flex item the span sizes to its content instead, so a
-            // long word overflowed the rail.
-            className="w-full min-w-0 text-center leading-[1.18] break-words uppercase"
-            style={{
-              ...TIER_LABEL_FONT,
-              // Steps down as the label grows so a renamed tier costs
-              // legibility rather than breaking the rail's width.
-              // The rail minus its own padding, and the shortest a row
-              // can be - a tier holding two rows of marks is taller, but the
-              // label must not have to grow into that to fit.
-              fontSize: tierLabelSize(tierLabelFor(tier, index), railWidth - 12, chipSize + 16),
-            }}
-          >
-            {tierLabelFor(tier, index)}
-          </span>
-        )}
+        <span
+          // leading-none stacks wrapped lines right on top of each
+          // other; a name long enough to wrap needs the gap back.
+          // w-full/min-w-0 are what make wrapping actually bite: as a bare
+          // flex item the span sizes to its content instead, so a long
+          // name overflowed the rail.
+          className="w-full min-w-0 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
+          style={{
+            ...TIER_LABEL_FONT,
+            // Steps down as the name grows - far enough that its longest
+            // WORD fits the rail, because a word split across two lines
+            // is not a shorter word, it is two wrong ones.
+            fontSize: tierLabelSize(tierLabelFor(tier, index), railWidth - 12, chipSize + 16),
+          }}
+        >
+          {tierLabelFor(tier, index)}
+        </span>
       </div>
 
       {/* Drop zone. min-h keeps an empty tier a real target rather than a
@@ -208,8 +179,42 @@ export function TierRow({
           Three buttons crushed into a 64px rail under the label was the
           worst part of edit mode; out here they get full-size targets and
           the rail only has to hold a name. */}
+      {/* Everything about editing a tier lives on its own line under the
+          row: the name, and the three buttons that move or delete it.
+          Both were in the rail once. The rail is as narrow as it is on
+          purpose, and a 16px field inside it - 16 so iOS doesn't zoom the
+          page on focus - left about six characters visible, so you could
+          not read what you were typing. Down here the field gets real
+          width, and the rail beside it goes on showing the name at its
+          true size as you type. */}
       {editing && (
-        <div className="shrink-0 flex items-center gap-1.5 pr-2.5 pl-1">
+        // w-full as well as basis-full: basis alone resolved to the
+          // line's max-content in Chromium here, which pushed the delete
+          // button off the right edge of the board.
+          <div className="basis-full w-full min-w-0 flex items-center gap-2 px-2 pb-2">
+          <input
+            value={tier.label}
+            onChange={(e) => onRename(e.target.value)}
+            maxLength={MAX_TIER_LABEL}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.blur();
+                onCommitRename();
+              }
+            }}
+            // Caret to the end rather than wherever the tap landed. The
+            // field used to be centre-aligned, so tapping it usually put
+            // the caret in front of the name and backspace did nothing.
+            onFocus={(e) => {
+              const end = e.currentTarget.value.length;
+              e.currentTarget.setSelectionRange(end, end);
+            }}
+            placeholder="Name this tier"
+            aria-label={`Rename ${tierLabelFor(tier, index)} tier`}
+            className="flex-1 min-w-0 rounded-lg bg-black/45 border border-white/15 focus:border-white/45 px-3 py-2 text-white placeholder:text-white/30 outline-none"
+            style={{ ...TIER_LABEL_FONT, color: "#ffffff", fontSize: 16 }}
+          />
           <RailButton label="Move tier up" disabled={!canMoveUp} onClick={() => onMove(-1)}>
             <path d="M18 15l-6-6-6 6" />
           </RailButton>

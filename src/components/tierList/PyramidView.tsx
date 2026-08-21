@@ -135,7 +135,7 @@ export function PyramidView({
                     reaches past its slanted edges. */}
                 <span
                   data-plabel
-                  className="absolute top-1/2 text-center leading-[1.18] break-words uppercase"
+                  className="absolute top-1/2 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
                   style={{
                     ...TIER_LABEL_FONT,
                     left: 0,

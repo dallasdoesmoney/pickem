@@ -19,25 +19,24 @@ export const TIER_LABEL_LEADING = 1.18;
 // A pessimistic stand-in for the face's advance width in caps, tracking
 // included. Measured across the names people actually type, the widest
 // ("SUPERBOWL") runs 0.70em and the rest sit below it; the extra covers
-// the letter-spacing above.
+// the letter-spacing. Estimated rather than measured because this is
+// called during render, and a canvas measurement would give the server
+// and the browser different answers.
 const ADVANCE = 0.73;
 
-// How many characters actually land on one line is a worse number than
-// the average: a line that happens to catch the wide caps - C, H, M, W -
-// holds fewer of them, and it only takes one such line to push the block
-// onto an extra row.
-const WIDEST = 0.85;
+// Small, but not so small that a name is decoration. Below this the rail
+// would be showing that a tier is named rather than what it is named.
+const FLOOR = 8;
 
 // Type steps down in bands rather than scaling continuously, so tiers of
 // similar name length stay visually consistent with each other.
 //
-// The band alone isn't enough: the rail is much narrower on a phone than
-// on a desktop, and a band picked for a 136px rail is far too big for an
-// 86px one. What decides it is HEIGHT, not width - the label wraps and
-// will break a word if it has to, so a long name does not need to fit
-// across on one line, it needs to fit in the rows the rail can give it.
-// Capping on the longest word instead is what dropped "CHAMPIONSHIP" to
-// 9px on a phone inside a rail with room for three comfortable lines.
+// A NAME WRAPS BETWEEN WORDS AND NEVER INSIDE ONE. A word split across
+// two lines is not a shorter word, it is two wrong ones, and on a rail
+// this narrow it is what "CHAMPI / ONSHIP" looked like. So the size is
+// capped by what the LONGEST WORD can measure at - wrapping cannot
+// rescue a single word that is too wide, only a smaller size can - and
+// then again by the height the rail can give the lines it needs.
 export function tierLabelSize(
   label: string,
   innerWidth: number,
@@ -48,17 +47,25 @@ export function tierLabelSize(
   const n = Math.max(1, label.trim().length);
   const band = n <= 2 ? 22 : n <= 5 ? 16 : n <= 9 ? 14 : n <= 14 ? 13 : n <= 22 ? 12 : 11;
   const width = Math.max(1, innerWidth);
-  for (let size = band; size > 9; size--) {
-    // Word by word, because wrapping does not pack: a word that needs a
-    // second line leaves the tail of the first one empty, and estimating
-    // off the whole string was what let a four-line name through as a
-    // three-line one.
-    const perLine = Math.max(1, Math.floor(width / (WIDEST * size)));
-    const lines =
-      n * ADVANCE * size <= width
-        ? 1
-        : words.reduce((a, word) => a + Math.ceil(word.length / perLine), 0);
+
+  const longest = words.reduce((m, w) => Math.max(m, w.length), 1);
+  const capByWord = Math.floor(width / (ADVANCE * longest));
+
+  for (let size = Math.min(band, capByWord); size > FLOOR; size--) {
+    // Greedy wrap at spaces, exactly as the browser will do it.
+    let lines = 1;
+    let used = 0;
+    for (const word of words) {
+      const w = word.length * ADVANCE * size;
+      const withSpace = used ? used + ADVANCE * size + w : w;
+      if (used && withSpace > width) {
+        lines += 1;
+        used = w;
+      } else {
+        used = withSpace;
+      }
+    }
     if (lines <= maxLines && lines * size * TIER_LABEL_LEADING <= maxHeight) return size;
   }
-  return 9;
+  return FLOOR;
 }

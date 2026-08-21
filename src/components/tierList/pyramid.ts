@@ -24,6 +24,40 @@ export const readingOrder = (state: TierListState): string[] =>
 export const fillSlots = (order: string[]): (string | null)[] =>
   Array.from({ length: RANKED }, (_, i) => order[i] ?? null);
 
+// The inverse of the fill: which tier and which place in it a given rank
+// is, so a move made in the pyramid can be made on the board instead.
+//
+// This is what makes the pyramid an edit of the tier list rather than a
+// picture of it. Slot 5 IS reading position 5, so dropping a team there
+// means "make this the sixth-best thing on the board", and the tier it
+// lands in falls out of how many the tiers above it already hold.
+//
+// Computed with the moving item already taken out, because that is the
+// order the reducer inserts into - asking where rank 5 is while the item
+// is still sitting at rank 2 lands it one place late.
+export function insertionForRank(
+  state: TierListState,
+  itemId: string,
+  rank: number,
+  hintRow: number,
+): { tier: string | null; index: number | null } {
+  let at = 0;
+  for (const tier of state.tiers) {
+    const n = (state.placements[tier.id] ?? []).filter((id) => id !== itemId).length;
+    // <= rather than <, so a rank landing exactly on a tier's end appends
+    // to that tier instead of jumping to the front of the next one. Both
+    // give the same reading order; this one keeps a promotion inside the
+    // tier the team was heading for.
+    if (rank <= at + n) return { tier: tier.id, index: rank - at };
+    at += n;
+  }
+  // Past the end of every tier - the board has fewer ranked items than
+  // the pyramid has places. The row aimed at is the only hint available,
+  // and it is a good one: the apex is the top tier.
+  const tier = state.tiers[Math.min(hintRow, state.tiers.length - 1)];
+  return { tier: tier?.id ?? null, index: null };
+}
+
 // The four bands take their look from the board's own top four tiers, so
 // the pyramid is recognisably the same list. A board with fewer than four
 // tiers still needs four bands, and those fall back to the defaults.
