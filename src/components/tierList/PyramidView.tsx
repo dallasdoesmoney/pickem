@@ -197,7 +197,7 @@ export function PyramidView({
             view but not the other would read as a bug when you toggle.
             The empty span balances the heading so the mark sits centred
             on the row rather than centred on what is left of it. */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-2 px-0.5 min-h-[34px]">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-2 px-0.5 min-h-[44px]">
           <h2 className="shrink-0 whitespace-nowrap text-sm text-white/70 tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
             MISSED THE CUT <span className="text-white/35">({missed.length})</span>
           </h2>
@@ -206,11 +206,11 @@ export function PyramidView({
               alt=""
               aria-hidden
               draggable={false}
-            // 34 where there is room for it, 24 on a phone. At 34 the mark,
-          // the heading and the shuffle do not all fit a 358px row, and what
-          // gave way was the heading - "UNRANKED" on one line and "(3)" on
-          // the next.
-          className="h-[24px] sm:h-[34px] w-auto max-w-full justify-self-center select-none"
+            // 44 where there is room for it, 28 on a phone: at 44 the mark,
+          // the heading and the shuffle do not all fit a 358px row, and
+          // what gives way is the heading - "UNRANKED" on one line and
+          // "(3)" on the next.
+          className="h-[28px] sm:h-[44px] w-auto max-w-full justify-self-center select-none"
           />
           <span aria-hidden />
         </div>

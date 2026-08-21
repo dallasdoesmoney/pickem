@@ -1264,7 +1264,7 @@ function UnrankedPool({
 
   return (
     <section className="mt-6">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-2 px-0.5 min-h-[34px]">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-2 px-0.5 min-h-[44px]">
         <h2 className="shrink-0 whitespace-nowrap text-sm text-white/70 tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
           UNRANKED <span className="text-white/35">({ids.length})</span>
         </h2>
@@ -1278,18 +1278,21 @@ function UnrankedPool({
           alt=""
           aria-hidden
           draggable={false}
-          // 34 where there is room for it, 24 on a phone. At 34 the mark,
-          // the heading and the shuffle do not all fit a 358px row, and what
-          // gave way was the heading - "UNRANKED" on one line and "(3)" on
-          // the next.
-          className="h-[24px] sm:h-[34px] w-auto max-w-full justify-self-center select-none"
+          // 44 where there is room for it, 28 on a phone: at 44 the mark,
+          // the heading and the shuffle do not all fit a 358px row, and
+          // what gives way is the heading - "UNRANKED" on one line and
+          // "(3)" on the next.
+          className="h-[28px] sm:h-[44px] w-auto max-w-full justify-self-center select-none"
         />
         <button
           type="button"
           onClick={onShuffle}
           disabled={ids.length < 2}
           aria-label="Shuffle unranked"
-          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] border border-white/15 hover:border-white/30 text-white/60 hover:text-white transition-colors disabled:opacity-30"
+          // justify-self-end, because a grid item fills its track by
+          // default - in a 1fr column that meant a SHUFFLE button four
+          // hundred pixels wide.
+          className="justify-self-end flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] border border-white/15 hover:border-white/30 text-white/60 hover:text-white transition-colors disabled:opacity-30"
           style={{ fontFamily: "var(--font-display)" }}
         >
           <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
