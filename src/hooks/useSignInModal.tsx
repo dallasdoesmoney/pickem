@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
 import { getPendingReferralCode } from "@/lib/referralStorage";
+import { sendPasswordReset } from "@/lib/supabase/profile";
+import { errorMessage } from "@/lib/errorMessage";
 
 type ModalState = { resolve: (ok: boolean) => void } | null;
 
@@ -36,9 +38,14 @@ function CloseIcon({ className }: { className?: string }) {
 export function useSignInModal() {
   const { signInWithPassword, signUpWithPassword, signInWithGoogle } = useAuth();
   const [state, setState] = useState<ModalState>(null);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  // "forgot" is a third mode rather than a separate dialog: it is the
+  // same email field, and coming back from it should land on sign-in
+  // with what you typed still there.
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [referrer, setReferrer] = useState<{ label: string; avatarUrl: string | null } | null>(null);
@@ -50,6 +57,8 @@ export function useSignInModal() {
     setMode(initialMode ?? (getPendingReferralCode() ? "signup" : "signin"));
     setEmail("");
     setPassword("");
+    setConfirm("");
+    setSentTo(null);
     setError(null);
     return new Promise<boolean>((resolve) => {
       setState({ resolve });
@@ -79,6 +88,32 @@ export function useSignInModal() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (mode === "forgot") {
+      setSubmitting(true);
+      try {
+        await sendPasswordReset(email);
+        // Said the same way whether or not that address has an account.
+        // Anything else turns this box into a way to find out who has
+        // signed up.
+        setSentTo(email);
+      } catch (err) {
+        console.error("Password reset failed", err);
+        setError(errorMessage(err));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Checked here rather than left to the browser: two fields that
+    // don't match is a typo you want caught before an account exists
+    // with a password nobody knows.
+    if (mode === "signup" && password !== confirm) {
+      setError("Those two passwords don't match.");
+      return;
+    }
+
     setSubmitting(true);
     const { error } = mode === "signin" ? await signInWithPassword(email, password) : await signUpWithPassword(email, password);
     setSubmitting(false);
@@ -87,6 +122,14 @@ export function useSignInModal() {
       return;
     }
     close(true);
+  }
+
+  function switchTo(next: "signin" | "signup" | "forgot") {
+    setMode(next);
+    setError(null);
+    setSentTo(null);
+    setPassword("");
+    setConfirm("");
   }
 
   async function handleGoogle() {
@@ -115,16 +158,21 @@ export function useSignInModal() {
         </button>
 
         <h2 className="text-white text-lg" style={{ fontFamily: "var(--font-display)" }}>
-          {mode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}
+          {mode === "signin" ? "SIGN IN" : mode === "signup" ? "CREATE ACCOUNT" : "FORGOT PASSWORD"}
         </h2>
         <p className="text-white/50 text-sm mt-1 mb-3">
-          {mode === "signin" ? "Pick up where you left off." : "Free, and it takes about ten seconds."}
+          {mode === "signin"
+            ? "Pick up where you left off."
+            : mode === "signup"
+              ? "Free, and it takes about ten seconds."
+              : "We'll email you a link to set a new one."}
         </p>
 
         {/* What an account actually buys. This modal is the only place
             most people meet that pitch, and "sign in to save your picks"
             undersold it - saving tier lists, the leaderboard and the
             season predictor were all invisible from here. */}
+        {mode !== "forgot" && (
         <ul className="flex flex-col gap-2 mb-4">
           {[
             "Save tier lists and come back to them later",
@@ -140,6 +188,7 @@ export function useSignInModal() {
             </li>
           ))}
         </ul>
+        )}
 
         {referrer && mode === "signup" && (
           <div className="flex flex-col items-center gap-1.5 text-center mb-4">
@@ -187,17 +236,41 @@ export function useSignInModal() {
             onChange={(e) => setEmail(e.target.value)}
             className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-white text-sm placeholder:text-white/30 outline-none focus:border-white/35"
           />
-          <input
-            type="password"
-            required
-            minLength={6}
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-white text-sm placeholder:text-white/30 outline-none focus:border-white/35"
-          />
+          {mode !== "forgot" && (
+            <input
+              type="password"
+              required
+              minLength={6}
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-white text-sm placeholder:text-white/30 outline-none focus:border-white/35"
+            />
+          )}
 
+          {/* Twice, on the way in only. Signing up is the one moment
+              nobody can check their work: there is no existing password
+              to fail against, so a typo here creates a real account with
+              a password its owner has never seen. */}
+          {mode === "signup" && (
+            <input
+              type="password"
+              required
+              minLength={6}
+              autoComplete="new-password"
+              placeholder="Password again"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-white text-sm placeholder:text-white/30 outline-none focus:border-white/35"
+            />
+          )}
+
+          {sentTo && (
+            <p className="text-xs text-emerald-400">
+              If {sentTo} has an account, a reset link is on its way. Check the spam folder too.
+            </p>
+          )}
           {error && <p className="text-xs text-red-400">{error}</p>}
 
           <button
@@ -206,9 +279,38 @@ export function useSignInModal() {
             className="mt-1 rounded-full px-5 py-2.5 text-sm active:scale-95 transition-transform duration-150 disabled:opacity-60"
             style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
           >
-            {submitting ? "PLEASE WAIT…" : mode === "signin" ? "SIGN IN" : "SIGN UP"}
+            {submitting
+              ? "PLEASE WAIT…"
+              : mode === "signin"
+                ? "SIGN IN"
+                : mode === "signup"
+                  ? "SIGN UP"
+                  : "EMAIL ME A LINK"}
           </button>
         </form>
+
+        {/* The way back in when the password is gone. There was no way at
+            all before this - an account whose password was forgotten was
+            simply lost, and the only tell was people signing up again. */}
+        <div className="mt-3 text-center">
+          {mode === "signin" ? (
+            <button
+              type="button"
+              onClick={() => switchTo("forgot")}
+              className="text-xs text-white/45 underline underline-offset-2 hover:text-white/80 transition-colors"
+            >
+              Forgot your password?
+            </button>
+          ) : mode === "forgot" ? (
+            <button
+              type="button"
+              onClick={() => switchTo("signin")}
+              className="text-xs text-white/45 underline underline-offset-2 hover:text-white/80 transition-colors"
+            >
+              Back to sign in
+            </button>
+          ) : null}
+        </div>
 
         <div className="flex items-center gap-3 my-4">
           <div className="h-px flex-1 bg-white/10" />
@@ -229,12 +331,12 @@ export function useSignInModal() {
         <button
           type="button"
           onClick={() => {
-            setMode((m) => (m === "signin" ? "signup" : "signin"));
+            switchTo(mode === "signin" ? "signup" : "signin");
             setError(null);
           }}
           className="w-full text-center text-xs text-white/45 hover:text-white/70 mt-4 transition-colors"
         >
-          {mode === "signin" ? "Need an account? Sign up" : "Already have an account? Sign in"}
+          {mode === "signup" ? "Already have an account? Sign in" : "Need an account? Sign up"}
         </button>
       </div>
     </div>

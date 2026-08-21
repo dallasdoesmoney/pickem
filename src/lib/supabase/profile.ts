@@ -78,3 +78,16 @@ export async function updateDisplayName(userId: string, displayName: string): Pr
   }
   return { error: null };
 }
+
+// Emails a one-time link that lands on /reset-password with a recovery
+// session, where the password can be set. Deliberately in the profile
+// layer rather than useAuth: the admin panel sends these for OTHER
+// people, and it is the same call either way - Supabase does not tell
+// the caller whether the address exists, which is what stops this being
+// an account-enumeration endpoint.
+export async function sendPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  if (error) throw error;
+}

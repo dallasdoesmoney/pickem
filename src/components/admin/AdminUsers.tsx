@@ -1,13 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AdminUserRow, fetchAdminUsers, setUserReferrer } from "@/lib/supabase/adminUsers";
+import {
+  AdminUserRow,
+  deleteAdminUser,
+  fetchAdminUserEmail,
+  fetchAdminUsers,
+  setUserAdmin,
+  setUserReferrer,
+  updateAdminUser,
+} from "@/lib/supabase/adminUsers";
+import { sendPasswordReset } from "@/lib/supabase/profile";
 import { errorMessage } from "@/lib/errorMessage";
 
-// The user directory. Its reason for existing is the referrer editor at
-// the bottom of each row: referrals are normally self-claimed through a
-// link, so anyone referred by word of mouth arrives unattributed and
-// there was previously no way to credit the person who sent them.
+// The user directory. It began as a referrer editor - referrals are
+// normally self-claimed through a link, so anyone referred by word of
+// mouth arrived unattributed and there was no way to credit them - and
+// now carries the rest of what you need when somebody writes in: rename
+// them, send them back into their account, make them an admin, or remove
+// them entirely.
 
 function joined(iso: string): string {
   const date = new Date(iso);
@@ -197,13 +208,16 @@ export function AdminUsers() {
                   </button>
 
                   {open && (
-                    <ReferrerEditor
-                      row={row}
-                      onError={setError}
-                      // Re-reads the list so the referrer's own row picks up
-                      // its new count and points, not just the row we edited.
-                      onSaved={() => load(query)}
-                    />
+                    <>
+                      <ReferrerEditor
+                        row={row}
+                        onError={setError}
+                        // Re-reads the list so the referrer's own row picks up
+                        // its new count and points, not just the row we edited.
+                        onSaved={() => load(query)}
+                      />
+                      <AccountEditor row={row} onError={setError} onSaved={() => load(query)} />
+                    </>
                   )}
                 </div>
               );
@@ -212,5 +226,183 @@ export function AdminUsers() {
         </>
       )}
     </>
+  );
+}
+
+const fieldClass =
+  "w-full min-w-0 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-white/40";
+const ghostClass =
+  "rounded-full border border-white/15 px-3 py-1.5 text-[11px] text-white/60 transition-colors hover:border-white/35 hover:text-white disabled:opacity-40";
+
+// Everything about an account that an admin might need to change, under
+// the referrer editor it grew out of. Each action says what it did
+// rather than silently succeeding, because from out here you cannot see
+// the effect of any of them.
+function AccountEditor({
+  row,
+  onSaved,
+  onError,
+}: {
+  row: AdminUserRow;
+  onSaved: () => void;
+  onError: (message: string | null) => void;
+}) {
+  const [username, setUsername] = useState(row.username ?? "");
+  const [displayName, setDisplayName] = useState(row.display_name ?? "");
+  const [busy, setBusy] = useState<null | "save" | "reset" | "admin" | "delete">(null);
+  const [note, setNote] = useState<string | null>(null);
+  // Deleting takes everything the account owns and cannot be undone, so
+  // it asks for the name to be typed rather than for a click.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [typed, setTyped] = useState("");
+
+  const label = row.username || row.display_name || row.email || row.id.slice(0, 8);
+  const dirty = username.trim() !== (row.username ?? "") || displayName.trim() !== (row.display_name ?? "");
+
+  async function run(kind: "save" | "reset" | "admin" | "delete", work: () => Promise<string>) {
+    if (busy) return;
+    setBusy(kind);
+    setNote(null);
+    onError(null);
+    try {
+      setNote(await work());
+      onSaved();
+    } catch (err) {
+      onError(errorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mt-3 border-t border-white/10 pt-3">
+      <div className="mb-2 text-[10px] tracking-[0.12em] text-white/30">ACCOUNT</div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="username"
+          aria-label={`Username for ${label}`}
+          className={fieldClass}
+        />
+        <input
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder="Display name"
+          aria-label={`Display name for ${label}`}
+          className={fieldClass}
+        />
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={!dirty || busy !== null}
+          onClick={() =>
+            run("save", async () => {
+              await updateAdminUser(row.id, {
+                // Only what actually changed, so saving a display name
+                // doesn't re-submit a username that is already right and
+                // trip its own uniqueness check.
+                username: username.trim() !== (row.username ?? "") ? username.trim() : undefined,
+                displayName: displayName.trim() !== (row.display_name ?? "") ? displayName.trim() : undefined,
+              });
+              return "Saved.";
+            })
+          }
+          className="rounded-full bg-white/15 px-3 py-1.5 text-[11px] text-white transition-colors hover:bg-white/25 disabled:opacity-40"
+        >
+          {busy === "save" ? "SAVING…" : "SAVE"}
+        </button>
+
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() =>
+            run("reset", async () => {
+              // Read fresh rather than trusting the row this page loaded
+              // with, which may be minutes old.
+              const email = await fetchAdminUserEmail(row.id);
+              if (!email) throw new Error("That account has no email address to send to.");
+              await sendPasswordReset(email);
+              return `Reset link sent to ${email}.`;
+            })
+          }
+          className={ghostClass}
+        >
+          {busy === "reset" ? "SENDING…" : "SEND RESET LINK"}
+        </button>
+
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={() =>
+            run("admin", async () => {
+              await setUserAdmin(row.id, !row.is_admin);
+              return row.is_admin ? "Admin access removed." : "Admin access granted.";
+            })
+          }
+          className={ghostClass}
+        >
+          {busy === "admin" ? "SAVING…" : row.is_admin ? "REMOVE ADMIN" : "MAKE ADMIN"}
+        </button>
+
+        {!confirmDelete && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => {
+              setConfirmDelete(true);
+              setTyped("");
+            }}
+            className="ml-auto rounded-full border border-red-400/30 px-3 py-1.5 text-[11px] text-red-300 transition-colors hover:border-red-400/60 hover:text-red-200 disabled:opacity-40"
+          >
+            DELETE
+          </button>
+        )}
+      </div>
+
+      {confirmDelete && (
+        <div className="mt-3 rounded-xl border border-red-400/30 bg-red-500/5 p-3">
+          <p className="text-[12px] text-red-200">
+            This deletes {label} and everything they own — picks, tier lists, points, follows. It
+            cannot be undone.
+          </p>
+          <p className="mt-1.5 text-[11px] text-white/45">
+            Type <span className="font-semibold text-white/80">{label}</span> to confirm.
+          </p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={label}
+              aria-label="Type the name to confirm deletion"
+              className={fieldClass}
+            />
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                disabled={typed.trim() !== label || busy !== null}
+                onClick={() =>
+                  run("delete", async () => {
+                    await deleteAdminUser(row.id);
+                    return `${label} deleted.`;
+                  })
+                }
+                className="rounded-full bg-red-500/80 px-3 py-1.5 text-[11px] text-white transition-colors hover:bg-red-500 disabled:opacity-30"
+              >
+                {busy === "delete" ? "DELETING…" : "DELETE FOR GOOD"}
+              </button>
+              <button type="button" onClick={() => setConfirmDelete(false)} className={ghostClass}>
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {note && <p className="mt-2 text-[11px] text-[#4ade80]">{note}</p>}
+    </div>
   );
 }
