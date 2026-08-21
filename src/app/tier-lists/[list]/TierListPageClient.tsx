@@ -1264,10 +1264,26 @@ function UnrankedPool({
 
   return (
     <section className="mt-6">
-      <div className="flex items-center justify-between mb-2 px-0.5">
-        <h2 className="text-sm text-white/70 tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-2 px-0.5 min-h-[34px]">
+        <h2 className="shrink-0 whitespace-nowrap text-sm text-white/70 tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
           UNRANKED <span className="text-white/35">({ids.length})</span>
         </h2>
+        {/* The brand, on the line that was already there. Centred between
+            the two labels rather than given a strip of its own: this seam
+            is the one place on the page with room for a mark, and using
+            it costs nothing that was already doing a job. Decorative -
+            the header carries the real one, and this is not a link. */}
+        <img
+          src="/header-logo.png"
+          alt=""
+          aria-hidden
+          draggable={false}
+          // 34 where there is room for it, 24 on a phone. At 34 the mark,
+          // the heading and the shuffle do not all fit a 358px row, and what
+          // gave way was the heading - "UNRANKED" on one line and "(3)" on
+          // the next.
+          className="h-[24px] sm:h-[34px] w-auto max-w-full justify-self-center select-none"
+        />
         <button
           type="button"
           onClick={onShuffle}
