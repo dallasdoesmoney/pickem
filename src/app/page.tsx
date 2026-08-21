@@ -114,7 +114,24 @@ function MatchupGrid({ games }: { games: Game[] }) {
   const shown = games.slice(0, cols * 2);
 
   return (
-    <div ref={ref} className="grid w-full" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: PILL_GAP }}>
+    // Inert, and it has to be. TeamHalfPill draws a real <button>, and a
+    // disabled button doesn't just ignore its own clicks - it swallows
+    // them, so nothing reached the Link wrapping this card. Every pixel
+    // over a pill was dead while the gaps between them worked, which
+    // reads as the site being broken rather than as a preview. Letting
+    // pointer events fall straight through hands the whole card back to
+    // the link.
+    //
+    // aria-hidden for the same reason from the other side: nested
+    // interactive content inside a link is invalid, and thirty-two
+    // unusable buttons is not what anyone wants read out. The card
+    // already announces itself as "Weekly Pick'em, 3 of 16 picked".
+    <div
+      ref={ref}
+      aria-hidden
+      className="pointer-events-none grid w-full"
+      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: PILL_GAP }}
+    >
       {shown.map((game) => (
         <Matchup key={game.id} game={game} scale={scale} />
       ))}
