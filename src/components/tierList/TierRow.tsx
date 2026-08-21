@@ -79,6 +79,10 @@ export function TierRow({
       // each other and the board clips the outer corners, so the whole
       // thing reads as one object with a continuous colour column down
       // the side. A hairline is all that separates one tier from the next.
+      // Tagged so the board can fold this row back out of the pyramid's
+      // slope when the view returns. The row is a fresh element then, so
+      // the animation has to find it by position rather than by identity.
+      data-tier-row={index}
       className={`flex items-stretch transition-[background,box-shadow] duration-150 ${cascading ? "tier-anim-cascade" : ""}`}
       style={{
         // Pure black. It's the highest-contrast ground the logos can sit
@@ -104,6 +108,7 @@ export function TierRow({
           letter entirely. It still drives forward on drag-over, which
           reads as the row reaching out to take the item. */}
       <div
+        data-tier-rail
         className="shrink-0 flex items-center justify-center transition-[width,filter] duration-150"
         style={{
           width: editing ? railWidth + 40 : hot ? railWidth + 14 : railWidth,

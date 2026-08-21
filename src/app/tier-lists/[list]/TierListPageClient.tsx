@@ -53,6 +53,7 @@ import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemCh
 import { TierRow } from "@/components/tierList/TierRow";
 import { PyramidView, POOL_ID as PYRAMID_POOL } from "@/components/tierList/PyramidView";
 import { RANKED, fillSlots, pyramidBands, readingOrder, solvePyramid } from "@/components/tierList/pyramid";
+import { readBoard, runCascade } from "@/components/tierList/cascade";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
@@ -315,68 +316,28 @@ export default function TierListPageClient({
 
   // ------------------------------------------------------- the cascade
   //
-  // The two layouts are different element trees, so nothing can morph
-  // from one into the other. What CAN be preserved is every mark: read
-  // where each one is, switch, read where it now is, and play it from
-  // the old place to the new. The Web Animations API rather than an
-  // inline style, because a re-render mid-flight would overwrite the
-  // style and snap the board.
+  // Both directions are driven from here rather than from either layout,
+  // because only here are both ends measurable in the same frame. See
+  // cascade.ts for what actually moves.
   const boardRef = useRef<HTMLDivElement>(null);
-  const markRects = useCallback(() => {
-    const at = new Map<string, DOMRect>();
-    boardRef.current?.querySelectorAll<HTMLElement>("[data-mark]").forEach((el) => {
-      at.set(el.dataset.mark!, el.getBoundingClientRect());
-    });
-    return at;
-  }, []);
-
   const switchView = useCallback(
     (next: "rows" | "pyramid") => {
       setSelectedId(null);
+      const board = boardRef.current;
       const reduced =
         typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduced || !boardRef.current) {
+      if (reduced || !board) {
         setView(next);
         return;
       }
-      const before = markRects();
-      const top = boardRef.current.getBoundingClientRect().top;
+      const before = readBoard(board, next === "pyramid" ? "rows" : "pyramid", pyrShape);
       // Synchronous so the new layout can be measured in the same frame -
       // a normal setState would paint the destination first and there
       // would be nothing left to animate from.
       flushSync(() => setView(next));
-      const after = markRects();
-      const rowH = pyrShape.rowH;
-      after.forEach((to, id) => {
-        const from = before.get(id);
-        if (!from) return;
-        const dx = from.left - to.left;
-        const dy = from.top - to.top;
-        const scale = to.width ? from.width / to.width : 1;
-        if (!dx && !dy && Math.abs(scale - 1) < 0.01) return;
-        const el = boardRef.current?.querySelector<HTMLElement>(`[data-mark="${CSS.escape(id)}"]`);
-        if (!el) return;
-        // Bottom row first, so the base settles and the rows fold in
-        // above it rather than the whole board moving at once. Measured
-        // against whichever end of the trip is the pyramid.
-        const band = ((next === "pyramid" ? to.top : from.top) - top) / rowH;
-        const delay = Math.max(0, Math.min(3, 3 - Math.floor(band))) * 80;
-        el.animate(
-          [
-            { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
-            { transform: "translate(0px, 0px) scale(1)" },
-          ],
-          {
-            duration: 720,
-            delay,
-            easing: "cubic-bezier(.65,0,.35,1)",
-            fill: "backwards",
-            composite: "add",
-          },
-        );
-      });
+      runCascade(board, next, pyrShape, before);
     },
-    [markRects, pyrShape.rowH],
+    [pyrShape],
   );
 
   const sensors = useSensors(
