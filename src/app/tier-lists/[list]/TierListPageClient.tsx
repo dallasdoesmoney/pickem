@@ -1264,7 +1264,7 @@ function UnrankedPool({
 
   return (
     <section className="mt-6">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-2 px-0.5 min-h-[44px]">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 mb-2 px-0.5 min-h-[56px]">
         <h2 className="shrink-0 whitespace-nowrap text-sm text-white/70 tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
           UNRANKED <span className="text-white/35">({ids.length})</span>
         </h2>
@@ -1278,11 +1278,11 @@ function UnrankedPool({
           alt=""
           aria-hidden
           draggable={false}
-          // 44 where there is room for it, 28 on a phone: at 44 the mark,
+          // 56 where there is room for it, 32 on a phone: at 56 the mark,
           // the heading and the shuffle do not all fit a 358px row, and
           // what gives way is the heading - "UNRANKED" on one line and
           // "(3)" on the next.
-          className="h-[28px] sm:h-[44px] w-auto max-w-full justify-self-center select-none"
+          className="h-[32px] sm:h-[56px] w-auto max-w-full justify-self-center select-none"
         />
         <button
           type="button"
