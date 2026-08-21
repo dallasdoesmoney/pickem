@@ -115,17 +115,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (pendingCode) {
         claimingReferralRef.current = true;
         try {
-          await claimReferral(pendingCode);
+          // The code the link carried can be junk - a username that has
+          // since changed, or one that never existed. claim_referral says
+          // which, so a link that credited nobody no longer marks this
+          // account as referred: it leaves them for ReferralPromptGate to
+          // ask, which is the whole point of that gate.
+          const result = await claimReferral(pendingCode);
           localStorage.removeItem(PENDING_REFERRAL_KEY);
-          setProfile((prev) => (prev ? { ...prev, referred_by: "claimed" } : prev));
-          // Best-effort - if the referrer lookup fails, we just skip the
-          // suggestion prompt rather than blocking the claim itself,
-          // which has already succeeded by this point.
-          fetchLeaderboardEntry(pendingCode)
-            .then((row) => {
-              if (row) setPendingReferrerSuggestion({ userId: row.user_id, label: row.display_name || row.username, avatarUrl: row.avatar_url });
-            })
-            .catch(() => {});
+          if (result === "ok" || result === "already_claimed") {
+            setProfile((prev) => (prev ? { ...prev, referred_by: "claimed" } : prev));
+            // Best-effort - if the referrer lookup fails, we just skip the
+            // suggestion prompt rather than blocking the claim itself,
+            // which has already succeeded by this point.
+            fetchLeaderboardEntry(pendingCode)
+              .then((row) => {
+                if (row) setPendingReferrerSuggestion({ userId: row.user_id, label: row.display_name || row.username, avatarUrl: row.avatar_url });
+              })
+              .catch(() => {});
+          }
         } catch (err) {
           console.error("Referral claim failed", err);
         } finally {

@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { markReferralPrompted } from "@/lib/supabase/profile";
 import { ReferrerMatch, claimReferral, searchReferrers } from "@/lib/supabase/referrals";
 import { errorMessage } from "@/lib/errorMessage";
+import { PENDING_REFERRAL_KEY } from "@/lib/referralStorage";
 
 // The last first-run gate, after the username and the photo.
 //
@@ -31,13 +32,36 @@ export function ReferralPromptGate() {
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
 
+  // A link that hasn't been cashed in yet. useAuth claims it in the
+  // background on the first session resolve, but it awaits a data
+  // migration first, so there IS a window where the account has a
+  // referrer coming and doesn't have one yet - and asking "who invited
+  // you?" inside that window is asking someone who already answered.
+  // Read after mount, never during render: there is no localStorage on
+  // the server.
+  const [linkPending, setLinkPending] = useState(true);
+  useEffect(() => {
+    const read = () => setLinkPending(!!localStorage.getItem(PENDING_REFERRAL_KEY));
+    read();
+    // The claim clears the key rather than telling anyone, so this
+    // watches for it going away.
+    const t = setInterval(read, 400);
+    return () => clearInterval(t);
+  }, []);
+
   const show =
     !loading &&
     !!user &&
     !!profile &&
+    // Never over the top of the two gates that come first, which also
+    // buys the background claim all the time it needs: nobody reaches
+    // this until they have named themselves and dealt with a photo.
     !!profile.username &&
     profile.onboarding_avatar_prompted &&
+    // The two ways an account can already have a referrer: the column is
+    // set, or a link is still in flight to set it.
     !profile.referred_by &&
+    !linkPending &&
     !profile.onboarding_referral_prompted;
 
   // Debounced so a fast typist makes one request at the end of a word
