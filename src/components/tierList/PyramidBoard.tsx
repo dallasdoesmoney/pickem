@@ -66,23 +66,29 @@ function solveSize(viewportWidth: number) {
   const content = Math.min(viewportWidth, 1056) - 32;
   const base = viewportWidth < 768 ? 86 : 136;
   const gap = viewportWidth < 768 ? 4 : 6;
-  const track = content - base - 16;
-  const size = Math.floor((track - (WIDEST - 1) * gap) / WIDEST);
-  // Same 80px cap as the board. The floor is lower than the board's 34,
-  // because at 390px seven across simply cannot be had at 34 - and a
-  // smaller mark is a better trade than a broken triangle.
-  const chipSize = Math.max(22, Math.min(80, size));
+  // p-2 either side of the marks, exactly as a tier row, plus the row's
+  // own 1px side borders - which are part of its width now that each row
+  // is its own object, and left out of the budget put a phone 1px over.
+  const pad = 16 + 2;
+
+  // Rows are sized to their own capacity now, so the bottom row is the
+  // whole board's width and everything solves backwards from it.
+  const solve = (rails: number) => {
+    const track = content - base * rails - pad;
+    return Math.max(22, Math.min(80, Math.floor((track - (WIDEST - 1) * gap) / WIDEST)));
+  };
+
+  // The rail sits on the left, so without something the same width on the
+  // right the marks sit right of the row's own centre - the silhouette
+  // and the marks end up as two triangles on different axes. Paying for
+  // the rail twice is worth it while the mark stays big; on a phone it
+  // costs more than half the mark, which is not.
+  const mirrored = solve(2) >= 40;
+  const chipSize = mirrored ? solve(2) : solve(1);
+  // Same derivation as the board. In practice this lands on `base` at
+  // every size the pyramid solves to, so a row's rail is the board's rail.
   const railWidth = Math.max(base, Math.round((chipSize + 16) * 1.28));
-  // The rail sits on the left, so a row centred in its own track is
-  // centred right of the board's middle - which on a pyramid reads as a
-  // lean. Reserving the rail's width on the right too puts the apex on
-  // the board's centre line. Only where it actually fits: a phone spends
-  // a quarter of its width on the rail already, and paying it twice would
-  // squeeze the bottom row below a legible mark. There it stays
-  // track-centred, which is where a tier row's contents live anyway.
-  const widest = WIDEST * chipSize + (WIDEST - 1) * gap;
-  const centreOnBoard = widest + railWidth * 2 + 16 <= content;
-  return { chipSize, railWidth, gap, centreOnBoard };
+  return { chipSize, railWidth, gap, mirrored };
 }
 
 // --------------------------------------------------------------- pieces
@@ -255,7 +261,7 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     else if (over.startsWith("slot:")) place(id, Number(over.slice(5)));
   }
 
-  const { chipSize, railWidth, gap, centreOnBoard } = solveSize(viewportWidth);
+  const { chipSize, railWidth, gap, mirrored } = solveSize(viewportWidth);
   const { setNodeRef: poolRef, isOver: overPool } = useDroppable({ id: "pool" });
   const draggingItem = dragging ? byId.get(dragging) : null;
 
@@ -276,18 +282,32 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
       onDragCancel={() => setDragging(null)}
       onDragEnd={onDragEnd}
     >
-      {/* The board's own surface: one object, clipped corners, rows butted
-          straight into each other with nothing but a hairline between. */}
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-black">
+      {/* Still the board - pure black, the chevron rail, a hairline between
+          tiers, the outer corners rounded - but each row is only as wide as
+          its own tier holds, and they stack dead centre with no gap. Every
+          row is wider than the one above by exactly two marks, so the sides
+          step out evenly and the stack itself is the pyramid. */}
+      <div className="flex flex-col items-center">
         {rows.map(({ tier, from, cap }) => (
           <div
             key={tier}
-            className="flex items-stretch"
+            className="flex items-stretch overflow-hidden"
             style={{
               // Pure black, exactly as TierRow: the highest-contrast ground
               // the marks can sit on.
               background: "#000000",
-              borderTop: tier === 0 ? undefined : "1px solid rgba(255,255,255,0.09)",
+              // The sides are the pyramid's edge, so they carry the board's
+              // border; the top of each row is the hairline that separates
+              // it from the tier above, and where the row sticks out past
+              // that tier the same hairline reads as the step's edge.
+              borderLeft: "1px solid rgba(255,255,255,0.10)",
+              borderRight: "1px solid rgba(255,255,255,0.10)",
+              borderTop: tier === 0 ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(255,255,255,0.09)",
+              borderBottom: tier === CAPS.length - 1 ? "1px solid rgba(255,255,255,0.10)" : undefined,
+              borderTopLeftRadius: tier === 0 ? 16 : undefined,
+              borderTopRightRadius: tier === 0 ? 16 : undefined,
+              borderBottomLeftRadius: tier === CAPS.length - 1 ? 16 : undefined,
+              borderBottomRightRadius: tier === CAPS.length - 1 ? 16 : undefined,
             }}
           >
             <div
@@ -308,12 +328,12 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
               </span>
             </div>
 
-            {/* Same padding and min-height as a tier row. The only change
-                in the whole component: centred instead of left-packed, and
-                capped at the tier's capacity. */}
+            {/* Same padding and min-height as a tier row. The row is sized
+                to exactly this tier's capacity, so there is nothing to
+                centre within - the slots ARE the row. */}
             <div
-              className="flex min-w-0 flex-1 items-center justify-center p-2"
-              style={{ gap, minHeight: chipSize + 16, paddingRight: centreOnBoard ? railWidth : undefined }}
+              className="flex items-center p-2"
+              style={{ gap, minHeight: chipSize + 16 }}
             >
               {Array.from({ length: cap }, (_, k) => {
                 const index = from + k;
@@ -341,6 +361,10 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
                 );
               })}
             </div>
+
+            {/* Black, so it is simply more row. Its only job is to put the
+                marks on the same centre line as the silhouette. */}
+            {mirrored && <span aria-hidden className="shrink-0" style={{ width: railWidth }} />}
           </div>
         ))}
       </div>
