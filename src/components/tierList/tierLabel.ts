@@ -37,7 +37,19 @@ const isLetter = (label: string) => {
   return t.length > 0 && t.length <= 2 && !/\s/.test(t);
 };
 
+// The pyramid's band is narrower than the board's rail - 111px against
+// 124 on a desktop, because it is a fraction of the triangle rather than
+// a fixed width - so the board's sizes clip in it. These are the two
+// that give the band the SAME capacity the rail has at 15px: eleven
+// characters of a single word - measured, a twelve-letter name needs
+// 101px of the 107 the band has at 1024, and 111 at 1280. Anything the
+// tier list can show on a laptop or bigger, the pyramid can show too.
+const PYRAMID_LETTER_SIZE = 16;
+const PYRAMID_NAME_SIZE = 12;
+
 export const TIER_LABEL_SIZES = { letter: LETTER_SIZE, word: NAME_SIZE } as const;
 
-export const pickTierLabelSize = (label: string): number =>
-  isLetter(label) ? LETTER_SIZE : NAME_SIZE;
+export const pickTierLabelSize = (label: string, pyramid = false): number => {
+  if (isLetter(label)) return pyramid ? PYRAMID_LETTER_SIZE : LETTER_SIZE;
+  return pyramid ? PYRAMID_NAME_SIZE : NAME_SIZE;
+};

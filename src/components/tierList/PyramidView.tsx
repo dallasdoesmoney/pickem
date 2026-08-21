@@ -141,7 +141,7 @@ export function PyramidView({
                     left: 0,
                     width: T - 12,
                     transform: `translate(${leftEdgeAt(row * shape.rowH + shape.rowH / 2) + T / 2}px, -50%) translateX(-50%)`,
-                    fontSize: pickTierLabelSize(band.label),
+                    fontSize: pickTierLabelSize(band.label, true),
                   }}
                 >
                   {band.label}
