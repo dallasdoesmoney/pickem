@@ -1,11 +1,17 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { Tier, MAX_TIER_LABEL, tierLabelFor } from "@/lib/tierList";
 import { SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TIER_LABEL_FONT, TierLabelSizes, pickTierLabelSize } from "@/components/tierList/tierLabel";
+
+// The label's own ink, reused for the marks that say it can be edited -
+// a dashed inset and a pencil in any other colour would read as a
+// second thing sitting on the rail rather than as part of the label.
+const INK = TIER_LABEL_FONT.color;
 
 export function TierRow({
   tier,
@@ -32,6 +38,9 @@ export function TierRow({
   onDelete,
   onItemActivate,
   onPlaceSelected,
+  onStartEditing,
+  onActivate,
+  active,
 }: {
   tier: Tier;
   index: number;
@@ -69,10 +78,39 @@ export function TierRow({
   onDelete: () => void;
   onItemActivate: (item: TierItem) => void;
   onPlaceSelected: () => void;
+  // Double-clicking a name is the way into edit mode from anywhere on
+  // the board, so the row has to be able to ask for it.
+  onStartEditing: () => void;
+  // Fired when this row's name takes focus, so the board can follow
+  // which tier is being worked on.
+  onActivate: () => void;
+  // The one tier currently being edited. Its name takes the caret, and
+  // its controls are the only ones on screen: showing move and delete on
+  // every row at once pushed the marks around on a phone, and edit mode
+  // has to look like the list you are editing.
+  active: boolean;
 }) {
   // Registered so an empty row is still a drop target; the lit state
   // arrives as a prop instead (see `hot` above).
   const { setNodeRef } = useDroppable({ id: `tier:${tier.id}` });
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  const [focused, setFocused] = useState(false);
+
+  // A textarea has no natural height, and the rail centres what is in it,
+  // so the field is grown to exactly its own content each time it
+  // changes. Without this a wrapped name would scroll inside a one-line
+  // box instead of filling the rail the way the label does.
+  const fit = (el: HTMLTextAreaElement) => {
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    const el = fieldRef.current;
+    if (!el) return;
+    fit(el);
+    if (active) el.focus();
+  }, [active, editing]);
   const items = itemIds.map((id) => resolveItem(template, id));
   // `armed` is every row while an item is selected for tap-to-place -
   // giving all six a full glow at once would just be noise.
@@ -88,7 +126,7 @@ export function TierRow({
       // slope when the view returns. The row is a fresh element then, so
       // the animation has to find it by position rather than by identity.
       data-tier-row={index}
-      className={`flex flex-wrap items-stretch transition-[background,box-shadow] duration-150 ${cascading ? "tier-anim-cascade" : ""}`}
+      className={`flex items-stretch transition-[background,box-shadow] duration-150 ${cascading ? "tier-anim-cascade" : ""}`}
       style={{
         // Pure black. It's the highest-contrast ground the logos can sit
         // on, and with 32 marks up there they should be the loudest thing
@@ -114,28 +152,111 @@ export function TierRow({
           reads as the row reaching out to take the item. */}
       <div
         data-tier-rail
-        className="shrink-0 flex items-center justify-center transition-[width,filter] duration-150"
+        // Double-click is what opens edit mode, from anywhere on the
+        // board. A tier name is a thing you look at far more often than
+        // you change, so the way in is the gesture people already try on
+        // a label rather than a control the board has to carry all the
+        // time.
+        onDoubleClick={onStartEditing}
+        className="relative shrink-0 flex items-center justify-center transition-[filter] duration-150"
         style={{
-          // No longer widens to edit: the field is out in the row now,
-          // so the rail has nothing to make room for.
           width: hot ? railWidth + 14 : railWidth,
           background: tier.accent,
           filter: hot ? "brightness(1.18)" : undefined,
           paddingLeft: 6,
           paddingRight: 6,
+          overflow: "hidden",
+          cursor: editing ? "text" : undefined,
         }}
       >
-        <span
-          // leading-none stacks wrapped lines right on top of each
-          // other; a name long enough to wrap needs the gap back.
-          // w-full/min-w-0 are what make wrapping actually bite: as a bare
-          // flex item the span sizes to its content instead, so a long
-          // name overflowed the rail.
-          className="w-full min-w-0 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
-          style={{ ...TIER_LABEL_FONT, fontSize: pickTierLabelSize(tierLabelFor(tier, index), labelSizes) }}
-        >
-          {tierLabelFor(tier, index)}
-        </span>
+        {editing ? (
+          <textarea
+            ref={fieldRef}
+            defaultValue={tier.label}
+            onChange={(e) => {
+              onRename(e.target.value);
+              fit(e.currentTarget);
+            }}
+            onFocus={(e) => {
+              setFocused(true);
+              onActivate();
+              const end = e.currentTarget.value.length;
+              e.currentTarget.setSelectionRange(end, end);
+              fit(e.currentTarget);
+            }}
+            onBlur={() => setFocused(false)}
+            onKeyDown={(e) => {
+              // A tier name is one line of text however many lines it
+              // wraps to, so Enter commits rather than inserting a break.
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.blur();
+                onCommitRename();
+              }
+              if (e.key === "Escape") e.currentTarget.blur();
+            }}
+            rows={1}
+            maxLength={MAX_TIER_LABEL}
+            spellCheck={false}
+            aria-label={`Rename ${tierLabelFor(tier, index)} tier`}
+            // Typed at exactly the size and in exactly the place it will
+            // be read, so what you are looking at while you type IS the
+            // result. A textarea rather than an input because the rail
+            // wraps: an input would scroll a long name sideways instead.
+            className="w-full min-w-0 resize-none overflow-hidden bg-transparent text-center leading-[1.18] uppercase outline-none [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
+            style={{
+              ...TIER_LABEL_FONT,
+              fontSize: pickTierLabelSize(tier.label || tierLabelFor(tier, index), labelSizes),
+              caretColor: TIER_LABEL_FONT.color,
+            }}
+          />
+        ) : (
+          <span
+            // leading-none stacks wrapped lines right on top of each
+            // other; a name long enough to wrap needs the gap back.
+            // w-full/min-w-0 are what make wrapping actually bite: as a
+            // bare flex item the span sizes to its content instead, so a
+            // long name overflowed the rail.
+            className="w-full min-w-0 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
+            style={{ ...TIER_LABEL_FONT, fontSize: pickTierLabelSize(tierLabelFor(tier, index), labelSizes) }}
+          >
+            {tierLabelFor(tier, index)}
+          </span>
+        )}
+
+        {/* What says the box is editable, and nothing more: a dashed
+            inset that goes solid on the one you are in, and a pencil that
+            steps out of the way once you are typing. Drawn over the rail
+            rather than around it so the row's own geometry never moves -
+            edit mode has to look like the list you are editing. */}
+        {editing && (
+          <>
+            <span
+              aria-hidden
+              className="pointer-events-none absolute rounded-lg transition-[border] duration-150"
+              style={{
+                inset: 4,
+                border: focused
+                  ? `2px solid ${INK}d9`
+                  : `1.5px dashed ${INK}61`,
+              }}
+            />
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              className="pointer-events-none absolute transition-opacity duration-150"
+              style={{ top: 7, right: 8, width: 11, height: 11, opacity: focused ? 0 : 0.5 }}
+              fill="none"
+              stroke={INK}
+              strokeWidth={2.4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </>
+        )}
       </div>
 
       {/* Drop zone. min-h keeps an empty tier a real target rather than a
@@ -178,42 +299,14 @@ export function TierRow({
           Three buttons crushed into a 64px rail under the label was the
           worst part of edit mode; out here they get full-size targets and
           the rail only has to hold a name. */}
-      {/* Everything about editing a tier lives on its own line under the
-          row: the name, and the three buttons that move or delete it.
-          Both were in the rail once. The rail is as narrow as it is on
-          purpose, and a 16px field inside it - 16 so iOS doesn't zoom the
-          page on focus - left about six characters visible, so you could
-          not read what you were typing. Down here the field gets real
-          width, and the rail beside it goes on showing the name at its
-          true size as you type. */}
-      {editing && (
-        // w-full as well as basis-full: basis alone resolved to the
-          // line's max-content in Chromium here, which pushed the delete
-          // button off the right edge of the board.
-          <div className="basis-full w-full min-w-0 flex items-center gap-2 px-2 pb-2">
-          <input
-            value={tier.label}
-            onChange={(e) => onRename(e.target.value)}
-            maxLength={MAX_TIER_LABEL}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                e.currentTarget.blur();
-                onCommitRename();
-              }
-            }}
-            // Caret to the end rather than wherever the tap landed. The
-            // field used to be centre-aligned, so tapping it usually put
-            // the caret in front of the name and backspace did nothing.
-            onFocus={(e) => {
-              const end = e.currentTarget.value.length;
-              e.currentTarget.setSelectionRange(end, end);
-            }}
-            placeholder="Name this tier"
-            aria-label={`Rename ${tierLabelFor(tier, index)} tier`}
-            className="flex-1 min-w-0 rounded-lg bg-black/45 border border-white/15 focus:border-white/45 px-3 py-2 text-white placeholder:text-white/30 outline-none"
-            style={{ ...TIER_LABEL_FONT, color: "#ffffff", fontSize: 16 }}
-          />
+      {/* This tier's own controls, at the end of its row, and only on the
+          tier being edited. They were in the rail once, where three
+          buttons crushed into 64px was the worst part of edit mode; out
+          here they get full-size targets and the rail only has to hold a
+          name. On every row at once they cost a phone two marks a line,
+          which is the board rearranging itself to be edited. */}
+      {editing && active && (
+        <div className="shrink-0 flex items-center gap-1.5 pr-2.5 pl-1">
           <RailButton label="Move tier up" disabled={!canMoveUp} onClick={() => onMove(-1)}>
             <path d="M18 15l-6-6-6 6" />
           </RailButton>
@@ -223,7 +316,6 @@ export function TierRow({
           <RailButton label={`Delete ${tierLabelFor(tier, index)} tier`} disabled={!canDelete} onClick={onDelete} danger>
             <path d="M3 6h18" />
             <path d="M8 6V4h8v2" />
-            <path d="M19 6l-1 14H6L5 6" />
           </RailButton>
         </div>
       )}

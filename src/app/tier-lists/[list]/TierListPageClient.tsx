@@ -93,6 +93,11 @@ export default function TierListPageClient({
   // one that edits it; see the pyramid block below.
   const [view, setView] = useState<"rows" | "pyramid">("rows");
   const [editing, setEditing] = useState(false);
+  // Which tier is being edited. Double-clicking a name is the way into
+  // edit mode, and it would be no use if the caret then appeared in the
+  // top tier instead of the one you aimed at - and it is what decides
+  // which row shows its move and delete controls.
+  const [editingTierId, setEditingTierId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [landedId, setLandedId] = useState<string | null>(null);
   // Keyed so the overlay fully remounts each time - reusing the element
@@ -877,6 +882,7 @@ export default function TierListPageClient({
             onClick={() => {
               setView("rows");
               setEditing((v) => !v);
+              setEditingTierId(null);
             }}
             aria-pressed={editing}
             aria-label={editing ? "Finish editing tiers" : "Edit tiers"}
@@ -1027,11 +1033,21 @@ export default function TierListPageClient({
               canMoveDown={i < state.tiers.length - 1}
               canDelete={state.tiers.length > 1}
               onRename={(label) => dispatch({ type: "renameTier", tierId: tier.id, label })}
-              onCommitRename={() => setEditing(false)}
+              onCommitRename={() => {
+                setEditing(false);
+                setEditingTierId(null);
+              }}
               onMove={(direction) => dispatch({ type: "moveTier", tierId: tier.id, direction })}
               onDelete={() => handleDeleteTier(tier.id, tierLabelFor(tier, i))}
               onItemActivate={handleItemActivate}
               onPlaceSelected={() => placeSelected(tier.id)}
+              onStartEditing={() => {
+                setView("rows");
+                setEditing(true);
+                setEditingTierId(tier.id);
+              }}
+              onActivate={() => setEditingTierId(tier.id)}
+              active={editingTierId === tier.id}
             />
           ))}
         </div>
