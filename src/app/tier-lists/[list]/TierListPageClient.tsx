@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import posthog from "posthog-js";
 import {
@@ -311,6 +312,72 @@ export default function TierListPageClient({
   const dropFromPyramid = useCallback((itemId: string) => {
     setPyrSlots((prev) => prev.map((id) => (id === itemId ? null : id)));
   }, []);
+
+  // ------------------------------------------------------- the cascade
+  //
+  // The two layouts are different element trees, so nothing can morph
+  // from one into the other. What CAN be preserved is every mark: read
+  // where each one is, switch, read where it now is, and play it from
+  // the old place to the new. The Web Animations API rather than an
+  // inline style, because a re-render mid-flight would overwrite the
+  // style and snap the board.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const markRects = useCallback(() => {
+    const at = new Map<string, DOMRect>();
+    boardRef.current?.querySelectorAll<HTMLElement>("[data-mark]").forEach((el) => {
+      at.set(el.dataset.mark!, el.getBoundingClientRect());
+    });
+    return at;
+  }, []);
+
+  const switchView = useCallback(
+    (next: "rows" | "pyramid") => {
+      setSelectedId(null);
+      const reduced =
+        typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced || !boardRef.current) {
+        setView(next);
+        return;
+      }
+      const before = markRects();
+      const top = boardRef.current.getBoundingClientRect().top;
+      // Synchronous so the new layout can be measured in the same frame -
+      // a normal setState would paint the destination first and there
+      // would be nothing left to animate from.
+      flushSync(() => setView(next));
+      const after = markRects();
+      const rowH = pyrShape.rowH;
+      after.forEach((to, id) => {
+        const from = before.get(id);
+        if (!from) return;
+        const dx = from.left - to.left;
+        const dy = from.top - to.top;
+        const scale = to.width ? from.width / to.width : 1;
+        if (!dx && !dy && Math.abs(scale - 1) < 0.01) return;
+        const el = boardRef.current?.querySelector<HTMLElement>(`[data-mark="${CSS.escape(id)}"]`);
+        if (!el) return;
+        // Bottom row first, so the base settles and the rows fold in
+        // above it rather than the whole board moving at once. Measured
+        // against whichever end of the trip is the pyramid.
+        const band = ((next === "pyramid" ? to.top : from.top) - top) / rowH;
+        const delay = Math.max(0, Math.min(3, 3 - Math.floor(band))) * 80;
+        el.animate(
+          [
+            { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
+            { transform: "translate(0px, 0px) scale(1)" },
+          ],
+          {
+            duration: 720,
+            delay,
+            easing: "cubic-bezier(.65,0,.35,1)",
+            fill: "backwards",
+            composite: "add",
+          },
+        );
+      });
+    },
+    [markRects, pyrShape.rowH],
+  );
 
   const sensors = useSensors(
     // Mouse needs a few px of travel so a plain click still selects.
@@ -908,9 +975,7 @@ export default function TierListPageClient({
                   type="button"
                   aria-pressed={view === v}
                   onClick={() => {
-                    if (v === view) return;
-                    setSelectedId(null);
-                    setView(v);
+                    if (v !== view) switchView(v);
                   }}
                   className={`rounded-full px-5 py-1.5 text-[11px] transition-colors ${
                     view === v ? "bg-white/15 text-white" : "text-white/50 hover:text-white"
@@ -942,6 +1007,7 @@ export default function TierListPageClient({
         }}
         onDragEnd={handleDragEnd}
       >
+        <div ref={boardRef}>
         {/* One solid block, not six cards. Rows sit flush against each
             other and this clips the outer corners, so the colour column
             runs unbroken and the board reads as one object. Opaque black
@@ -1030,6 +1096,8 @@ export default function TierListPageClient({
             }}
           />
         )}
+
+        </div>
 
         <DragOverlay dropAnimation={null}>
           {activeItem ? (

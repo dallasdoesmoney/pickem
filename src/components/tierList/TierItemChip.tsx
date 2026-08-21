@@ -49,6 +49,11 @@ export function TierItemChip({
       aria-label={item.label}
       aria-pressed={selected}
       title={item.label}
+      // How the board finds this mark again after a layout change, so it
+      // can be flown from where it was to where it now is. The two
+      // layouts are different element trees, so identity has to come from
+      // the data rather than from the node.
+      data-mark={item.id}
       onClick={onActivate}
       className={`relative shrink-0 rounded-xl flex items-center justify-center transition-[box-shadow,transform] duration-150 ${
         landed ? "tier-anim-land" : ""

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { DraggableTierItem } from "./TierItemChip";
@@ -97,9 +98,46 @@ export function PyramidView({
   const { setNodeRef: poolRef } = useDroppable({ id: POOL_ID });
   const armed = !!selectedId;
 
+  // The bands fold in from full width when the view arrives - bottom row
+  // first, so the base settles and the rows close above it. A rectangle
+  // and a trapezoid are the same four points, so this interpolates
+  // without anything reflowing to make the shape.
+  //
+  // Mounting IS arriving: the tier list is the default view, so this
+  // component only ever appears because somebody switched to it.
+  const bandsRef = useRef<HTMLDivElement>(null);
+  const edgeRef = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const ease = "cubic-bezier(.65,0,.35,1)";
+    bandsRef.current?.querySelectorAll<HTMLElement>("[data-band]").forEach((el) => {
+      const row = Number(el.dataset.band);
+      const now = getComputedStyle(el);
+      const from = el.dataset.flatClip
+        ? { clipPath: el.dataset.flatClip }
+        : { transform: el.dataset.flatTransform! };
+      const to = el.dataset.flatClip ? { clipPath: now.clipPath } : { transform: now.transform };
+      el.animate([from, to], {
+        duration: 720,
+        delay: (CAPS.length - 1 - row) * 80,
+        easing: ease,
+        fill: "backwards",
+      });
+    });
+    // The silhouette can't fold with them - SVG points are not animatable
+    // - and drawn at its final shape from the first frame it reads as two
+    // diagonals slashing across a board that is still square. So it
+    // arrives once the shape it outlines has finished forming.
+    edgeRef.current?.animate([{ opacity: 0 }, { opacity: 0 }, { opacity: 1 }], {
+      duration: 1000,
+      easing: ease,
+      fill: "backwards",
+    });
+  }, []);
+
   return (
     <>
-      <div className="relative mx-auto" style={{ width: w, height }}>
+      <div ref={bandsRef} className="relative mx-auto" style={{ width: w, height }}>
         {CAPS.map((_, row) => {
           const band = bands[row];
           const a = leftEdgeAt(row * shape.rowH);
@@ -107,6 +145,8 @@ export function PyramidView({
           return (
             <div
               key={row}
+              data-band={row}
+              data-flat-clip={`polygon(0px 0%, ${w}px 0%, ${w}px 100%, 0px 100%)`}
               className="absolute left-0 overflow-hidden"
               style={{
                 top: row * shape.rowH,
@@ -122,6 +162,8 @@ export function PyramidView({
             >
               <span
                 aria-hidden
+                data-band={row}
+                data-flat-clip={`polygon(0px 0%, ${T}px 0%, ${T}px 100%, 0px 100%)`}
                 className="absolute inset-0"
                 style={{
                   background: band.accent,
@@ -132,6 +174,8 @@ export function PyramidView({
                     band is a parallelogram, and a name tall enough to wrap
                     reaches past its slanted edges. */}
                 <span
+                  data-band={row}
+                  data-flat-transform={`translate(${T / 2}px, -50%) translateX(-50%)`}
                   className="absolute top-1/2 text-center leading-[1.18] break-words uppercase"
                   style={{
                     ...TIER_LABEL_FONT,
@@ -152,7 +196,7 @@ export function PyramidView({
             contrast, so without it the shape has no visible boundary at
             all. Both slopes are straight lines from the apex to the base,
             so the whole outline is four points. */}
-        <svg aria-hidden className="pointer-events-none absolute left-0 top-0" width={w} height={height}>
+        <svg ref={edgeRef} aria-hidden className="pointer-events-none absolute left-0 top-0" width={w} height={height}>
           <polygon
             points={`${(w - apex) / 2},0 ${(w + apex) / 2},0 ${w},${height} 0,${height}`}
             fill="none"
