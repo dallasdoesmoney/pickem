@@ -50,6 +50,8 @@ import { shareBlob } from "@/lib/shareBlob";
 import { buildReferralLink } from "@/lib/referralStorage";
 import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TierRow } from "@/components/tierList/TierRow";
+import { PyramidView, POOL_ID as PYRAMID_POOL } from "@/components/tierList/PyramidView";
+import { RANKED, fillSlots, pyramidBands, readingOrder, solvePyramid } from "@/components/tierList/pyramid";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
@@ -75,6 +77,9 @@ export default function TierListPageClient({
   const { confirm, dialog } = useConfirmDialog();
 
   const [viewportWidth, setViewportWidth] = useState(390);
+  // Which layout the board is in. "rows" is the tier list and is the only
+  // one that edits it; see the pyramid block below.
+  const [view, setView] = useState<"rows" | "pyramid">("rows");
   const [editing, setEditing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [landedId, setLandedId] = useState<string | null>(null);
@@ -257,6 +262,56 @@ export default function TierListPageClient({
     return { chipSize: chip, railWidth: rail };
   }, [viewportWidth]);
 
+  // ------------------------------------------------------- pyramid mode
+  //
+  // The same board, laid out as sixteen places in four rows instead of as
+  // tiers. It is a view, not a second editor: it renders inside the
+  // DndContext below and reports through the same handlers, so undo,
+  // clear, reset, share and save all still apply while it is on screen.
+  const pyrShape = useMemo(() => solvePyramid(Math.min(viewportWidth, 1056) - 32), [viewportWidth]);
+  const [pyrSlots, setPyrSlots] = useState<(string | null)[]>(() => fillSlots([]));
+  // Which container a pyramid drag is over: a slot index, "pool", or null.
+  const [pyrOver, setPyrOver] = useState<number | "pool" | null>(null);
+
+  const order = useMemo(() => readingOrder(state), [state]);
+  // Only the top sixteen can reach the pyramid, so only they can make it
+  // stale - reordering the tail of the board must not throw away an
+  // arrangement made up here.
+  const orderKey = useMemo(() => order.slice(0, RANKED).join(","), [order]);
+  const filledFrom = useRef<string | null>(null);
+  useEffect(() => {
+    if (!loaded || filledFrom.current === orderKey) return;
+    filledFrom.current = orderKey;
+    setPyrSlots(fillSlots(order));
+  }, [loaded, orderKey, order]);
+
+  const bands = useMemo(() => pyramidBands(state.tiers), [state.tiers]);
+  const placedInPyramid = useMemo(
+    () => new Set(pyrSlots.filter(Boolean) as string[]),
+    [pyrSlots]
+  );
+  const missedTheCut = useMemo(
+    () => template.items.map((i) => i.id).filter((id) => !placedInPyramid.has(id)),
+    [template.items, placedInPyramid]
+  );
+
+  const placeInSlot = useCallback((itemId: string, slot: number) => {
+    setPyrSlots((prev) => {
+      const next = [...prev];
+      const from = prev.indexOf(itemId);
+      const evicted = next[slot];
+      next[slot] = itemId;
+      // Swap rather than displace: the row it came from would otherwise
+      // be left a place short with nothing to fill it.
+      if (from >= 0 && from !== slot) next[from] = evicted ?? null;
+      return next;
+    });
+  }, []);
+
+  const dropFromPyramid = useCallback((itemId: string) => {
+    setPyrSlots((prev) => prev.map((id) => (id === itemId ? null : id)));
+  }, []);
+
   const sensors = useSensors(
     // Mouse needs a few px of travel so a plain click still selects.
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -312,6 +367,17 @@ export default function TierListPageClient({
     const hits = pointerWithin(args);
     return hits.length ? hits : closestCenter(args);
   }, []);
+
+  // Drops in the pyramid land on a slot, on the cut, or on another mark -
+  // and a mark inherits whatever it is sitting in, exactly as a tier drop
+  // does, so aiming at a team works as well as aiming at its square.
+  function pyramidTarget(overId: string): number | "pool" | null {
+    if (overId === PYRAMID_POOL) return "pool";
+    if (overId.startsWith("pyr:")) return Number(overId.slice(4));
+    const slot = pyrSlots.indexOf(overId);
+    if (slot >= 0) return slot;
+    return missedTheCut.includes(overId) ? "pool" : null;
+  }
 
   function containerOf(overId: string): { tier: string | null } | null {
     if (overId === "unranked") return { tier: null };
@@ -374,6 +440,13 @@ export default function TierListPageClient({
     const { active, over } = e;
     if (!over) return;
     const overId = String(over.id);
+    if (view === "pyramid") {
+      // Nothing moves until the drop. A pyramid row cannot grow to make
+      // room, so shuffling its marks live would just thrash sixteen fixed
+      // places while the cursor wandered.
+      setPyrOver(pyramidTarget(overId));
+      return;
+    }
     const target = containerOf(overId);
     if (!target) return;
     setOverTier(target.tier);
@@ -395,8 +468,16 @@ export default function TierListPageClient({
       suppressClick.current = false;
     }, 0);
     const { active, over } = e;
+    setPyrOver(null);
     if (!over) return;
     const id = String(active.id);
+    if (view === "pyramid") {
+      const target = pyramidTarget(String(over.id));
+      if (target === "pool") dropFromPyramid(id);
+      else if (target !== null) placeInSlot(id, target);
+      setSelectedId(null);
+      return;
+    }
     const action = applyMove(id, String(over.id), true);
     // A no-op drop still counts: the live moves during the drag may have
     // already carried this item into first place.
@@ -738,7 +819,10 @@ export default function TierListPageClient({
         <div className={editing ? "flex items-center gap-3" : "relative flex items-center justify-center"}>
           <button
             type="button"
-            onClick={() => setEditing((v) => !v)}
+            onClick={() => {
+              setView("rows");
+              setEditing((v) => !v);
+            }}
             aria-pressed={editing}
             aria-label={editing ? "Finish editing tiers" : "Edit tiers"}
             className={`${editing ? "shrink-0" : "absolute left-0"} flex items-center gap-1.5 rounded-full py-1.5 pl-2.5 pr-2.5 sm:pr-3.5 text-[11px] border transition-colors ${
@@ -810,6 +894,35 @@ export default function TierListPageClient({
             Originally ranked by <span className="text-white/70">{snapshotAuthor}</span>
           </p>
         )}
+
+        {/* Hidden while editing tiers: adding, renaming and reordering
+            tiers are all about a list of rows, and the pyramid has four
+            fixed bands instead. Switching in is what would need explaining,
+            not the toggle being absent. */}
+        {!editing && (
+          <div className="flex justify-center mt-2">
+            <div className="flex gap-1 rounded-full border border-white/12 bg-black/40 p-1">
+              {(["rows", "pyramid"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={view === v}
+                  onClick={() => {
+                    if (v === view) return;
+                    setSelectedId(null);
+                    setView(v);
+                  }}
+                  className={`rounded-full px-5 py-1.5 text-[11px] transition-colors ${
+                    view === v ? "bg-white/15 text-white" : "text-white/50 hover:text-white"
+                  }`}
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {v === "rows" ? "TIER LIST" : "PYRAMID"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </header>
 
       <DndContext
@@ -830,12 +943,15 @@ export default function TierListPageClient({
         onDragEnd={handleDragEnd}
       >
         {/* One solid block, not six cards. Rows sit flush against each
-            other and this clips the outer corners, so the chevrons form a
-            single continuous column and the board reads as one object.
-            Opaque black also stops the page's tiled logo watermark showing
-            through the rows. */}
-        <div className="flex flex-col rounded-2xl border border-white/10 overflow-hidden bg-black">
-          {state.tiers.map((tier, i) => (
+            other and this clips the outer corners, so the colour column
+            runs unbroken and the board reads as one object. Opaque black
+            also stops the page's tiled logo watermark showing through the
+            rows. */}
+        <div
+          className="flex flex-col rounded-2xl border border-white/10 overflow-hidden bg-black"
+          style={{ display: view === "pyramid" ? "none" : undefined }}
+        >
+          {view === "rows" && state.tiers.map((tier, i) => (
             <TierRow
               key={tier.id}
               tier={tier}
@@ -877,27 +993,59 @@ export default function TierListPageClient({
           </button>
         )}
 
-        <UnrankedPool
-          hot={draggingId !== null && overTier === null}
-          ids={state.unranked}
-          template={template}
-          chipSize={chipSize}
-          selectedItemId={selectedId}
-          landedItemId={landedId}
-          onItemActivate={handleItemActivate}
-          onPlaceSelected={() => placeSelected(null)}
-          onShuffle={handleShuffle}
-          scatterKey={scatterKey}
-        />
+        {view === "rows" ? (
+          <UnrankedPool
+            hot={draggingId !== null && overTier === null}
+            ids={state.unranked}
+            template={template}
+            chipSize={chipSize}
+            selectedItemId={selectedId}
+            landedItemId={landedId}
+            onItemActivate={handleItemActivate}
+            onPlaceSelected={() => placeSelected(null)}
+            onShuffle={handleShuffle}
+            scatterKey={scatterKey}
+          />
+        ) : (
+          <PyramidView
+            template={template}
+            shape={pyrShape}
+            bands={bands}
+            slots={pyrSlots}
+            missed={missedTheCut}
+            selectedId={selectedId}
+            landedId={landedId}
+            poolHot={pyrOver === "pool"}
+            onItemActivate={handleItemActivate}
+            onPlaceSlot={(slot) => {
+              if (!selectedId) return;
+              placeInSlot(selectedId, slot);
+              flashLanded(selectedId);
+              setSelectedId(null);
+            }}
+            onPlacePool={() => {
+              if (!selectedId) return;
+              dropFromPyramid(selectedId);
+              setSelectedId(null);
+            }}
+          />
+        )}
 
         <DragOverlay dropAnimation={null}>
-          {activeItem ? <TierItemChip item={activeItem} style={template.itemStyle} size={chipSize * 1.15} /> : null}
+          {activeItem ? (
+            <TierItemChip
+              item={activeItem}
+              style={template.itemStyle}
+              size={(view === "pyramid" ? pyrShape.chip : chipSize) * 1.15}
+            />
+          ) : null}
         </DragOverlay>
       </DndContext>
 
       {selectedId && (
         <p className="text-center text-xs text-white/50 mt-3">
-          Now tap a tier to drop <span className="text-white/80">{resolveItem(template, selectedId).label}</span> in — or tap it again to cancel.
+          Now tap {view === "pyramid" ? "a place" : "a tier"} to drop{" "}
+          <span className="text-white/80">{resolveItem(template, selectedId).label}</span> in — or tap it again to cancel.
         </p>
       )}
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useDraggable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TierItem, TierItemStyle } from "@/data/tierTemplates";
@@ -240,6 +241,42 @@ export function SortableTierItem({
         sweepIndex={sweepIndex}
         scatterKey={scatterKey}
         scatterIndex={scatterIndex}
+        onActivate={onActivate}
+        dragging={isDragging}
+      />
+    </div>
+  );
+}
+
+// The same chip, draggable but not sortable. The pyramid's places are
+// fixed slots rather than a list you reorder, so there is nothing for a
+// sorting strategy to do there - and letting it run would have every
+// mark shuffling sideways to make room in a row that cannot grow.
+export function DraggableTierItem({
+  item,
+  style,
+  size,
+  selected,
+  landed,
+  onActivate,
+}: {
+  item: TierItem;
+  style?: TierItemStyle;
+  size: number;
+  selected?: boolean;
+  landed?: boolean;
+  onActivate?: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id });
+
+  return (
+    <div ref={setNodeRef} {...attributes} {...listeners} style={{ touchAction: "none" }}>
+      <TierItemChip
+        item={item}
+        style={style}
+        size={size}
+        selected={selected}
+        landed={landed}
         onActivate={onActivate}
         dragging={isDragging}
       />
