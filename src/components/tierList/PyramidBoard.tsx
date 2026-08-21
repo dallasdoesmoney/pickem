@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -21,21 +21,18 @@ import { TierItemChip } from "./TierItemChip";
 // line. 1 + 3 + 5 + 7 is the only four-row triangle that lands on exactly
 // sixteen, so the shape IS the rule - there is no separate "top 16"
 // setting that could disagree with the rows on screen.
+//
+// Everything about how this is DRAWN is the tier board's, not this
+// file's: one black surface with a rounded border and clipped corners,
+// rows butted straight into each other with a hairline between, the
+// chevron rail on the left, the same chip solver, the same pool
+// underneath. The only thing that differs is where the marks sit - each
+// row is capped at its tier's capacity and centred in the track, so the
+// marks form the triangle while the board itself stays the board.
 export const CAPS = [1, 3, 5, 7] as const;
 export const RANKED = CAPS.reduce((a, b) => a + b, 0);
+const WIDEST = CAPS[CAPS.length - 1];
 const LABELS = ["S", "A", "B", "C"] as const;
-
-// Where a slot index falls. Slot 0 is the apex, 1-3 the second row, and
-// so on, so the whole board is one flat array and "which tier is this"
-// is arithmetic rather than bookkeeping.
-function tierOf(slot: number): number {
-  let at = 0;
-  for (let t = 0; t < CAPS.length; t++) {
-    if (slot < at + CAPS[t]) return t;
-    at += CAPS[t];
-  }
-  return CAPS.length - 1;
-}
 
 const storageKey = (slug: string) => `pickem:pyramid:${slug}`;
 
@@ -50,8 +47,8 @@ function readSlots(slug: string, valid: Set<string>): (string | null)[] {
     return empty.map((_, i) => {
       const id = saved[i];
       // Drop anything that isn't a real item of this template, and never
-      // let one id occupy two slots - a hand-edited or stale value must
-      // not be able to duplicate a chip.
+      // let one id hold two slots - a stale or hand-edited value must not
+      // be able to duplicate a mark.
       if (typeof id !== "string" || !valid.has(id) || seen.has(id)) return null;
       seen.add(id);
       return id;
@@ -61,6 +58,33 @@ function readSlots(slug: string, valid: Set<string>): (string | null)[] {
   }
 }
 
+// The board's own solver, with one substitution: the real board wraps, so
+// it picks a per-row count from the viewport. A pyramid cannot wrap - a
+// wrapped row is a different shape - so the widest tier's capacity IS the
+// per-row count, and the chip solves down to whatever makes seven fit.
+function solveSize(viewportWidth: number) {
+  const content = Math.min(viewportWidth, 1056) - 32;
+  const base = viewportWidth < 768 ? 86 : 136;
+  const gap = viewportWidth < 768 ? 4 : 6;
+  const track = content - base - 16;
+  const size = Math.floor((track - (WIDEST - 1) * gap) / WIDEST);
+  // Same 80px cap as the board. The floor is lower than the board's 34,
+  // because at 390px seven across simply cannot be had at 34 - and a
+  // smaller mark is a better trade than a broken triangle.
+  const chipSize = Math.max(22, Math.min(80, size));
+  const railWidth = Math.max(base, Math.round((chipSize + 16) * 1.28));
+  // The rail sits on the left, so a row centred in its own track is
+  // centred right of the board's middle - which on a pyramid reads as a
+  // lean. Reserving the rail's width on the right too puts the apex on
+  // the board's centre line. Only where it actually fits: a phone spends
+  // a quarter of its width on the rail already, and paying it twice would
+  // squeeze the bottom row below a legible mark. There it stays
+  // track-centred, which is where a tier row's contents live anyway.
+  const widest = WIDEST * chipSize + (WIDEST - 1) * gap;
+  const centreOnBoard = widest + railWidth * 2 + 16 <= content;
+  return { chipSize, railWidth, gap, centreOnBoard };
+}
+
 // --------------------------------------------------------------- pieces
 
 function Draggable({
@@ -68,14 +92,12 @@ function Draggable({
   style,
   size,
   selected,
-  dim,
   onActivate,
 }: {
   item: TierItem;
   style?: TierTemplate["itemStyle"];
   size: number;
   selected: boolean;
-  dim?: boolean;
   onActivate: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id });
@@ -84,20 +106,17 @@ function Draggable({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      style={{
-        touchAction: "none",
-        opacity: isDragging ? 0.25 : dim ? 0.72 : 1,
-        filter: dim && !isDragging ? "grayscale(0.3)" : undefined,
-        transition: "opacity 120ms, filter 120ms",
-      }}
+      style={{ touchAction: "none", opacity: isDragging ? 0.25 : 1 }}
     >
       <TierItemChip item={item} style={style} size={size} selected={selected} onActivate={onActivate} />
     </div>
   );
 }
 
-// An empty slot is also the drop target, so the triangle holds its shape
-// on a board nobody has finished and the gaps say where things go.
+// An empty slot is the drop target, so the triangle keeps its shape on a
+// board nobody has finished and the gaps say where things go. Sized and
+// cornered like a chip, so a filled row and an empty one are the same
+// grid.
 function Slot({
   index,
   size,
@@ -119,18 +138,17 @@ function Slot({
     <div
       ref={setNodeRef}
       onClick={onTap}
+      className="grid shrink-0 place-items-center rounded-xl transition-[background,box-shadow] duration-150"
       style={{
         width: size,
         height: size,
-        display: "grid",
-        placeItems: "center",
-        borderRadius: Math.round(size * 0.26),
-        flex: "none",
         cursor: armed ? "pointer" : undefined,
-        border: empty || isOver ? `1.5px dashed ${isOver ? accent : "rgba(255,255,255,0.16)"}` : undefined,
-        background: isOver ? `${accent}26` : undefined,
-        boxShadow: armed && empty ? `0 0 0 1px ${accent}55` : undefined,
-        transition: "background 120ms, border-color 120ms, box-shadow 120ms",
+        background: isOver ? `${accent}2e` : empty ? "rgba(255,255,255,0.04)" : undefined,
+        boxShadow: isOver
+          ? `inset 0 0 0 2px ${accent}`
+          : empty
+            ? `inset 0 0 0 1px ${armed ? `${accent}88` : "rgba(255,255,255,0.09)"}`
+            : undefined,
       }}
     >
       {children}
@@ -155,6 +173,14 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(390);
+
+  useEffect(() => {
+    const measure = () => setViewportWidth(window.innerWidth);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   // Read after mount, never during render: the server has no local
   // storage and seeding from it directly tears on hydration.
@@ -169,16 +195,16 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     try {
       localStorage.setItem(storageKey(template.slug), JSON.stringify(slots));
     } catch {
-      /* private mode - the board still works, it just won't survive a reload */
+      /* private mode - the board works, it just won't survive a reload */
     }
   }, [slots, loaded, template.slug]);
 
   const placed = useMemo(() => new Set(slots.filter(Boolean) as string[]), [slots]);
-  const bucket = useMemo(() => template.items.filter((i) => !placed.has(i.id)), [template.items, placed]);
+  const pool = useMemo(() => template.items.filter((i) => !placed.has(i.id)), [template.items, placed]);
 
-  // Put an item in a slot. Whatever was there goes back to the bucket,
-  // unless the item came from another slot - then the two trade places,
-  // which is what a drag onto an occupied slot obviously means.
+  // Put an item in a slot. Whatever was there goes back to the pool -
+  // unless the item came from another slot, in which case the two trade
+  // places, which is what a drag onto an occupied slot obviously means.
   const place = useCallback((itemId: string, slot: number) => {
     setSlots((prev) => {
       const next = [...prev];
@@ -191,7 +217,7 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     setSelected(null);
   }, []);
 
-  const toBucket = useCallback((itemId: string) => {
+  const toPool = useCallback((itemId: string) => {
     setSlots((prev) => prev.map((id) => (id === itemId ? null : id)));
     setSelected(null);
   }, []);
@@ -201,15 +227,15 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     setSelected(null);
   }, []);
 
-  // Fill the pyramid from the bucket in template order - a fast way to
-  // get a full board to look at without dragging sixteen things.
+  // Fills the sixteen from the pool in order - a fast way to get a full
+  // board to look at without dragging sixteen things.
   const fill = useCallback(() => {
     setSlots((prev) => {
       const next = [...prev];
       const taken = new Set(next.filter(Boolean) as string[]);
-      const pool = template.items.filter((i) => !taken.has(i.id));
+      const rest = template.items.filter((i) => !taken.has(i.id));
       let p = 0;
-      for (let i = 0; i < next.length && p < pool.length; i++) if (!next[i]) next[i] = pool[p++].id;
+      for (let i = 0; i < next.length && p < rest.length; i++) if (!next[i]) next[i] = rest[p++].id;
       return next;
     });
     setSelected(null);
@@ -225,44 +251,18 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     const id = String(e.active.id);
     const over = e.over ? String(e.over.id) : null;
     if (!over) return;
-    if (over === "bucket") toBucket(id);
+    if (over === "pool") toPool(id);
     else if (over.startsWith("slot:")) place(id, Number(over.slice(5)));
   }
 
-  // --- sizing ---------------------------------------------------------
-  //
-  // The widest row is seven chips plus a rail either side. Solved from
-  // the measured width rather than a breakpoint, so it fills a desktop
-  // and still holds the triangle on a phone instead of wrapping - a
-  // wrapped row is a different shape, which would defeat the whole thing.
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const measure = () => setWidth(el.clientWidth);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const wide = CAPS[CAPS.length - 1];
-  const gap = width < 420 ? 5 : 8;
-  const rail = width < 420 ? 30 : 46;
-  const size = Math.max(
-    24,
-    Math.min(56, Math.floor((width - rail * 2 - gap * (wide - 1) - 26) / wide)),
-  );
-  const bucketSize = Math.max(22, Math.round(size * 0.72));
-
-  const { setNodeRef: bucketRef, isOver: overBucket } = useDroppable({ id: "bucket" });
+  const { chipSize, railWidth, gap, centreOnBoard } = solveSize(viewportWidth);
+  const { setNodeRef: poolRef, isOver: overPool } = useDroppable({ id: "pool" });
   const draggingItem = dragging ? byId.get(dragging) : null;
 
-  let slotAt = 0;
+  let at = 0;
   const rows = CAPS.map((cap, tier) => {
-    const from = slotAt;
-    slotAt += cap;
+    const from = at;
+    at += cap;
     return { tier, from, cap };
   });
 
@@ -276,148 +276,152 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
       onDragCancel={() => setDragging(null)}
       onDragEnd={onDragEnd}
     >
-      <div ref={wrapRef} className="w-full">
-        {/* the triangle */}
-        <div className="flex flex-col items-center gap-2">
-          {rows.map(({ tier, from, cap }) => (
-            <div key={tier} className="flex items-center justify-center">
-              <div
-                className="inline-flex items-center overflow-hidden rounded-[13px] border"
-                style={{ gap, borderColor: accents[tier], background: "rgba(255,255,255,0.045)" }}
+      {/* The board's own surface: one object, clipped corners, rows butted
+          straight into each other with nothing but a hairline between. */}
+      <div className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-black">
+        {rows.map(({ tier, from, cap }) => (
+          <div
+            key={tier}
+            className="flex items-stretch"
+            style={{
+              // Pure black, exactly as TierRow: the highest-contrast ground
+              // the marks can sit on.
+              background: "#000000",
+              borderTop: tier === 0 ? undefined : "1px solid rgba(255,255,255,0.09)",
+            }}
+          >
+            <div
+              className="flex shrink-0 items-center justify-center"
+              style={{
+                width: railWidth,
+                background: accents[tier],
+                clipPath: "polygon(0 0, 84% 0, 100% 50%, 84% 100%, 0 100%)",
+                paddingRight: 14,
+                paddingLeft: 4,
+              }}
+            >
+              <span
+                className="w-full min-w-0 text-center leading-[1.12]"
+                style={{ fontFamily: "var(--font-display)", color: "#0c1830", fontSize: 30 }}
               >
-                <span
-                  className="grid shrink-0 place-items-center self-stretch"
-                  style={{
-                    width: rail,
-                    background: accents[tier],
-                    color: "#0b1220",
-                    fontFamily: "var(--font-display)",
-                    fontSize: Math.max(11, Math.round(size * 0.34)),
-                    // The chevron cut, exactly as TierRow draws it - the
-                    // point is the edge, so no border-right.
-                    clipPath: "polygon(0 0, 84% 0, 100% 50%, 84% 100%, 0 100%)",
-                    paddingRight: Math.round(rail * 0.26),
-                  }}
-                >
-                  {LABELS[tier]}
-                </span>
-                <span className="flex items-center" style={{ gap }}>
-                  {Array.from({ length: cap }, (_, k) => {
-                    const index = from + k;
-                    const id = slots[index];
-                    const item = id ? byId.get(id) : null;
-                    return (
-                      <Slot
-                        key={index}
-                        index={index}
-                        size={size}
-                        accent={accents[tier]}
-                        armed={!!selected}
-                        onTap={() => selected && place(selected, index)}
-                      >
-                        {item && (
-                          <Draggable
-                            item={item}
-                            style={template.itemStyle}
-                            size={size}
-                            selected={selected === item.id}
-                            onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
-                          />
-                        )}
-                      </Slot>
-                    );
-                  })}
-                </span>
-                {/* Mirrors the rail so the shelf is symmetric about its
-                    chips. Without it every row grew further right than
-                    left and the "perfect triangle" leaned. Tinted and
-                    chevroned back the other way rather than left blank:
-                    an empty box of the rail's width read as unfinished
-                    space, where a faded bookend reads as the shelf
-                    closing. */}
-                <span
-                  aria-hidden
-                  className="shrink-0 self-stretch"
-                  style={{
-                    width: rail,
-                    background: accents[tier],
-                    opacity: 0.22,
-                    clipPath: "polygon(16% 0, 100% 0, 100% 100%, 16% 100%, 0 50%)",
-                  }}
-                />
-              </div>
+                {LABELS[tier]}
+              </span>
             </div>
-          ))}
+
+            {/* Same padding and min-height as a tier row. The only change
+                in the whole component: centred instead of left-packed, and
+                capped at the tier's capacity. */}
+            <div
+              className="flex min-w-0 flex-1 items-center justify-center p-2"
+              style={{ gap, minHeight: chipSize + 16, paddingRight: centreOnBoard ? railWidth : undefined }}
+            >
+              {Array.from({ length: cap }, (_, k) => {
+                const index = from + k;
+                const id = slots[index];
+                const item = id ? byId.get(id) : null;
+                return (
+                  <Slot
+                    key={index}
+                    index={index}
+                    size={chipSize}
+                    accent={accents[tier]}
+                    armed={!!selected}
+                    onTap={() => selected && place(selected, index)}
+                  >
+                    {item && (
+                      <Draggable
+                        item={item}
+                        style={template.itemStyle}
+                        size={chipSize}
+                        selected={selected === item.id}
+                        onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
+                      />
+                    )}
+                  </Slot>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* The pool, in the board's own treatment - same black, same radius,
+          same border, same heading shape as UNRANKED. The dashed rule is
+          the one addition: it says the line these missed, which "unranked"
+          never had to. */}
+      <section className="mt-6">
+        <div className="mb-2 flex items-center gap-3 px-0.5">
+          <span className="h-px flex-1 bg-[repeating-linear-gradient(90deg,rgba(148,163,184,0.55)_0_6px,transparent_6px_12px)]" />
+          <h2
+            className="shrink-0 text-sm tracking-wide text-white/70"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            MISSED THE CUT <span className="text-white/35">({pool.length})</span>
+          </h2>
+          <span className="h-px flex-1 bg-[repeating-linear-gradient(90deg,rgba(148,163,184,0.55)_0_6px,transparent_6px_12px)]" />
         </div>
 
-        {/* the cut */}
         <div
-          className="mt-5 mb-3 flex items-center gap-3 text-[10px] tracking-[0.16em] text-slate-400"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          <span className="h-px flex-1 bg-[repeating-linear-gradient(90deg,#94a3b8_0_6px,transparent_6px_12px)] opacity-60" />
-          <span className="whitespace-nowrap">MISSED THE CUT · {bucket.length}</span>
-          <span className="h-px flex-1 bg-[repeating-linear-gradient(90deg,#94a3b8_0_6px,transparent_6px_12px)] opacity-60" />
-        </div>
-
-        <div
-          ref={bucketRef}
-          className="flex flex-wrap justify-center rounded-xl p-2 transition-colors"
+          ref={poolRef}
+          onClick={() => selected && toPool(selected)}
+          className="flex flex-wrap content-start gap-1.5 rounded-2xl border p-2.5 transition-[background,border-color,box-shadow] duration-150"
           style={{
-            gap,
-            background: overBucket ? "rgba(148,163,184,0.12)" : "transparent",
-            outline: overBucket ? "1.5px dashed rgba(148,163,184,0.5)" : "1.5px dashed transparent",
+            minHeight: chipSize + 20,
+            borderColor: overPool ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.10)",
+            background: overPool ? "#141414" : "#000000",
+            boxShadow: overPool
+              ? "0 0 0 2px rgba(255,255,255,0.5), 0 10px 30px -12px rgba(0,0,0,0.9)"
+              : undefined,
+            cursor: selected ? "pointer" : undefined,
           }}
-          onClick={() => selected && toBucket(selected)}
         >
-          {bucket.length === 0 ? (
-            <p className="py-3 text-xs text-white/35">Everything is ranked.</p>
-          ) : (
-            bucket.map((item) => (
-              <Draggable
-                key={item.id}
-                item={item}
-                style={template.itemStyle}
-                size={bucketSize}
-                selected={selected === item.id}
-                dim
-                onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
-              />
-            ))
+          {pool.map((item) => (
+            <Draggable
+              key={item.id}
+              item={item}
+              style={template.itemStyle}
+              size={chipSize}
+              selected={selected === item.id}
+              onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
+            />
+          ))}
+          {pool.length === 0 && (
+            <span className="self-center px-1 text-[11px] tracking-wide text-white/30">
+              EVERY {template.itemNoun[0].toUpperCase()} MADE THE CUT
+            </span>
           )}
         </div>
+      </section>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
-          <button
-            type="button"
-            onClick={fill}
-            className="rounded-full border border-white/20 px-5 py-2 text-xs text-white/70 transition-colors hover:border-white/45 hover:text-white"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            FILL FROM POOL
-          </button>
-          <button
-            type="button"
-            onClick={clear}
-            className="rounded-full border border-white/20 px-5 py-2 text-xs text-white/70 transition-colors hover:border-red-300/60 hover:text-red-200"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            CLEAR
-          </button>
-        </div>
-
-        {selected && (
-          <p className="mt-4 text-center text-xs text-white/55">
-            Now tap a slot to drop{" "}
-            <span className="text-white/85">{byId.get(selected)?.label}</span> in — or tap it again to
-            cancel.
-          </p>
-        )}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+        <button
+          type="button"
+          onClick={fill}
+          className="rounded-full border border-white/15 px-5 py-2 text-[11px] text-white/60 transition-colors hover:border-white/30 hover:text-white"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          FILL FROM POOL
+        </button>
+        <button
+          type="button"
+          onClick={clear}
+          className="rounded-full border border-white/15 px-5 py-2 text-[11px] text-white/60 transition-colors hover:border-red-300/50 hover:text-red-200"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          CLEAR
+        </button>
       </div>
+
+      {selected && (
+        <p className="mt-3 text-center text-xs text-white/50">
+          Now tap a slot to drop <span className="text-white/80">{byId.get(selected)?.label}</span> in —
+          or tap it again to cancel.
+        </p>
+      )}
 
       <DragOverlay dropAnimation={null}>
         {draggingItem ? (
-          <TierItemChip item={draggingItem} style={template.itemStyle} size={size} dragging />
+          <TierItemChip item={draggingItem} style={template.itemStyle} size={chipSize * 1.15} />
         ) : null}
       </DragOverlay>
     </DndContext>

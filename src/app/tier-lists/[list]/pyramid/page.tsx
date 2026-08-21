@@ -25,7 +25,9 @@ export default async function Page({ params }: { params: Promise<{ list: string 
   const others = Object.values(TIER_TEMPLATES).filter((t) => t.slug !== template.slug);
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-4 pt-6 pb-20">
+    // Same width and gutters as the real editor, so the board comes out
+    // the exact size it does there rather than a preview-sized copy.
+    <main className="mx-auto w-full max-w-[66rem] flex-1 px-4 pt-6 pb-16">
       <div className="mb-5 flex justify-center">
         <span
           className="rounded-full border border-amber-300/35 bg-amber-300/10 px-3.5 py-1.5 text-[10px] tracking-[0.16em] text-amber-200/90"
