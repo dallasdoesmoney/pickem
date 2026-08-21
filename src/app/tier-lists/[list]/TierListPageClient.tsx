@@ -63,6 +63,7 @@ import {
   solvePyramid,
 } from "@/components/tierList/pyramid";
 import { readBoard, runCascade } from "@/components/tierList/cascade";
+import { sharedTierLabelSize } from "@/components/tierList/tierLabel";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
@@ -339,6 +340,21 @@ export default function TierListPageClient({
       runCascade(board, next, pyrShape, before);
     },
     [pyrShape],
+  );
+
+  // One size for every rail on the board - the smallest any of its tiers
+  // needs. Solved here because no single row can know what the others are
+  // called.
+  const labelSize = useMemo(
+    () =>
+      sharedTierLabelSize(
+        state.tiers.map((t, i) => tierLabelFor(t, i)),
+        railWidth - 12,
+        // The shortest a row can be. A tier holding two rows of marks is
+        // taller, but the name must not have to grow into that to fit.
+        chipSize + 16
+      ),
+    [state.tiers, railWidth, chipSize]
   );
 
   const sensors = useSensors(
@@ -991,6 +1007,7 @@ export default function TierListPageClient({
               template={template}
               chipSize={chipSize}
               railWidth={railWidth}
+              labelSize={labelSize}
               first={i === 0}
               cascading={cascading}
               sweeping={sweeping}

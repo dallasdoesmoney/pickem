@@ -27,9 +27,30 @@ const ADVANCE = 0.73;
 // Small, but not so small that a name is decoration. Below this the rail
 // would be showing that a tier is named rather than what it is named.
 const FLOOR = 8;
+const MAX_SIZE = 22;
 
-// Type steps down in bands rather than scaling continuously, so tiers of
-// similar name length stay visually consistent with each other.
+// ONE SIZE FOR THE WHOLE BOARD: the smallest any of its tiers needs.
+//
+// Sized per tier, a board of "S / A / CHAMPIONSHIP / F" set three of them
+// at 22px and one at 9, which reads as four unrelated labels rather than
+// one scale. Renaming a single tier is not supposed to be a typographic
+// event for that row alone.
+export function sharedTierLabelSize(
+  labels: string[],
+  innerWidth: number,
+  maxHeight: number,
+  maxLines = 3,
+): number {
+  // Seeded at the largest band rather than at infinity, so a board with
+  // no tiers still answers with a real size.
+  return labels.reduce(
+    (smallest, label) => Math.min(smallest, tierLabelSize(label, innerWidth, maxHeight, maxLines)),
+    MAX_SIZE,
+  );
+}
+
+// What one name on its own would take. Only sharedTierLabelSize should
+// call this - a rail rendering at its own answer is the thing above.
 //
 // A NAME WRAPS BETWEEN WORDS AND NEVER INSIDE ONE. A word split across
 // two lines is not a shorter word, it is two wrong ones, and on a rail
@@ -45,7 +66,7 @@ export function tierLabelSize(
 ): number {
   const words = label.trim().split(/\s+/).filter(Boolean);
   const n = Math.max(1, label.trim().length);
-  const band = n <= 2 ? 22 : n <= 5 ? 16 : n <= 9 ? 14 : n <= 14 ? 13 : n <= 22 ? 12 : 11;
+  const band = n <= 2 ? MAX_SIZE : n <= 5 ? 16 : n <= 9 ? 14 : n <= 14 ? 13 : n <= 22 ? 12 : 11;
   const width = Math.max(1, innerWidth);
 
   const longest = words.reduce((m, w) => Math.max(m, w.length), 1);

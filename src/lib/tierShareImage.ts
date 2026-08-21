@@ -196,6 +196,12 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
     });
   }
 
+  const railLabelSize = sharedRailSize(
+    ctx,
+    rows.map((r, i) => tierLabelFor(r.tier, i).toUpperCase()),
+    RAIL_W - 16
+  );
+
   // The board is a single rounded black block; rows are drawn inside one
   // clip so the top and bottom rows get their outer corners cut by it,
   // exactly like the live board.
@@ -216,6 +222,7 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
       h,
       label: tierLabelFor(row.tier, i),
       accent: row.tier.accent,
+      labelSize: railLabelSize,
       ids: row.ids,
       chip,
       perRow,
@@ -271,6 +278,7 @@ function drawPyramid(
   },
 ) {
   const { w, T, apex, rowH, height, leftEdgeAt } = o.shape;
+  const labelSize = sharedRailSize(ctx, o.bands.map((b) => b.label.toUpperCase()), T - 16);
 
   CAPS.forEach((_, row) => {
     const yTop = o.y + row * rowH;
@@ -301,7 +309,7 @@ function drawPyramid(
     // tall enough to wrap reaches past its slanted edges.
     ctx.save();
     ctx.clip();
-    drawRailLabel(ctx, o.bands[row].label, o.x + leftEdgeAt(row * rowH + rowH / 2), yTop, rowH, false, T);
+    drawRailLabel(ctx, o.bands[row].label, o.x + leftEdgeAt(row * rowH + rowH / 2), yTop, rowH, labelSize, false, T);
     ctx.restore();
 
     // Same hairline as the rows, across the row AND its band.
@@ -409,6 +417,7 @@ function drawRow(
     logos: Map<string, HTMLImageElement | null>;
     backdrops: Map<string, HTMLImageElement | null>;
     template: TierTemplate;
+    labelSize: number;
     muted?: boolean;
     first?: boolean;
   }
@@ -430,7 +439,7 @@ function drawRow(
   ctx.fillStyle = o.muted ? "rgba(255,255,255,0.10)" : o.accent;
   ctx.fillRect(o.x, o.y, RAIL_W, o.h);
 
-  drawRailLabel(ctx, o.label, o.x, o.y, o.h, o.muted);
+  drawRailLabel(ctx, o.label, o.x, o.y, o.h, o.labelSize, o.muted);
 
   // The separator goes on LAST, over the rail as well as the row. On the
   // board it is a border on the row and the rail sits inside it, so the
@@ -478,6 +487,10 @@ function drawRailLabel(
   x: number,
   y: number,
   h: number,
+  // Solved once for the whole card, not per row: sized individually, a
+  // board of "S / A / CHAMPIONSHIP / F" set three rails at 26px and one
+  // at 13, which reads as four unrelated labels rather than one scale.
+  size: number,
   muted?: boolean,
   // The rows' rail is a fixed width and `x` is its left edge; the
   // pyramid's band is the shape's thickness and `x` is where its left
@@ -485,7 +498,8 @@ function drawRailLabel(
   bandW?: number,
 ) {
   const w = bandW ?? RAIL_W;
-  const { size, lines } = layoutRailLabel(ctx, label.toUpperCase(), w - 16);
+  ctx.font = railFont(size);
+  const lines = wrapWords(ctx, label.toUpperCase().split(/\s+/).filter(Boolean), w - 16);
   ctx.fillStyle = muted ? "rgba(255,255,255,0.45)" : "#0c1830";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -544,40 +558,30 @@ function breakWord(ctx: CanvasRenderingContext2D, word: string, maxWidth: number
   return pieces;
 }
 
-// Picks the largest size at which the name both wraps inside the line
-// budget AND has no single word too wide to wrap (wrapping can't rescue
-// one long word - only a smaller size can). Measured against the real
-// font rather than estimated from character counts, which is what the
-// old length-banded size did and why long names overflowed.
-function layoutRailLabel(
-  ctx: CanvasRenderingContext2D,
-  label: string,
-  maxWidth: number,
-): { size: number; lines: string[] } {
+// One size for every rail on the card - the smallest any of its names
+// needs. Measured against the real font rather than estimated from
+// character counts, which is what the old length-banded size did and why
+// long names overflowed.
+function sharedRailSize(ctx: CanvasRenderingContext2D, labels: string[], maxWidth: number): number {
+  return labels.reduce((smallest, label) => Math.min(smallest, railSize(ctx, label, maxWidth)), 26);
+}
+
+function railSize(ctx: CanvasRenderingContext2D, label: string, maxWidth: number): number {
   const n = label.length;
   // The same bands the board uses, scaled for this card's wider rail.
   const band = n <= 2 ? 26 : n <= 5 ? 19 : n <= 9 ? 16 : n <= 14 ? 15 : n <= 22 ? 14 : 13;
   const words = label.split(/\s+/).filter(Boolean);
-  if (!words.length) return { size: band, lines: [] };
+  if (!words.length) return band;
 
   let size = band;
-  let lines = words;
-  for (; size >= RAIL_LABEL_MIN_PX; size -= 1) {
+  for (; size > RAIL_LABEL_MIN_PX; size -= 1) {
     ctx.font = railFont(size);
-    lines = wrapWords(ctx, words, maxWidth);
-    if (lines.length <= RAIL_LABEL_MAX_LINES) break;
+    // Every word has to fit its own line: wrapping cannot rescue a single
+    // word that is too wide, only a smaller size can.
+    const fits = words.every((w) => ctx.measureText(w).width <= maxWidth);
+    if (fits && wrapWords(ctx, words, maxWidth).length <= RAIL_LABEL_MAX_LINES) break;
   }
-  size = Math.max(RAIL_LABEL_MIN_PX, size);
-  ctx.font = railFont(size);
-
-  // Only reachable if a name won't fit even at the floor, in which case
-  // showing most of it beats showing none of the last line.
-  if (lines.length > RAIL_LABEL_MAX_LINES) {
-    lines = lines.slice(0, RAIL_LABEL_MAX_LINES);
-    const last = RAIL_LABEL_MAX_LINES - 1;
-    lines[last] = fitText(ctx, `${lines[last]} …`, maxWidth);
-  }
-  return { size, lines: lines.map((l) => fitText(ctx, l, maxWidth)) };
+  return Math.max(RAIL_LABEL_MIN_PX, size);
 }
 
 // Shrinks a string until it fits, then ellipsises - a 60-char custom
