@@ -16,6 +16,7 @@ import {
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { tierLabelFor } from "@/lib/tierList";
 import { useTierList } from "@/hooks/useTierList";
+import { TIER_LABEL_FONT, tierLabelSize } from "./tierLabel";
 import { TierItemChip } from "./TierItemChip";
 
 // Two boards, one animation layer.
@@ -28,25 +29,38 @@ import { TierItemChip } from "./TierItemChip";
 // PYRAMID is a different ranking with its own rules: sixteen places in
 // four rows, 1 + 3 + 5 + 7, everything else below a cut.
 //
-// Keeping them separate is the point. A pyramid cannot represent six
-// free-form tiers, so deriving each from the other would lose work every
-// time you switched. Instead neither writes to the other: the pyramid is
-// seeded once from the board's reading order, and toggling back returns
-// the tier list exactly as it was - extra tiers, empty tiers and all.
+// The board is the source of truth and the pyramid reads from it, never
+// the other way. It fills itself from the board's reading order and
+// refills whenever that order changes, so a team is in the pyramid row
+// its tier put it in without anyone asking for that. Nothing flows back,
+// because a pyramid cannot represent six free-form tiers: toggling
+// returns the tier list exactly as it was, extra tiers and all. Starting
+// over is what the board's own CLEAR is for.
 export const CAPS = [1, 3, 5, 7] as const;
 export const RANKED = CAPS.reduce((a, b) => a + b, 0);
 
 const storageKey = (slug: string) => `pickem:pyramid:${slug}`;
 
-function readSlots(slug: string, valid: Set<string>): (string | null)[] | null {
+// The tier list is the source of truth, so the pyramid fills itself from
+// the board's reading order and refills whenever that order changes -
+// everything stays in the tier you put it in without being asked. What
+// is saved is therefore a pair: the arrangement, and the order it came
+// from. A saved arrangement the board has since moved past is stale, and
+// the fill wins over it.
+type Saved = { from: string; slots: (string | null)[] };
+
+const fill = (order: string[]): (string | null)[] =>
+  Array.from({ length: RANKED }, (_, i) => order[i] ?? null);
+
+function readSaved(slug: string, valid: Set<string>): Saved | null {
   try {
     const raw = localStorage.getItem(storageKey(slug));
     if (!raw) return null;
     const saved = JSON.parse(raw);
-    if (!Array.isArray(saved)) return null;
+    if (!saved || typeof saved.from !== "string" || !Array.isArray(saved.slots)) return null;
     const seen = new Set<string>();
-    return Array.from({ length: RANKED }, (_, i) => {
-      const id = saved[i];
+    const slots = Array.from({ length: RANKED }, (_, i) => {
+      const id = saved.slots[i];
       // Never let one id hold two places, and drop anything that is not
       // an item of this template - a stale value must not be able to
       // duplicate a mark.
@@ -54,6 +68,7 @@ function readSlots(slug: string, valid: Set<string>): (string | null)[] | null {
       seen.add(id);
       return id;
     });
+    return { from: saved.from, slots };
   } catch {
     return null;
   }
@@ -254,29 +269,34 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     () => state.tiers.flatMap((t) => state.placements[t.id] ?? []),
     [state],
   );
-  // Held in a ref so seeding and refilling can read the board's current
-  // order without either of them re-running every time the board changes.
-  const readingRef = useRef(readingOrder);
-  useEffect(() => {
-    readingRef.current = readingOrder;
-  }, [readingOrder]);
+  // Only the top sixteen can reach the pyramid, so only they can make it
+  // stale - reordering the tail of the board must not throw away an
+  // arrangement the user made up here.
+  const signature = useMemo(() => readingOrder.slice(0, RANKED).join(","), [readingOrder]);
 
-  // Seeded once, then independent. Read after mount, never during render:
-  // the server has no local storage and seeding from it during render
-  // tears on hydration.
-  const seeded = useRef(false);
+  // Filled from the board, and refilled the moment the board moves. Read
+  // after mount, never during render: the server has no local storage and
+  // reading it during render tears on hydration.
+  const filledFrom = useRef<string | null>(null);
   useEffect(() => {
-    if (!boardLoaded || seeded.current) return;
-    seeded.current = true;
-    const saved = readSlots(template.slug, validIds);
-    setSlots(saved ?? Array.from({ length: RANKED }, (_, i) => readingRef.current[i] ?? null));
+    if (!boardLoaded || filledFrom.current === signature) return;
+    // On the very first pass a saved arrangement of this same order is
+    // still the user's own work, so it is kept. Every pass after that is
+    // the board having changed, and the board wins.
+    const saved = filledFrom.current === null ? readSaved(template.slug, validIds) : null;
+    filledFrom.current = signature;
+    setSlots(saved && saved.from === signature ? saved.slots : fill(readingOrder));
+    setSelected(null);
     setPyrLoaded(true);
-  }, [boardLoaded, template.slug, validIds]);
+  }, [boardLoaded, signature, readingOrder, template.slug, validIds]);
 
   useEffect(() => {
     if (!pyrLoaded) return;
     try {
-      localStorage.setItem(storageKey(template.slug), JSON.stringify(slots));
+      localStorage.setItem(
+        storageKey(template.slug),
+        JSON.stringify({ from: filledFrom.current ?? "", slots } satisfies Saved),
+      );
     } catch {
       /* private mode - it works, it just won't survive a reload */
     }
@@ -302,11 +322,6 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
 
   const toPyrPool = useCallback((itemId: string) => {
     setSlots((prev) => prev.map((id) => (id === itemId ? null : id)));
-    setSelected(null);
-  }, []);
-
-  const reseed = useCallback(() => {
-    setSlots(Array.from({ length: RANKED }, (_, i) => readingRef.current[i] ?? null));
     setSelected(null);
   }, []);
 
@@ -493,16 +508,6 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
             </button>
           ))}
         </div>
-        {view === "pyramid" && (
-          <button
-            type="button"
-            onClick={reseed}
-            className="rounded-full border border-white/15 px-4 py-2 text-[10px] text-white/50 transition-colors hover:border-white/35 hover:text-white"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            REFILL FROM TIER LIST
-          </button>
-        )}
       </div>
 
       <div
@@ -552,23 +557,29 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
                     : `polygon(0px 0%, ${T}px 0%, ${T}px 100%, 0px 100%)`,
                   transition: `clip-path ${dur}ms ${ease} ${d}ms`,
                 }}
-              />
-              <span
-                aria-hidden
-                className="absolute top-1/2 whitespace-nowrap"
-                style={{
-                  left: 0,
-                  transform: `translate(${
-                    shaped ? leftEdgeAt(i * pyrRowH + pyrRowH / 2) + T / 2 : T / 2
-                  }px, -50%) translateX(-50%)`,
-                  transition: `transform ${dur}ms ${ease} ${d}ms`,
-                  fontFamily: "var(--font-display)",
-                  fontSize: Math.max(13, Math.round(chip * 0.42)),
-                  color: "#0c1830",
-                  lineHeight: 1,
-                }}
               >
-                {tierLabelFor(tier, i)}
+                {/* Inside the band, so the band's own clip cuts it. In the
+                    pyramid the band is a parallelogram: a name tall enough
+                    to wrap two or three times reaches past the slanted
+                    edges at the top and bottom of the block, and clipping
+                    ends that at the colour rather than over the marks. */}
+                <span
+                  className="absolute top-1/2 text-center leading-[1.18] break-words uppercase"
+                  style={{
+                    ...TIER_LABEL_FONT,
+                    left: 0,
+                    width: T - 12,
+                    transform: `translate(${
+                      shaped ? leftEdgeAt(i * pyrRowH + pyrRowH / 2) + T / 2 : T / 2
+                    }px, -50%) translateX(-50%)`,
+                    transition: `transform ${dur}ms ${ease} ${d}ms`,
+                    // Sized once for both views, off whichever band is
+                    // shorter, so the label does not resize mid-morph.
+                    fontSize: tierLabelSize(tierLabelFor(tier, i), T - 12, chip + 20, 3),
+                  }}
+                >
+                  {tierLabelFor(tier, i)}
+                </span>
               </span>
             </div>
           );

@@ -5,6 +5,7 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { Tier, MAX_TIER_LABEL, tierLabelFor } from "@/lib/tierList";
 import { SortableTierItem } from "@/components/tierList/TierItemChip";
+import { TIER_LABEL_FONT, tierLabelSize } from "@/components/tierList/tierLabel";
 
 export function TierRow({
   tier,
@@ -76,7 +77,7 @@ export function TierRow({
     <div
       // No radius, no gap, no border of its own: rows butt straight into
       // each other and the board clips the outer corners, so the whole
-      // thing reads as one object with a continuous chevron column down
+      // thing reads as one object with a continuous colour column down
       // the side. A hairline is all that separates one tier from the next.
       className={`flex items-stretch transition-[background,box-shadow] duration-150 ${cascading ? "tier-anim-cascade" : ""}`}
       style={{
@@ -95,24 +96,21 @@ export function TierRow({
         animationDelay: cascading ? `${index * 90}ms` : undefined,
       }}
     >
-      {/* Label rail, cut to a chevron so the tiers read as a descending
-          ladder rather than six identical shelves. Solid accent with dark
-          type: at this size a tinted rail with coloured text loses the
-          letter entirely. It also drives forward on drag-over, which
-          reads as the row reaching out to take the item.
-
-          No border-right - clip-path would cut it off anyway. The point
-          IS the edge. */}
+      {/* Label rail. A plain block of accent, not a chevron: the point ate
+          the right-hand sixth of the rail, which is the part a wrapped
+          name needs most, and stacked six of them into an arrow motif
+          that fought the marks for attention. Solid accent with dark
+          type - at this size a tinted rail with coloured text loses the
+          letter entirely. It still drives forward on drag-over, which
+          reads as the row reaching out to take the item. */}
       <div
         className="shrink-0 flex items-center justify-center transition-[width,filter] duration-150"
         style={{
           width: editing ? railWidth + 40 : hot ? railWidth + 14 : railWidth,
           background: tier.accent,
-          clipPath: "polygon(0 0, 84% 0, 100% 50%, 84% 100%, 0 100%)",
           filter: hot ? "brightness(1.18)" : undefined,
-          // Keeps the label clear of the point.
-          paddingRight: 14,
-          paddingLeft: 4,
+          paddingLeft: 6,
+          paddingRight: 6,
         }}
       >
         {editing ? (
@@ -148,14 +146,16 @@ export function TierRow({
             // other; a name long enough to wrap needs the gap back.
             // w-full/min-w-0 are what make break-words actually bite: as a
             // bare flex item the span sizes to its content instead, so a
-            // long word overflowed the rail and got cut by the chevron.
-            className="w-full min-w-0 text-center leading-[1.12] break-words"
+            // long word overflowed the rail.
+            className="w-full min-w-0 text-center leading-[1.18] break-words uppercase"
             style={{
-              fontFamily: "var(--font-display)",
-              color: "#0c1830",
+              ...TIER_LABEL_FONT,
               // Steps down as the label grows so a renamed tier costs
               // legibility rather than breaking the rail's width.
-              fontSize: labelSize(tierLabelFor(tier, index), railWidth),
+              // The rail minus its own padding, and the shortest a row
+              // can be - a tier holding two rows of marks is taller, but the
+              // label must not have to grow into that to fit.
+              fontSize: tierLabelSize(tierLabelFor(tier, index), railWidth - 12, chipSize + 16),
             }}
           >
             {tierLabelFor(tier, index)}
@@ -220,32 +220,6 @@ export function TierRow({
       )}
     </div>
   );
-}
-
-// Type steps down in bands rather than scaling continuously, so tiers of
-// similar name length stay visually consistent with each other. The rail
-// wraps, so these are sized to fill it across two or three lines rather
-// than to squeeze a long name onto one - the old bands bottomed out at
-// 10px, which read as fine print next to a 74px logo.
-//
-// The band alone isn't enough: the rail is much narrower on a phone than
-// on a desktop, and a band picked for a 136px rail overflows an 86px one.
-// Wrapping can't save a single word that is itself too wide, so the band
-// is also capped by what the longest word can measure at - "REBUILDING"
-// has to fit the rail on its own or it gets sliced by the chevron.
-function labelSize(label: string, railWidth: number): number {
-  const n = label.length;
-  const band = n <= 2 ? 30 : n <= 5 ? 20 : n <= 9 ? 16 : n <= 14 ? 15 : n <= 22 ? 14 : 13;
-  // Rail minus its own left/right padding.
-  const inner = railWidth - 18;
-  const longestWord = label.split(/\s+/).reduce((m, w) => Math.max(m, w.length), 1);
-  // 0.75em per character is a deliberately pessimistic stand-in for the
-  // display font's advance width - measured, it runs 0.70 for long words
-  // and 0.73 for short ones, so rounding up keeps the cap honest at every
-  // length. Erring the other way is what put a lone "R" on its own line.
-  // break-words below is the backstop if a face ever runs wider still.
-  const capByWord = Math.floor(inner / (0.75 * longestWord));
-  return Math.max(9, Math.min(band, capByWord));
 }
 
 function RailButton({
