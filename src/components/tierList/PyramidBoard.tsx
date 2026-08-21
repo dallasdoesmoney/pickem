@@ -27,8 +27,8 @@ import { TierItemChip } from "./TierItemChip";
 // rows butted straight into each other with a hairline between, the
 // chevron rail on the left, the same chip solver, the same pool
 // underneath. The only thing that differs is where the marks sit - each
-// row is capped at its tier's capacity and centred in the track, so the
-// marks form the triangle while the board itself stays the board.
+// row is capped at its tier's capacity and ends at its last slot, so the
+// rows themselves step out into the triangle.
 export const CAPS = [1, 3, 5, 7] as const;
 export const RANKED = CAPS.reduce((a, b) => a + b, 0);
 const WIDEST = CAPS[CAPS.length - 1];
@@ -68,27 +68,19 @@ function solveSize(viewportWidth: number) {
   const gap = viewportWidth < 768 ? 4 : 6;
   // p-2 either side of the marks, exactly as a tier row, plus the row's
   // own 1px side borders - which are part of its width now that each row
-  // is its own object, and left out of the budget put a phone 1px over.
+  // is its own object.
   const pad = 16 + 2;
 
-  // Rows are sized to their own capacity now, so the bottom row is the
-  // whole board's width and everything solves backwards from it.
-  const solve = (rails: number) => {
-    const track = content - base * rails - pad;
-    return Math.max(22, Math.min(80, Math.floor((track - (WIDEST - 1) * gap) / WIDEST)));
-  };
-
-  // The rail sits on the left, so without something the same width on the
-  // right the marks sit right of the row's own centre - the silhouette
-  // and the marks end up as two triangles on different axes. Paying for
-  // the rail twice is worth it while the mark stays big; on a phone it
-  // costs more than half the mark, which is not.
-  const mirrored = solve(2) >= 40;
-  const chipSize = mirrored ? solve(2) : solve(1);
+  // The bottom row is the whole board's width, and everything solves
+  // backwards from it. Nothing is reserved past the last slot: a row ends
+  // where its tier ends, so the black never runs on into space a team
+  // could not go.
+  const track = content - base - pad;
+  const chipSize = Math.max(22, Math.min(80, Math.floor((track - (WIDEST - 1) * gap) / WIDEST)));
   // Same derivation as the board. In practice this lands on `base` at
   // every size the pyramid solves to, so a row's rail is the board's rail.
   const railWidth = Math.max(base, Math.round((chipSize + 16) * 1.28));
-  return { chipSize, railWidth, gap, mirrored };
+  return { chipSize, railWidth, gap };
 }
 
 // --------------------------------------------------------------- pieces
@@ -261,7 +253,7 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     else if (over.startsWith("slot:")) place(id, Number(over.slice(5)));
   }
 
-  const { chipSize, railWidth, gap, mirrored } = solveSize(viewportWidth);
+  const { chipSize, railWidth, gap } = solveSize(viewportWidth);
   const { setNodeRef: poolRef, isOver: overPool } = useDroppable({ id: "pool" });
   const draggingItem = dragging ? byId.get(dragging) : null;
 
@@ -362,9 +354,6 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
               })}
             </div>
 
-            {/* Black, so it is simply more row. Its only job is to put the
-                marks on the same centre line as the silhouette. */}
-            {mirrored && <span aria-hidden className="shrink-0" style={{ width: railWidth }} />}
           </div>
         ))}
       </div>
