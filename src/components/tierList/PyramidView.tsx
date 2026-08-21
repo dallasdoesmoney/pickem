@@ -3,7 +3,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { DraggableTierItem } from "./TierItemChip";
-import { TIER_LABEL_FONT, pickTierLabelSize, tierLabelSizes } from "./tierLabel";
+import { TIER_LABEL_FONT, pickTierLabelSize } from "./tierLabel";
 import { CAPS, PyramidShape, RANKED, ROW_OF, slotRect } from "./pyramid";
 
 // The board's other layout. It renders inside the editor's own DndContext
@@ -96,9 +96,6 @@ export function PyramidView({
   const { w, T, apex, chip, height, leftEdgeAt } = shape;
   const { setNodeRef: poolRef } = useDroppable({ id: POOL_ID });
   const armed = !!selectedId;
-  // One size for a letter and one for a name, across all four bands -
-  // same rule as the board's rails.
-  const labelSizes = tierLabelSizes(bands.map((b) => b.label), T - 12, chip + 20);
 
   return (
     <>
@@ -144,7 +141,7 @@ export function PyramidView({
                     left: 0,
                     width: T - 12,
                     transform: `translate(${leftEdgeAt(row * shape.rowH + shape.rowH / 2) + T / 2}px, -50%) translateX(-50%)`,
-                    fontSize: pickTierLabelSize(band.label, labelSizes),
+                    fontSize: pickTierLabelSize(band.label),
                   }}
                 >
                   {band.label}

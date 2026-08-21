@@ -6,7 +6,7 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { Tier, MAX_TIER_LABEL, tierLabelFor } from "@/lib/tierList";
 import { SortableTierItem } from "@/components/tierList/TierItemChip";
-import { TIER_LABEL_FONT, TierLabelSizes, pickTierLabelSize } from "@/components/tierList/tierLabel";
+import { TIER_LABEL_FONT, pickTierLabelSize } from "@/components/tierList/tierLabel";
 
 // The label's own ink, reused for the marks that say it can be edited -
 // a dashed inset and a pencil in any other colour would read as a
@@ -20,7 +20,6 @@ export function TierRow({
   template,
   chipSize,
   railWidth,
-  labelSizes,
   first,
   cascading,
   sweeping,
@@ -48,10 +47,6 @@ export function TierRow({
   template: TierTemplate;
   chipSize: number;
   railWidth: number;
-  // Solved once for the whole board and handed down: one size for a
-  // letter, one shared by every name, so no two names ever set at
-  // different sizes however long or short one of them is.
-  labelSizes: TierLabelSizes;
   // Only the separator differs; the first row has the board's edge above it.
   first: boolean;
   // Set for a beat when the board fills, so the rows can light in sequence.
@@ -206,7 +201,7 @@ export function TierRow({
             className="w-full min-w-0 resize-none overflow-hidden bg-transparent text-center leading-[1.18] uppercase outline-none [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
             style={{
               ...TIER_LABEL_FONT,
-              fontSize: pickTierLabelSize(tier.label || tierLabelFor(tier, index), labelSizes),
+              fontSize: pickTierLabelSize(tier.label || tierLabelFor(tier, index)),
               caretColor: TIER_LABEL_FONT.color,
             }}
           />
@@ -218,7 +213,7 @@ export function TierRow({
             // bare flex item the span sizes to its content instead, so a
             // long name overflowed the rail.
             className="w-full min-w-0 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
-            style={{ ...TIER_LABEL_FONT, fontSize: pickTierLabelSize(tierLabelFor(tier, index), labelSizes) }}
+            style={{ ...TIER_LABEL_FONT, fontSize: pickTierLabelSize(tierLabelFor(tier, index)) }}
           >
             {tierLabelFor(tier, index)}
           </span>
