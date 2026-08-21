@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -22,13 +22,17 @@ import { TierItemChip } from "./TierItemChip";
 // sixteen, so the shape IS the rule - there is no separate "top 16"
 // setting that could disagree with the rows on screen.
 //
-// Everything about how this is DRAWN is the tier board's, not this
-// file's: one black surface with a rounded border and clipped corners,
-// rows butted straight into each other with a hairline between, the
-// chevron rail on the left, the same chip solver, the same pool
-// underneath. The only thing that differs is where the marks sit - each
-// row is capped at its tier's capacity and ends at its last slot, so the
-// rows themselves step out into the triangle.
+// Two views of the same sixteen. ROWS is the tier board's own shape -
+// full-width bands, the rail down the left, marks packed from the left
+// edge. PYRAMID clips each band to the slope and centres the marks. The
+// data does not move between them; only the drawing does, which is what
+// makes the switch a view rather than a mode.
+//
+// The morph works because a rectangle and a trapezoid are the same four
+// points. Nothing resizes and nothing reflows - each band keeps its full
+// width the whole time and only its clip-path interpolates, and the
+// marks ride on transforms the compositor can handle. See the animation
+// block further down for the choreography.
 export const CAPS = [1, 3, 5, 7] as const;
 export const RANKED = CAPS.reduce((a, b) => a + b, 0);
 const LABELS = ["S", "A", "B", "C"] as const;
@@ -62,7 +66,9 @@ function readSlots(slug: string, valid: Set<string>): (string | null)[] {
 // Every proportion is a fraction of the base, so the triangle looks
 // identical at any size and only the marks change:
 //
-//   T    - the colour band's thickness, measured horizontally
+//   T    - the colour band's thickness, measured horizontally. It is
+//          also the rows view's rail width, so the two states are the
+//          same shape at different angles and the morph is honest.
 //   top  - the flat width at the apex
 //
 // `top` is not a style choice. A band thick enough to carry its own
@@ -129,6 +135,7 @@ function Slot({
   size,
   accent,
   armed,
+  motion,
   children,
   onTap,
 }: {
@@ -136,6 +143,10 @@ function Slot({
   size: number;
   accent: string;
   armed: boolean;
+  // Where this slot sits in the current view, and how it should travel
+  // there. Absolute + transform rather than flex, so moving sixteen of
+  // them costs the compositor about what moving one does.
+  motion: { x: number; y: number; transition: string };
   children?: React.ReactNode;
   onTap: () => void;
 }) {
@@ -145,10 +156,12 @@ function Slot({
     <div
       ref={setNodeRef}
       onClick={onTap}
-      className="grid shrink-0 place-items-center rounded-xl transition-[background,box-shadow] duration-150"
+      className="absolute left-0 top-0 grid place-items-center rounded-xl"
       style={{
         width: size,
         height: size,
+        transform: `translate(${motion.x}px, ${motion.y}px)`,
+        transition: `${motion.transition}, background 150ms, box-shadow 150ms`,
         cursor: armed ? "pointer" : undefined,
         background: isOver ? `${accent}2e` : empty ? "rgba(255,255,255,0.04)" : undefined,
         boxShadow: isOver
@@ -161,6 +174,38 @@ function Slot({
       {children}
     </div>
   );
+}
+
+// ------------------------------------------------------------- motion
+//
+// "Cascade": the bands narrow from the bottom up, the marks travel with
+// their own band rather than after it, and the cut line arrives last.
+// Slower and heavier than a snap - it reads as the board folding itself
+// rather than as a control being flipped.
+const CASCADE = {
+  duration: 900,
+  ease: "cubic-bezier(.65,0,.35,1)",
+  bezier: [0.65, 0, 0.35, 1] as const,
+  rowStagger: 95,
+  markStagger: 22,
+};
+
+// The outline cannot be a CSS transition - SVG points are not
+// animatable - but it must not re-time the animation either. Staggering
+// the rows and separately easing one polygon put the two out of register
+// mid-flight, with the outline wider than the row it was supposed to be
+// tracing.
+//
+// So it traces instead of predicting: every frame it reads each row's
+// CURRENT computed clip-path and stitches the silhouette out of those
+// corners. Whatever the rows are doing, the edge is doing, by
+// construction - including the steps between rows that the stagger
+// creates, which are the cascade rather than a defect.
+function readClipXs(el: HTMLElement): [number, number, number, number] | null {
+  const m = getComputedStyle(el).clipPath.match(/-?[\d.]+px/g);
+  if (!m || m.length < 4) return null;
+  const [a, b, c, d] = m.slice(0, 4).map(parseFloat);
+  return [a, b, c, d];
 }
 
 // ---------------------------------------------------------------- board
@@ -181,6 +226,22 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(390);
+  const [view, setView] = useState<"rows" | "pyramid">("pyramid");
+  // False on the first paint: the board should arrive in its shape, not
+  // assemble itself every time the page loads.
+  const [animate, setAnimate] = useState(false);
+  const [reduced, setReduced] = useState(false);
+
+  // Sixteen marks flying across the screen is exactly the motion the OS
+  // setting exists for, so honour it: the switch still works, it just
+  // cuts straight to the end state.
+  useEffect(() => {
+    const mq = matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduced(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     const measure = () => setViewportWidth(window.innerWidth);
@@ -262,16 +323,96 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
     else if (over.startsWith("slot:")) place(id, Number(over.slice(5)));
   }
 
-  const { w, T, top, chipSize, gap, rowH, H, leftEdgeAt } = solveShape(viewportWidth);
+  const { w, T, chipSize, gap, rowH, H, leftEdgeAt } = solveShape(viewportWidth);
   const { setNodeRef: poolRef, isOver: overPool } = useDroppable({ id: "pool" });
   const draggingItem = dragging ? byId.get(dragging) : null;
 
-  let at = 0;
-  const rows = CAPS.map((cap, tier) => {
-    const from = at;
-    at += cap;
-    return { tier, from, cap };
-  });
+  // Where every piece sits in each view. Both are pure functions of the
+  // solved shape, so the two states can never disagree about geometry -
+  // which is what lets them be interpolated rather than cross-faded.
+  const layout = useMemo(() => {
+    const rowsOf = (view: "rows" | "pyramid") => {
+      let at = 0;
+      return CAPS.map((cap, tier) => {
+        const from = at;
+        at += cap;
+        const yTop = tier * rowH;
+        const yBot = yTop + rowH;
+        const a = leftEdgeAt(yTop);
+        const b = leftEdgeAt(yBot);
+        const total = cap * chipSize + (cap - 1) * gap;
+        // ROWS packs from the left edge, past the rail, exactly as a tier
+        // row does. PYRAMID centres in what the band leaves - both bounds
+        // move with the slope by the same amount, so the marks land on
+        // the same x for every tier.
+        const startX = view === "rows" ? T + 12 : (w + T) / 2 - total / 2;
+        return {
+          tier,
+          from,
+          cap,
+          yTop,
+          // A rectangle and a trapezoid are the same four points.
+          rowClip:
+            view === "rows"
+              ? `polygon(0px 0%, ${w}px 0%, ${w}px 100%, 0px 100%)`
+              : `polygon(${a}px 0%, ${w - a}px 0%, ${w - b}px 100%, ${b}px 100%)`,
+          // The rail is a band standing straight up; the pyramid's is the
+          // same band lying along the slope.
+          bandClip:
+            view === "rows"
+              ? `polygon(0px 0%, ${T}px 0%, ${T}px 100%, 0px 100%)`
+              : `polygon(${a}px 0%, ${a + T}px 0%, ${b + T}px 100%, ${b}px 100%)`,
+          letterX: view === "rows" ? T / 2 : leftEdgeAt(yTop + rowH / 2) + T / 2,
+          slotX: (k: number) => startX + k * (chipSize + gap),
+          slotY: yTop + (rowH - chipSize) / 2,
+        };
+      });
+    };
+    return { rows: rowsOf("rows"), pyramid: rowsOf("pyramid") };
+  }, [w, T, chipSize, gap, rowH, leftEdgeAt]);
+
+  const shown = layout[view];
+
+  // Redrawn from the rows themselves, every frame while anything is
+  // moving, and once whenever the solved shape changes.
+  const edgeRef = useRef<SVGPolygonElement>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const traceEdge = useCallback(() => {
+    const poly = edgeRef.current;
+    if (!poly) return;
+    const left: string[] = [];
+    const right: string[] = [];
+    for (let i = 0; i < CAPS.length; i++) {
+      const el = rowRefs.current[i];
+      if (!el) return;
+      const xs = readClipXs(el);
+      if (!xs) return;
+      const [topL, topR, botR, botL] = xs;
+      const yTop = i * rowH;
+      const yBot = yTop + rowH;
+      left.push(`${topL},${yTop}`, `${botL},${yBot}`);
+      right.unshift(`${topR},${yTop}`, `${botR},${yBot}`);
+    }
+    poly.setAttribute("points", [...left, ...right].join(" "));
+  }, [rowH]);
+
+  useEffect(() => {
+    let raf = 0;
+    // Long enough to cover the last row's delay plus its duration.
+    const until =
+      performance.now() +
+      (animate && !reduced ? CASCADE.duration + CAPS.length * CASCADE.rowStagger + 60 : 0);
+    const step = () => {
+      traceEdge();
+      if (performance.now() < until) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [view, animate, reduced, traceEdge, w, H]);
+
+  const dur = animate && !reduced ? CASCADE.duration : 0;
+  // Bottom row first: the base settles and the tiers fold in above it.
+  const rowDelay = (tier: number) => (dur ? (CAPS.length - 1 - tier) * CASCADE.rowStagger : 0);
 
   return (
     <DndContext
@@ -283,98 +424,109 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
       onDragCancel={() => setDragging(null)}
       onDragEnd={onDragEnd}
     >
-      {/* One shape, sliced into tiers. The clip is what makes the edges
-          true diagonals rather than a staircase: each tier is a full-width
-          band and the shape cuts it to whatever the slope allows at that
-          height, so the corners fill themselves with the row's own black. */}
+      <div className="mb-5 flex justify-center">
+        <div className="flex gap-1 rounded-full border border-white/12 bg-black/40 p-1">
+          {(["rows", "pyramid"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={view === v}
+              onClick={() => {
+                if (v === view) return;
+                setAnimate(true);
+                setView(v);
+              }}
+              className={`rounded-full px-5 py-2 text-[11px] transition-colors ${
+                view === v ? "bg-white/15 text-white" : "text-white/50 hover:text-white"
+              }`}
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {v === "rows" ? "ROWS" : "PYRAMID"}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="relative mx-auto" style={{ width: w, height: H }}>
-        <div
-          className="absolute inset-0"
-          style={{
-            clipPath: `polygon(${(w - top) / 2}px 0, ${(w + top) / 2}px 0, ${w}px ${H}px, 0 ${H}px)`,
-          }}
-        >
-          {rows.map(({ tier, from, cap }) => {
-            const yTop = tier * rowH;
-            const x1 = leftEdgeAt(yTop);
-            const x4 = leftEdgeAt(yTop + rowH);
-            const mid = leftEdgeAt(yTop + rowH / 2);
-            return (
-              <div
-                key={tier}
-                className="absolute left-0 flex items-center justify-center"
+        {shown.map(({ tier, yTop, rowClip, bandClip, letterX }) => {
+          const d = rowDelay(tier);
+          return (
+            <div
+              key={tier}
+              ref={(el) => {
+                rowRefs.current[tier] = el;
+              }}
+              className="absolute left-0"
+              style={{
+                top: yTop,
+                width: w,
+                height: rowH,
+                background: "#000000",
+                borderTop: tier === 0 ? undefined : "1px solid rgba(255,255,255,0.09)",
+                clipPath: rowClip,
+                transition: `clip-path ${dur}ms ${CASCADE.ease} ${d}ms`,
+              }}
+            >
+              <span
+                aria-hidden
+                className="absolute inset-0"
                 style={{
-                  top: yTop,
-                  width: w,
-                  height: rowH,
-                  // Pure black, exactly as TierRow: the highest-contrast
-                  // ground the marks can sit on.
-                  background: "#000000",
-                  borderTop: tier === 0 ? undefined : "1px solid rgba(255,255,255,0.09)",
-                  // Centres the marks in what the band leaves rather than
-                  // in the whole row. Both bounds move with the slope by
-                  // the same amount, so this lands on the same x for every
-                  // tier and the marks stay a symmetric triangle.
-                  paddingLeft: T,
-                  gap,
+                  background: accents[tier],
+                  clipPath: bandClip,
+                  transition: `clip-path ${dur}ms ${CASCADE.ease} ${d}ms`,
+                }}
+              />
+              <span
+                aria-hidden
+                className="absolute top-1/2"
+                style={{
+                  left: 0,
+                  transform: `translate(${letterX}px, -50%) translateX(-50%)`,
+                  transition: `transform ${dur}ms ${CASCADE.ease} ${d}ms`,
+                  fontFamily: "var(--font-display)",
+                  fontSize: Math.max(13, Math.round(chipSize * 0.42)),
+                  color: "#0c1830",
+                  lineHeight: 1,
                 }}
               >
-                {/* The tier's colour, cut at the slope's angle on BOTH
-                    sides - a band lying along the triangle's edge rather
-                    than a wedge that thickens as it falls. */}
-                <span
-                  aria-hidden
-                  className="absolute inset-0"
-                  style={{
-                    background: accents[tier],
-                    clipPath: `polygon(${x1}px 0, ${x1 + T}px 0, ${x4 + T}px 100%, ${x4}px 100%)`,
-                  }}
-                />
-                <span
-                  aria-hidden
-                  className="absolute"
-                  style={{
-                    left: mid + T / 2,
-                    top: "50%",
-                    transform: "translate(-50%, -50%)",
-                    fontFamily: "var(--font-display)",
-                    fontSize: Math.max(13, Math.round(chipSize * 0.42)),
-                    color: "#0c1830",
-                    lineHeight: 1,
-                  }}
-                >
-                  {LABELS[tier]}
-                </span>
+                {LABELS[tier]}
+              </span>
+            </div>
+          );
+        })}
 
-                {Array.from({ length: cap }, (_, k) => {
-                  const index = from + k;
-                  const id = slots[index];
-                  const item = id ? byId.get(id) : null;
-                  return (
-                    <Slot
-                      key={index}
-                      index={index}
-                      size={chipSize}
-                      accent={accents[tier]}
-                      armed={!!selected}
-                      onTap={() => selected && place(selected, index)}
-                    >
-                      {item && (
-                        <Draggable
-                          item={item}
-                          style={template.itemStyle}
-                          size={chipSize}
-                          selected={selected === item.id}
-                          onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
-                        />
-                      )}
-                    </Slot>
-                  );
-                })}
-              </div>
+        {/* Slots live above the bands rather than inside them: a clipped
+            row would cut a mark in half mid-flight, and a drop target you
+            cannot see is a drop target you cannot hit. */}
+        {shown.map(({ tier, from, cap, slotX, slotY }) =>
+          Array.from({ length: cap }, (_, k) => {
+            const index = from + k;
+            const id = slots[index];
+            const item = id ? byId.get(id) : null;
+            const d = dur ? rowDelay(tier) + index * CASCADE.markStagger : 0;
+            return (
+              <Slot
+                key={index}
+                index={index}
+                size={chipSize}
+                accent={accents[tier]}
+                armed={!!selected}
+                motion={{ x: slotX(k), y: slotY, transition: `transform ${dur}ms ${CASCADE.ease} ${d}ms` }}
+                onTap={() => selected && place(selected, index)}
+              >
+                {item && (
+                  <Draggable
+                    item={item}
+                    style={template.itemStyle}
+                    size={chipSize}
+                    selected={selected === item.id}
+                    onActivate={() => setSelected((s) => (s === item.id ? null : item.id))}
+                  />
+                )}
+              </Slot>
             );
-          })}
-        </div>
+          }),
+        )}
 
         {/* The shape's own edge. #000 on the page's ground is almost no
             contrast, so without this the triangle has no visible boundary
@@ -388,7 +540,7 @@ export function PyramidBoard({ template }: { template: TierTemplate }) {
           viewBox={`0 0 ${w} ${H}`}
         >
           <polygon
-            points={`${(w - top) / 2},0 ${(w + top) / 2},0 ${w},${H} 0,${H}`}
+            ref={edgeRef}
             fill="none"
             stroke="rgba(255,255,255,0.17)"
             strokeWidth={1.5}
