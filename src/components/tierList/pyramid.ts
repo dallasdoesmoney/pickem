@@ -7,17 +7,14 @@ import { Tier, TierListState, accentForIndex, tierLabelFor } from "@/lib/tierLis
 // shape IS, though, is the list's own - saved with it, and edited a row
 // at a time.
 //
-// A row can hold more than the row above it, the same, or fewer, and
-// nothing else. That single rule is what keeps the silhouette honest:
-// adding one team widens a row by exactly one logo plus one gap, so a
-// constant step is a constant rise over a constant run, and every edge in
-// the shape lands on the same angle. A row that holds the SAME number
-// changes width by nothing at all, and no width change is a vertical
-// edge. Out, straight down, in - there is no fourth thing an edge can do.
-//
-// So the same model draws a triangle, a diamond, a kite, an hourglass and
-// a plain stack of equal rows, and all of them are made of one angle and
-// ninety degrees.
+// The silhouette is not drawn, it is DERIVED: each row's width comes from
+// how many places it holds, and the outline is threaded through those
+// widths. A row wider than the one above slopes out, a narrower one
+// slopes back in, and a row holding the same number changes width by
+// nothing at all - which is a vertical edge. So the same model draws a
+// triangle, a diamond, a kite, an hourglass and a plain stack of equal
+// rows, and nobody has to choose between them: you add and remove places
+// a row at a time and the shape follows.
 export const DEFAULT_CAPS: readonly number[] = [1, 3, 5, 7];
 
 // Ten rows because a band takes its colour and letter from a tier, and a
@@ -25,13 +22,7 @@ export const DEFAULT_CAPS: readonly number[] = [1, 3, 5, 7];
 // being readable on a phone whatever else you do.
 export const MAX_PYRAMID_ROWS = 10;
 export const MAX_PER_ROW = 12;
-export const MIN_PYRAMID_ROWS = 2;
-
-// How many teams a row gains or loses from the one above. This is the
-// angle: bigger steps lean the sides over further. Two is what the board
-// has always used, which is why its sides sit near 56 degrees.
-export const STEP_CHOICES = [1, 2, 3] as const;
-export const DEFAULT_STEP = 2;
+export const MIN_PYRAMID_ROWS = 1;
 
 export const rankedIn = (caps: readonly number[]): number => caps.reduce((a, b) => a + b, 0);
 
@@ -288,47 +279,31 @@ export function silhouettePoints(shape: PyramidShape): string {
 
 // ------------------------------------------------------------- editing
 //
-// A shape is edited a row at a time, and a row only ever holds more than
-// the one above it, the same, or fewer. These keep that true: the counts
-// are never set directly, they are derived from the top row and a
-// direction per row, so a half-step - which would be a different angle -
-// cannot be expressed at all.
-export type Direction = -1 | 0 | 1;
-
-export const stepOf = (caps: readonly number[]): number => {
-  for (let r = 1; r < caps.length; r++) {
-    const d = Math.abs(caps[r] - caps[r - 1]);
-    if (d) return d;
-  }
-  return DEFAULT_STEP; // every row the same width; the step is moot
-};
-
-export const directionsOf = (caps: readonly number[]): Direction[] => {
-  const d = caps.map((c, r) => (r === 0 ? 0 : (Math.sign(c - caps[r - 1]) as Direction)));
-  d[0] = d[1] ?? 1;
-  return d;
-};
-
-export function capsFrom(seed: number, dirs: readonly Direction[], step: number): number[] {
-  const caps = [clampCap(seed)];
-  for (let r = 1; r < dirs.length; r++) {
-    // Turned around rather than clamped. A clamped row would be a
-    // half-step, and a half-step is a different angle - the one thing
-    // this model exists to rule out.
-    const want = caps[r - 1] + dirs[r] * step;
-    caps.push(want < 1 || want > MAX_PER_ROW ? caps[r - 1] : want);
-  }
-  return caps;
-}
-
+// One place at a time. Nothing derives anything: a row holds what it
+// holds, and the outline redraws around it.
 export const clampCap = (n: number) => Math.max(1, Math.min(MAX_PER_ROW, Math.round(n) || 1));
 
-// Whether a row could go that way at all, so a direction with no room
-// greys out rather than letting someone build something crooked.
-export const canGo = (above: number, dir: Direction, step: number) => {
-  const want = above + dir * step;
-  return want >= 1 && want <= MAX_PER_ROW;
-};
+export function bumpRow(caps: readonly number[], row: number, by: 1 | -1): number[] {
+  const next = [...caps];
+  // Taking the last place off the bottom row removes the row - the exact
+  // inverse of adding one at the bottom, so the two controls undo each
+  // other rather than leaving an empty row behind.
+  if (by === -1 && next[row] === 1) {
+    return row === next.length - 1 && next.length > MIN_PYRAMID_ROWS
+      ? next.slice(0, -1)
+      : next;
+  }
+  next[row] = clampCap(next[row] + by);
+  return next;
+}
+
+export function addRow(caps: readonly number[]): number[] {
+  if (caps.length >= MAX_PYRAMID_ROWS) return [...caps];
+  // Two wider than the row above it, which is the step the pyramid has
+  // always grown by - so adding a row to the stock shape keeps it a
+  // triangle rather than putting a kink in it.
+  return [...caps, clampCap(caps[caps.length - 1] + 2)];
+}
 
 // Anything that crossed a trust boundary - a hand-edited localStorage
 // blob, an old saved row, a share snapshot.

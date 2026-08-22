@@ -4,7 +4,23 @@ import { useDroppable } from "@dnd-kit/core";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { DraggableTierItem } from "./TierItemChip";
 import { TIER_LABEL_FONT, pickTierLabelSize } from "./tierLabel";
-import { PyramidShape, rankedIn, rowClip, rowsOf, silhouettePoints, slotRect } from "./pyramid";
+import {
+  MAX_PER_ROW,
+  MAX_PYRAMID_ROWS,
+  MIN_PYRAMID_ROWS,
+  PyramidShape,
+  rankedIn,
+  rowClip,
+  rowsOf,
+  silhouettePoints,
+  slotRect,
+} from "./pyramid";
+
+// The width kept clear down the right for a row's own minus and plus.
+// Reserved rather than borrowed, because there is no dead space inside
+// the shape to put them in: a row's teams run right up to both slopes,
+// and on a diamond they do it at the bottom as well as the top.
+export const ROW_CTL_W = 44;
 
 // The board's other layout. It renders inside the editor's own DndContext
 // and reports drops through it, so every control on the page - clear,
@@ -68,6 +84,49 @@ function Slot({
   );
 }
 
+// A row's own minus and plus, parked in the gutter beside it. One place
+// at a time, which is the whole vocabulary - taking the last place off
+// the bottom row removes the row, so this and ADD ROW undo each other.
+function RowStepper({
+  cap,
+  isLast,
+  rows,
+  onBump,
+}: {
+  cap: number;
+  isLast: boolean;
+  rows: number;
+  onBump: (by: 1 | -1) => void;
+}) {
+  const removes = cap === 1 && isLast && rows > MIN_PYRAMID_ROWS;
+  const canShrink = cap > 1 || removes;
+  const btn =
+    "h-[22px] w-[20px] rounded-full text-[14px] leading-none text-white/60 transition-colors " +
+    "enabled:hover:bg-white/10 enabled:hover:text-white disabled:opacity-25";
+  return (
+    <span className="flex items-center rounded-full border border-white/15 bg-black/70 p-px backdrop-blur-[2px]">
+      <button
+        type="button"
+        aria-label={removes ? "Remove the bottom row" : "One fewer place in this row"}
+        disabled={!canShrink}
+        onClick={() => onBump(-1)}
+        className={btn}
+      >
+        −
+      </button>
+      <button
+        type="button"
+        aria-label="One more place in this row"
+        disabled={cap >= MAX_PER_ROW}
+        onClick={() => onBump(1)}
+        className={btn}
+      >
+        +
+      </button>
+    </span>
+  );
+}
+
 export function PyramidView({
   template,
   shape,
@@ -80,6 +139,8 @@ export function PyramidView({
   onItemActivate,
   onPlaceSlot,
   onPlacePool,
+  onBumpRow,
+  onAddRow,
 }: {
   template: TierTemplate;
   shape: PyramidShape;
@@ -92,6 +153,9 @@ export function PyramidView({
   onItemActivate: (item: TierItem) => void;
   onPlaceSlot: (slot: number) => void;
   onPlacePool: () => void;
+  // Absent on a shared snapshot, which is somebody else's board.
+  onBumpRow?: (row: number, by: 1 | -1) => void;
+  onAddRow?: () => void;
 }) {
   const { w, T, chip, height, leftEdgeAt } = shape;
   const rowOf = rowsOf(shape.caps);
@@ -100,7 +164,10 @@ export function PyramidView({
 
   return (
     <>
-      <div className="relative mx-auto" style={{ width: w, height }}>
+      <div
+        className="relative mx-auto"
+        style={{ width: w + (onBumpRow ? ROW_CTL_W : 0), height }}
+      >
         {shape.caps.map((_, row) => {
           const band = bands[row];
           const clip = rowClip(shape, row);
@@ -188,7 +255,37 @@ export function PyramidView({
             </Slot>
           );
         })}
+
+        {onBumpRow &&
+          shape.caps.map((cap, row) => (
+            <div
+              key={`ctl-${row}`}
+              className="absolute"
+              style={{ left: w + 2, top: row * shape.rowH + (shape.rowH - 22) / 2 }}
+            >
+              <RowStepper
+                cap={cap}
+                isLast={row === shape.caps.length - 1}
+                rows={shape.caps.length}
+                onBump={(by) => onBumpRow(row, by)}
+              />
+            </div>
+          ))}
       </div>
+
+      {onAddRow && (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={onAddRow}
+            disabled={shape.caps.length >= MAX_PYRAMID_ROWS}
+            className="rounded-full border border-dashed border-white/20 px-4 py-1.5 text-[10px] tracking-[0.1em] text-white/45 transition-colors enabled:hover:border-emerald-400/60 enabled:hover:text-emerald-300 disabled:opacity-35"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            + ADD ROW
+          </button>
+        </div>
+      )}
 
       <section className="mt-6">
         {/* Same seam, same mark - the pyramid's cut is the tier list's
