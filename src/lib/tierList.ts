@@ -1,5 +1,6 @@
 import { TierTemplate } from "@/data/tierTemplates";
 import { RANKS } from "@/lib/levels";
+import { DEFAULT_CAPS, sanitizeCaps } from "@/components/tierList/pyramid";
 
 // Tier identity is a generated id, never the label - users rename "S" to
 // "Elite" and every placement has to survive that. Labels are display
@@ -20,6 +21,13 @@ export type TierListState = {
   tiers: Tier[];
   placements: Record<string, string[]>;
   unranked: string[];
+  // The pyramid's shape: how many places each row holds, top down. Lives
+  // here rather than in its own column because the whole state is one
+  // JSONB blob, and because the shape belongs to the LIST - two boards of
+  // the same template can be a triangle and a diamond. Optional so every
+  // list saved before this existed keeps working; absent means the
+  // 1-3-5-7 the pyramid always was.
+  pyramid?: number[];
 };
 
 export const MAX_TIERS = 10;
@@ -52,7 +60,10 @@ const TIER_ACCENTS: string[] = [...RANKS].reverse().map((r) => r.color);
 
 const DEFAULT_TIER_LABELS = ["S", "A", "B", "C", "D", "F"];
 
-function accentForIndex(i: number): string {
+// Exported for the pyramid, whose bands sit at the same depths as the
+// tiers and go on past them when a shape has more rows than the board has
+// tiers.
+export function accentForIndex(i: number): string {
   return TIER_ACCENTS[i % TIER_ACCENTS.length];
 }
 
@@ -80,6 +91,7 @@ export function createInitialState(template: TierTemplate): TierListState {
     tiers,
     placements,
     unranked: template.items.map((i) => i.id),
+    pyramid: [...DEFAULT_CAPS],
   };
 }
 
@@ -95,6 +107,10 @@ export type TierListAction =
   | { type: "moveTier"; tierId: string; direction: -1 | 1 }
   | { type: "setTitle"; title: string }
   | { type: "shuffleUnranked" }
+  // The pyramid's shape. Its own action rather than part of a placement
+  // move, because changing the shape moves the CUT rather than any team:
+  // nothing is reordered, some ranks simply stop having a place.
+  | { type: "setPyramid"; caps: number[] }
   // Two different kinds of starting over. Clearing empties the board but
   // keeps everything you set up; resetting puts the tiers AND the heading
   // back to stock while keeping your ranking wherever it still has
@@ -203,6 +219,11 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
       return { ...state, placements, unranked: action.template.items.map((i) => i.id) };
     }
 
+    case "setPyramid": {
+      const caps = sanitizeCaps(action.caps);
+      return caps ? { ...state, pyramid: caps } : state;
+    }
+
     case "resetTiers": {
       // Stock tiers back, ranking preserved by position: whatever was in
       // the old first tier lands in the new first tier. Anything below the
@@ -227,6 +248,9 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
         tiers,
         placements,
         unranked: [...state.unranked, ...displaced],
+        // The shape is a customisation like the tiers and the heading, so
+        // it goes back with them.
+        pyramid: [...DEFAULT_CAPS],
       };
     }
 
@@ -327,5 +351,9 @@ export function sanitizeState(raw: unknown, template: TierTemplate): TierListSta
     tiers,
     placements,
     unranked,
+    // A list saved before shapes existed has no pyramid, and the shape it
+    // was drawn with was 1-3-5-7. Filling it in here rather than leaving
+    // it undefined means everything downstream can just read it.
+    pyramid: sanitizeCaps(r.pyramid) ?? [...DEFAULT_CAPS],
   };
 }

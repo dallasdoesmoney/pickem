@@ -4,7 +4,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { DraggableTierItem } from "./TierItemChip";
 import { TIER_LABEL_FONT, pickTierLabelSize } from "./tierLabel";
-import { CAPS, PyramidShape, RANKED, ROW_OF, slotRect } from "./pyramid";
+import { PyramidShape, rankedIn, rowClip, rowsOf, silhouettePoints, slotRect } from "./pyramid";
 
 // The board's other layout. It renders inside the editor's own DndContext
 // and reports drops through it, so every control on the page - clear,
@@ -15,9 +15,9 @@ const SLOT_ID = (slot: number) => `pyr:${slot}`;
 export const POOL_ID = "pyr:pool";
 
 // A slot's drop target. Drawn, unlike a tier's, because a pyramid HAS
-// capacity - sixteen places, and an empty one is a place you can still
-// take. That is the opposite of a tier row, which has no capacity and so
-// has nothing empty to show.
+// capacity - a fixed number of places, and an empty one is a place you
+// can still take. That is the opposite of a tier row, which has no
+// capacity and so has nothing empty to show.
 function Slot({
   slot,
   shape,
@@ -93,17 +93,17 @@ export function PyramidView({
   onPlaceSlot: (slot: number) => void;
   onPlacePool: () => void;
 }) {
-  const { w, T, apex, chip, height, leftEdgeAt } = shape;
+  const { w, T, chip, height, leftEdgeAt } = shape;
+  const rowOf = rowsOf(shape.caps);
   const { setNodeRef: poolRef } = useDroppable({ id: POOL_ID });
   const armed = !!selectedId;
 
   return (
     <>
       <div className="relative mx-auto" style={{ width: w, height }}>
-        {CAPS.map((_, row) => {
+        {shape.caps.map((_, row) => {
           const band = bands[row];
-          const a = leftEdgeAt(row * shape.rowH);
-          const b = leftEdgeAt((row + 1) * shape.rowH);
+          const clip = rowClip(shape, row);
           return (
             <div
               key={row}
@@ -115,20 +115,19 @@ export function PyramidView({
                 height: shape.rowH,
                 background: "#000000",
                 borderTop: row === 0 ? undefined : "1px solid rgba(255,255,255,0.09)",
-                // A rectangle and a trapezoid are the same four points, so
-                // the row keeps its full width in the DOM and only its
-                // silhouette changes - nothing reflows to make the shape.
-                clipPath: `polygon(${a}px 0%, ${w - a}px 0%, ${w - b}px 100%, ${b}px 100%)`,
+                // A rectangle and any six-point shape are the same six
+                // points, so the row keeps its full width in the DOM and
+                // only its silhouette changes - nothing reflows to make
+                // the shape, and the two ends still interpolate when the
+                // board folds.
+                clipPath: clip.row,
               }}
             >
               <span
                 aria-hidden
                 data-pband
                 className="absolute inset-0"
-                style={{
-                  background: band.accent,
-                  clipPath: `polygon(${a}px 0%, ${a + T}px 0%, ${b + T}px 100%, ${b}px 100%)`,
-                }}
+                style={{ background: band.accent, clipPath: clip.band }}
               >
                 {/* Inside the band, so the band's own clip cuts it: the
                     band is a parallelogram, and a name tall enough to wrap
@@ -153,11 +152,11 @@ export function PyramidView({
 
         {/* The silhouette. Pure black on this ground has almost no
             contrast, so without it the shape has no visible boundary at
-            all. Both slopes are straight lines from the apex to the base,
-            so the whole outline is four points. */}
+            all. One point per seam, plus one halfway down any row that
+            turns - which is what puts the point on a diamond. */}
         <svg data-pedge aria-hidden className="pointer-events-none absolute left-0 top-0" width={w} height={height}>
           <polygon
-            points={`${(w - apex) / 2},0 ${(w + apex) / 2},0 ${w},${height} 0,${height}`}
+            points={silhouettePoints(shape)}
             fill="none"
             stroke="rgba(255,255,255,0.17)"
             strokeWidth={1.5}
@@ -165,14 +164,14 @@ export function PyramidView({
           />
         </svg>
 
-        {Array.from({ length: RANKED }, (_, slot) => {
+        {Array.from({ length: rankedIn(shape.caps) }, (_, slot) => {
           const id = slots[slot];
           return (
             <Slot
               key={slot}
               slot={slot}
               shape={shape}
-              accent={bands[ROW_OF[slot]].accent}
+              accent={bands[rowOf[slot]].accent}
               armed={armed}
               onTap={() => onPlaceSlot(slot)}
             >

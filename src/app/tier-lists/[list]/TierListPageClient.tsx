@@ -52,11 +52,13 @@ import { buildReferralLink } from "@/lib/referralStorage";
 import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TierRow } from "@/components/tierList/TierRow";
 import { PyramidView, POOL_ID as PYRAMID_POOL } from "@/components/tierList/PyramidView";
+import { ShapePanel } from "@/components/tierList/ShapePanel";
 import {
-  CAPS,
-  RANKED,
-  ROW_OF,
+  DEFAULT_CAPS,
   fillSlots,
+  rankedIn,
+  rowsOf,
+  sanitizeCaps,
   insertionForRank,
   pyramidBands,
   readingOrder,
@@ -293,26 +295,44 @@ export default function TierListPageClient({
   // you just built rather than the one you started with. Slot n is
   // reading position n, and insertionForRank turns that back into a tier
   // and a place in it.
-  const pyrShape = useMemo(() => solvePyramid(Math.min(viewportWidth, 1056) - 32), [viewportWidth]);
+  // The list's own shape, not a constant any more. A row holds more than
+  // the one above it, the same, or fewer - and those three are the only
+  // things an edge can do, which is what keeps every slope in the
+  // silhouette at one angle.
+  // Sanitised here as well as in sanitizeState, because a row loaded from
+  // the database goes straight into the reducer without passing through
+  // it - so this is the only guard on a list saved before shapes existed,
+  // or one whose blob has been tampered with.
+  const caps = useMemo(() => sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], [state.pyramid]);
+  const pyrShape = useMemo(
+    () => solvePyramid(Math.min(viewportWidth, 1056) - 32, caps),
+    [viewportWidth, caps]
+  );
+  const places = useMemo(() => rankedIn(caps), [caps]);
+  const rowOf = useMemo(() => rowsOf(caps), [caps]);
   // Which container a pyramid drag is over: a slot index, "pool", or null.
   const [pyrOver, setPyrOver] = useState<number | "pool" | null>(null);
+  // Whether the shape panel is open. Its own mode rather than part of
+  // EDIT TIERS, because that one is about the rows of a tier list and
+  // this one is about the outline of a pyramid.
+  const [shaping, setShaping] = useState(false);
 
   const order = useMemo(() => readingOrder(state), [state]);
-  const pyrSlots = useMemo(() => fillSlots(order), [order]);
-  const bands = useMemo(() => pyramidBands(state.tiers), [state.tiers]);
+  const pyrSlots = useMemo(() => fillSlots(order, caps), [order, caps]);
+  const bands = useMemo(() => pyramidBands(state.tiers, caps), [state.tiers, caps]);
   // Below the cut, in the order the board has them: the ranked ones that
   // did not make the top sixteen first, then everything unranked.
   const missedTheCut = useMemo(
-    () => [...order.slice(RANKED), ...state.unranked],
-    [order, state.unranked]
+    () => [...order.slice(places), ...state.unranked],
+    [order, state.unranked, places]
   );
 
   const placeInSlot = useCallback(
     (itemId: string, slot: number) => {
-      const { tier, index } = insertionForRank(state, itemId, slot, ROW_OF[slot]);
+      const { tier, index } = insertionForRank(state, itemId, slot, rowOf[slot]);
       dispatch({ type: "moveItem", itemId, toTier: tier, toIndex: index });
     },
-    [state, dispatch]
+    [state, dispatch, rowOf]
   );
 
   // Out of the pyramid is not out of the list: the cut already holds
@@ -321,10 +341,10 @@ export default function TierListPageClient({
   // tier list's own pool is for.
   const dropFromPyramid = useCallback(
     (itemId: string) => {
-      const { tier, index } = insertionForRank(state, itemId, RANKED, CAPS.length - 1);
+      const { tier, index } = insertionForRank(state, itemId, places, caps.length - 1);
       dispatch({ type: "moveItem", itemId, toTier: tier, toIndex: index });
     },
-    [state, dispatch]
+    [state, dispatch, places, caps.length]
   );
 
   // ------------------------------------------------------- the cascade
@@ -966,6 +986,26 @@ export default function TierListPageClient({
             </div>
           </div>
         )}
+
+        {/* Only in the pyramid, because a tier list has no shape to set:
+            its rows hold as many as you put in them. */}
+        {!editing && view === "pyramid" && !readOnlySnapshot && (
+          <div className="flex justify-center mt-2">
+            <button
+              type="button"
+              onClick={() => setShaping((v) => !v)}
+              aria-pressed={shaping}
+              className={`rounded-full border px-4 py-1.5 text-[10px] tracking-wide transition-colors ${
+                shaping
+                  ? "border-emerald-400/60 text-emerald-300"
+                  : "border-white/15 text-white/50 hover:border-white/35 hover:text-white"
+              }`}
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {shaping ? "DONE" : "SHAPE"}
+            </button>
+          </div>
+        )}
       </header>
 
       <DndContext
@@ -1082,6 +1122,13 @@ export default function TierListPageClient({
               dropFromPyramid(selectedId);
               setSelectedId(null);
             }}
+          />
+        )}
+        {view === "pyramid" && shaping && !readOnlySnapshot && (
+          <ShapePanel
+            caps={caps}
+            bands={bands}
+            onChange={(next) => dispatch({ type: "setPyramid", caps: next })}
           />
         )}
 

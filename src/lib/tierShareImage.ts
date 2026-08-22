@@ -2,7 +2,15 @@ import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { TierListState, tierLabelFor } from "@/lib/tierList";
 import { BRAND_LOGO_SRC, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
 import { BACKDROP_OPACITY, BACKDROP_SCALE } from "@/components/tierList/TierItemChip";
-import { CAPS, RANKED, ROW_OF, pyramidBands, slotRect, solvePyramid } from "@/components/tierList/pyramid";
+import {
+  DEFAULT_CAPS,
+  PyramidShape,
+  pyramidBands,
+  rankedIn,
+  sanitizeCaps,
+  slotRect,
+  solvePyramid,
+} from "@/components/tierList/pyramid";
 
 // Same canvas approach and the same 840px width as the picks/predictor
 // share cards, so all three read as one family in a feed. Purpose-built
@@ -92,7 +100,10 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
   // Pyramid mode is a different composition, not a variant of the rows:
   // its own geometry, its own mark size, and a cut instead of an unranked
   // strip. Everything below branches on it once and then goes its own way.
-  const shape = pyramid ? solvePyramid(WIDTH - PAD_X * 2) : null;
+  // Same guard as the editor: a share snapshot is the least trustworthy
+  // state in the app.
+  const caps = sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS];
+  const shape = pyramid ? solvePyramid(WIDTH - PAD_X * 2, caps) : null;
   const placed = new Set((pyramid ?? []).filter(Boolean) as string[]);
   const missed = pyramid ? template.items.map((i) => i.id).filter((id) => !placed.has(id)) : [];
 
@@ -160,10 +171,13 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
 
   if (shape) {
     drawPyramid(ctx, displayFont, {
-      x: PAD_X,
+      // Centred, because a shape's width is its OWN now rather than the
+      // board's: a diamond or a podium is narrower than the card, and
+      // drawn from the left margin it sits off to one side.
+      x: PAD_X + (WIDTH - PAD_X * 2 - shape.w) / 2,
       y: cursorY,
       shape,
-      bands: pyramidBands(state.tiers),
+      bands: pyramidBands(state.tiers, caps),
       slots: pyramid!,
       logos,
       backdrops,
@@ -253,17 +267,18 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
   });
 }
 
-// The pyramid: four bands narrowing to a point, sixteen places, and the
-// same black ground and hairline separators as the rows. Drawn from the
-// same solvePyramid the board uses, so the card is the board's geometry
-// at a different size rather than a second guess at it.
+// The pyramid: one band per row, however many the list's shape has, and
+// the same black ground and hairline separators as the rows. Drawn from
+// the same solvePyramid the board uses, so the card is the board's
+// geometry at a different size rather than a second guess at it - which
+// now matters more, because the board's shape is the list's own.
 function drawPyramid(
   ctx: CanvasRenderingContext2D,
   displayFont: string,
   o: {
     x: number;
     y: number;
-    shape: ReturnType<typeof solvePyramid>;
+    shape: PyramidShape;
     bands: { label: string; accent: string }[];
     slots: (string | null)[];
     logos: Map<string, HTMLImageElement | null>;
@@ -271,29 +286,29 @@ function drawPyramid(
     template: TierTemplate;
   },
 ) {
-  const { w, T, apex, rowH, height, leftEdgeAt } = o.shape;
+  const { w, T, rowH, height, leftEdgeAt, verts } = o.shape;
 
-  CAPS.forEach((_, row) => {
+  o.shape.caps.forEach((_, row) => {
     const yTop = o.y + row * rowH;
-    const a = leftEdgeAt(row * rowH);
-    const b = leftEdgeAt((row + 1) * rowH);
+    // Three heights per row, not two: a row that turns from out to in has
+    // its corner halfway down, and drawing it top-to-bottom only would
+    // cut the point off a diamond.
+    const ys = [row * rowH, row * rowH + rowH / 2, (row + 1) * rowH];
+    const edge = ys.map(leftEdgeAt);
+    const a = edge[0];
 
     // The row, black, cut to the slope on both sides.
     ctx.beginPath();
-    ctx.moveTo(o.x + a, yTop);
-    ctx.lineTo(o.x + w - a, yTop);
-    ctx.lineTo(o.x + w - b, yTop + rowH);
-    ctx.lineTo(o.x + b, yTop + rowH);
+    ys.forEach((y, i) => ctx[i ? "lineTo" : "moveTo"](o.x + w - edge[i], o.y + y));
+    for (let i = ys.length - 1; i >= 0; i--) ctx.lineTo(o.x + edge[i], o.y + ys[i]);
     ctx.closePath();
     ctx.fillStyle = "#000000";
     ctx.fill();
 
     // The band, flush with the left slope and running parallel to it.
     ctx.beginPath();
-    ctx.moveTo(o.x + a, yTop);
-    ctx.lineTo(o.x + a + T, yTop);
-    ctx.lineTo(o.x + b + T, yTop + rowH);
-    ctx.lineTo(o.x + b, yTop + rowH);
+    ys.forEach((y, i) => ctx[i ? "lineTo" : "moveTo"](o.x + edge[i] + T, o.y + y));
+    for (let i = ys.length - 1; i >= 0; i--) ctx.lineTo(o.x + edge[i], o.y + ys[i]);
     ctx.closePath();
     ctx.fillStyle = o.bands[row].accent;
     ctx.fill();
@@ -314,7 +329,7 @@ function drawPyramid(
     }
   });
 
-  for (let slot = 0; slot < RANKED; slot++) {
+  for (let slot = 0; slot < rankedIn(o.shape.caps); slot++) {
     const id = o.slots[slot];
     if (!id) continue;
     const logo = o.logos.get(id) ?? null;
@@ -326,17 +341,13 @@ function drawPyramid(
   // The silhouette. Pure black on this ground has almost no contrast, so
   // without it the shape has no visible boundary at all.
   ctx.beginPath();
-  ctx.moveTo(o.x + (w - apex) / 2, o.y);
-  ctx.lineTo(o.x + (w + apex) / 2, o.y);
-  ctx.lineTo(o.x + w, o.y + height);
-  ctx.lineTo(o.x, o.y + height);
+  verts.forEach((v, i) => ctx[i ? "lineTo" : "moveTo"](o.x + (w + v.width) / 2, o.y + v.y));
+  for (let i = verts.length - 1; i >= 0; i--) ctx.lineTo(o.x + (w - verts[i].width) / 2, o.y + verts[i].y);
   ctx.closePath();
   ctx.lineWidth = 2;
   ctx.strokeStyle = "rgba(255,255,255,0.17)";
   ctx.stroke();
-  // ROW_OF is imported for the band a slot belongs to; referenced here so
-  // the shared module stays the single source for it.
-  void ROW_OF;
+  void height;
 }
 
 // The strip under the board - unranked in the tier list, missed the cut
