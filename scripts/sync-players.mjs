@@ -239,18 +239,23 @@ async function syncPosition(season, teams, position) {
 
   rows.sort((a, b) => a.name.localeCompare(b.name));
   writeFileSync(join(DATA, position.file), fileFor(position, rows));
-  console.log(`Wrote ${rows.length} to src/data/${position.file}`);
+  console.log(`Wrote ${rows.length} to src/data/rosters/${position.file}`);
 }
 
 // ---------------------------------------------------------------- coaches
 //
-// Head coaches are not on a depth chart, so this is its own fetch: the
-// single-team endpoint carries the coach, and ESPN has moved it between
-// `coach` and `coaches` over the years. Both are read rather than one
-// guessed at, because the failure is silent - a missing coach would just
-// shrink the list.
-export function coachFrom(team) {
-  const raw = team?.coach ?? team?.coaches;
+// Head coaches are not on a depth chart, so this is its own fetch - and
+// the first version of it asked the wrong endpoint. The team object does
+// NOT carry a coach: the run found nothing for all 32 and refused to
+// write, which is the guard working, but it cost a run to learn. The
+// coach rides on the ROSTER response instead, as a top-level `coach`
+// array beside `athletes`.
+//
+// Called with whichever payload is to hand, and it digs rather than
+// assuming a shape: `coach`, `coaches`, an array, or a wrapped list.
+// A shape change here does not throw, it silently shrinks the list.
+export function coachFrom(payload) {
+  const raw = payload?.coach ?? payload?.coaches ?? payload?.team?.coach ?? payload?.team?.coaches;
   const first = Array.isArray(raw) ? raw[0] : Array.isArray(raw?.items) ? raw.items[0] : raw;
   if (!first?.id) return null;
   const name =
@@ -324,21 +329,45 @@ async function syncCoaches(teams) {
   const missing = [];
   const faceless = [];
 
+  // Asked in the order they are most likely to answer. The roster is
+  // first because that is where the coach actually lives; the other two
+  // stay as fallbacks rather than being deleted, since ESPN has moved
+  // this before and will again.
+  const SOURCES = [
+    (id) => `${SITE}/teams/${id}/roster`,
+    (id) => `${SITE}/teams/${id}`,
+    (id) => `${CORE}/seasons/${new Date().getUTCFullYear()}/teams/${id}/coaches`,
+  ];
+  let dumped = false;
+
   for (const team of teams) {
     const abbr = (ESPN_TO_OURS[team.abbreviation] ?? team.abbreviation).toUpperCase();
-    // The list endpoint's team objects are thin; the single-team one
-    // carries the coach.
     let coach = coachFrom(team);
-    if (!coach) {
+    let last = null;
+    for (const source of SOURCES) {
+      if (coach) break;
       try {
-        coach = coachFrom((await json(`${SITE}/teams/${team.id}`)).team);
+        last = await json(source(team.id));
+        coach = coachFrom(last);
       } catch {
-        coach = null;
+        // Try the next source rather than dropping the team on one 404.
       }
     }
     if (!coach) {
       missing.push(abbr);
       console.log(`${abbr.padEnd(4)} NO COACH FOUND`);
+      // Once, for the first team that fails: print what the last
+      // response actually contained. The previous run said NO COACH
+      // FOUND thirty-two times and gave nothing to act on - a whole run
+      // spent learning only that the guess was wrong. This makes one
+      // failed run say where to look instead.
+      if (!dumped && last && typeof last === "object") {
+        dumped = true;
+        console.log(`     last response had keys: ${Object.keys(last).join(", ")}`);
+        if (last.team && typeof last.team === "object") {
+          console.log(`     .team had keys: ${Object.keys(last.team).join(", ")}`);
+        }
+      }
       continue;
     }
     const imageUrl = await resolveHeadshot(coach.espnId);

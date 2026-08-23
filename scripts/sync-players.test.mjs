@@ -109,8 +109,16 @@ assert.deepEqual(await depthChartAt(2026, "T", QB.slots, 1), []);
 // ESPN has carried the coach as `coach`, as `coaches`, and as a wrapped
 // list. All three are read, because a shape change here does not throw -
 // it silently drops a team out of the list.
+// The roster response, which is where it actually lives - a top-level
+// `coach` array beside `athletes`. The first version of this looked on
+// the team object and found nothing for all 32.
+assert.deepEqual(coachFrom({ athletes: [], coach: [{ id: 7, firstName: "Andy", lastName: "Reid" }] }),
+  { espnId: "7", name: "Andy Reid" });
 assert.deepEqual(coachFrom({ coach: { id: 7, firstName: "Andy", lastName: "Reid" } }),
   { espnId: "7", name: "Andy Reid" });
+// Wrapped under `team`, which the single-team endpoint would use.
+assert.deepEqual(coachFrom({ team: { coach: [{ id: 11, displayName: "Kyle Shanahan" }] } }),
+  { espnId: "11", name: "Kyle Shanahan" });
 assert.deepEqual(coachFrom({ coaches: [{ id: 8, displayName: "Sean McVay" }] }),
   { espnId: "8", name: "Sean McVay" });
 assert.deepEqual(coachFrom({ coach: { items: [{ id: 9, fullName: "Dan Campbell" }] } }),
