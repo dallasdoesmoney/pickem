@@ -2,6 +2,7 @@ import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { QUARTERBACKS } from "@/data/rosters/qbs";
 import { TIGHT_ENDS } from "@/data/rosters/tes";
 import { KICKERS } from "@/data/rosters/ks";
+import { HEAD_COACHES } from "@/data/rosters/coaches";
 import { RUNNING_BACKS } from "@/data/rosters/rbs";
 import { WIDE_RECEIVERS } from "@/data/rosters/wrs";
 import { espnHeadshot } from "@/lib/espnImages";
@@ -101,7 +102,10 @@ function playerTemplate({
   tagline: string;
   noun: [string, string];
   idPrefix: string;
-  players: { espnId: string; name: string; team: TeamAbbr }[];
+  // imageUrl overrides the built headshot URL. Coaches need it: they do
+  // not live at the players image path, so the sync records the URL it
+  // actually confirmed rather than one rebuilt from a guess.
+  players: { espnId: string; name: string; team: TeamAbbr; imageUrl?: string }[];
 }): TierTemplate {
   return {
     slug,
@@ -119,7 +123,7 @@ function playerTemplate({
       // and a bare ESPN id has no business colliding with that.
       id: `${idPrefix}-${p.espnId}`,
       label: p.name,
-      imageUrl: espnHeadshot(p.espnId),
+      imageUrl: p.imageUrl ?? espnHeadshot(p.espnId),
       backdropUrl: TEAMS[p.team].logo,
       accent: TEAMS[p.team].color,
     })),
@@ -162,6 +166,19 @@ const NFL_KICKERS = playerTemplate({
   players: KICKERS,
 });
 
+// The one category here that is not a position. Coaches get the same
+// treatment as players - portrait chip, team-colour plate, logo behind -
+// because "a category of people, one per team" is exactly what the
+// player template already is.
+const NFL_COACHES = playerTemplate({
+  slug: "nfl-head-coaches",
+  title: "NFL Head Coaches",
+  tagline: "Rank all 32 head coaches",
+  noun: ["head coach", "head coaches"],
+  idPrefix: "hc",
+  players: HEAD_COACHES,
+});
+
 const NFL_WRS = playerTemplate({
   slug: "nfl-wide-receivers",
   // Two per team rather than one: a team lines up three receivers and
@@ -180,7 +197,7 @@ export const TIER_TEMPLATES: Record<string, TierTemplate> = {
   // unsynced checkout offers fewer categories, which is recoverable;
   // offering an empty board is not - see qbs.ts.
   ...Object.fromEntries(
-    [NFL_QBS, NFL_RBS, NFL_WRS, NFL_TES, NFL_KICKERS]
+    [NFL_QBS, NFL_RBS, NFL_WRS, NFL_TES, NFL_KICKERS, NFL_COACHES]
       .filter((t) => t.items.length > 0)
       .map((t) => [t.slug, t]),
   ),
