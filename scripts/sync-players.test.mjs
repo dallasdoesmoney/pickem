@@ -109,14 +109,44 @@ assert.deepEqual(await depthChartAt(2026, "T", QB.slots, 1), []);
 // ESPN has carried the coach as `coach`, as `coaches`, and as a wrapped
 // list. All three are read, because a shape change here does not throw -
 // it silently drops a team out of the list.
-assert.deepEqual(coachFrom({ coach: { id: 7, firstName: "Andy", lastName: "Reid" } }),
-  { espnId: "7", name: "Andy Reid" });
-assert.deepEqual(coachFrom({ coaches: [{ id: 8, displayName: "Sean McVay" }] }),
-  { espnId: "8", name: "Sean McVay" });
-assert.deepEqual(coachFrom({ coach: { items: [{ id: 9, fullName: "Dan Campbell" }] } }),
-  { espnId: "9", name: "Dan Campbell" });
+// The roster response, which is where it actually lives - a top-level
+// `coach` array beside `athletes`. The first version looked on the team
+// object and found nothing for all 32.
+const coach = (payload) => {
+  const c = coachFrom(payload);
+  return c && { espnId: c.espnId, name: c.name, headshot: c.headshot, titled: c.titled };
+};
+assert.deepEqual(coach({ athletes: [], coach: [{ id: 7, firstName: "Andy", lastName: "Reid" }] }),
+  { espnId: "7", name: "Andy Reid", headshot: "", titled: false });
+assert.deepEqual(coach({ team: { coach: [{ id: 11, displayName: "Kyle Shanahan" }] } }),
+  { espnId: "11", name: "Kyle Shanahan", headshot: "", titled: false });
+
+// THE one that matters. That array is the whole staff, and taking [0]
+// put Jesse Minter in for Baltimore and Todd Monken in for Cleveland -
+// coordinators, in a head coach list, looking entirely normal.
+assert.deepEqual(
+  coach({
+    coach: [
+      { id: 1, displayName: "Some Coordinator", position: { name: "Offensive Coordinator" } },
+      { id: 2, displayName: "The Boss", position: { name: "Head Coach" } },
+    ],
+  }),
+  { espnId: "2", name: "The Boss", headshot: "", titled: true },
+);
+// Titles have come through as a plain string and as displayName too.
+assert.equal(coach({ coach: [{ id: 3, displayName: "A" }, { id: 4, displayName: "B", position: "head coach" }] })?.espnId, "4");
+assert.equal(coach({ coach: [{ id: 5, displayName: "A" }, { id: 6, displayName: "B", title: "Head Coach" }] })?.espnId, "6");
+// Nothing titled: falls back to the first, and says it was a guess.
+assert.equal(coach({ coach: [{ id: 9, displayName: "Only One" }] })?.titled, false);
+
+// A picture ESPN hands over beats one we build.
+assert.equal(
+  coach({ coach: [{ id: 12, displayName: "X", headshot: { href: "https://img/x.png" } }] })?.headshot,
+  "https://img/x.png",
+);
+
 // An id with no name is not a coach, and neither is a name with no id -
-// either one would write a row that renders as a blank tile.
+// either one writes a row that renders as a blank tile.
 assert.equal(coachFrom({ coach: { id: 10 } }), null);
 assert.equal(coachFrom({ coach: { firstName: "No", lastName: "Id" } }), null);
 assert.equal(coachFrom({}), null);
