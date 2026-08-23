@@ -22,7 +22,7 @@ export const DEFAULT_CAPS: readonly number[] = [1, 3, 5, 7];
 // being readable on a phone whatever else you do.
 export const MAX_PYRAMID_ROWS = 10;
 export const MAX_PER_ROW = 12;
-export const MIN_PYRAMID_ROWS = 1;
+export const MIN_PYRAMID_ROWS = 2;
 
 export const rankedIn = (caps: readonly number[]): number => caps.reduce((a, b) => a + b, 0);
 
@@ -279,30 +279,71 @@ export function silhouettePoints(shape: PyramidShape): string {
 
 // ------------------------------------------------------------- editing
 //
-// One place at a time. Nothing derives anything: a row holds what it
-// holds, and the outline redraws around it.
+// A row is always the same as the row above it, TWO more, or two fewer.
+// Never one - because one more team widens a row by one logo plus one
+// gap, and two widens it by exactly twice that. Every delta being the
+// same size is what holds every sloped edge in the shape at one angle;
+// a row that stepped by one would lean at its own angle and the
+// silhouette would visibly kink. Same, +2, -2 is the whole vocabulary,
+// and a row's minus and plus walk between those three.
+export const STEP = 2;
+
 export const clampCap = (n: number) => Math.max(1, Math.min(MAX_PER_ROW, Math.round(n) || 1));
 
-export function bumpRow(caps: readonly number[], row: number, by: 1 | -1): number[] {
-  const next = [...caps];
-  // Taking the last place off the bottom row removes the row - the exact
-  // inverse of adding one at the bottom, so the two controls undo each
-  // other rather than leaving an empty row behind.
-  if (by === -1 && next[row] === 1) {
-    return row === next.length - 1 && next.length > MIN_PYRAMID_ROWS
-      ? next.slice(0, -1)
-      : next;
+// -1 in, 0 straight down, +1 out. Derived from the counts rather than
+// stored, which is lossless because every delta is 0 or +/-STEP.
+export type Direction = -1 | 0 | 1;
+export const directionsOf = (caps: readonly number[]): Direction[] =>
+  caps.map((c, r) => (r === 0 ? 0 : (Math.sign(c - caps[r - 1]) as Direction)));
+
+// Rebuild the counts from the top row and a direction per row. A row that
+// cannot go the way it is pointed - there is no room below one, or above
+// twelve - goes straight down instead of being clamped part way, because
+// a clamped row is a half-step and a half-step is a different angle.
+export function capsFromDirs(seed: number, dirs: readonly Direction[]): number[] {
+  const caps = [clampCap(seed)];
+  for (let r = 1; r < dirs.length; r++) {
+    const want = caps[r - 1] + dirs[r] * STEP;
+    caps.push(want < 1 || want > MAX_PER_ROW ? caps[r - 1] : want);
   }
-  next[row] = clampCap(next[row] + by);
-  return next;
+  return caps;
+}
+
+// Whether a row's minus or plus does anything, so a button with nowhere
+// to go greys out instead of looking live and doing nothing.
+export function canBump(caps: readonly number[], row: number, by: 1 | -1): boolean {
+  if (row === 0) {
+    // The top row is the one free number in the shape. It moves by ONE,
+    // not two: shifting it shifts every row with it, so every delta -
+    // and therefore every angle - is untouched.
+    const seed = caps[0] + by;
+    return seed >= 1 && seed <= MAX_PER_ROW;
+  }
+  const dirs = directionsOf(caps);
+  const next = dirs[row] + by;
+  if (next < -1 || next > 1) return false;
+  const want = caps[row - 1] + next * STEP;
+  return want >= 1 && want <= MAX_PER_ROW;
+}
+
+export function bumpRow(caps: readonly number[], row: number, by: 1 | -1): number[] {
+  if (!canBump(caps, row, by)) return [...caps];
+  const dirs = directionsOf(caps);
+  if (row === 0) return capsFromDirs(caps[0] + by, dirs);
+  dirs[row] = (dirs[row] + by) as Direction;
+  return capsFromDirs(caps[0], dirs);
 }
 
 export function addRow(caps: readonly number[]): number[] {
   if (caps.length >= MAX_PYRAMID_ROWS) return [...caps];
-  // Two wider than the row above it, which is the step the pyramid has
-  // always grown by - so adding a row to the stock shape keeps it a
-  // triangle rather than putting a kink in it.
-  return [...caps, clampCap(caps[caps.length - 1] + 2)];
+  const dirs = directionsOf(caps);
+  // Carries on the way the shape was already going, so adding a row to a
+  // triangle keeps it a triangle rather than putting a kink in it.
+  return capsFromDirs(caps[0], [...dirs, dirs[dirs.length - 1] || 1]);
+}
+
+export function removeRow(caps: readonly number[]): number[] {
+  return caps.length > MIN_PYRAMID_ROWS ? caps.slice(0, -1) : [...caps];
 }
 
 // Anything that crossed a trust boundary - a hand-edited localStorage

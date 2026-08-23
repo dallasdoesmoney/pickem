@@ -24,6 +24,7 @@ import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } fro
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import {
   MAX_TIERS,
+  MIN_TIERS,
   MAX_TITLE,
   TierListAction,
   TierListState,
@@ -51,12 +52,19 @@ import { shareBlob } from "@/lib/shareBlob";
 import { buildReferralLink } from "@/lib/referralStorage";
 import { TierItemChip, SortableTierItem } from "@/components/tierList/TierItemChip";
 import { TierRow } from "@/components/tierList/TierRow";
-import { PyramidView, POOL_ID as PYRAMID_POOL, ROW_CTL_W } from "@/components/tierList/PyramidView";
+import {
+  PyramidView,
+  POOL_ID as PYRAMID_POOL,
+  ROW_BUTTON_GAP,
+  ROW_CTL_W,
+  RowButton,
+} from "@/components/tierList/PyramidView";
 import {
   DEFAULT_CAPS,
   addRow,
   bumpRow,
   fillSlots,
+  removeRow,
   rankedIn,
   rowsOf,
   sanitizeCaps,
@@ -305,12 +313,13 @@ export default function TierListPageClient({
   // it - so this is the only guard on a list saved before shapes existed,
   // or one whose blob has been tampered with.
   const caps = useMemo(() => sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], [state.pyramid]);
+  const boardWidth = Math.min(viewportWidth, 1056) - 32;
   const pyrShape = useMemo(
     // Minus the gutter the row steppers sit in, so the shape and its
     // controls together are what fits the board rather than the shape
     // alone with the buttons hanging off the edge.
-    () => solvePyramid(Math.min(viewportWidth, 1056) - 32 - (readOnlySnapshot ? 0 : ROW_CTL_W), caps),
-    [viewportWidth, caps, readOnlySnapshot]
+    () => solvePyramid(boardWidth - (readOnlySnapshot ? 0 : ROW_CTL_W), caps),
+    [boardWidth, caps, readOnlySnapshot]
   );
   const places = useMemo(() => rankedIn(caps), [caps]);
   const rowOf = useMemo(() => rowsOf(caps), [caps]);
@@ -1068,6 +1077,28 @@ export default function TierListPageClient({
           </button>
         )}
 
+        {/* The same pair the pyramid has, and for the same reason: adding
+            a row is a normal thing to want and it should not need a mode.
+            Hidden while editing, which already has its own full-width
+            ADD TIER right above this. */}
+        {view === "rows" && !editing && !readOnlySnapshot && (
+          <div className={`flex justify-center gap-2 ${ROW_BUTTON_GAP}`}>
+            <RowButton
+              onClick={() => {
+                const last = state.tiers[state.tiers.length - 1];
+                if (last) dispatch({ type: "deleteTier", tierId: last.id });
+              }}
+              disabled={state.tiers.length <= MIN_TIERS}
+              label="− REMOVE TIER"
+            />
+            <RowButton
+              onClick={() => dispatch({ type: "addTier" })}
+              disabled={state.tiers.length >= MAX_TIERS}
+              label="+ ADD TIER"
+            />
+          </div>
+        )}
+
         {view === "rows" ? (
           <UnrankedPool
             hot={draggingId !== null && overTier === null}
@@ -1109,6 +1140,10 @@ export default function TierListPageClient({
                 : (row, by) => dispatch({ type: "setPyramid", caps: bumpRow(caps, row, by) })
             }
             onAddRow={readOnlySnapshot ? undefined : () => dispatch({ type: "setPyramid", caps: addRow(caps) })}
+            onRemoveRow={
+              readOnlySnapshot ? undefined : () => dispatch({ type: "setPyramid", caps: removeRow(caps) })
+            }
+            frameWidth={boardWidth}
           />
         )}
 

@@ -5,10 +5,10 @@ import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { DraggableTierItem } from "./TierItemChip";
 import { TIER_LABEL_FONT, pickTierLabelSize } from "./tierLabel";
 import {
-  MAX_PER_ROW,
   MAX_PYRAMID_ROWS,
   MIN_PYRAMID_ROWS,
   PyramidShape,
+  canBump,
   rankedIn,
   rowClip,
   rowsOf,
@@ -20,7 +20,16 @@ import {
 // Reserved rather than borrowed, because there is no dead space inside
 // the shape to put them in: a row's teams run right up to both slopes,
 // and on a diamond they do it at the bottom as well as the top.
-export const ROW_CTL_W = 44;
+//
+// It is pinned to the BOARD's right edge, not the shape's. The shape's
+// width changes every time a row does, so buttons parked beside it slid
+// left and right under your finger - you had to find the button again
+// after every press. Against the board they do not move at all.
+export const ROW_CTL_W = 52;
+
+// The spacing under a board before its add/remove pair, shared so the
+// tier list and the pyramid sit the buttons at the same distance.
+export const ROW_BUTTON_GAP = "mt-2";
 
 // The board's other layout. It renders inside the editor's own DndContext
 // and reports drops through it, so every control on the page - clear,
@@ -84,31 +93,29 @@ function Slot({
   );
 }
 
-// A row's own minus and plus, parked in the gutter beside it. One place
-// at a time, which is the whole vocabulary - taking the last place off
-// the bottom row removes the row, so this and ADD ROW undo each other.
+// A row's own minus and plus, parked in a fixed column down the right of
+// the board. Minus and plus walk the row between three states: the same
+// as the row above, two more, two fewer.
 function RowStepper({
-  cap,
-  isLast,
-  rows,
+  caps,
+  row,
   onBump,
 }: {
-  cap: number;
-  isLast: boolean;
-  rows: number;
+  caps: readonly number[];
+  row: number;
   onBump: (by: 1 | -1) => void;
 }) {
-  const removes = cap === 1 && isLast && rows > MIN_PYRAMID_ROWS;
-  const canShrink = cap > 1 || removes;
   const btn =
-    "h-[22px] w-[20px] rounded-full text-[14px] leading-none text-white/60 transition-colors " +
-    "enabled:hover:bg-white/10 enabled:hover:text-white disabled:opacity-25";
+    "h-[24px] w-[24px] rounded-full text-[15px] leading-none text-white/65 transition-colors " +
+    "enabled:hover:bg-white/12 enabled:hover:text-white disabled:opacity-25";
+  // The top row moves by one and every other row by two - see pyramid.ts.
+  const jump = row === 0 ? "one" : "two";
   return (
     <span className="flex items-center rounded-full border border-white/15 bg-black/70 p-px backdrop-blur-[2px]">
       <button
         type="button"
-        aria-label={removes ? "Remove the bottom row" : "One fewer place in this row"}
-        disabled={!canShrink}
+        aria-label={`${jump === "one" ? "One" : "Two"} fewer places in this row`}
+        disabled={!canBump(caps, row, -1)}
         onClick={() => onBump(-1)}
         className={btn}
       >
@@ -116,14 +123,38 @@ function RowStepper({
       </button>
       <button
         type="button"
-        aria-label="One more place in this row"
-        disabled={cap >= MAX_PER_ROW}
+        aria-label={`${jump === "one" ? "One" : "Two"} more places in this row`}
+        disabled={!canBump(caps, row, 1)}
         onClick={() => onBump(1)}
         className={btn}
       >
         +
       </button>
     </span>
+  );
+}
+
+// The pair under the board. Exported because the tier list wants the
+// same two, so adding a row is the same gesture in either layout.
+export function RowButton({
+  onClick,
+  disabled,
+  label,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-full border border-dashed border-white/20 px-4 py-1.5 text-[10px] tracking-[0.1em] text-white/45 transition-colors enabled:hover:border-emerald-400/60 enabled:hover:text-emerald-300 disabled:opacity-35"
+      style={{ fontFamily: "var(--font-display)" }}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -141,6 +172,8 @@ export function PyramidView({
   onPlacePool,
   onBumpRow,
   onAddRow,
+  onRemoveRow,
+  frameWidth,
 }: {
   template: TierTemplate;
   shape: PyramidShape;
@@ -156,18 +189,30 @@ export function PyramidView({
   // Absent on a shared snapshot, which is somebody else's board.
   onBumpRow?: (row: number, by: 1 | -1) => void;
   onAddRow?: () => void;
+  onRemoveRow?: () => void;
+  // The board's full width. The shape is only as wide as its widest row,
+  // so this is what the row buttons are pinned to.
+  frameWidth?: number;
 }) {
   const { w, T, chip, height, leftEdgeAt } = shape;
   const rowOf = rowsOf(shape.caps);
+  const gutter = onBumpRow ? ROW_CTL_W : 0;
+  const frame = Math.max(w + gutter, frameWidth ?? w + gutter);
+  const shapeLeft = Math.max(0, (frame - gutter - w) / 2);
   const { setNodeRef: poolRef } = useDroppable({ id: POOL_ID });
   const armed = !!selectedId;
 
   return (
     <>
+      {/* The frame is the BOARD's width and never changes; the shape sits
+          centred inside what the button column leaves. Sizing the frame
+          to the shape instead made the whole thing shuffle sideways every
+          time a row changed. */}
       <div
         className="relative mx-auto"
-        style={{ width: w + (onBumpRow ? ROW_CTL_W : 0), height }}
+        style={{ width: frame, height }}
       >
+      <div className="absolute top-0" style={{ left: shapeLeft, width: w, height }}>
         {shape.caps.map((_, row) => {
           const band = bands[row];
           const clip = rowClip(shape, row);
@@ -256,34 +301,36 @@ export function PyramidView({
           );
         })}
 
+      </div>
+
         {onBumpRow &&
-          shape.caps.map((cap, row) => (
+          shape.caps.map((_, row) => (
             <div
               key={`ctl-${row}`}
               className="absolute"
-              style={{ left: w + 2, top: row * shape.rowH + (shape.rowH - 22) / 2 }}
+              style={{ left: frame - ROW_CTL_W, top: row * shape.rowH + (shape.rowH - 24) / 2 }}
             >
-              <RowStepper
-                cap={cap}
-                isLast={row === shape.caps.length - 1}
-                rows={shape.caps.length}
-                onBump={(by) => onBumpRow(row, by)}
-              />
+              <RowStepper caps={shape.caps} row={row} onBump={(by) => onBumpRow(row, by)} />
             </div>
           ))}
       </div>
 
-      {onAddRow && (
-        <div className="mt-2 flex justify-center">
-          <button
-            type="button"
-            onClick={onAddRow}
-            disabled={shape.caps.length >= MAX_PYRAMID_ROWS}
-            className="rounded-full border border-dashed border-white/20 px-4 py-1.5 text-[10px] tracking-[0.1em] text-white/45 transition-colors enabled:hover:border-emerald-400/60 enabled:hover:text-emerald-300 disabled:opacity-35"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            + ADD ROW
-          </button>
+      {(onAddRow || onRemoveRow) && (
+        <div className={`flex justify-center gap-2 ${ROW_BUTTON_GAP}`}>
+          {onRemoveRow && (
+            <RowButton
+              onClick={onRemoveRow}
+              disabled={shape.caps.length <= MIN_PYRAMID_ROWS}
+              label="− REMOVE ROW"
+            />
+          )}
+          {onAddRow && (
+            <RowButton
+              onClick={onAddRow}
+              disabled={shape.caps.length >= MAX_PYRAMID_ROWS}
+              label="+ ADD ROW"
+            />
+          )}
         </div>
       )}
 
