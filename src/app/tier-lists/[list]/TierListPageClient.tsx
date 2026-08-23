@@ -25,6 +25,7 @@ import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import {
   MAX_TIERS,
   MIN_TIERS,
+  shownFor,
   MAX_TITLE,
   TierListAction,
   TierListState,
@@ -313,9 +314,23 @@ export default function TierListPageClient({
   // or one whose blob has been tampered with.
   // One entry per tier, always: a row IS a tier, so a tier added or
   // removed in either layout has to show up in the shape.
+  // One list of tiers, two layouts that each reveal as much of it as they
+  // have been told to. Adding a row in one does not rearrange the other.
+  const shown = useMemo(() => shownFor(state), [state]);
+  const visibleTiers = useMemo(
+    () => state.tiers.slice(0, shown[view]),
+    [state.tiers, shown, view]
+  );
   const caps = useMemo(
-    () => fitCaps(sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], state.tiers.length),
-    [state.pyramid, state.tiers.length]
+    () => fitCaps(sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], shown.pyramid),
+    [state.pyramid, shown.pyramid]
+  );
+  // Teams sitting in a tier this layout does not show. Still ranked, and
+  // still there when the layout reveals that tier again - but from in here
+  // they are off the board, so they belong in the pool with the rest.
+  const hiddenRanked = useMemo(
+    () => state.tiers.slice(shown[view]).flatMap((t) => state.placements[t.id] ?? []),
+    [state.tiers, state.placements, shown, view]
   );
   const boardWidth = Math.min(viewportWidth, 1056) - 32;
   const pyrShape = useMemo(
@@ -333,6 +348,10 @@ export default function TierListPageClient({
   // Below the cut, in the order the board has them: the ranked ones that
   // did not make the top sixteen first, then everything unranked.
   const missedTheCut = useMemo(() => belowTheCut(state, caps), [state, caps]);
+  // The tier list's pool. Same idea as the pyramid's cut: a team in a
+  // hidden tier is off this layout's board, so it sits here until the row
+  // it belongs to is revealed again.
+  const poolIds = useMemo(() => [...hiddenRanked, ...state.unranked], [hiddenRanked, state.unranked]);
 
   const placeInSlot = useCallback(
     (itemId: string, slot: number) => {
@@ -351,20 +370,30 @@ export default function TierListPageClient({
     [dispatch]
   );
 
+  // Reveal the next tier this layout is not showing yet, or - once it is
+  // showing all of them - make a new one. The other layout keeps whatever
+  // it was showing, which is the point: a row added to the pyramid does
+  // not turn up in the tier list until you add one there too.
   const handleAddRow = useCallback(() => {
-    if (state.tiers.length >= MAX_TIERS) return;
-    dispatch({ type: "addTier" });
-    dispatch({ type: "setPyramid", caps: addRow(caps) });
-  }, [dispatch, state.tiers.length, caps]);
+    const count = shown[view];
+    if (count >= state.tiers.length) {
+      if (state.tiers.length >= MAX_TIERS) return;
+      dispatch({ type: "addTier" });
+    }
+    dispatch({ type: "setShown", view, count: count + 1 });
+    if (view === "pyramid") dispatch({ type: "setPyramid", caps: addRow(caps) });
+  }, [dispatch, shown, view, state.tiers.length, caps]);
 
+  // Hides the bottom row HERE. It does not delete the tier: the other
+  // layout may still be showing it, and its teams have not gone anywhere -
+  // they show up in this layout's pool until the row comes back. Deleting
+  // a tier for real is the bin in EDIT TIERS.
   const handleRemoveRow = useCallback(() => {
-    const last = state.tiers[state.tiers.length - 1];
-    if (!last || state.tiers.length <= MIN_TIERS) return;
-    // Teams in it go back to the pool, same as deleting the tier from the
-    // tier list - which is what this is.
-    dispatch({ type: "deleteTier", tierId: last.id });
-    dispatch({ type: "setPyramid", caps: removeRow(caps) });
-  }, [dispatch, state.tiers, caps]);
+    const count = shown[view];
+    if (count <= MIN_TIERS) return;
+    dispatch({ type: "setShown", view, count: count - 1 });
+    if (view === "pyramid") dispatch({ type: "setPyramid", caps: removeRow(caps) });
+  }, [dispatch, shown, view, caps]);
 
   // ------------------------------------------------------- the cascade
   //
@@ -406,7 +435,9 @@ export default function TierListPageClient({
 
   // Only a genuine bottom tier counts. With a single tier the top and the
   // bottom are the same row, and a promotion should not also be a binning.
-  const bottomTierId = state.tiers.length > 1 ? state.tiers[state.tiers.length - 1]?.id : undefined;
+  // The bottom of what this layout SHOWS - the celebration for reaching
+  // it should fire on the row you can actually see.
+  const bottomTierId = visibleTiers.length > 1 ? visibleTiers[visibleTiers.length - 1]?.id : undefined;
 
   const isInTier = useCallback(
     (s: TierListState, itemId: string, tierId: string | undefined) =>
@@ -1039,7 +1070,7 @@ export default function TierListPageClient({
           className="flex flex-col rounded-2xl border border-white/10 overflow-hidden bg-black"
           style={{ display: view === "pyramid" ? "none" : undefined }}
         >
-          {view === "rows" && state.tiers.map((tier, i) => (
+          {view === "rows" && visibleTiers.map((tier, i) => (
             <TierRow
               key={tier.id}
               tier={tier}
@@ -1057,7 +1088,7 @@ export default function TierListPageClient({
               hot={overTier === tier.id}
               isDropTarget={!!selectedId}
               canMoveUp={i > 0}
-              canMoveDown={i < state.tiers.length - 1}
+              canMoveDown={i < visibleTiers.length - 1}
               canDelete={state.tiers.length > 1}
               onRename={(label) => dispatch({ type: "renameTier", tierId: tier.id, label })}
               onCommitRename={() => {
@@ -1097,16 +1128,13 @@ export default function TierListPageClient({
         {view === "rows" && !editing && !readOnlySnapshot && (
           <div className={`flex justify-center gap-2 ${ROW_BUTTON_GAP}`}>
             <RowButton
-              onClick={() => {
-                const last = state.tiers[state.tiers.length - 1];
-                if (last) dispatch({ type: "deleteTier", tierId: last.id });
-              }}
-              disabled={state.tiers.length <= MIN_TIERS}
+              onClick={handleRemoveRow}
+              disabled={shown.rows <= MIN_TIERS}
               label="− REMOVE TIER"
             />
             <RowButton
-              onClick={() => dispatch({ type: "addTier" })}
-              disabled={state.tiers.length >= MAX_TIERS}
+              onClick={handleAddRow}
+              disabled={shown.rows >= state.tiers.length && state.tiers.length >= MAX_TIERS}
               label="+ ADD TIER"
             />
           </div>
@@ -1115,7 +1143,7 @@ export default function TierListPageClient({
         {view === "rows" ? (
           <UnrankedPool
             hot={draggingId !== null && overTier === null}
-            ids={state.unranked}
+            ids={poolIds}
             template={template}
             chipSize={chipSize}
             selectedItemId={selectedId}

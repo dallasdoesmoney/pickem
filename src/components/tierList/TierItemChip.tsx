@@ -176,7 +176,7 @@ export function TierItemChip({
 // ("Michael Penix Jr." -> "Penix Jr.") because dropping one can leave a
 // father and son indistinguishable, which is the exact job this caption
 // has.
-const SUFFIXES = new Set(["jr.", "sr.", "ii", "iii", "iv", "v"]);
+export const SUFFIXES = new Set(["jr.", "sr.", "ii", "iii", "iv", "v"]);
 
 // Slightly larger than the chip so the mark bleeds past the corners
 // rather than sitting in the middle of a frame, and faint enough to stay
@@ -184,12 +184,15 @@ const SUFFIXES = new Set(["jr.", "sr.", "ii", "iii", "iv", "v"]);
 export const BACKDROP_SCALE = 1.2;
 export const BACKDROP_OPACITY = 0.22;
 
-const BUNGEE_ADVANCE = 0.72; // em per character, measured off the face
+// em per character. 0.72 was measured off lowercase; these captions are
+// uppercased, and caps run wider - measured at 0.80-0.82 across the
+// surnames actually on the board, so the budget uses the worst of them.
+export const BUNGEE_ADVANCE = 0.82;
 function captionSize(fullName: string, chip: number): number {
   const chars = Math.max(1, surname(fullName).length);
   return Math.max(6, Math.min(chip * 0.17, (chip - 4) / (BUNGEE_ADVANCE * chars)));
 }
-function surname(fullName: string): string {
+export function surname(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length < 2) return fullName;
   const tail = parts.length - (SUFFIXES.has(parts[parts.length - 1].toLowerCase()) ? 2 : 1);

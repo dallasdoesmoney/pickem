@@ -1,5 +1,5 @@
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
-import { TierListState, tierLabelFor } from "@/lib/tierList";
+import { TierListState, shownFor, tierLabelFor } from "@/lib/tierList";
 import { BRAND_LOGO_SRC, drawBrandFooter, loadImage, resolveDisplayFont, roundRectPath } from "@/lib/canvasShare";
 import { BACKDROP_OPACITY, BACKDROP_SCALE } from "@/components/tierList/TierItemChip";
 import {
@@ -91,19 +91,26 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
   const chip = CHIP;
   const perRow = PER_ROW;
 
-  // Unranked teams are shown as a final muted strip rather than being
-  // dropped - a half-finished list is still a statement - but only when
-  // some exist, so a completed list ends cleanly on its last tier.
-  const showUnranked = state.unranked.length > 0;
+  // Only the rows this layout shows - the card is a picture of the board
+  // you were looking at, not of everything that board could reveal. Both
+  // counts are sanitised on the way out, because a share snapshot is the
+  // least trustworthy state in the app.
+  const shown = shownFor(state);
+  const caps = fitCaps(sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], shown.pyramid);
 
-  const rows = state.tiers.map((t) => ({ tier: t, ids: state.placements[t.id] ?? [] }));
+  const rows = state.tiers
+    .slice(0, shown.rows)
+    .map((t) => ({ tier: t, ids: state.placements[t.id] ?? [] }));
 
-  // Pyramid mode is a different composition, not a variant of the rows:
-  // its own geometry, its own mark size, and a cut instead of an unranked
-  // strip. Everything below branches on it once and then goes its own way.
-  // Same guard as the editor: a share snapshot is the least trustworthy
-  // state in the app.
-  const caps = fitCaps(sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], state.tiers.length);
+  // The strip under a tier list: unranked teams, plus any sitting in a
+  // tier this layout does not show. Drawn rather than dropped - a
+  // half-finished list is still a statement - but only when some exist,
+  // so a completed list ends cleanly on its last tier.
+  const pool = [
+    ...state.tiers.slice(shown.rows).flatMap((t) => state.placements[t.id] ?? []),
+    ...state.unranked,
+  ];
+  const showUnranked = pool.length > 0;
   const shape = pyramid ? solvePyramid(WIDTH - PAD_X * 2, caps) : null;
   const placed = new Set((pyramid ?? []).filter(Boolean) as string[]);
   const missed = pyramid ? template.items.map((i) => i.id).filter((id) => !placed.has(id)) : [];
@@ -111,7 +118,7 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
   const bodyH = shape
     ? shape.height + 26 + rowHeight(missed.length, shape.chip, PER_ROW) + ROW_GAP
     : rows.reduce((h, r) => h + rowHeight(r.ids.length, chip, perRow) + ROW_GAP, 0) +
-      (showUnranked ? rowHeight(state.unranked.length, chip, perRow) + ROW_GAP + 26 : 0);
+      (showUnranked ? rowHeight(pool.length, chip, perRow) + ROW_GAP + 26 : 0);
 
   const headerH = HEADER_EYEBROW_PX + HEADER_EYEBROW_GAP + HEADER_TITLE_PX + HEADER_TITLE_GAP + 20;
   const totalHeight = PAD_TOP + headerH + bodyH + BRAND_FOOTER_H + PAD_BOTTOM;
@@ -122,7 +129,7 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
   // all thirty-two too - sixteen placed and sixteen below the cut.
   const usedIds = pyramid
     ? template.items.map((i) => i.id)
-    : [...rows.flatMap((r) => r.ids), ...state.unranked];
+    : [...rows.flatMap((r) => r.ids), ...pool];
   // Backdrops are loaded in the same pass rather than lazily: the canvas
   // draws in one synchronous sweep, so anything not resolved by here is
   // simply missing from the card.
@@ -254,10 +261,10 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
     ctx.textAlign = "left";
     ctx.font = `13px system-ui, sans-serif`;
     ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.fillText(`STILL UNRANKED (${state.unranked.length})`, PAD_X, cursorY + 13);
+    ctx.fillText(`STILL UNRANKED (${pool.length})`, PAD_X, cursorY + 13);
     cursorY += 26;
-    const h = rowHeight(state.unranked.length, chip, perRow);
-    drawPool(ctx, { x: PAD_X, y: cursorY, h, ids: state.unranked, chip, perRow, logos, backdrops, template });
+    const h = rowHeight(pool.length, chip, perRow);
+    drawPool(ctx, { x: PAD_X, y: cursorY, h, ids: pool, chip, perRow, logos, backdrops, template });
     cursorY += h + ROW_GAP;
   }
 

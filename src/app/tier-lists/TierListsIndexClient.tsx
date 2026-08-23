@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { TierTemplate, getTierTemplate } from "@/data/tierTemplates";
-import { BoardThumb, previewFor } from "@/components/tierList/BoardThumb";
+import { BoardThumb, BoardZoom, previewFor } from "@/components/tierList/BoardThumb";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
@@ -55,7 +55,7 @@ function TemplateCard({ template }: { template: TierTemplate }) {
   return (
     <Link href={`/tier-lists/${template.slug}`} className={CARD}>
       <span className="block p-2.5 pb-0">
-        <BoardThumb state={preview} template={template} />
+        <BoardZoom state={preview} template={template} />
       </span>
       {/* The name, and nothing else.
           The tagline said in a sentence what the board above it already

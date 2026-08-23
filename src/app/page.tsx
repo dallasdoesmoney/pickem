@@ -11,7 +11,7 @@ import { TEAMS, TeamAbbr } from "@/data/teams";
 import { PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
 import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
 import { getTierTemplate } from "@/data/tierTemplates";
-import { BoardThumb, previewFor } from "@/components/tierList/BoardThumb";
+import { BoardZoom, previewFor } from "@/components/tierList/BoardThumb";
 import { useAuth } from "@/hooks/useAuth";
 
 // Every card fronts a destination with a live picture of what is behind
@@ -258,7 +258,7 @@ function TierListsCard() {
     <Link href="/tier-lists" className={CARD}>
       <div className={ART}>
         <div className="w-full">
-          <BoardThumb state={preview} template={template} />
+          <BoardZoom state={preview} template={template} />
         </div>
       </div>
       <div className="px-3 pt-2.5 pb-3">
