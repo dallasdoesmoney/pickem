@@ -1,9 +1,9 @@
 import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
-import { QUARTERBACKS } from "@/data/qbs";
-import { TIGHT_ENDS } from "@/data/tes";
-import { KICKERS } from "@/data/ks";
-import { RUNNING_BACKS } from "@/data/rbs";
-import { WIDE_RECEIVERS } from "@/data/wrs";
+import { QUARTERBACKS } from "@/data/rosters/qbs";
+import { TIGHT_ENDS } from "@/data/rosters/tes";
+import { KICKERS } from "@/data/rosters/ks";
+import { RUNNING_BACKS } from "@/data/rosters/rbs";
+import { WIDE_RECEIVERS } from "@/data/rosters/wrs";
 import { espnHeadshot } from "@/lib/espnImages";
 
 // A tier-list template is "what's being ranked" - the item set plus the

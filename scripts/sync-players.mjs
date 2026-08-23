@@ -22,7 +22,12 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, join } from "node:path";
 
-const DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data");
+// Their own directory, so the workflow that commits them can name the
+// DIRECTORY rather than a list of files. Listing them meant adding a
+// category silently produced a roster the scheduled sync then refused to
+// commit - the sort of gap that shows up a month later as "why is that
+// tier list stale".
+const DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data", "rosters");
 
 // One entry per category. `slots` decides which depth chart positions
 // count, and `perTeam` how many players to take from them.
