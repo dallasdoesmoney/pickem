@@ -7,6 +7,7 @@ import { TIER_LABEL_FONT, pickTierLabelSize } from "./tierLabel";
 import {
   MAX_PYRAMID_ROWS,
   MIN_PYRAMID_ROWS,
+  PyramidBand,
   PyramidShape,
   canBump,
   rankedIn,
@@ -173,11 +174,14 @@ export function PyramidView({
   onBumpRow,
   onAddRow,
   onRemoveRow,
+  editing,
+  onRename,
+  onActivateBand,
   frameWidth,
 }: {
   template: TierTemplate;
   shape: PyramidShape;
-  bands: { label: string; accent: string }[];
+  bands: PyramidBand[];
   slots: (string | null)[];
   missed: string[];
   selectedId: string | null;
@@ -190,6 +194,10 @@ export function PyramidView({
   onBumpRow?: (row: number, by: 1 | -1) => void;
   onAddRow?: () => void;
   onRemoveRow?: () => void;
+  // EDIT TIERS, without leaving the pyramid.
+  editing?: boolean;
+  onRename?: (tierId: string, label: string) => void;
+  onActivateBand?: (tierId: string) => void;
   // The board's full width. The shape is only as wide as its widest row,
   // so this is what the row buttons are pinned to.
   frameWidth?: number;
@@ -244,19 +252,43 @@ export function PyramidView({
                 {/* Inside the band, so the band's own clip cuts it: the
                     band is a parallelogram, and a name tall enough to wrap
                     reaches past its slanted edges. */}
-                <span
-                  data-plabel
-                  className="absolute top-1/2 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
-                  style={{
-                    ...TIER_LABEL_FONT,
-                    left: 0,
-                    width: T - 12,
-                    transform: `translate(${leftEdgeAt(row * shape.rowH + shape.rowH / 2) + T / 2}px, -50%) translateX(-50%)`,
-                    fontSize: pickTierLabelSize(band.label, true),
-                  }}
-                >
-                  {band.label}
-                </span>
+                {editing && band.id && onRename ? (
+                  // Renamed where it sits, so EDIT TIERS does not have to
+                  // throw you back to the tier list to change a name. Same
+                  // font, same box, same clip as the label it replaces -
+                  // the only difference is that you can type in it.
+                  <textarea
+                    data-plabel
+                    value={band.label}
+                    onChange={(e) => onRename(band.id!, e.target.value)}
+                    onFocus={() => onActivateBand?.(band.id!)}
+                    rows={1}
+                    spellCheck={false}
+                    aria-label={`Rename this tier`}
+                    className="absolute top-1/2 resize-none overflow-hidden bg-transparent text-center leading-[1.18] uppercase outline-none rounded-[3px] ring-1 ring-dashed ring-black/25 focus:ring-black/60 [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
+                    style={{
+                      ...TIER_LABEL_FONT,
+                      left: 0,
+                      width: T - 12,
+                      transform: `translate(${leftEdgeAt(row * shape.rowH + shape.rowH / 2) + T / 2}px, -50%) translateX(-50%)`,
+                      fontSize: pickTierLabelSize(band.label, true),
+                    }}
+                  />
+                ) : (
+                  <span
+                    data-plabel
+                    className="absolute top-1/2 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
+                    style={{
+                      ...TIER_LABEL_FONT,
+                      left: 0,
+                      width: T - 12,
+                      transform: `translate(${leftEdgeAt(row * shape.rowH + shape.rowH / 2) + T / 2}px, -50%) translateX(-50%)`,
+                      fontSize: pickTierLabelSize(band.label, true),
+                    }}
+                  >
+                    {band.label}
+                  </span>
+                )}
               </span>
             </div>
           );

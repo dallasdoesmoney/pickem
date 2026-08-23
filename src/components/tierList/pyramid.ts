@@ -22,7 +22,8 @@ export const DEFAULT_CAPS: readonly number[] = [1, 3, 5, 7];
 // being readable on a phone whatever else you do.
 export const MAX_PYRAMID_ROWS = 10;
 export const MAX_PER_ROW = 12;
-export const MIN_PYRAMID_ROWS = 2;
+// One, to agree with MIN_TIERS: a pyramid row is a tier.
+export const MIN_PYRAMID_ROWS = 1;
 
 export const rankedIn = (caps: readonly number[]): number => caps.reduce((a, b) => a + b, 0);
 
@@ -32,60 +33,85 @@ export const rowsOf = (caps: readonly number[]): number[] =>
 export const firstSlotsOf = (caps: readonly number[]): number[] =>
   caps.map((_, row) => caps.slice(0, row).reduce((a, b) => a + b, 0));
 
-// Top tier first, then left to right inside it. It is the only ranking a
-// free-form board already contains, so it is what the pyramid fills from.
-export const readingOrder = (state: TierListState): string[] =>
-  state.tiers.flatMap((t) => state.placements[t.id] ?? []);
-
-export const fillSlots = (order: string[], caps: readonly number[]): (string | null)[] =>
-  Array.from({ length: rankedIn(caps) }, (_, i) => order[i] ?? null);
-
-// The inverse of the fill: which tier and which place in it a given rank
-// is, so a move made in the pyramid can be made on the board instead.
+// A pyramid ROW IS A TIER. Row r draws tier r, left to right, up to the
+// places that row has; anything past that falls below the cut.
 //
-// This is what makes the pyramid an edit of the tier list rather than a
-// picture of it. Slot 5 IS reading position 5, so dropping a team there
-// means "make this the sixth-best thing on the board", and the tier it
-// lands in falls out of how many the tiers above it already hold.
+// It used to be a slice of the whole board's reading order instead -
+// every tier flattened into one list and cut at sixteen - and that had
+// two consequences nobody wanted. Dropping a team into the fourth row of
+// an empty board put it at the APEX, because rank 10 of a board holding
+// one team is rank 1; you could only ever fill the thing top to bottom.
+// And the tier a team actually landed in was invisible, so the pyramid
+// and the tier list disagreed about a board they were both showing.
 //
-// Computed with the moving item already taken out, because that is the
-// order the reducer inserts into - asking where rank 5 is while the item
-// is still sitting at rank 2 lands it one place late.
-export function insertionForRank(
+// Tying the row to the tier fixes both at once: every drop says which
+// tier, the two layouts always agree, and rows can be filled in any
+// order.
+export function slotsForBoard(state: TierListState, caps: readonly number[]): (string | null)[] {
+  const out: (string | null)[] = [];
+  caps.forEach((cap, row) => {
+    const tier = state.tiers[row];
+    const ids = tier ? state.placements[tier.id] ?? [] : [];
+    for (let i = 0; i < cap; i++) out.push(ids[i] ?? null);
+  });
+  return out;
+}
+
+// Everything the shape has no room for: each tier's overflow in tier
+// order, then the pool. A team here is not necessarily unranked - it may
+// be eleventh in a tier that only shows five - which is why this is
+// "missed the cut" rather than "unranked".
+export function belowTheCut(state: TierListState, caps: readonly number[]): string[] {
+  const out: string[] = [];
+  state.tiers.forEach((tier, row) => {
+    const ids = state.placements[tier.id] ?? [];
+    out.push(...ids.slice(caps[row] ?? 0));
+  });
+  out.push(...state.unranked);
+  return out;
+}
+
+// Which tier a slot belongs to, and where in it. The place is where the
+// team lands INSIDE that tier - a row compacts left, because a tier is a
+// list and a list has no gaps.
+export function tierSlotFor(
   state: TierListState,
-  itemId: string,
-  rank: number,
-  hintRow: number,
+  caps: readonly number[],
+  slot: number,
 ): { tier: string | null; index: number | null } {
-  let at = 0;
-  for (const tier of state.tiers) {
-    const n = (state.placements[tier.id] ?? []).filter((id) => id !== itemId).length;
-    // <= rather than <, so a rank landing exactly on a tier's end appends
-    // to that tier instead of jumping to the front of the next one. Both
-    // give the same reading order; this one keeps a promotion inside the
-    // tier the team was heading for.
-    if (rank <= at + n) return { tier: tier.id, index: rank - at };
-    at += n;
-  }
-  // Past the end of every tier - the board has fewer ranked items than
-  // the pyramid has places. The row aimed at is the only hint available,
-  // and it is a good one: the apex is the top tier.
-  const tier = state.tiers[Math.min(hintRow, state.tiers.length - 1)];
-  return { tier: tier?.id ?? null, index: null };
+  const row = rowsOf(caps)[slot];
+  const place = slot - firstSlotsOf(caps)[row];
+  const tier = state.tiers[row];
+  return tier ? { tier: tier.id, index: place } : { tier: null, index: null };
+}
+
+// The shape has one entry per tier, always. Tiers can be added and
+// removed from either layout, so rather than keeping two lengths in step
+// everywhere this fits the stored shape to whatever the board has now:
+// a new row carries on the way the shape was already going, and rows past
+// the last tier are dropped.
+export function fitCaps(caps: readonly number[], tierCount: number): number[] {
+  const out = caps.slice(0, Math.max(1, tierCount));
+  // A row nobody asked for runs STRAIGHT DOWN - it repeats the row above
+  // rather than continuing to widen. Carrying the step on instead turned
+  // the stock six-tier board into 1-3-5-7-9-11, which is 36 places for 32
+  // teams and logos small enough to be unreadable. Widening is something
+  // you press the plus for.
+  while (out.length < tierCount) out.push(out[out.length - 1] ?? 1);
+  return out.map(clampCap);
 }
 
 // A band per row, taking its look from the tier at the same depth so the
 // pyramid is recognisably the same list. A shape with more rows than the
 // board has tiers falls back to the ladder's own colours.
-export function pyramidBands(
-  tiers: Tier[],
-  caps: readonly number[],
-): { label: string; accent: string }[] {
+export type PyramidBand = { id: string | null; label: string; accent: string };
+
+export function pyramidBands(tiers: Tier[], caps: readonly number[]): PyramidBand[] {
   return caps.map((_, i) => {
     const tier = tiers[i];
     return tier
-      ? { label: tierLabelFor(tier, i), accent: tier.accent }
-      : { label: "", accent: accentForIndex(i) };
+      ? { id: tier.id, label: tierLabelFor(tier, i), accent: tier.accent }
+      : { id: null, label: "", accent: accentForIndex(i) };
   });
 }
 

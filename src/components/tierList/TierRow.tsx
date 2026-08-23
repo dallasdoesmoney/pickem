@@ -290,17 +290,16 @@ export function TierRow({
         )}
       </div>
 
-      {/* Tier controls live at the end of the row, not inside the rail.
-          Three buttons crushed into a 64px rail under the label was the
-          worst part of edit mode; out here they get full-size targets and
-          the rail only has to hold a name. */}
-      {/* This tier's own controls, at the end of its row, and only on the
-          tier being edited. They were in the rail once, where three
-          buttons crushed into 64px was the worst part of edit mode; out
-          here they get full-size targets and the rail only has to hold a
-          name. On every row at once they cost a phone two marks a line,
-          which is the board rearranging itself to be edited. */}
-      {editing && active && (
+      {/* This tier's own controls, at the end of its row, on EVERY row
+          while editing. They were in the rail once, where three buttons
+          crushed into 64px was the worst part of edit mode; out here they
+          get full-size targets and the rail only has to hold a name.
+          Showing them one row at a time - only on the tier you had tapped
+          - cost a phone less width, but it hid reordering behind a step
+          nobody guesses at: you cannot move a row up if you do not know
+          the arrows exist. Two marks a line is the price of them being
+          findable. */}
+      {editing && (
         <div className="shrink-0 flex items-center gap-1.5 pr-2.5 pl-1">
           <RailButton label="Move tier up" disabled={!canMoveUp} onClick={() => onMove(-1)}>
             <path d="M18 15l-6-6-6 6" />

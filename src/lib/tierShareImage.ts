@@ -6,6 +6,7 @@ import {
   DEFAULT_CAPS,
   PyramidShape,
   pyramidBands,
+  fitCaps,
   rankedIn,
   sanitizeCaps,
   slotRect,
@@ -102,7 +103,7 @@ export async function renderTierShareImage({ state, template, pyramid }: TierSha
   // strip. Everything below branches on it once and then goes its own way.
   // Same guard as the editor: a share snapshot is the least trustworthy
   // state in the app.
-  const caps = sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS];
+  const caps = fitCaps(sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], state.tiers.length);
   const shape = pyramid ? solvePyramid(WIDTH - PAD_X * 2, caps) : null;
   const placed = new Set((pyramid ?? []).filter(Boolean) as string[]);
   const missed = pyramid ? template.items.map((i) => i.id).filter((id) => !placed.has(id)) : [];

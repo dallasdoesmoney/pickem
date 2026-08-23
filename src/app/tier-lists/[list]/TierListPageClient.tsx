@@ -63,14 +63,13 @@ import {
   DEFAULT_CAPS,
   addRow,
   bumpRow,
-  fillSlots,
+  belowTheCut,
+  fitCaps,
   removeRow,
-  rankedIn,
-  rowsOf,
   sanitizeCaps,
-  insertionForRank,
   pyramidBands,
-  readingOrder,
+  slotsForBoard,
+  tierSlotFor,
   solvePyramid,
 } from "@/components/tierList/pyramid";
 import { readBoard, runCascade } from "@/components/tierList/cascade";
@@ -312,7 +311,12 @@ export default function TierListPageClient({
   // the database goes straight into the reducer without passing through
   // it - so this is the only guard on a list saved before shapes existed,
   // or one whose blob has been tampered with.
-  const caps = useMemo(() => sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], [state.pyramid]);
+  // One entry per tier, always: a row IS a tier, so a tier added or
+  // removed in either layout has to show up in the shape.
+  const caps = useMemo(
+    () => fitCaps(sanitizeCaps(state.pyramid) ?? [...DEFAULT_CAPS], state.tiers.length),
+    [state.pyramid, state.tiers.length]
+  );
   const boardWidth = Math.min(viewportWidth, 1056) - 32;
   const pyrShape = useMemo(
     // Minus the gutter the row steppers sit in, so the shape and its
@@ -321,40 +325,46 @@ export default function TierListPageClient({
     () => solvePyramid(boardWidth - (readOnlySnapshot ? 0 : ROW_CTL_W), caps),
     [boardWidth, caps, readOnlySnapshot]
   );
-  const places = useMemo(() => rankedIn(caps), [caps]);
-  const rowOf = useMemo(() => rowsOf(caps), [caps]);
   // Which container a pyramid drag is over: a slot index, "pool", or null.
   const [pyrOver, setPyrOver] = useState<number | "pool" | null>(null);
 
-  const order = useMemo(() => readingOrder(state), [state]);
-  const pyrSlots = useMemo(() => fillSlots(order, caps), [order, caps]);
+  const pyrSlots = useMemo(() => slotsForBoard(state, caps), [state, caps]);
   const bands = useMemo(() => pyramidBands(state.tiers, caps), [state.tiers, caps]);
   // Below the cut, in the order the board has them: the ranked ones that
   // did not make the top sixteen first, then everything unranked.
-  const missedTheCut = useMemo(
-    () => [...order.slice(places), ...state.unranked],
-    [order, state.unranked, places]
-  );
+  const missedTheCut = useMemo(() => belowTheCut(state, caps), [state, caps]);
 
   const placeInSlot = useCallback(
     (itemId: string, slot: number) => {
-      const { tier, index } = insertionForRank(state, itemId, slot, rowOf[slot]);
+      const { tier, index } = tierSlotFor(state, caps, slot);
       dispatch({ type: "moveItem", itemId, toTier: tier, toIndex: index });
     },
-    [state, dispatch, rowOf]
+    [state, dispatch, caps]
   );
 
-  // Out of the pyramid is not out of the list: the cut already holds
-  // ranked teams that placed seventeenth and lower, so this drops the
-  // team to exactly there rather than unranking it. Unranking is what the
-  // tier list's own pool is for.
+  // Dropping on the cut takes the team off the board. The cut also holds
+  // teams that are still ranked - overflow from a tier deeper than its row
+  // is wide - but putting one THERE on purpose can only mean unranking it,
+  // because every other destination is a place you could have aimed at.
   const dropFromPyramid = useCallback(
-    (itemId: string) => {
-      const { tier, index } = insertionForRank(state, itemId, places, caps.length - 1);
-      dispatch({ type: "moveItem", itemId, toTier: tier, toIndex: index });
-    },
-    [state, dispatch, places, caps.length]
+    (itemId: string) => dispatch({ type: "moveItem", itemId, toTier: null, toIndex: null }),
+    [dispatch]
   );
+
+  const handleAddRow = useCallback(() => {
+    if (state.tiers.length >= MAX_TIERS) return;
+    dispatch({ type: "addTier" });
+    dispatch({ type: "setPyramid", caps: addRow(caps) });
+  }, [dispatch, state.tiers.length, caps]);
+
+  const handleRemoveRow = useCallback(() => {
+    const last = state.tiers[state.tiers.length - 1];
+    if (!last || state.tiers.length <= MIN_TIERS) return;
+    // Teams in it go back to the pool, same as deleting the tier from the
+    // tier list - which is what this is.
+    dispatch({ type: "deleteTier", tierId: last.id });
+    dispatch({ type: "setPyramid", caps: removeRow(caps) });
+  }, [dispatch, state.tiers, caps]);
 
   // ------------------------------------------------------- the cascade
   //
@@ -893,7 +903,10 @@ export default function TierListPageClient({
           <button
             type="button"
             onClick={() => {
-              setView("rows");
+              // Stays in whichever layout you are in. It used to force the
+              // tier list, from when the pyramid had nothing editable in
+              // it - now its rows ARE the tiers, so being thrown out of
+              // the pyramid to rename one was just losing your place.
               setEditing((v) => !v);
               setEditingTierId(null);
             }}
@@ -969,11 +982,12 @@ export default function TierListPageClient({
           </p>
         )}
 
-        {/* Hidden while editing tiers: adding, renaming and reordering
-            tiers are all about a list of rows, and the pyramid has four
-            fixed bands instead. Switching in is what would need explaining,
-            not the toggle being absent. */}
-        {!editing && (
+        {/* Shown while editing too. It used to be hidden, because the
+            pyramid had four fixed bands and nothing about EDIT TIERS
+            applied to it. Its rows ARE the tiers now - renaming, adding
+            and removing all work in either layout - so taking the toggle
+            away would only strand you. */}
+        {true && (
           <div className="flex justify-center mt-2">
             <div className="flex gap-1 rounded-full border border-white/12 bg-black/40 p-1">
               {(["rows", "pyramid"] as const).map((v) => (
@@ -1055,7 +1069,6 @@ export default function TierListPageClient({
               onItemActivate={handleItemActivate}
               onPlaceSelected={() => placeSelected(tier.id)}
               onStartEditing={() => {
-                setView("rows");
                 setEditing(true);
                 setEditingTierId(tier.id);
               }}
@@ -1139,11 +1152,15 @@ export default function TierListPageClient({
                 ? undefined
                 : (row, by) => dispatch({ type: "setPyramid", caps: bumpRow(caps, row, by) })
             }
-            onAddRow={readOnlySnapshot ? undefined : () => dispatch({ type: "setPyramid", caps: addRow(caps) })}
-            onRemoveRow={
-              readOnlySnapshot ? undefined : () => dispatch({ type: "setPyramid", caps: removeRow(caps) })
-            }
+            // A row is a tier, so these are the tier list's own add and
+            // remove wearing the pyramid's labels. The shape follows the
+            // tier count rather than being stored alongside it.
+            onAddRow={readOnlySnapshot ? undefined : handleAddRow}
+            onRemoveRow={readOnlySnapshot ? undefined : handleRemoveRow}
             frameWidth={boardWidth}
+            editing={editing}
+            onRename={(tierId, label) => dispatch({ type: "renameTier", tierId, label })}
+            onActivateBand={(tierId) => setEditingTierId(tierId)}
           />
         )}
 
