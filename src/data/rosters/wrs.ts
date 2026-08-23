@@ -49,7 +49,6 @@ export const WIDE_RECEIVERS: WideReceiver[] = [
   { espnId: "4249417", name: "Jalen Tolbert", team: "MIA" },
   { espnId: "4426388", name: "Jameson Williams", team: "DET" },
   { espnId: "4430878", name: "Jaxon Smith-Njigba", team: "SEA" },
-  { espnId: "4877706", name: "Jayden Higgins", team: "HOU" },
   { espnId: "4362249", name: "Jayden Reed", team: "GB" },
   { espnId: "4372016", name: "Jaylen Waddle", team: "DEN" },
   { espnId: "4241463", name: "Jerry Jeudy", team: "CLE" },
@@ -82,6 +81,7 @@ export const WIDE_RECEIVERS: WideReceiver[] = [
   { espnId: "4685472", name: "Tetairoa McMillan", team: "CAR" },
   { espnId: "4428718", name: "Tre Tucker", team: "LV" },
   { espnId: "4569587", name: "Wan'Dale Robinson", team: "TEN" },
+  { espnId: "4686422", name: "Xavier Hutchinson", team: "HOU" },
   { espnId: "4683062", name: "Xavier Worthy", team: "KC" },
   { espnId: "4429615", name: "Zay Flowers", team: "BAL" },
 ];
