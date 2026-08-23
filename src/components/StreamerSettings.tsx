@@ -56,11 +56,17 @@ export function StreamerSettings({
           <rect x="3" y="4" width="7" height="16" rx="1.5" />
           <rect x="14" y="4" width="7" height="16" rx="1.5" />
         </svg>
-        {/* The percentage stands in for the label once it is not 100 -
-            so a board left zoomed says so without opening anything. */}
-        <span className="hidden sm:inline">
-          {on ? "STREAMER MODE" : zoomPct === 100 ? "STREAMER" : `${zoomPct}%`}
-        </span>
+        {/* Named the same whether the mode is on or off - it is one
+            switch, and calling it "STREAMER" until you turn it on read
+            as a different thing from the "STREAMER MODE" inside.
+            The label used to fall back to the zoom percentage when it
+            was not 100, so a board left zoomed would say so. That could
+            never fire: zoom belongs to the mode's own state, and with
+            the mode off the board reads NORMAL, which is always 100 -
+            so the percentage would only ever have shown while the
+            branch above it had already won. A board with the mode off
+            is not zoomed, so there is nothing to report. */}
+        <span className="hidden sm:inline">STREAMER MODE</span>
       </button>
 
       {open &&
