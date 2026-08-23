@@ -445,7 +445,23 @@ async function main() {
   if (teams.length !== 32) throw new Error(`Expected 32 teams, got ${teams.length}`);
 
   for (const position of POSITIONS) await syncPosition(season, teams, position);
-  await syncCoaches(teams);
+
+  // Parked, and OFF by default. Two runs established that ESPN gives us
+  // a coach list with no head coach marked on it and no photographs:
+  // the output was 32 rows, six of them coordinators, and 28 with no
+  // face. That is not a tier list, and the category stays unregistered
+  // until somebody supplies 32 pictures.
+  //
+  // It is a switch rather than a deletion because the fetching works -
+  // it is the DATA that is not good enough - and because leaving it
+  // running would do real damage on a schedule: the weekly job would
+  // either fail outright, which stops the five position rosters from
+  // updating since the pull request step never runs, or churn a pull
+  // request full of coordinators every Tuesday.
+  //
+  //   SYNC_COACHES=1 node scripts/sync-players.mjs
+  if (process.env.SYNC_COACHES === "1") await syncCoaches(teams);
+  else console.log(`\n=== HEAD_COACHES: skipped (set SYNC_COACHES=1) ===`);
 }
 
 // Guarded so the offline harness can import the parsing without the
