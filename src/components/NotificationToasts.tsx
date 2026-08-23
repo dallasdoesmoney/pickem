@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreadNotifications, markNotificationRead, syncLevelUpNotifications, NotificationRow } from "@/lib/supabase/notifications";
+import { dailyCheckIn } from "@/lib/supabase/checkIn";
 import { fetchMyReferrals, ReferralRow } from "@/lib/supabase/referrals";
 import { fetchProfilesByIds, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { ALL_LEVELS, subLevelRoman } from "@/lib/levels";
@@ -24,7 +25,34 @@ type ToastContent = {
   href: string;
 };
 
+// A check-in toast is made here rather than written to notifications:
+// it fires every single day, and a row a day would bury the activity
+// feed under the one thing nobody needs a record of. The "local:" prefix
+// marks it as having no database row, so dismissing it does not try to
+// mark one read.
+const LOCAL_ID = "local:";
+function checkInToast(points: number, streak: number): NotificationRow {
+  return {
+    id: `${LOCAL_ID}check-in`,
+    type: "daily_check_in" as NotificationRow["type"],
+    data: { points, streak },
+    created_at: new Date().toISOString(),
+  };
+}
+
 function buildToastContent(n: NotificationRow, referrals: ReferralRow[], actors: Map<string, Actor>): ToastContent {
+  if (n.type === ("daily_check_in" as NotificationRow["type"])) {
+    const streak = Number(n.data.streak);
+    return {
+      avatarUrl: null,
+      initial: "\u{1F525}",
+      title: `+${Number(n.data.points)} for checking in`,
+      subtitle: streak > 1 ? `${streak} days in a row` : "Come back tomorrow to start a streak",
+      accentColor: "#fb923c",
+      href: "/account",
+    };
+  }
+
   if (n.type === "new_follower") {
     const follower = actors.get(String(n.data.follower_id));
     const label = follower?.display_name || follower?.username || "Someone";
@@ -95,7 +123,17 @@ export function NotificationToasts() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    syncLevelUpNotifications()
+    // Check in first, then sync levels: the 50 points can be what tips
+    // someone over a level, and doing it the other way round would hold
+    // that notification back until the next load.
+    dailyCheckIn()
+      .then((result) => {
+        if (!cancelled && result.awarded) {
+          setQueue((q) => [checkInToast(result.points, result.streak), ...q]);
+        }
+      })
+      .catch((err) => console.error("Daily check-in failed", err))
+      .then(() => syncLevelUpNotifications())
       .catch((err) => console.error("Level-up sync failed", err))
       .finally(() => {
         if (cancelled) return;
@@ -130,11 +168,18 @@ export function NotificationToasts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
+  function clear(n: NotificationRow) {
+    // Synthetic toasts have no row to mark read.
+    if (!n.id.startsWith(LOCAL_ID)) {
+      markNotificationRead(n.id).catch((err) => console.error("Failed to mark notification read", err));
+    }
+    setCurrent(null);
+  }
+
   function dismiss(e?: React.MouseEvent | React.KeyboardEvent) {
     e?.stopPropagation();
     if (!current) return;
-    markNotificationRead(current.id).catch((err) => console.error("Failed to mark notification read", err));
-    setCurrent(null);
+    clear(current);
   }
 
   // Tapping anywhere on the toast (besides the dismiss button) goes to
@@ -145,9 +190,8 @@ export function NotificationToasts() {
   // hasn't resolved.
   function handleOpen() {
     if (!current) return;
-    markNotificationRead(current.id).catch((err) => console.error("Failed to mark notification read", err));
     const target = buildToastContent(current, referrals, actors).href;
-    setCurrent(null);
+    clear(current);
     router.push(target);
   }
 
