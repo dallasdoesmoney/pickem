@@ -147,11 +147,30 @@ export function BoardThumb({
 // items each, big enough that a face is a face and a helmet is a helmet.
 // The second item runs off the right edge on purpose - a crop that stops
 // neatly inside the frame reads as a small board, not as a close-up.
-export function BoardZoom({ state, template }: { state: TierListState; template: TierTemplate }) {
+//
+// Pass `title` and the art fills the whole card with the name laid over
+// it. Below the art, in its own strip, the name was the smallest thing on
+// a card whose loudest thing - the board - is the same five colours on
+// every category, so the one line that says WHICH category got lost. Over
+// the art it is the biggest thing on the card and the art still reads
+// through the scrim, which is the trade: the picture says what kind of
+// thing this ranks, the words say which.
+export function BoardZoom({
+  state,
+  template,
+  title,
+}: {
+  state: TierListState;
+  template: TierTemplate;
+  title?: string;
+}) {
   const rows = state.tiers.slice(0, 2);
   return (
     <div
-      className="relative overflow-hidden rounded-lg bg-black"
+      // Square corners when it is the whole card - the card clips to its
+      // own radius, and a second smaller one inside it leaves four slivers
+      // of the card's background showing through at the corners.
+      className={`relative overflow-hidden bg-black ${title ? "" : "rounded-lg"}`}
       // cqw so everything inside scales with the card: these sit in a
       // grid that is two columns on a phone and four on a desktop, and
       // the type has to hold its proportions across both.
@@ -190,6 +209,40 @@ export function BoardZoom({ state, template }: { state: TierListState; template:
           </div>
         );
       })}
+      {title && (
+        <>
+          {/* Heavy where the words are, light where the faces are - one
+              flat wash dark enough to read against would have taken the
+              team colours out with it, and the colours are why the crop
+              is here. The bottom stop is over 1 on purpose: alpha clamps,
+              so the last band under the title is solid ground and the
+              lettering never has a helmet behind it. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to top, rgba(3,7,15,1.14) 0%, rgba(3,7,15,0.65) 44%, rgba(3,7,15,0.4) 100%)",
+            }}
+          />
+          <span
+            className="absolute inset-x-0 bottom-0 block px-[7%] pb-[6%]"
+            style={{
+              fontFamily: "var(--font-display)",
+              // Bounded at both ends rather than pure cqw: the same card
+              // is half a phone screen and a quarter of a desktop row,
+              // and a name that scaled freely would be shouting at one
+              // size and unreadable at the other.
+              fontSize: "clamp(14px, 4.2cqw, 23px)",
+              lineHeight: 1.12,
+              textWrap: "balance",
+              textShadow: "0 2px 10px rgba(0,0,0,0.8)",
+            }}
+          >
+            {title}
+          </span>
+        </>
+      )}
     </div>
   );
 }
