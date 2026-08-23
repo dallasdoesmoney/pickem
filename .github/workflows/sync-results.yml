@@ -1,0 +1,54 @@
+# Posts final scores to game_results on a schedule.
+#
+# Unlike the roster sync next door, this one writes straight to the
+# database instead of opening a pull request. Rosters can wait for someone
+# to merge; a result cannot, because until it lands nobody's picks have
+# been scored and the leaderboard looks broken rather than pending.
+#
+# It is still safe to run into: the token it carries can only reach one
+# function, which can only set the winner of a game (see
+# supabase/migrations/0039_results_sync.sql), and the write is an upsert,
+# so a run that changes nothing costs nothing. Publishing a week remains
+# a person's decision in the admin panel - this only fills the results in.
+name: Sync game results
+
+on:
+  schedule:
+    # Every three hours through the season only. Football does not happen
+    # in June, and a job that runs all year to find nothing is a job
+    # nobody reads the output of.
+    - cron: "0 */3 * 9,10,11,12,1,2 *"
+  workflow_dispatch:
+
+# Reads the repo and talks to Supabase. It writes nothing here.
+permissions:
+  contents: read
+
+# One at a time. Two overlapping runs would race on the same upsert to no
+# benefit - the later one has strictly fresher scores.
+concurrency:
+  group: sync-results
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Against stubbed payloads, so a change in ESPN's shape fails before
+      # it can post a wrong winner - which is worse than posting none, as
+      # it scores everybody's picks against a game that did not happen
+      # that way.
+      - name: Check the scoreboard parsing
+        run: node scripts/sync-results.test.mjs
+
+      - name: Post finished games
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          RESULTS_SYNC_TOKEN: ${{ secrets.RESULTS_SYNC_TOKEN }}
+        run: node scripts/sync-results.mjs
