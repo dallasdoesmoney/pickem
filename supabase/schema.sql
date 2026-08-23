@@ -722,10 +722,60 @@ create policy "notifications_update_own" on public.notifications for update
 -- only ever written by the security-definer function below.
 alter table public.profiles add column last_notified_level integer not null default 0;
 
+-- Cost to reach a given level, 1-50. Ten ranks of five sub-levels: a
+-- rank's entry cost is a fixed rung, and its five sub-levels climb
+-- geometrically from that rung toward the next rank's entry.
+--
+-- MUST stay in step with cumulativeForLevel() in src/lib/levels.ts. The
+-- two are read in different places - the app draws the ladder, the
+-- function below decides when a level_up notification fires - and if they
+-- disagree, someone is congratulated for a level the page does not show.
+-- See 0040_reprice_levels.sql for why GOAT is 500,000 rather than the
+-- 162,150 the original triangular curve produced.
+create or replace function public.points_for_level(lvl integer)
+returns integer
+language plpgsql
+immutable
+as $$
+declare
+  -- Entry cost per rank, in RANKS order. Practice Squad is non-zero so
+  -- that a player with no points is unranked rather than level 1.
+  entry constant integer[] := array[100, 500, 2000, 6000, 15000, 32500, 65000, 125000, 250000, 500000];
+  max_points constant integer := 1000000; -- GOAT V
+  rank_i integer;
+  step_i integer;
+  from_p integer;
+  to_p integer;
+  span integer;
+begin
+  if lvl <= 0 then
+    return 0;
+  end if;
+  rank_i := least((lvl - 1) / 5, 9) + 1; -- Postgres arrays are 1-based
+  step_i := (lvl - 1) % 5;
+  from_p := entry[rank_i];
+
+  if step_i = 0 then
+    return from_p;
+  end if;
+
+  if rank_i = 10 then
+    -- The last rank has no next rank to run toward, so it lands ON the
+    -- ceiling rather than approaching it: GOAT V is exactly max_points.
+    to_p := max_points;
+    span := 4;
+  else
+    to_p := entry[rank_i + 1];
+    span := 5;
+  end if;
+
+  return round(from_p * power(to_p::numeric / from_p::numeric, step_i::numeric / span::numeric));
+end;
+$$;
+
 -- SQL port of getLevelInfo()'s loop in src/lib/levels.ts - deliberately a
--- loop, not a closed-form inversion of the triangular-number curve, so
--- floating-point rounding can't land it on the wrong side of a threshold.
--- Keep in sync with BASE_POINTS/MAX_LEVEL there if the curve ever changes.
+-- loop, not a closed-form inversion of the curve, so floating-point
+-- rounding can't land a player on the wrong side of a threshold.
 create or replace function public.level_for_points(total_points integer)
 returns integer
 language plpgsql
@@ -734,7 +784,7 @@ as $$
 declare
   lvl integer := 0;
 begin
-  while lvl < 50 and total_points >= 75 * (lvl + 1) * (lvl + 2) loop
+  while lvl < 50 and total_points >= public.points_for_level(lvl + 1) loop
     lvl := lvl + 1;
   end loop;
   return lvl;
