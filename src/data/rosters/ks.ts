@@ -19,4 +19,37 @@ export type Kicker = {
   team: TeamAbbr;
 };
 
-export const KICKERS: Kicker[] = [];
+export const KICKERS: Kicker[] = [
+  { espnId: "4258620", name: "Andre Szmyt", team: "CLE" },
+  { espnId: "4569923", name: "Andy Borregales", team: "NE" },
+  { espnId: "4566158", name: "Ben Sauls", team: "NYG" },
+  { espnId: "4259619", name: "Blake Grupe", team: "IND" },
+  { espnId: "3953687", name: "Brandon Aubrey", team: "DAL" },
+  { espnId: "17427", name: "Cairo Santos", team: "CHI" },
+  { espnId: "4686361", name: "Cam Little", team: "JAX" },
+  { espnId: "4362081", name: "Cameron Dicker", team: "LAC" },
+  { espnId: "4363538", name: "Chad Ryland", team: "ARI" },
+  { espnId: "5208518", name: "Charlie Smyth", team: "NO" },
+  { espnId: "3150744", name: "Chase McLaughlin", team: "TB" },
+  { espnId: "17372", name: "Chris Boswell", team: "PIT" },
+  { espnId: "5081335", name: "Drew Stevens", team: "WAS" },
+  { espnId: "4034949", name: "Eddy Pineiro", team: "SF" },
+  { espnId: "4360234", name: "Evan McPherson", team: "CIN" },
+  { espnId: "3055899", name: "Harrison Butker", team: "KC" },
+  { espnId: "4574716", name: "Harrison Mevis", team: "LAR" },
+  { espnId: "4689936", name: "Jake Bates", team: "DET" },
+  { espnId: "3050478", name: "Jake Elliott", team: "PHI" },
+  { espnId: "2473037", name: "Jason Myers", team: "SEA" },
+  { espnId: "3124679", name: "Jason Sanders", team: "NYJ" },
+  { espnId: "3124084", name: "Joey Slye", team: "TEN" },
+  { espnId: "2971573", name: "Ka'imi Fairbairn", team: "HOU" },
+  { espnId: "4249087", name: "Matt Gay", team: "LV" },
+  { espnId: "10621", name: "Nick Folk", team: "ATL" },
+  { espnId: "4243371", name: "Riley Patterson", team: "MIA" },
+  { espnId: "4568263", name: "Ryan Fitzgerald", team: "CAR" },
+  { espnId: "4869461", name: "Trey Smack", team: "GB" },
+  { espnId: "3917232", name: "Tyler Bass", team: "BUF" },
+  { espnId: "4697745", name: "Tyler Loop", team: "BAL" },
+  { espnId: "2985659", name: "Wil Lutz", team: "DEN" },
+  { espnId: "4567104", name: "Will Reichard", team: "MIN" },
+];
