@@ -1,5 +1,5 @@
-# Keeps the player tier lists' rosters current - quarterbacks, running
-# backs and receivers - without letting ESPN anywhere near a deploy.
+# Keeps the player tier lists' rosters current - every category in
+# scripts/sync-players.mjs - without letting ESPN anywhere near a deploy.
 #
 # The obvious way to do this is to fetch at build time. That trades a data
 # problem for a deploy problem: site.api.espn.com is undocumented and
@@ -59,7 +59,7 @@ jobs:
             the template no longer lists. Those degrade to a face with no
             name (see `resolveItem`), which is fine, but it is worth
             knowing when it happens.
-          add-paths: |
-            src/data/qbs.ts
-            src/data/rbs.ts
-            src/data/wrs.ts
+          # The whole directory, not a list. Every generated roster lives
+          # in it and nothing else does, so a category added later is
+          # picked up without anyone remembering to edit this file.
+          add-paths: src/data/rosters/

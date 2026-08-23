@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { TierTemplate, getTierTemplate } from "@/data/tierTemplates";
-import { BoardThumb, previewFor } from "@/components/tierList/BoardThumb";
+import { BoardThumb, BoardZoom, previewFor } from "@/components/tierList/BoardThumb";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
@@ -53,26 +53,15 @@ export function popularity(stats?: TierListStats): number {
 function TemplateCard({ template }: { template: TierTemplate }) {
   const preview = useMemo(() => previewFor(template), [template]);
   return (
+    // The art IS the card. It used to sit inset above a strip holding the
+    // name, which put the one line that tells these apart at the bottom
+    // in the smallest type on the card - and every category's board is
+    // the same five bands of colour, so a wall of them read as a wall of
+    // the same thing. Full bleed, name over the top: the crop still says
+    // faces-or-helmets at a glance and the words are now the loudest
+    // thing on it.
     <Link href={`/tier-lists/${template.slug}`} className={CARD}>
-      <span className="block p-2.5 pb-0">
-        <BoardThumb state={preview} template={template} />
-      </span>
-      {/* The name, and nothing else.
-          The tagline said in a sentence what the board above it already
-          shows and the title already names - thirty-two quarterback
-          headshots under the words "NFL QUARTERBACKS" do not need "rank
-          every starting QB" as well - and the counter under it was a
-          third line competing with the one line that matters. With both
-          gone the title gets the room, which is what makes a wall of
-          these scannable. */}
-      <span className="block px-3 pt-2.5 pb-3">
-        <span
-          className="block text-[17px] leading-[1.15]"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          {template.title.toUpperCase()}
-        </span>
-      </span>
+      <BoardZoom state={preview} template={template} title={template.title.toUpperCase()} />
     </Link>
   );
 }

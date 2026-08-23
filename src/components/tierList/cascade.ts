@@ -1,4 +1,4 @@
-import { CAPS, PyramidShape } from "./pyramid";
+import { PyramidShape } from "./pyramid";
 
 // Switching layouts, as one movement.
 //
@@ -22,8 +22,10 @@ const ROW_STAGGER = 80;
 
 // Bottom row first: the base settles and the rows fold in above it, which
 // reads as the board folding itself rather than a control being flipped.
-const delayFor = (row: number) =>
-  Math.max(0, Math.min(CAPS.length - 1, CAPS.length - 1 - Math.floor(row))) * ROW_STAGGER;
+// Takes the row count from the shape now that a board's shape is its own -
+// a three-row diamond staggers over three rows, not four.
+const delayFor = (row: number, rows: number) =>
+  Math.max(0, Math.min(rows - 1, rows - 1 - Math.floor(row))) * ROW_STAGGER;
 
 type RowGeom = { top: number; height: number; railW: number };
 
@@ -61,11 +63,19 @@ export function readBoard(board: HTMLElement, view: "rows" | "pyramid", shape: P
   return { height: board.offsetHeight, marks, rows, boardTop };
 }
 
-const rect = (w: number, top: number, bottom: number) =>
-  `polygon(0px ${top}px, ${w}px ${top}px, ${w}px ${bottom}px, 0px ${bottom}px)`;
+// SIX points, not four, with a redundant pair at the mid height. A
+// pyramid row is six points now - a row that turns needs the mid pair to
+// describe its corner - and clip-path only interpolates between polygons
+// with matching point counts. A four-point rectangle at one end of the
+// animation would snap rather than fold.
+const rect = (w: number, top: number, bottom: number) => {
+  const mid = (top + bottom) / 2;
+  return `polygon(${w}px ${top}px, ${w}px ${mid}px, ${w}px ${bottom}px, ` +
+    `0px ${bottom}px, 0px ${mid}px, 0px ${top}px)`;
+};
 
-const slope = (w: number, a: number, b: number, top: number, bottom: number) =>
-  `polygon(${a}px ${top}px, ${w - a}px ${top}px, ${w - b}px ${bottom}px, ${b}px ${bottom}px)`;
+// The band's rectangle, in the same six points.
+const railRect = (railW: number, top: number, bottom: number) => rect(railW, top, bottom);
 
 export function runCascade(
   board: HTMLElement,
@@ -74,6 +84,7 @@ export function runCascade(
   before: BoardSnapshot,
 ) {
   const after = readBoard(board, next, shape);
+  const rows = shape.caps.length;
   const play = (el: Element, frames: Keyframe[], delay: number, extra?: KeyframeAnimationOptions) =>
     el.animate(frames, { duration: CASCADE_MS, delay, easing: CASCADE_EASE, fill: "backwards", ...extra });
 
@@ -94,7 +105,7 @@ export function runCascade(
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
         { transform: "translate(0px, 0px) scale(1)" },
       ],
-      delayFor(band),
+      delayFor(band, rows),
       // Added to whatever transform the element already carries, so a
       // chip that dnd-kit or a hover is already moving is not fought.
       { composite: "add" },
@@ -120,15 +131,15 @@ export function runCascade(
           { top: `${was.top}px`, height: `${was.height}px`, clipPath: rect(w, 0, was.height) },
           { top: now.top, height: now.height, clipPath: now.clipPath },
         ],
-        delayFor(i),
+        delayFor(i, rows),
       );
       const bandEl = el.querySelector<HTMLElement>("[data-pband]");
       if (bandEl) {
         const bs = getComputedStyle(bandEl);
         play(
           bandEl,
-          [{ clipPath: rect(was.railW, 0, was.height) }, { clipPath: bs.clipPath }],
-          delayFor(i),
+          [{ clipPath: railRect(was.railW, 0, was.height) }, { clipPath: bs.clipPath }],
+          delayFor(i, rows),
         );
       }
       const labelEl = el.querySelector<HTMLElement>("[data-plabel]");
@@ -140,7 +151,7 @@ export function runCascade(
             { transform: `translate(${was.railW / 2}px, -50%) translateX(-50%)` },
             { transform: ls.transform },
           ],
-          delayFor(i),
+          delayFor(i, rows),
         );
       }
     });
@@ -151,39 +162,40 @@ export function runCascade(
     const edge = board.querySelector("[data-pedge]");
     if (edge) {
       play(edge, [{ opacity: 0 }, { opacity: 0 }, { opacity: 1 }], 0, {
-        duration: CASCADE_MS + ROW_STAGGER * (CAPS.length - 1) + 120,
+        duration: CASCADE_MS + ROW_STAGGER * (rows - 1) + 120,
       });
     }
   } else {
     board.querySelectorAll<HTMLElement>("[data-tier-row]").forEach((el, i) => {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
-      if (i >= CAPS.length) {
+      if (i >= rows) {
         // A tier the pyramid had no room for. It was not on screen at all
         // a moment ago, so it arrives rather than moves.
-        play(el, [{ opacity: 0 }, { opacity: 1 }], delayFor(0) + 60);
+        play(el, [{ opacity: 0 }, { opacity: 1 }], delayFor(0, rows) + 60);
         return;
       }
       const bandTop = i * shape.rowH;
       const a = shape.leftEdgeAt(bandTop);
       const b = shape.leftEdgeAt(bandTop + shape.rowH);
+      const m = shape.leftEdgeAt(bandTop + shape.rowH / 2);
       // Where the band sat inside this row's own box. The two have
-      // different heights, so this is the band's rectangle expressed in
-      // the row's coordinates rather than the row's own top and bottom.
+      // different heights, so this is the band's shape expressed in the
+      // row's coordinates rather than the row's own top and bottom - and
+      // in the same six points the pyramid row itself uses, mid height
+      // included, so a diamond's corner unfolds instead of snapping.
       const from = Math.max(0, Math.min(h, bandTop - (after.rows[i]?.top ?? 0)));
-      play(
-        el,
-        [
-          { clipPath: slope(w, a, b, from, Math.min(h, from + shape.rowH)) },
-          { clipPath: rect(w, 0, h) },
-        ],
-        delayFor(i),
-      );
+      const to = Math.min(h, from + shape.rowH);
+      const half = (from + to) / 2;
+      const wedge =
+        `polygon(${w - a}px ${from}px, ${w - m}px ${half}px, ${w - b}px ${to}px, ` +
+        `${b}px ${to}px, ${m}px ${half}px, ${a}px ${from}px)`;
+      play(el, [{ clipPath: wedge }, { clipPath: rect(w, 0, h) }], delayFor(i, rows));
       // The rail rides in from where its band was sitting on the slope, so
       // the colour arrives with the row rather than being revealed by it.
       const rail = el.querySelector<HTMLElement>("[data-tier-rail]");
       if (rail) {
-        play(rail, [{ transform: `translateX(${(a + b) / 2}px)` }, { transform: "translateX(0px)" }], delayFor(i));
+        play(rail, [{ transform: `translateX(${(a + b) / 2}px)` }, { transform: "translateX(0px)" }], delayFor(i, rows));
       }
     });
   }

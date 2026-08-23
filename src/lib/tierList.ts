@@ -1,5 +1,6 @@
 import { TierTemplate } from "@/data/tierTemplates";
 import { RANKS } from "@/lib/levels";
+import { DEFAULT_CAPS, sanitizeCaps } from "@/components/tierList/pyramid";
 
 // Tier identity is a generated id, never the label - users rename "S" to
 // "Elite" and every placement has to survive that. Labels are display
@@ -20,7 +21,30 @@ export type TierListState = {
   tiers: Tier[];
   placements: Record<string, string[]>;
   unranked: string[];
+  // The pyramid's shape: how many places each row holds, top down. Lives
+  // here rather than in its own column because the whole state is one
+  // JSONB blob, and because the shape belongs to the LIST - two boards of
+  // the same template can be a triangle and a diamond. Optional so every
+  // list saved before this existed keeps working; absent means the
+  // 1-3-5-7 the pyramid always was.
+  pyramid?: number[];
+  // How many tiers each layout SHOWS. There is one list of tiers - one
+  // set of names, colours and placements, shared - but the two layouts
+  // do not have to reveal the same amount of it. A tier list starts at
+  // six; a pyramid starts at four, because a pyramid that opens with six
+  // rows is not a pyramid.
+  //
+  // Adding a row is therefore two different things depending on where you
+  // are: revealing the next tier that already exists, or, once they are
+  // all revealed, making a new one. That new tier belongs to the board,
+  // so the other layout can reach it - but not until you add a row there
+  // too, which is what keeps a shape you built in one layout from
+  // rearranging the other.
+  shown?: { rows: number; pyramid: number };
 };
+
+export const DEFAULT_SHOWN = { rows: 6, pyramid: 4 } as const;
+export type ViewName = "rows" | "pyramid";
 
 export const MAX_TIERS = 10;
 export const MIN_TIERS = 1;
@@ -52,7 +76,10 @@ const TIER_ACCENTS: string[] = [...RANKS].reverse().map((r) => r.color);
 
 const DEFAULT_TIER_LABELS = ["S", "A", "B", "C", "D", "F"];
 
-function accentForIndex(i: number): string {
+// Exported for the pyramid, whose bands sit at the same depths as the
+// tiers and go on past them when a shape has more rows than the board has
+// tiers.
+export function accentForIndex(i: number): string {
   return TIER_ACCENTS[i % TIER_ACCENTS.length];
 }
 
@@ -80,6 +107,8 @@ export function createInitialState(template: TierTemplate): TierListState {
     tiers,
     placements,
     unranked: template.items.map((i) => i.id),
+    pyramid: [...DEFAULT_CAPS],
+    shown: { ...DEFAULT_SHOWN },
   };
 }
 
@@ -95,6 +124,11 @@ export type TierListAction =
   | { type: "moveTier"; tierId: string; direction: -1 | 1 }
   | { type: "setTitle"; title: string }
   | { type: "shuffleUnranked" }
+  // The pyramid's shape. Its own action rather than part of a placement
+  // move, because changing the shape moves the CUT rather than any team:
+  // nothing is reordered, some ranks simply stop having a place.
+  | { type: "setPyramid"; caps: number[] }
+  | { type: "setShown"; view: ViewName; count: number }
   // Two different kinds of starting over. Clearing empties the board but
   // keeps everything you set up; resetting puts the tiers AND the heading
   // back to stock while keeping your ranking wherever it still has
@@ -154,7 +188,21 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
       const tiers = [...state.tiers];
       if (at >= 0) tiers.splice(at + 1, 0, tier);
       else tiers.push(tier);
-      return { ...state, tiers, placements: { ...state.placements, [id]: [] } };
+      // A tier inserted in the middle pushes everything below it down, so
+      // both layouts have to reveal one more or they would lose their
+      // last row to make room. Appended at the end, only the layout that
+      // asked reveals it - see the action.
+      const shown = shownFor(state);
+      const grow = at >= 0 ? 1 : 0;
+      return {
+        ...state,
+        tiers,
+        placements: { ...state.placements, [id]: [] },
+        shown: {
+          rows: Math.min(tiers.length, shown.rows + grow),
+          pyramid: Math.min(tiers.length, shown.pyramid + grow),
+        },
+      };
     }
 
     case "deleteTier": {
@@ -162,12 +210,19 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
       const doomed = state.placements[action.tierId] ?? [];
       const placements = { ...state.placements };
       delete placements[action.tierId];
+      const tiers = state.tiers.filter((t) => t.id !== action.tierId);
+      const shown = shownFor(state);
       return {
         ...state,
-        tiers: state.tiers.filter((t) => t.id !== action.tierId),
+        tiers,
         placements,
         // Never silently drop items - they go back to the pool.
         unranked: [...state.unranked, ...doomed],
+        // A layout showing every tier keeps showing every tier.
+        shown: {
+          rows: Math.min(tiers.length, shown.rows),
+          pyramid: Math.min(tiers.length, shown.pyramid),
+        },
       };
     }
 
@@ -203,6 +258,18 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
       return { ...state, placements, unranked: action.template.items.map((i) => i.id) };
     }
 
+    case "setPyramid": {
+      const caps = sanitizeCaps(action.caps);
+      return caps ? { ...state, pyramid: caps } : state;
+    }
+
+    case "setShown": {
+      const shown = shownFor(state);
+      const count = Math.max(MIN_TIERS, Math.min(state.tiers.length, Math.round(action.count)));
+      if (count === shown[action.view]) return state;
+      return { ...state, shown: { ...shown, [action.view]: count } };
+    }
+
     case "resetTiers": {
       // Stock tiers back, ranking preserved by position: whatever was in
       // the old first tier lands in the new first tier. Anything below the
@@ -227,6 +294,10 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
         tiers,
         placements,
         unranked: [...state.unranked, ...displaced],
+        // The shape is a customisation like the tiers and the heading, so
+        // it goes back with them.
+        pyramid: [...DEFAULT_CAPS],
+        shown: { ...DEFAULT_SHOWN },
       };
     }
 
@@ -327,5 +398,27 @@ export function sanitizeState(raw: unknown, template: TierTemplate): TierListSta
     tiers,
     placements,
     unranked,
+    // A list saved before shapes existed has no pyramid, and the shape it
+    // was drawn with was 1-3-5-7. Filling it in here rather than leaving
+    // it undefined means everything downstream can just read it.
+    pyramid: sanitizeCaps(r.pyramid) ?? [...DEFAULT_CAPS],
+    shown: sanitizeShown(r.shown, tiers.length),
   };
+}
+
+// How many tiers each layout shows, always inside what the board has. A
+// list saved before this existed showed all of them in the tier list, and
+// the pyramid's four - which is exactly the default.
+function sanitizeShown(raw: unknown, tierCount: number): { rows: number; pyramid: number } {
+  const fit = (n: unknown, fallback: number) =>
+    Math.max(MIN_TIERS, Math.min(tierCount, typeof n === "number" && Number.isFinite(n) ? Math.round(n) : fallback));
+  const r = (raw ?? {}) as Partial<{ rows: number; pyramid: number }>;
+  return { rows: fit(r.rows, tierCount), pyramid: fit(r.pyramid, DEFAULT_SHOWN.pyramid) };
+}
+
+// The stored counts, clamped to the board as it is now. Read through this
+// rather than off the state: a row loaded from the database never passed
+// through sanitizeState.
+export function shownFor(state: TierListState): { rows: number; pyramid: number } {
+  return sanitizeShown(state.shown, state.tiers.length);
 }

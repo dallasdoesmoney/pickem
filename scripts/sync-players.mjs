@@ -22,7 +22,12 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, join } from "node:path";
 
-const DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data");
+// Their own directory, so the workflow that commits them can name the
+// DIRECTORY rather than a list of files. Listing them meant adding a
+// category silently produced a roster the scheduled sync then refused to
+// commit - the sort of gap that shows up a month later as "why is that
+// tier list stale".
+const DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data", "rosters");
 
 // One entry per category. `slots` decides which depth chart positions
 // count, and `perTeam` how many players to take from them.
@@ -60,6 +65,28 @@ const POSITIONS = [
     // LWR / RWR / SWR, and plain WR in some formations.
     slots: (abbr) => abbr.endsWith("WR"),
     perTeam: 2,
+  },
+  {
+    file: "tes.ts",
+    typeName: "TightEnd",
+    exportName: "TIGHT_ENDS",
+    noun: "tight end",
+    // One apiece, like quarterback: a team has a starting tight end even
+    // when it lines two up, and the second is a blocker nobody is
+    // arguing about.
+    slots: (abbr) => abbr === "TE",
+    perTeam: 1,
+  },
+  {
+    file: "ks.ts",
+    typeName: "Kicker",
+    exportName: "KICKERS",
+    noun: "kicker",
+    // ESPN has used PK for the place kicker and plain K in places.
+    // Matching both, and NOT the punter, who is a different job however
+    // often the two get confused.
+    slots: (abbr) => abbr === "PK" || abbr === "K",
+    perTeam: 1,
   },
 ];
 const CORE = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl";
