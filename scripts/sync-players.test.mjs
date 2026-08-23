@@ -9,7 +9,7 @@
 // the position key's case moving around, an athlete $ref coming back as
 // http, a receiver occupying two slots, and a team with no chart at all.
 import assert from "node:assert/strict";
-import { depthChartAt, POSITIONS } from "./sync-players.mjs";
+import { coachFrom, depthChartAt, POSITIONS } from "./sync-players.mjs";
 
 const QB = POSITIONS.find((p) => p.exportName === "QUARTERBACKS");
 const WR = POSITIONS.find((p) => p.exportName === "WIDE_RECEIVERS");
@@ -104,5 +104,22 @@ assert.deepEqual(await depthChartAt(2026, "T", WR.slots, 2), []);
 // 6. No chart at all falls through quietly, for the caller to top up.
 stubFetch({});
 assert.deepEqual(await depthChartAt(2026, "T", QB.slots, 1), []);
+
+// ---- head coaches ----------------------------------------------------
+// ESPN has carried the coach as `coach`, as `coaches`, and as a wrapped
+// list. All three are read, because a shape change here does not throw -
+// it silently drops a team out of the list.
+assert.deepEqual(coachFrom({ coach: { id: 7, firstName: "Andy", lastName: "Reid" } }),
+  { espnId: "7", name: "Andy Reid" });
+assert.deepEqual(coachFrom({ coaches: [{ id: 8, displayName: "Sean McVay" }] }),
+  { espnId: "8", name: "Sean McVay" });
+assert.deepEqual(coachFrom({ coach: { items: [{ id: 9, fullName: "Dan Campbell" }] } }),
+  { espnId: "9", name: "Dan Campbell" });
+// An id with no name is not a coach, and neither is a name with no id -
+// either one would write a row that renders as a blank tile.
+assert.equal(coachFrom({ coach: { id: 10 } }), null);
+assert.equal(coachFrom({ coach: { firstName: "No", lastName: "Id" } }), null);
+assert.equal(coachFrom({}), null);
+assert.equal(coachFrom(undefined), null);
 
 console.log("all depth chart cases pass");
