@@ -4,6 +4,7 @@ import { useState } from "react";
 import { TierItem, TierItemStyle, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { TierListState, createInitialState, tierLabelFor } from "@/lib/tierList";
 import { BACKDROP_OPACITY, BACKDROP_SCALE, BUNGEE_ADVANCE, surname } from "./TierItemChip";
+import { widestWordEm } from "./bungee";
 import { TIER_LABEL_FONT, TIER_LABEL_LEADING } from "./tierLabel";
 
 // Shared by the tier-list hub and the home page, which both front a
@@ -155,6 +156,21 @@ export function BoardThumb({
 // the art it is the biggest thing on the card and the art still reads
 // through the scrim, which is the trade: the picture says what kind of
 // thing this ranks, the words say which.
+
+// The name's size, in three parts.
+//
+// TITLE_FLOOR is what a phone gets: the card is 173px there and 10% of it
+// is 17, so the floor is what actually renders on a phone. TITLE_SHARE
+// takes over on anything wider - 32px on a 320px desktop card, 36 on a
+// 360px tablet - so a big card reads as a big card. The previous rule
+// paired a 14px floor with a 4.2% share, and since the card is only ever
+// 173 to 360px across, 4.2% never once beat 14: the title was a flat 14px
+// on every screen in the world.
+const TITLE_FLOOR = 22; // px
+const TITLE_SHARE = 10; // cqw
+// 7% padding each side, so this much of the card is the line's to use.
+const TITLE_ROOM = 100 - 7 * 2; // cqw
+
 export function BoardZoom({
   state,
   template,
@@ -229,11 +245,14 @@ export function BoardZoom({
             className="absolute inset-x-0 bottom-0 block px-[7%] pb-[6%]"
             style={{
               fontFamily: "var(--font-display)",
-              // Bounded at both ends rather than pure cqw: the same card
-              // is half a phone screen and a quarter of a desktop row,
-              // and a name that scaled freely would be shouting at one
-              // size and unreadable at the other.
-              fontSize: "clamp(14px, 4.2cqw, 23px)",
+              // Whichever is bigger of the floor and the share - except
+              // never bigger than the widest WORD can be and still fit on
+              // one line, which is the term that stops anything being cut
+              // off. Multi-word names take a second or third line and are
+              // free to run at full size; QUARTERBACKS has no second line
+              // available to it, so on a narrow card it is the one name
+              // that gives ground, and only as much as it has to.
+              fontSize: `min(max(${TITLE_FLOOR}px, ${TITLE_SHARE}cqw), calc(${TITLE_ROOM}cqw / ${widestWordEm(title).toFixed(3)}))`,
               lineHeight: 1.12,
               textWrap: "balance",
               textShadow: "0 2px 10px rgba(0,0,0,0.8)",
