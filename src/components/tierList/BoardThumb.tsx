@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { TierItem, TierItemStyle, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { TierListState, createInitialState, tierLabelFor } from "@/lib/tierList";
-import { BUNGEE_ADVANCE, surname } from "./TierItemChip";
+import { BACKDROP_OPACITY, BACKDROP_SCALE, BUNGEE_ADVANCE, surname } from "./TierItemChip";
 import { TIER_LABEL_FONT, TIER_LABEL_LEADING } from "./tierLabel";
 
 // Shared by the tier-list hub and the home page, which both front a
@@ -230,6 +230,30 @@ function ZoomMark({ item, style = "mark" }: { item: TierItem; style?: TierItemSt
       className={`${CHIP} relative overflow-hidden rounded-[2cqw]`}
       style={{ background: item.accent }}
     >
+      {/* The player's team logo, behind him. ESPN's headshots are cut out
+          on transparency, so this shows through - it is most of what
+          tells two players on a plate of similar navy apart, and leaving
+          it out was the one thing that stopped these reading as the board
+          they are a crop of. Same scale and opacity as the chip: bled
+          past the corners so it is a texture rather than a sticker, and
+          faint enough to stay behind the player. */}
+      {item.backdropUrl && (
+        <img
+          src={item.backdropUrl}
+          alt=""
+          loading="lazy"
+          crossOrigin="anonymous"
+          className="absolute max-w-none object-contain"
+          style={{
+            width: `${BACKDROP_SCALE * 100}%`,
+            height: `${BACKDROP_SCALE * 100}%`,
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            opacity: BACKDROP_OPACITY,
+          }}
+        />
+      )}
       <img
         src={item.imageUrl}
         alt=""
