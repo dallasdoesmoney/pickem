@@ -23,20 +23,59 @@ export const RANKS: RankTier[] = [
 
 export const LEVELS_PER_RANK = 5;
 export const MAX_LEVEL = RANKS.length * LEVELS_PER_RANK;
-const BASE_POINTS = 150;
 
-// Triangular-number curve: level L costs 150*L points on top of the last
-// one, so cumulative cost grows quadratically - levels 26-50 alone account
-// for ~75% of the total climb to GOAT. Calibrated against a future
-// year-round daily-games economy (up to 500 pts/day): GOAT (191,250 pts)
-// takes roughly a year for someone who hits the daily max every single
-// day, and more like 2+ years for a realistic dedicated player accounting
-// for a quieter off-season - hard, not impossible. Early levels still
-// clear fast off one-time achievements (predictor + weekly pick'em +
-// onboarding bonus), which is the point - fast early payoff, brutal climb
-// at the top.
+// What it costs to ENTER each rank - the first of its five sub-levels.
+//
+// Written out rather than generated, because the shape matters more than
+// any formula: near-doubling at the sharp end and much steeper multiples
+// early, where the numbers are small enough that it does not hurt. The
+// first few ranks should fall out of a first week; the last three should
+// take years.
+//
+// The old curve was 150*L triangular, which put GOAT at 162,150 - and a
+// referral is worth 1,000, so GOAT was 162 referrals while a PERFECT
+// season of everything the app actually pays for was 7,900 points. The
+// ladder was a recruiting leaderboard wearing a football hat. 500,000
+// makes the recruiting route 500 people, and leaves room for a real
+// year-round economy underneath it.
+//
+// Note what this is NOT: harder across the board. The crossover is
+// between All-Pro and MVP, so anyone under ~110,000 points comes out at
+// the same rank or a better one. Only the very top of the ladder gets
+// further away, which is the half that was broken.
+const RANK_ENTRY = [
+  100, // Practice Squad - non-zero, or nobody is ever unranked
+  500, // Rookie
+  2_000, // Role Player
+  6_000, // Starter
+  15_000, // Team Captain
+  32_500, // Pro Bowler
+  65_000, // All-Pro
+  125_000, // MVP
+  250_000, // Hall of Famer
+  500_000, // GOAT
+];
+// Where GOAT V lands. Every other rank runs up to the next rank's entry;
+// the last one has no next rank, so it lands ON this instead of
+// approaching it.
+const MAX_POINTS = 1_000_000;
+
+// Sub-levels inside a rank grow geometrically rather than in five equal
+// steps, so the fifth level of a rank is a real step up from the first
+// and the ladder has no flat stretches.
 function cumulativeForLevel(level: number): number {
-  return (BASE_POINTS * (level * (level + 1))) / 2;
+  if (level <= 0) return 0;
+  const rank = Math.min(Math.floor((level - 1) / LEVELS_PER_RANK), RANKS.length - 1);
+  const step = (level - 1) % LEVELS_PER_RANK;
+  const from = RANK_ENTRY[rank];
+  if (step === 0) return from;
+  const isLast = rank === RANKS.length - 1;
+  const to = isLast ? MAX_POINTS : RANK_ENTRY[rank + 1];
+  // The last rank spans its five levels inclusively so GOAT V is exactly
+  // MAX_POINTS; every other rank stops one step short of the next rank's
+  // entry, which is that next rank's own first level.
+  const span = isLast ? LEVELS_PER_RANK - 1 : LEVELS_PER_RANK;
+  return Math.round(from * Math.pow(to / from, step / span));
 }
 
 export type LevelInfo = {
@@ -111,6 +150,6 @@ export const ALL_LEVELS: LevelListEntry[] = Array.from({ length: MAX_LEVEL }, (_
     rankEmoji: rank.emoji,
     subLevel: ((level - 1) % LEVELS_PER_RANK) + 1,
     cumulativePoints: cumulativeForLevel(level),
-    pointsForThisLevel: BASE_POINTS * level,
+    pointsForThisLevel: cumulativeForLevel(level) - cumulativeForLevel(level - 1),
   };
 });
