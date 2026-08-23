@@ -30,26 +30,31 @@ const CARD =
 // same line: the previews are naturally different heights (a 5-row tier
 // board is twice a progress bar), and without this the shorter cards
 // stretch to match and leave their caption stranded mid-card.
-//
-// The bottom padding is the room the name sits in. The scrim it sits on
-// is see-through at the top, so without this the art would run under the
-// words rather than stopping above them.
-const ART = "flex flex-1 items-center bg-[#050a15] p-2.5 pb-[54px] sm:pb-[60px]";
+const ART = "flex flex-1 items-center bg-[#050a15] p-2.5";
 
 // How dark the name's ground gets, and how far up the card it reaches.
-// Below about 60 the names on the pale cards - the Saints pill, the pink
-// S band - start to go soft; the preview above the reach line is
-// untouched, which is the point of stopping short of the top.
-const DIM = 0.85;
-const REACH = 80; // % of the card height
+// Below about 60 the names on the pale previews - the Saints pill, the
+// pink S band - start to go soft; stopping short of the top is what
+// leaves some of the preview in the clear.
+const DIM = 0.95;
+const REACH = 90; // % of the card height
 
-// The name, over the art rather than in a strip below it.
+// The name, on the dark end of the art rather than in a strip below it.
 //
 // Under the art it was 15px and the quietest thing on a card whose
 // loudest thing is a preview - and the previews are what a stranger
 // cannot tell apart, since four dark panels of small coloured shapes
-// read as four of the same card. Over the art the name is the biggest
+// read as four of the same card. On the art the name is the biggest
 // thing on it, and the scrim keeps the preview legible underneath.
+//
+// The name sits in normal flow, NOT pinned over the art, so the card
+// grows to hold whatever it needs and there is always clear space above
+// the words. Pinned, the room had to be reserved as fixed padding, and
+// no single number was right: the hero's one-liner wanted 64px and a
+// two-line RECORD PREDICTOR wanted 77, so the hero name sat down on the
+// white edge of a matchup pill while the tiles reserved dead space. The
+// scrim is what still makes it read as one picture - it is absolute, so
+// it crosses the seam between the art and this band.
 function Caption({ name, color, meta }: { name: string; color: string; meta: React.ReactNode }) {
   return (
     <>
@@ -61,7 +66,8 @@ function Caption({ name, color, meta }: { name: string; color: string; meta: Rea
           background: `linear-gradient(to top, rgba(3,7,15,${(DIM + 0.18).toFixed(2)}) 0%, rgba(3,7,15,${(DIM * 0.62).toFixed(2)}) 42%, rgba(3,7,15,0) 100%)`,
         }}
       />
-      <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+      {/* relative so it paints over the scrim rather than under it. */}
+      <div className="relative px-3 pt-2.5 pb-3">
         <div
           className="leading-[1.08]"
           style={{
