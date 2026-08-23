@@ -256,13 +256,38 @@ async function syncPosition(season, teams, position) {
 // A shape change here does not throw, it silently shrinks the list.
 export function coachFrom(payload) {
   const raw = payload?.coach ?? payload?.coaches ?? payload?.team?.coach ?? payload?.team?.coaches;
-  const first = Array.isArray(raw) ? raw[0] : Array.isArray(raw?.items) ? raw.items[0] : raw;
-  if (!first?.id) return null;
+  const list = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : raw ? [raw] : [];
+  const named = list.filter((c) => c?.id);
+  if (!named.length) return null;
+
+  // The HEAD coach, not whoever the staff list happens to start with.
+  // Taking [0] returned Jesse Minter for Baltimore and Todd Monken for
+  // Cleveland - both coordinators - because this array is the whole
+  // staff. Where nothing says which one is in charge, fall back to the
+  // first, but say so, since a coordinator in a head coach list is
+  // wrong in a way that looks completely normal.
+  const title = (c) =>
+    String(c.position?.name ?? c.position?.displayName ?? c.position ?? c.title ?? "").toLowerCase();
+  const head = named.find((c) => title(c).includes("head coach"));
+  const pick = head ?? named[0];
+
   const name =
-    first.displayName ??
-    first.fullName ??
-    [first.firstName, first.lastName].filter(Boolean).join(" ").trim();
-  return name ? { espnId: String(first.id), name } : null;
+    pick.displayName ??
+    pick.fullName ??
+    [pick.firstName, pick.lastName].filter(Boolean).join(" ").trim();
+  if (!name) return null;
+  return {
+    espnId: String(pick.id),
+    name,
+    // ESPN sometimes hands the picture over rather than making us build
+    // the URL. Given four of 32 resolved from a guessed path last run,
+    // its own answer beats ours whenever it offers one.
+    headshot: pick.headshot?.href ?? pick.headshot ?? pick.image?.href ?? "",
+    // False when nothing in the payload said "head coach", so the run
+    // can flag which teams were a guess.
+    titled: Boolean(head),
+    staffSize: named.length,
+  };
 }
 
 // A coach's headshot is not at the players path, and the coaches path has
@@ -328,6 +353,7 @@ async function syncCoaches(teams) {
   const rows = [];
   const missing = [];
   const faceless = [];
+  const untitled = [];
 
   // Asked in the order they are most likely to answer. The roster is
   // first because that is where the coach actually lives; the other two
@@ -353,39 +379,55 @@ async function syncCoaches(teams) {
         // Try the next source rather than dropping the team on one 404.
       }
     }
+    // Once per run, print one raw coach entry. Two runs have now been
+    // spent guessing at this payload from the outside - what fields it
+    // carries, whether it says who is the head coach, whether it hands
+    // over a picture. One team's worth of JSON in the log answers all of
+    // that for good, and costs nothing.
+    if (!dumped && last) {
+      const raw = last.coach ?? last.coaches ?? last.team?.coach;
+      const one = Array.isArray(raw) ? raw[0] : Array.isArray(raw?.items) ? raw.items[0] : raw;
+      if (one) {
+        dumped = true;
+        console.log(`     [shape] staff of ${coach?.staffSize ?? "?"}, first entry:`);
+        console.log(`     ${JSON.stringify(one).slice(0, 700)}`);
+      }
+    }
     if (!coach) {
       missing.push(abbr);
       console.log(`${abbr.padEnd(4)} NO COACH FOUND`);
-      // Once, for the first team that fails: print what the last
-      // response actually contained. The previous run said NO COACH
-      // FOUND thirty-two times and gave nothing to act on - a whole run
-      // spent learning only that the guess was wrong. This makes one
-      // failed run say where to look instead.
-      if (!dumped && last && typeof last === "object") {
-        dumped = true;
+      if (last && typeof last === "object") {
         console.log(`     last response had keys: ${Object.keys(last).join(", ")}`);
-        if (last.team && typeof last.team === "object") {
-          console.log(`     .team had keys: ${Object.keys(last.team).join(", ")}`);
-        }
       }
       continue;
     }
-    const imageUrl = await resolveHeadshot(coach.espnId);
+    // ESPN's own URL first, ours only if it gave none.
+    const imageUrl = coach.headshot || (await resolveHeadshot(coach.espnId));
     if (!imageUrl) faceless.push(`${abbr} ${coach.name}`);
+    if (!coach.titled) untitled.push(`${abbr} ${coach.name}`);
     console.log(
       `${abbr.padEnd(4)} ${coach.espnId} ${coach.name.padEnd(24)} ` +
-        `[${imageUrl ? imageUrl.split("/").slice(-3, -1).join("/") : "NO HEADSHOT"}]`,
+        `[${imageUrl ? (coach.headshot ? "espn-supplied" : "resolved") : "NO HEADSHOT"}]` +
+        `${coach.titled ? "" : `  (staff of ${coach.staffSize}, none titled head coach)`}`,
     );
-    rows.push({ ...coach, team: abbr, imageUrl });
+    rows.push({ espnId: coach.espnId, name: coach.name, team: abbr, imageUrl });
   }
 
   // Same rule as the positions: a list quietly missing five teams looks
   // finished to everyone who did not run this.
   if (missing.length) throw new Error(`No head coach for: ${missing.join(", ")}`);
+  if (untitled.length) {
+    console.log(
+      `\nWARNING: nothing in the payload named a head coach for ${untitled.join(", ")} - ` +
+        `those are the first name on the staff list, which is how a coordinator ends up ` +
+        `in a head coach tier list looking perfectly normal. Check them before merging.`,
+    );
+  }
   if (faceless.length) {
     console.log(
-      `\nWARNING: no headshot found for ${faceless.join(", ")} - those render as ` +
-        `team-coloured tiles. If it is all 32, the image path has moved again.`,
+      `\nWARNING: no headshot for ${faceless.join(", ")} - those render as team-coloured ` +
+        `tiles with the name on. If it is most of them, see the [shape] line above for ` +
+        `what ESPN actually hands over.`,
     );
   }
 
