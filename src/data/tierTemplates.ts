@@ -1,5 +1,7 @@
 import { TEAMS, TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { QUARTERBACKS } from "@/data/qbs";
+import { TIGHT_ENDS } from "@/data/tes";
+import { KICKERS } from "@/data/ks";
 import { RUNNING_BACKS } from "@/data/rbs";
 import { WIDE_RECEIVERS } from "@/data/wrs";
 import { espnHeadshot } from "@/lib/espnImages";
@@ -142,6 +144,24 @@ const NFL_RBS = playerTemplate({
   players: RUNNING_BACKS,
 });
 
+const NFL_TES = playerTemplate({
+  slug: "nfl-tight-ends",
+  title: "NFL Tight Ends",
+  tagline: "Rank every starting TE",
+  noun: ["tight end", "tight ends"],
+  idPrefix: "te",
+  players: TIGHT_ENDS,
+});
+
+const NFL_KICKERS = playerTemplate({
+  slug: "nfl-kickers",
+  title: "NFL Kickers",
+  tagline: "Rank every starting kicker",
+  noun: ["kicker", "kickers"],
+  idPrefix: "k",
+  players: KICKERS,
+});
+
 const NFL_WRS = playerTemplate({
   slug: "nfl-wide-receivers",
   // Two per team rather than one: a team lines up three receivers and
@@ -160,9 +180,19 @@ export const TIER_TEMPLATES: Record<string, TierTemplate> = {
   // unsynced checkout offers fewer categories, which is recoverable;
   // offering an empty board is not - see qbs.ts.
   ...Object.fromEntries(
-    [NFL_QBS, NFL_RBS, NFL_WRS].filter((t) => t.items.length > 0).map((t) => [t.slug, t]),
+    [NFL_QBS, NFL_RBS, NFL_WRS, NFL_TES, NFL_KICKERS]
+      .filter((t) => t.items.length > 0)
+      .map((t) => [t.slug, t]),
   ),
 };
+
+// Every id prefix any player category uses, from the categories
+// themselves - see the note in resolveItem.
+const PLAYER_ID = new RegExp(
+  `^(?:${[...new Set(Object.values(TIER_TEMPLATES)
+    .flatMap((t) => t.items.map((i) => /^([a-z]+)-\d+$/.exec(i.id)?.[1]))
+    .filter(Boolean))].join("|") || "\\0"})-(\\d+)$`,
+);
 
 export function getTierTemplate(slug: string): TierTemplate | null {
   return TIER_TEMPLATES[slug] ?? null;
@@ -184,7 +214,12 @@ export function resolveItem(template: TierTemplate, id: string): TierItem {
   // nothing else, so the face survives even when the row is gone. Only
   // the name is lost, and a face with no name still beats a grey tile
   // captioned "qb-3139477".
-  const player = /^(?:qb|rb|wr)-(\d+)$/.exec(id);
+  //
+  // The prefixes are DERIVED, not listed. Hard-coding them meant every
+  // category added after this line was written quietly lost its fallback
+  // and rendered dropped players as grey tiles - a bug that only shows up
+  // weeks later, on somebody else's saved board.
+  const player = PLAYER_ID.exec(id);
   if (player) return { id, label: "", imageUrl: espnHeadshot(player[1]), accent: "#64748b" };
   return { id, label: id, imageUrl: "", accent: "#64748b" };
 }
