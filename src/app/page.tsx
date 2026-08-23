@@ -12,6 +12,7 @@ import { PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
 import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
 import { getTierTemplate } from "@/data/tierTemplates";
 import { BoardZoom, previewFor } from "@/components/tierList/BoardThumb";
+import { widestWordEm } from "@/components/tierList/bungee";
 import { useAuth } from "@/hooks/useAuth";
 
 // Every card fronts a destination with a live picture of what is behind
@@ -21,28 +22,73 @@ import { useAuth } from "@/hooks/useAuth";
 // signed-out shape too, since the home page is the first thing a stranger
 // sees.
 
+// @container so a name can be sized against its own card: these run from
+// a 137px tile on a small phone to a full-width hero.
 const CARD =
-  "group flex flex-col rounded-2xl border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/40";
+  "group relative flex flex-col rounded-2xl @container border border-white/15 bg-[#101d38] overflow-hidden transition-colors hover:border-white/40";
 // flex-1 so the three preview cards in a row all put their caption on the
 // same line: the previews are naturally different heights (a 5-row tier
 // board is twice a progress bar), and without this the shorter cards
 // stretch to match and leave their caption stranded mid-card.
-const ART = "flex flex-1 items-center bg-[#050a15] p-2.5";
+//
+// The bottom padding is the room the name sits in. The scrim it sits on
+// is see-through at the top, so without this the art would run under the
+// words rather than stopping above them.
+const ART = "flex flex-1 items-center bg-[#050a15] p-2.5 pb-[54px] sm:pb-[60px]";
 
-function Name({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`text-[15px] leading-tight ${className}`} style={{ fontFamily: "var(--font-display)" }}>
-      {children}
-    </div>
-  );
-}
+// How dark the name's ground gets, and how far up the card it reaches.
+// Below about 60 the names on the pale cards - the Saints pill, the pink
+// S band - start to go soft; the preview above the reach line is
+// untouched, which is the point of stopping short of the top.
+const DIM = 0.85;
+const REACH = 80; // % of the card height
 
-function Meta({ color, children }: { color?: string; children: React.ReactNode }) {
+// The name, over the art rather than in a strip below it.
+//
+// Under the art it was 15px and the quietest thing on a card whose
+// loudest thing is a preview - and the previews are what a stranger
+// cannot tell apart, since four dark panels of small coloured shapes
+// read as four of the same card. Over the art the name is the biggest
+// thing on it, and the scrim keeps the preview legible underneath.
+function Caption({ name, color, meta }: { name: string; color: string; meta: React.ReactNode }) {
   return (
-    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] tracking-[0.09em] text-white/45">
-      {color && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />}
-      {children}
-    </div>
+    <>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0"
+        style={{
+          height: `${REACH}%`,
+          background: `linear-gradient(to top, rgba(3,7,15,${(DIM + 0.18).toFixed(2)}) 0%, rgba(3,7,15,${(DIM * 0.62).toFixed(2)}) 42%, rgba(3,7,15,0) 100%)`,
+        }}
+      />
+      <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+        <div
+          className="leading-[1.08]"
+          style={{
+            fontFamily: "var(--font-display)",
+            // Tracks the card, but never bigger than the widest WORD can
+            // be and still fit on one line - the same rule the tier list
+            // cards use. LEADERBOARD is eleven letters that cannot break,
+            // and at a flat 22px it ran off a 172px tile.
+            //
+            // The room is the card MINUS its 24px of padding, not a share
+            // of it: px-3 is 17% of a 137px tile and 2% of the hero. The
+            // extra pixel per character is glyph-advance rounding - under
+            // about 15px each advance lands on a whole device pixel, and
+            // eleven rounding the same way is how LEADERBOARD cleared the
+            // maths and still overflowed by 4px.
+            fontSize: `min(clamp(22px, 7cqw, 30px), calc((100cqw - ${26 + name.length}px) / ${widestWordEm(name).toFixed(3)}))`,
+            textShadow: "0 2px 10px rgba(0,0,0,0.8)",
+          }}
+        >
+          {name}
+        </div>
+        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] tracking-[0.09em] text-white/60">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+          {meta}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -173,10 +219,7 @@ function WeeklyHero({
       <div className={ART}>
         <MatchupGrid games={games} />
       </div>
-      <div className="px-3 pt-2.5 pb-3">
-        <Name>WEEKLY PICK&rsquo;EM</Name>
-        <Meta color="#4ade80">{meta}</Meta>
-      </div>
+      <Caption name={"WEEKLY PICK’EM"} color="#4ade80" meta={meta} />
     </Link>
   );
 }
@@ -240,10 +283,11 @@ function PredictorCard({ progress }: { progress: Partial<Record<TeamAbbr, number
         )}
         </div>
       </div>
-      <div className="px-3 pt-2.5 pb-3">
-        <Name>RECORD PREDICTOR</Name>
-        <Meta color="#38bdf8">{team && required > 0 ? `${team.abbr} · ${required - filled} WEEKS LEFT` : "32 TEAMS"}</Meta>
-      </div>
+      <Caption
+        name="RECORD PREDICTOR"
+        color="#38bdf8"
+        meta={team && required > 0 ? `${team.abbr} · ${required - filled} WEEKS LEFT` : "32 TEAMS"}
+      />
     </Link>
   );
 }
@@ -261,10 +305,7 @@ function TierListsCard() {
           <BoardZoom state={preview} template={template} />
         </div>
       </div>
-      <div className="px-3 pt-2.5 pb-3">
-        <Name>TIER LISTS</Name>
-        <Meta color="#f472b6">RANK ALL 32 TEAMS</Meta>
-      </div>
+      <Caption name="TIER LISTS" color="#f472b6" meta="RANK ALL 32 TEAMS" />
     </Link>
   );
 }
@@ -317,10 +358,11 @@ function LeaderboardCard({ rows }: { rows: LeaderboardRow[] }) {
         )}
         </div>
       </div>
-      <div className="px-3 pt-2.5 pb-3">
-        <Name>LEADERBOARD</Name>
-        <Meta color="#facc15">{rows.length > 0 ? `${rows.length} PLAYING` : "SEASON STANDINGS"}</Meta>
-      </div>
+      <Caption
+        name="LEADERBOARD"
+        color="#facc15"
+        meta={rows.length > 0 ? `${rows.length} PLAYING` : "SEASON STANDINGS"}
+      />
     </Link>
   );
 }
