@@ -525,6 +525,25 @@ grant execute on function public.create_tier_list_share(text, text, jsonb) to an
 -- sync_predictor_achievements(). Required game counts per week are
 -- hardcoded (src/data/games.ts can't be read from SQL) - keep this CASE
 -- in sync with GAMES_BY_WEEK if the schedule data ever changes.
+-- One place that knows how many games a week has. Perfect Week needs the
+-- identical number to decide whether a week was swept, and two copies of
+-- a schedule are two copies that can disagree - at which point a swept
+-- week silently fails to pay.
+create or replace function public.week_game_count(wk integer)
+returns integer
+language sql
+immutable
+as $$
+  select case wk
+    when 1 then 16 when 2 then 16 when 3 then 16 when 4 then 16
+    when 5 then 15 when 6 then 14 when 7 then 14 when 8 then 14
+    when 9 then 15 when 10 then 14 when 11 then 13 when 12 then 16
+    when 13 then 14 when 14 then 15 when 15 then 16 when 16 then 16
+    when 17 then 16 when 18 then 16
+    else 999
+  end;
+$$;
+
 create or replace function public.sync_weekly_pickem_achievements()
 returns void
 language plpgsql
@@ -533,21 +552,86 @@ set search_path = public
 as $$
 begin
   insert into public.point_events (user_id, source, points, reference_id)
-  select auth.uid(), 'weekly_pickem_complete', 100, wp.week::text
+  select auth.uid(), 'weekly_pickem_complete', 250, wp.week::text
   from public.weekly_picks wp
   where wp.user_id = auth.uid()
   group by wp.week
-  having count(distinct wp.game_id) >= case wp.week
-    when 1 then 16 when 2 then 16 when 3 then 16 when 4 then 16
-    when 5 then 15 when 6 then 14 when 7 then 14 when 8 then 14
-    when 9 then 15 when 10 then 14 when 11 then 13 when 12 then 16
-    when 13 then 14 when 14 then 15 when 15 then 16 when 16 then 16
-    when 17 then 16 when 18 then 16
-    else 999
-  end
+  having count(distinct wp.game_id) >= public.week_game_count(wp.week)
   on conflict (user_id, source, reference_id) do nothing;
 end;
 $$;
+
+-- Being right, as opposed to merely turning up: 25 a correct pick, 1,500
+-- for sweeping a week. See 0043_reprice_economy.sql for why these exist.
+-- Graded off published weeks only, exactly like sync_lock_bonus.
+create or replace function public.sync_correct_picks()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.point_events (user_id, source, points, reference_id)
+  select wp.user_id, 'correct_pick', 25, wp.week::text || ':' || wp.game_id
+  from public.weekly_picks wp
+  join public.weeks w on w.week = wp.week and w.results_published = true
+  join public.game_results gr on gr.game_id = wp.game_id
+  where wp.user_id = auth.uid()
+    and wp.team_abbr = gr.winner
+  on conflict (user_id, source, reference_id) do nothing;
+
+  -- A week counts as swept when the number of CORRECT picks reaches the
+  -- number of games it has - which also implies the card was full, so
+  -- there is no separate completeness check to keep in step.
+  insert into public.point_events (user_id, source, points, reference_id)
+  select wp.user_id, 'perfect_week', 1500, wp.week::text
+  from public.weekly_picks wp
+  join public.weeks w on w.week = wp.week and w.results_published = true
+  join public.game_results gr on gr.game_id = wp.game_id
+  where wp.user_id = auth.uid()
+    and wp.team_abbr = gr.winner
+  group by wp.user_id, wp.week
+  having count(distinct wp.game_id) >= public.week_game_count(wp.week)
+  on conflict (user_id, source, reference_id) do nothing;
+end;
+$$;
+
+revoke all on function public.sync_correct_picks() from public;
+grant execute on function public.sync_correct_picks() to authenticated;
+
+-- 10 per correct season-predictor call, paid as weeks are published
+-- rather than as a season-end lump - there is no "the season is over"
+-- trigger to hang one on.
+--
+-- COUPLED TO THE GAME ID FORMAT. season_picks stores (tracked_team,
+-- week); game_results stores (game_id, week, winner) and nowhere records
+-- who played whom - the schedule lives in src/data/games.ts, not in the
+-- database. The one link is the id itself, '{year}-w{week}-{away}-{home}',
+-- so parts 3 and 4 are the two teams. If that format changes this
+-- silently stops paying rather than erroring. A games table is the real
+-- fix.
+create or replace function public.sync_predictor_accuracy()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.point_events (user_id, source, points, reference_id)
+  select sp.user_id, 'predictor_correct', 10, sp.tracked_team || ':' || sp.week::text
+  from public.season_picks sp
+  join public.weeks w on w.week = sp.week and w.results_published = true
+  join public.game_results gr
+    on gr.week = sp.week
+   and lower(sp.tracked_team) in (split_part(gr.game_id, '-', 3), split_part(gr.game_id, '-', 4))
+  where sp.user_id = auth.uid()
+    and gr.winner = sp.predicted_winner
+  on conflict (user_id, source, reference_id) do nothing;
+end;
+$$;
+
+revoke all on function public.sync_predictor_accuracy() from public;
+grant execute on function public.sync_predictor_accuracy() to authenticated;
 grant execute on function public.sync_weekly_pickem_achievements() to authenticated;
 
 -- Awards a bonus for each lock that hit, once results are published.
@@ -596,7 +680,7 @@ as $$
 declare
   -- Keep in step with src/data/achievements.ts's daily_check_in
   -- pointsEach, which is the number the Challenges card promises.
-  v_points constant integer := 100;
+  v_points constant integer := 25;
   v_today date := (now() at time zone 'America/New_York')::date;
   v_uid uuid := auth.uid();
   v_last date;
