@@ -26,6 +26,7 @@ import { errorMessage } from "@/lib/errorMessage";
 import { AchievementCard } from "@/components/AchievementCard";
 import { LevelLadder } from "@/components/LevelLadder";
 import { InviteFriendsCard } from "@/components/InviteFriendsCard";
+import { JoinDiscordCard } from "@/components/JoinDiscordCard";
 
 const ALL_WEEKS = Object.keys(GAMES_BY_WEEK)
   .map(Number)
@@ -63,6 +64,7 @@ export function LevelsAchievementsModal({
   const [correctPicks, setCorrectPicks] = useState<number | null>(null);
   const [perfectWeeks, setPerfectWeeks] = useState<number | null>(null);
   const [predictorCorrect, setPredictorCorrect] = useState<number | null>(null);
+  const [discordClaimed, setDiscordClaimed] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,6 +82,7 @@ export function LevelsAchievementsModal({
     setCorrectPicks(null);
     setPerfectWeeks(null);
     setPredictorCorrect(null);
+    setDiscordClaimed(null);
     setError(null);
     Promise.all([
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)),
@@ -123,6 +126,9 @@ export function LevelsAchievementsModal({
       fetchPointSourceCount(user.id, "predictor_correct")
         .then(setPredictorCorrect)
         .catch((err) => setError(errorMessage(err)));
+      fetchPointSourceCount(user.id, "discord_join")
+        .then((n) => setDiscordClaimed(n > 0))
+        .catch((err) => setError(errorMessage(err)));
     });
   }, [open, user]);
 
@@ -136,6 +142,7 @@ export function LevelsAchievementsModal({
   const correctPickDef = ACHIEVEMENTS.find((a) => a.key === "correct_pick")!;
   const perfectWeekDef = ACHIEVEMENTS.find((a) => a.key === "perfect_week")!;
   const predictorCorrectDef = ACHIEVEMENTS.find((a) => a.key === "predictor_correct")!;
+  const discordDef = ACHIEVEMENTS.find((a) => a.key === "discord_join")!;
 
   const completedTeams = predictorProgress
     ? TEAMS_SORTED.filter((t) => (predictorProgress[t.abbr] ?? 0) >= (REQUIRED_PREDICTOR_WEEKS[t.abbr] ?? Infinity))
@@ -153,7 +160,8 @@ export function LevelsAchievementsModal({
     checkIn !== null &&
     correctPicks !== null &&
     perfectWeeks !== null &&
-    predictorCorrect !== null;
+    predictorCorrect !== null &&
+    discordClaimed !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
@@ -273,6 +281,22 @@ export function LevelsAchievementsModal({
                               )}
                             </p>
                           </AchievementCard>
+                        ),
+                      },
+                      {
+                        // Capped at one, so once it is claimed the
+                        // existing sort dims it and drops it to the
+                        // bottom - which is right: it is the only
+                        // challenge here you can genuinely finish.
+                        key: "discord",
+                        complete: discordClaimed!,
+                        node: (
+                          <JoinDiscordCard
+                            key="discord"
+                            def={discordDef}
+                            claimed={discordClaimed!}
+                            onClaimed={() => setDiscordClaimed(true)}
+                          />
                         ),
                       },
                       {

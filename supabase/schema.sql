@@ -735,6 +735,45 @@ $$;
 revoke all on function public.daily_check_in() from public;
 grant execute on function public.daily_check_in() to authenticated;
 
+-- 250 points, once ever, for joining the Discord. See
+-- 0044_discord_join.sql for the full note; the short version is that
+-- this pays for FOLLOWING the invite, not for joining - the app holds no
+-- Discord identity for anyone, so there is nothing to check a membership
+-- against. What it does guarantee is paying once: the fixed reference_id
+-- plus the unique index is the enforcement, not the client.
+create or replace function public.claim_discord_join()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  -- Keep in step with src/data/achievements.ts's discord_join pointsEach.
+  v_points constant integer := 250;
+  v_uid uuid := auth.uid();
+  v_rows integer;
+begin
+  if v_uid is null then
+    raise exception 'Not signed in';
+  end if;
+
+  -- 'joined' rather than a timestamp or a nonce: the reference_id IS the
+  -- once-ness here, so it has to be a value the caller cannot vary.
+  insert into public.point_events (user_id, source, points, reference_id)
+  values (v_uid, 'discord_join', v_points, 'joined')
+  on conflict (user_id, source, reference_id) do nothing;
+  get diagnostics v_rows = row_count;
+
+  return jsonb_build_object(
+    'awarded', v_rows > 0,
+    'points', case when v_rows > 0 then v_points else 0 end
+  );
+end;
+$$;
+
+revoke all on function public.claim_discord_join() from public;
+grant execute on function public.claim_discord_join() to authenticated;
+
 -- Attributes a new signup to whoever referred them (by username, doubling
 -- as the referral code - no separate code system needed) and pays BOTH
 -- sides a flat, deliberately large bonus - the referrer (source
