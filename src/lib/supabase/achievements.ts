@@ -83,10 +83,31 @@ export async function syncLockBonus(): Promise<void> {
   if (error) throw error;
 }
 
-export async function fetchLockBonusCount(userId: string): Promise<number> {
-  const { count, error } = await supabase.from("point_events").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("source", "lock_correct");
+// How many times a given point source has paid out. Own-row read -
+// point_events is "select own", so this is for your own profile only.
+export async function fetchPointSourceCount(userId: string, source: string): Promise<number> {
+  const { count, error } = await supabase.from("point_events").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("source", source);
   if (error) throw error;
   return count ?? 0;
+}
+
+export async function fetchLockBonusCount(userId: string): Promise<number> {
+  return fetchPointSourceCount(userId, "lock_correct");
+}
+
+// Idempotent, same reasoning as the sync_* functions above: pays out
+// every correct pick and every swept week in any week whose results have
+// been published, and no-ops for anything already paid.
+export async function syncCorrectPicks(): Promise<void> {
+  const { error } = await supabase.rpc("sync_correct_picks");
+  if (error) throw error;
+}
+
+// Idempotent - pays 10 for each season-predictor call that came true in a
+// published week.
+export async function syncPredictorAccuracy(): Promise<void> {
+  const { error } = await supabase.rpc("sync_predictor_accuracy");
+  if (error) throw error;
 }
 
 // Total weeks a lock was ever SET (correct or not, graded or not) - the

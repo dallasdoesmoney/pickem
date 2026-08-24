@@ -14,7 +14,10 @@ import {
   syncWeeklyPickemAchievements,
   fetchLockBonusCount,
   fetchLockAttemptCount,
+  fetchPointSourceCount,
   syncLockBonus,
+  syncCorrectPicks,
+  syncPredictorAccuracy,
 } from "@/lib/supabase/achievements";
 import { fetchCheckInStats, CheckInStats } from "@/lib/supabase/checkIn";
 import { fetchReferralCount } from "@/lib/supabase/referrals";
@@ -55,6 +58,11 @@ export function LevelsAchievementsModal({
   const [lockBonusCount, setLockBonusCount] = useState<number | null>(null);
   const [lockAttemptCount, setLockAttemptCount] = useState<number | null>(null);
   const [checkIn, setCheckIn] = useState<CheckInStats | null>(null);
+  // Rewards for being right, shown inside the card for the thing you were
+  // right about rather than as cards of their own.
+  const [correctPicks, setCorrectPicks] = useState<number | null>(null);
+  const [perfectWeeks, setPerfectWeeks] = useState<number | null>(null);
+  const [predictorCorrect, setPredictorCorrect] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,11 +77,16 @@ export function LevelsAchievementsModal({
     setLockBonusCount(null);
     setLockAttemptCount(null);
     setCheckIn(null);
+    setCorrectPicks(null);
+    setPerfectWeeks(null);
+    setPredictorCorrect(null);
     setError(null);
     Promise.all([
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)),
       syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err)),
       syncLockBonus().catch((err) => console.error("Achievement sync failed", err)),
+      syncCorrectPicks().catch((err) => console.error("Achievement sync failed", err)),
+      syncPredictorAccuracy().catch((err) => console.error("Achievement sync failed", err)),
     ]).finally(() => {
       fetchPredictorProgress(user.id)
         .then(setPredictorProgress)
@@ -101,6 +114,15 @@ export function LevelsAchievementsModal({
       fetchCheckInStats(user.id)
         .then(setCheckIn)
         .catch((err) => setError(errorMessage(err)));
+      fetchPointSourceCount(user.id, "correct_pick")
+        .then(setCorrectPicks)
+        .catch((err) => setError(errorMessage(err)));
+      fetchPointSourceCount(user.id, "perfect_week")
+        .then(setPerfectWeeks)
+        .catch((err) => setError(errorMessage(err)));
+      fetchPointSourceCount(user.id, "predictor_correct")
+        .then(setPredictorCorrect)
+        .catch((err) => setError(errorMessage(err)));
     });
   }, [open, user]);
 
@@ -111,6 +133,9 @@ export function LevelsAchievementsModal({
   const referralDef = ACHIEVEMENTS.find((a) => a.key === "referral")!;
   const lockDef = ACHIEVEMENTS.find((a) => a.key === "lock_correct")!;
   const checkInDef = ACHIEVEMENTS.find((a) => a.key === "daily_check_in")!;
+  const correctPickDef = ACHIEVEMENTS.find((a) => a.key === "correct_pick")!;
+  const perfectWeekDef = ACHIEVEMENTS.find((a) => a.key === "perfect_week")!;
+  const predictorCorrectDef = ACHIEVEMENTS.find((a) => a.key === "predictor_correct")!;
 
   const completedTeams = predictorProgress
     ? TEAMS_SORTED.filter((t) => (predictorProgress[t.abbr] ?? 0) >= (REQUIRED_PREDICTOR_WEEKS[t.abbr] ?? Infinity))
@@ -125,7 +150,10 @@ export function LevelsAchievementsModal({
     referralCount !== null &&
     lockBonusCount !== null &&
     lockAttemptCount !== null &&
-    checkIn !== null;
+    checkIn !== null &&
+    correctPicks !== null &&
+    perfectWeeks !== null &&
+    predictorCorrect !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
@@ -266,6 +294,25 @@ export function LevelsAchievementsModal({
                             doneCount={completedWeeks.length}
                             totalCount={ALL_WEEKS.length}
                           >
+                            {/* Filling the card in is only half of it -
+                                these are what being RIGHT pays, and they
+                                sit here rather than in cards of their own
+                                because they are the same activity. */}
+                            <div className="flex gap-2 mt-1 mb-2">
+                              <div className="flex-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-2">
+                                <div className="text-[10px] text-white/40">{correctPickDef.label}</div>
+                                <div className="text-sm tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
+                                  {correctPicks!} <span className="text-emerald-400 text-xs">&times;{correctPickDef.pointsEach}</span>
+                                </div>
+                              </div>
+                              <div className="flex-1 rounded-xl border border-white/10 bg-white/5 px-2.5 py-2">
+                                <div className="text-[10px] text-white/40">{perfectWeekDef.label}</div>
+                                <div className="text-sm tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
+                                  {perfectWeeks!}{" "}
+                                  <span className="text-emerald-400 text-xs">&times;{perfectWeekDef.pointsEach.toLocaleString()}</span>
+                                </div>
+                              </div>
+                            </div>
                             <div className="grid grid-cols-3 gap-2 mt-1">
                               {ALL_WEEKS.map((week) => {
                                 const required = GAMES_BY_WEEK[week].length;
@@ -343,6 +390,16 @@ export function LevelsAchievementsModal({
                             doneCount={completedTeams.length}
                             totalCount={TEAMS_SORTED.length}
                           >
+                            <div className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 mt-1 mb-2">
+                              <div className="text-[10px] text-white/40">{predictorCorrectDef.label}</div>
+                              <div className="text-sm tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
+                                {predictorCorrect!} <span className="text-emerald-400 text-xs">&times;{predictorCorrectDef.pointsEach}</span>
+                              </div>
+                              <p className="text-[10px] text-white/35 mt-0.5">
+                                Filling a team in pays {predictorDef.pointsEach}. Calling its games right pays{" "}
+                                {predictorCorrectDef.pointsEach} apiece, as results are published each week.
+                              </p>
+                            </div>
                             <div className="grid grid-cols-4 gap-2 mt-1">
                               {TEAMS_SORTED.map((team) => {
                                 const done = completedTeams.some((t) => t.abbr === team.abbr);

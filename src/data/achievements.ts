@@ -18,10 +18,11 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     label: "Daily Check-In",
     description: "Open Sideline Brew. That's the whole thing.",
     icon: "🔥",
-    // Must match v_points in daily_check_in() - see
-    // supabase/migrations/0042_check_in_points_100.sql. This number is
-    // only what the card promises; the database decides what is paid.
-    pointsEach: 100,
+    // Deliberately the smallest number in this file. Showing up is the
+    // floor of the economy, not the engine - see the note at the top of
+    // supabase/migrations/0043_reprice_economy.sql for what happened the
+    // one time it was not.
+    pointsEach: 25,
     unitLabel: "days",
   },
   {
@@ -37,8 +38,36 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     label: "Weekly Pick'em",
     description: "Make a pick for every game in a week.",
     icon: "🏈",
-    pointsEach: 100,
+    pointsEach: 250,
     unitLabel: "weeks",
+  },
+  // The three below have no card of their own - they are the reward for
+  // being RIGHT, so they belong inside the card for the thing you were
+  // right about, and are rendered in its expanded body. They live here
+  // anyway so that every number the app promises is in one file.
+  {
+    key: "correct_pick",
+    label: "Correct Pick",
+    description: "Win a game on your weekly card.",
+    icon: "✅",
+    pointsEach: 25,
+    unitLabel: "correct picks",
+  },
+  {
+    key: "perfect_week",
+    label: "Perfect Week",
+    description: "Get every single game in a week right.",
+    icon: "💯",
+    pointsEach: 1500,
+    unitLabel: "perfect weeks",
+  },
+  {
+    key: "predictor_correct",
+    label: "Predictor Accuracy",
+    description: "Call a game right on a team's season schedule.",
+    icon: "🎯",
+    pointsEach: 10,
+    unitLabel: "correct calls",
   },
   {
     key: "referral",
