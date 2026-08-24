@@ -8,9 +8,14 @@ export type LeaderboardRow = {
   correct: number;
   graded: number;
   total_points: number;
+  // Current daily check-in streak, but ONLY while it is still alive -
+  // the view reports 0 for a streak already broken, so anything above
+  // zero is safe to draw a flame next to. See
+  // supabase/migrations/0045_leaderboard_streak.sql.
+  streak: number;
 };
 
-const COLUMNS = "user_id, username, display_name, avatar_url, correct, graded, total_points";
+const COLUMNS = "user_id, username, display_name, avatar_url, correct, graded, total_points, streak";
 
 export async function fetchLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase

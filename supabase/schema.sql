@@ -320,7 +320,19 @@ select
   p.avatar_url,
   coalesce(agg.correct, 0) as correct,
   coalesce(agg.graded, 0) as graded,
-  coalesce(pts.total_points, 0) as total_points
+  coalesce(pts.total_points, 0) as total_points,
+  -- NOT check_in_streak straight: that column is only rewritten when
+  -- someone next checks in, so it records the last streak they had, not
+  -- one they are still on - a player who went twelve days running and
+  -- then vanished carries 12 forever. Liveness comes from
+  -- last_check_in_on. Today or yesterday is alive (today is not over yet);
+  -- anything staler is a broken streak and reports 0, meaning no badge.
+  -- See 0045_leaderboard_streak.sql.
+  case
+    when p.last_check_in_on >= (now() at time zone 'America/New_York')::date - 1
+      then coalesce(p.check_in_streak, 0)
+    else 0
+  end as streak
 from public.profiles p
 left join (
   select

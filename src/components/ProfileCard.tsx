@@ -7,6 +7,7 @@ import { getLevelInfo } from "@/lib/levels";
 import { FollowButton } from "@/components/FollowButton";
 import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
+import { StreakBadge } from "@/components/StreakBadge";
 import { CreatorLinks } from "@/components/CreatorLinks";
 import { LevelListModal } from "@/components/LevelListModal";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
@@ -88,8 +89,11 @@ export function ProfileCard({
         </button>
       </div>
 
-      <h2 className={`${nameSize} text-center mt-4`} style={{ fontFamily: "var(--font-display)" }}>
-        {label}
+      {/* The flame sits beside the name rather than under it so a long
+          name wraps around it instead of pushing it onto its own line. */}
+      <h2 className={`${nameSize} text-center mt-4 flex items-center justify-center gap-2 flex-wrap`} style={{ fontFamily: "var(--font-display)" }}>
+        <span>{label}</span>
+        <StreakBadge streak={row.streak} />
       </h2>
       <p className="text-white/45 text-sm mt-1">@{row.username}</p>
       <ProfileSocialLine userId={row.user_id} followerCount={stats?.followerCount} friendCount={stats?.friendCount} />

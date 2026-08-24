@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchPendingCreatorRequestCount } from "@/lib/supabase/creatorRequests";
 import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
+import { fetchMyLeaderboardEntry } from "@/lib/supabase/leaderboard";
+import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 
 const PANEL_WIDTH = 200;
 
@@ -48,6 +50,25 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
   // here rather than only inside /admin so an admin sees work waiting
   // without having to go looking for it.
   const [adminTaskCount, setAdminTaskCount] = useState(0);
+  // Challenges were previously reachable only by finding your level and
+  // then noticing the tab beside it, which is a lot of steps for the
+  // screen that answers "what can I do to earn points."
+  const [challengesOpen, setChallengesOpen] = useState(false);
+  // Only for the Levels tab's you-are-here marker, so it is fetched when
+  // the modal is opened rather than every time the menu is - the modal
+  // lands on Challenges, and by the time anyone switches tabs this has
+  // long since arrived.
+  const [totalPoints, setTotalPoints] = useState<number | undefined>(undefined);
+
+  function openChallenges() {
+    onOpenChange(false);
+    setChallengesOpen(true);
+    if (user) {
+      fetchMyLeaderboardEntry(user.id)
+        .then((row) => setTotalPoints(row?.total_points))
+        .catch(() => {});
+    }
+  }
 
   useEffect(() => {
     if (!user) {
@@ -162,6 +183,18 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
             >
               Profile
             </Link>
+            {/* Directly under Profile, because this is the thing people
+                are actually looking for when they go looking for their
+                profile: not who they are, but what is left to do. */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={openChallenges}
+              className="w-full text-left rounded-xl px-3 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Daily Challenges
+            </button>
             <Link
               href="/notifications"
               role="menuitem"
@@ -208,6 +241,16 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
           </div>,
           document.body
         )}
+
+      {/* Outside the `open && coords` portal above: closing the menu is
+          the first thing openChallenges does, so a modal rendered inside
+          it would be unmounted in the same tick it was asked for. */}
+      <LevelsAchievementsModal
+        open={challengesOpen}
+        initialTab="achievements"
+        totalPoints={totalPoints}
+        onClose={() => setChallengesOpen(false)}
+      />
     </div>
   );
 }
