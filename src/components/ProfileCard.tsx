@@ -108,7 +108,17 @@ export function ProfileCard({
           accentColor="#c084fc"
           onClick={self?.onReferrals}
         />
-        <StatTile icon="🔥" value="–" label="STREAK SOON" accentColor="rgba(255,255,255,0.35)" />
+        {/* This tile has been a greyed-out "STREAK SOON" placeholder
+            since the KPI row was built. The number is real now.
+            row.streak is already zeroed by the view for a streak that
+            has lapsed, so a dash here means "not on one", not "unknown" -
+            and the tile greys itself out again to say so. */}
+        <StatTile
+          icon="🔥"
+          value={row.streak > 0 ? String(row.streak) : "–"}
+          label="DAY STREAK"
+          accentColor={row.streak > 0 ? "#fb923c" : "rgba(255,255,255,0.35)"}
+        />
         <StatTile
           icon="🏆"
           value={`${row.correct}-${row.graded - row.correct}`}
