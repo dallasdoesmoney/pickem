@@ -242,15 +242,34 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
           document.body
         )}
 
-      {/* Outside the `open && coords` portal above: closing the menu is
-          the first thing openChallenges does, so a modal rendered inside
-          it would be unmounted in the same tick it was asked for. */}
-      <LevelsAchievementsModal
-        open={challengesOpen}
-        initialTab="achievements"
-        totalPoints={totalPoints}
-        onClose={() => setChallengesOpen(false)}
-      />
+      {/* Portalled to the body, and it has to be.
+
+          The header this menu sits in has backdrop-blur, and a
+          backdrop-filter makes that element the containing block for any
+          fixed-position descendant. So the modal's `fixed inset-0`
+          resolved to the header's 72px strip rather than the viewport: it
+          centred itself on that strip with its top hanging off-screen,
+          and its backdrop dimmed only the header. Portalling out is what
+          gets it back to the viewport - the same reason the menu panel
+          above is portalled.
+
+          It also has to sit outside that panel's `open && coords` portal,
+          for a different reason: closing the menu is the first thing
+          openChallenges does, so a modal rendered inside would unmount in
+          the same tick it was asked for.
+
+          challengesOpen is false until a click, so this never runs during
+          SSR where document does not exist. */}
+      {challengesOpen &&
+        createPortal(
+          <LevelsAchievementsModal
+            open
+            initialTab="achievements"
+            totalPoints={totalPoints}
+            onClose={() => setChallengesOpen(false)}
+          />,
+          document.body
+        )}
     </div>
   );
 }
