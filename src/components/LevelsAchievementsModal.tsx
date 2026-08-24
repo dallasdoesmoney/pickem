@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { ACHIEVEMENTS } from "@/data/achievements";
@@ -63,6 +63,7 @@ export function LevelsAchievementsModal({
 }) {
   const { user, profile } = useAuth();
   const [tab, setTab] = useState<Tab>(initialTab);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [predictorProgress, setPredictorProgress] = useState<Partial<Record<TeamAbbr, number>> | null>(null);
   const [weeklyProgress, setWeeklyProgress] = useState<Partial<Record<number, number>> | null>(null);
   const [weeks, setWeeks] = useState<WeekRow[]>([]);
@@ -81,6 +82,19 @@ export function LevelsAchievementsModal({
   useEffect(() => {
     if (open) setTab(initialTab);
   }, [open, initialTab]);
+
+  // Both tabs share one scroll container, and the Levels tab scrolls it:
+  // LevelLadder centres your current rank on mount. Switching to
+  // Challenges inherited that offset, and because the challenge list is
+  // shorter it clamped to a small one - which looked like the list
+  // opening slightly scrolled, with the EVERY DAY heading cut off above.
+  //
+  // Only on the way IN to Challenges. Resetting on every tab change would
+  // fight the ladder: child effects run before the parent's, so a reset
+  // here would land after LevelLadder's scrollIntoView and undo it.
+  useEffect(() => {
+    if (open && tab === "achievements") scrollRef.current?.scrollTo({ top: 0 });
+  }, [open, tab]);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -212,7 +226,7 @@ export function LevelsAchievementsModal({
           </div>
         </div>
 
-        <div className="overflow-y-auto px-5 pb-5 flex flex-col gap-4">
+        <div ref={scrollRef} className="overflow-y-auto px-5 pb-5 flex flex-col gap-4">
           {tab === "levels" ? (
             <LevelLadder totalPoints={totalPoints} />
           ) : (
