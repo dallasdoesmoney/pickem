@@ -13,9 +13,14 @@
 // the thing being shown.
 const MIN_VISIBLE = 2;
 
+// Sized against what sits beside it rather than against the text: on a
+// leaderboard row that is the 26px creator pill, and a flame smaller than
+// its neighbour reads as an afterthought. Rendered side by side at 18,
+// 22, 26 and 30 - 18 was too small to carry a number at all, and 30
+// outweighs the pill and starts running the row.
 const SIZES = {
-  xs: { emoji: "text-lg", num: "text-[9px]", numWide: "text-[7.5px]", pad: "pb-[1px]" },
-  sm: { emoji: "text-2xl", num: "text-[11px]", numWide: "text-[9px]", pad: "pb-[2px]" },
+  xs: { emoji: "text-[26px]", num: "text-[12px]", numWide: "text-[9.5px]", pad: "pb-[2px]" },
+  sm: { emoji: "text-[32px]", num: "text-[15px]", numWide: "text-[12px]", pad: "pb-[2px]" },
 } as const;
 
 export function StreakBadge({ streak, size = "sm" }: { streak: number; size?: keyof typeof SIZES }) {
@@ -41,8 +46,8 @@ export function StreakBadge({ streak, size = "sm" }: { streak: number; size?: ke
           flame's base and stops reading as part of it. */}
       <span
         aria-hidden
-        className={`absolute inset-0 flex items-end justify-center ${s.pad} ${streak >= 100 ? s.numWide : s.num} font-bold text-white tabular-nums whitespace-nowrap`}
-        style={{ textShadow: "0 1px 2px rgba(0,0,0,.95), 0 0 3px rgba(0,0,0,1)" }}
+        className={`absolute inset-0 flex items-end justify-center ${s.pad} ${streak >= 100 ? s.numWide : s.num} font-extrabold text-white tabular-nums whitespace-nowrap`}
+        style={{ textShadow: "0 1px 2px rgba(0,0,0,1), 0 0 3px rgba(0,0,0,1), 0 0 4px rgba(0,0,0,.9)" }}
       >
         {streak}
       </span>
