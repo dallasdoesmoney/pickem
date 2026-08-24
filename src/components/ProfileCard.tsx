@@ -9,6 +9,7 @@ import { LevelBadge } from "@/components/LevelBadge";
 import { PlayerBadges } from "@/components/PlayerBadges";
 import { CreatorLinks } from "@/components/CreatorLinks";
 import { LevelListModal } from "@/components/LevelListModal";
+import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 import { ProfileSocialLine } from "@/components/ProfileSocialLine";
 import { StatTile, StatDetailRow } from "@/components/StatTile";
 import { TeamsPredictedRow } from "@/components/TeamsPredictedRow";
@@ -47,6 +48,11 @@ export function ProfileCard({
   self?: { onEditProfile: () => void; onReferrals: () => void };
 }) {
   const [levelModalOpen, setLevelModalOpen] = useState(false);
+
+  // Not `self` - that is only passed by the account page, and this is
+  // also your own profile at /leaderboard/<your name> and in the
+  // leaderboard popup on your own row.
+  const isSelf = Boolean(myId && myId === row.user_id);
 
   const label = row.display_name || row.username;
   const rankColor = getLevelInfo(row.total_points).rankColor;
@@ -146,7 +152,19 @@ export function ProfileCard({
         )
       )}
 
-      <LevelListModal open={levelModalOpen} totalPoints={row.total_points} onClose={() => setLevelModalOpen(false)} />
+      {/* Your own ladder always comes with the Challenges tab attached.
+          Levels and challenges are the same subject seen from two ends -
+          where you are, and what would move you - so opening one without
+          the other is only ever right for someone else's profile, where
+          there is nothing you could go and do about it. This card is
+          reached from three places (the account page, /leaderboard/
+          [username], the leaderboard popup) and the test is the same in
+          all of them: is this me? */}
+      {isSelf ? (
+        <LevelsAchievementsModal open={levelModalOpen} totalPoints={row.total_points} onClose={() => setLevelModalOpen(false)} />
+      ) : (
+        <LevelListModal open={levelModalOpen} totalPoints={row.total_points} onClose={() => setLevelModalOpen(false)} />
+      )}
     </div>
   );
 }

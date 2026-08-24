@@ -12,6 +12,12 @@ export type AchievementDef = {
   unitLabel: string;
 };
 
+// Lives next to the achievement it belongs to, since the link and the
+// reward are one thing - change the server and this is the line to
+// change. A Discord invite can be revoked or expire; if this one stops
+// working, generate a new one and replace it here.
+export const DISCORD_INVITE_URL = "https://discord.gg/pcteJyuJXj";
+
 export const ACHIEVEMENTS: AchievementDef[] = [
   {
     key: "daily_check_in",
@@ -68,6 +74,14 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     icon: "🎯",
     pointsEach: 10,
     unitLabel: "correct calls",
+  },
+  {
+    key: "discord_join",
+    label: "Join the Discord",
+    description: "Come hang out in the Sideline Brew Discord.",
+    icon: "💬",
+    pointsEach: 250,
+    unitLabel: "joined",
   },
   {
     key: "referral",
