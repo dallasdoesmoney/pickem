@@ -34,6 +34,17 @@ const ALL_WEEKS = Object.keys(GAMES_BY_WEEK)
 
 type Tab = "levels" | "achievements";
 
+// How often a challenge comes round. This is the axis people actually
+// sort by when asking "what can I do right now" - not how much it pays,
+// and not how far through it they are.
+type Group = "daily" | "weekly" | "anytime";
+
+const GROUPS: { key: Group; title: string; blurb: string }[] = [
+  { key: "daily", title: "EVERY DAY", blurb: "resets at midnight ET" },
+  { key: "weekly", title: "EVERY WEEK", blurb: "while the season runs" },
+  { key: "anytime", title: "ANY TIME", blurb: "no deadline" },
+];
+
 // The "my own profile" version of the level ladder - unlike
 // LevelListModal (used for viewing someone else's ladder), this one adds
 // a toggle to switch to achievements without closing and reopening a
@@ -212,20 +223,27 @@ export function LevelsAchievementsModal({
                   <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                 </div>
               ) : (
-                <div className="flex flex-col gap-3">
-                  {/* Fully completed cards (done >= total) sink to the
-                      bottom, dimmed - same "complete >= 0 ? after" stable
-                      sort AchievementCard itself uses to decide dimming, so
-                      the two never disagree. Referral and lock bonus are
-                      uncapped (never "complete" in this sense) and always
-                      sort as if incomplete, keeping their normal position. */}
-                  {(
-                    [
+                <div className="flex flex-col gap-5">
+                  {/* Grouped by how often you can do it, daily first.
+                      Ungrouped, this was one run of six cards where the
+                      thing you can do again in an hour sat next to the
+                      thing that resolves in April, and the only way to
+                      tell them apart was to read all six.
+
+                      Within a group, fully completed cards (done >=
+                      total) sink to the bottom, dimmed - the same
+                      comparison AchievementCard itself uses to decide
+                      dimming, so the two never disagree. Referral and
+                      lock bonus are uncapped (never "complete" in this
+                      sense) and always sort as if incomplete. */}
+                  {(() => {
+                    const items = [
                       {
                         // First in the list because it is the only one
                         // that is already done by the time you read it -
                         // it exists to be noticed, not to be worked at.
                         key: "check-in",
+                        group: "daily" as Group,
                         complete: false,
                         node: (
                           <AchievementCard
@@ -289,6 +307,7 @@ export function LevelsAchievementsModal({
                         // bottom - which is right: it is the only
                         // challenge here you can genuinely finish.
                         key: "discord",
+                        group: "anytime" as Group,
                         complete: discordClaimed!,
                         node: (
                           <JoinDiscordCard
@@ -301,11 +320,13 @@ export function LevelsAchievementsModal({
                       },
                       {
                         key: "referral",
+                        group: "anytime" as Group,
                         complete: false,
                         node: <InviteFriendsCard key="referral" def={referralDef} username={profile?.username ?? null} referralCount={referralCount!} />,
                       },
                       {
                         key: "weekly",
+                        group: "weekly" as Group,
                         complete: ALL_WEEKS.length > 0 && completedWeeks.length >= ALL_WEEKS.length,
                         node: (
                           <AchievementCard
@@ -379,6 +400,7 @@ export function LevelsAchievementsModal({
                       },
                       {
                         key: "lock",
+                        group: "weekly" as Group,
                         complete: false,
                         node: (
                           <AchievementCard
@@ -401,6 +423,7 @@ export function LevelsAchievementsModal({
                       },
                       {
                         key: "predictor",
+                        group: "anytime" as Group,
                         complete: completedTeams.length >= TEAMS_SORTED.length,
                         node: (
                           <AchievementCard
@@ -448,10 +471,25 @@ export function LevelsAchievementsModal({
                           </AchievementCard>
                         ),
                       },
-                    ] as { key: string; complete: boolean; node: React.ReactNode }[]
-                  )
-                    .sort((a, b) => Number(a.complete) - Number(b.complete))
-                    .map((item) => item.node)}
+                    ] as { key: string; group: Group; complete: boolean; node: React.ReactNode }[];
+                    return GROUPS.map((g) => {
+                      const inGroup = items
+                        .filter((item) => item.group === g.key)
+                        .sort((a, b) => Number(a.complete) - Number(b.complete));
+                      if (!inGroup.length) return null;
+                      return (
+                        <div key={g.key} className="flex flex-col gap-3">
+                          <div className="flex items-baseline gap-2">
+                            <h3 className="text-xs text-white/45" style={{ fontFamily: "var(--font-display)" }}>
+                              {g.title}
+                            </h3>
+                            <span className="text-[10px] text-white/25">{g.blurb}</span>
+                          </div>
+                          {inGroup.map((item) => item.node)}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </>

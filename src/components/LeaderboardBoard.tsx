@@ -10,6 +10,7 @@ import { errorMessage } from "@/lib/errorMessage";
 import { PlayerProfileModal } from "@/components/PlayerProfileModal";
 import { LevelBadge } from "@/components/LevelBadge";
 import { CreatorBadgeIcon } from "@/components/CreatorBadgeIcon";
+import { StreakBadge } from "@/components/StreakBadge";
 import { getLevelInfo } from "@/lib/levels";
 
 type BoardView = "global" | "friends";
@@ -180,6 +181,7 @@ export function LeaderboardBoard() {
                     {isMe && <span className="text-white/40"> (you)</span>}
                   </span>
                   {creatorIds.has(row.user_id) && <CreatorBadgeIcon size="sm" />}
+                  <StreakBadge streak={row.streak} size="xs" />
                 </span>
                 <span className="text-sm shrink-0" style={{ fontFamily: "var(--font-display)" }}>
                   {row.correct}-{row.graded - row.correct}
