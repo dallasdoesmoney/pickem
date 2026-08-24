@@ -41,6 +41,7 @@ export function AchievementCard({
   doneCount,
   totalCount,
   neverComplete = false,
+  note,
   children,
 }: {
   icon: string;
@@ -53,6 +54,11 @@ export function AchievementCard({
   doneCount: number;
   totalCount?: number;
   neverComplete?: boolean;
+  // A short live status for the collapsed row - "Checked in today", a
+  // streak. Only worth using where the state changes without the user
+  // doing anything, which is the one case where making them expand the
+  // card to find out would be hiding the point of it.
+  note?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -100,6 +106,7 @@ export function AchievementCard({
                 {doneCount} {unitLabel}
               </span>
             )}
+            {note && <span className="text-[10px] shrink-0 whitespace-nowrap">{note}</span>}
           </div>
         </div>
         <svg

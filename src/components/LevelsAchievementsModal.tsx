@@ -16,6 +16,7 @@ import {
   fetchLockAttemptCount,
   syncLockBonus,
 } from "@/lib/supabase/achievements";
+import { fetchCheckInStats, CheckInStats } from "@/lib/supabase/checkIn";
 import { fetchReferralCount } from "@/lib/supabase/referrals";
 import { fetchWeeks, WeekRow } from "@/lib/supabase/admin";
 import { errorMessage } from "@/lib/errorMessage";
@@ -53,6 +54,7 @@ export function LevelsAchievementsModal({
   const [referralCount, setReferralCount] = useState<number | null>(null);
   const [lockBonusCount, setLockBonusCount] = useState<number | null>(null);
   const [lockAttemptCount, setLockAttemptCount] = useState<number | null>(null);
+  const [checkIn, setCheckIn] = useState<CheckInStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export function LevelsAchievementsModal({
     setReferralCount(null);
     setLockBonusCount(null);
     setLockAttemptCount(null);
+    setCheckIn(null);
     setError(null);
     Promise.all([
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)),
@@ -90,6 +93,14 @@ export function LevelsAchievementsModal({
       fetchLockAttemptCount(user.id)
         .then(setLockAttemptCount)
         .catch((err) => setError(errorMessage(err)));
+      // No sync_ call to pair with this one: today's check-in was
+      // already claimed by NotificationToasts on page load, so this only
+      // ever reads. Reading it fresh rather than off the cached auth
+      // profile matters for exactly that reason - the profile in context
+      // was fetched before today's check-in wrote to it.
+      fetchCheckInStats(user.id)
+        .then(setCheckIn)
+        .catch((err) => setError(errorMessage(err)));
     });
   }, [open, user]);
 
@@ -99,6 +110,7 @@ export function LevelsAchievementsModal({
   const weeklyDef = ACHIEVEMENTS.find((a) => a.key === "weekly_pickem_complete")!;
   const referralDef = ACHIEVEMENTS.find((a) => a.key === "referral")!;
   const lockDef = ACHIEVEMENTS.find((a) => a.key === "lock_correct")!;
+  const checkInDef = ACHIEVEMENTS.find((a) => a.key === "daily_check_in")!;
 
   const completedTeams = predictorProgress
     ? TEAMS_SORTED.filter((t) => (predictorProgress[t.abbr] ?? 0) >= (REQUIRED_PREDICTOR_WEEKS[t.abbr] ?? Infinity))
@@ -108,7 +120,12 @@ export function LevelsAchievementsModal({
   const weeksById = new Map(weeks.map((w) => [w.week, w]));
 
   const achievementsLoaded =
-    predictorProgress !== null && weeklyProgress !== null && referralCount !== null && lockBonusCount !== null && lockAttemptCount !== null;
+    predictorProgress !== null &&
+    weeklyProgress !== null &&
+    referralCount !== null &&
+    lockBonusCount !== null &&
+    lockAttemptCount !== null &&
+    checkIn !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
@@ -168,6 +185,68 @@ export function LevelsAchievementsModal({
                       sort as if incomplete, keeping their normal position. */}
                   {(
                     [
+                      {
+                        // First in the list because it is the only one
+                        // that is already done by the time you read it -
+                        // it exists to be noticed, not to be worked at.
+                        key: "check-in",
+                        complete: false,
+                        node: (
+                          <AchievementCard
+                            key="check-in"
+                            icon={checkInDef.icon}
+                            label={checkInDef.label}
+                            description={checkInDef.description}
+                            pointsEach={checkInDef.pointsEach}
+                            pointsLabel="PTS PER DAY"
+                            unitLabel={checkInDef.unitLabel}
+                            doneCount={checkIn!.total}
+                            note={
+                              checkIn!.checkedInToday ? (
+                                <span className="text-emerald-400">Checked in today</span>
+                              ) : (
+                                <span className="text-white/40">Checking you in…</span>
+                              )
+                            }
+                          >
+                            <div className="grid grid-cols-7 gap-1.5 mt-1">
+                              {/* Oldest on the left, so the week reads
+                                  the way a week reads. */}
+                              {[...checkIn!.recentDays].reverse().map((day, i, all) => {
+                                const isToday = i === all.length - 1;
+                                return (
+                                  <div
+                                    key={day.date}
+                                    title={day.date}
+                                    className={`flex flex-col items-center gap-1 rounded-lg border py-1.5 ${
+                                      day.checked
+                                        ? "border-emerald-400 bg-emerald-400/10"
+                                        : isToday
+                                          ? "border-white/25 bg-white/5"
+                                          : "border-white/10 bg-white/[0.02]"
+                                    }`}
+                                  >
+                                    <span className={`text-[9px] ${day.checked ? "text-emerald-300" : "text-white/40"}`}>
+                                      {new Date(`${day.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "narrow" })}
+                                    </span>
+                                    <span className={`text-[11px] leading-none ${day.checked ? "text-emerald-400" : "text-white/20"}`}>
+                                      {day.checked ? "✓" : "·"}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <p className="text-xs text-white/50 mt-2">
+                              {checkIn!.streak > 1
+                                ? `${checkIn!.streak} days in a row.`
+                                : "Come back tomorrow to start a streak."}
+                              {checkIn!.longest > checkIn!.streak && (
+                                <span className="text-white/35"> Best so far: {checkIn!.longest} days.</span>
+                              )}
+                            </p>
+                          </AchievementCard>
+                        ),
+                      },
                       {
                         key: "referral",
                         complete: false,

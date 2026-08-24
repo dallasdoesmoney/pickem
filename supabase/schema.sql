@@ -12,7 +12,14 @@ create table public.profiles (
   migrated_local_picks boolean not null default false,
   referred_by uuid references auth.users(id),
   onboarding_avatar_prompted boolean not null default false,
+  onboarding_referral_prompted boolean not null default false,
   follow_recs_prompted boolean not null default false,
+  -- Daily check-in state. Not in the grant list below, deliberately: a
+  -- streak a client can write is a streak worth nothing. Only
+  -- daily_check_in() sets these, and it is security definer.
+  check_in_streak integer not null default 0,
+  longest_check_in_streak integer not null default 0,
+  last_check_in_on date,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -569,6 +576,80 @@ begin
 end;
 $$;
 grant execute on function public.sync_lock_bonus() to authenticated;
+
+-- Points for showing up: opening the site once a day is worth 100,
+-- whether or not you touch anything. See 0041_daily_check_in.sql for the
+-- design and 0042_check_in_points_100.sql for the current amount.
+--
+-- Takes NO arguments on purpose. Both "which day is it" and "have I
+-- already claimed" are decided here rather than by the caller: a client
+-- that can name the day can claim a year of them, and a client that can
+-- say "not yet" can claim the same day forever. The day rolls at midnight
+-- in New York rather than UTC, which would roll it mid-evening Eastern -
+-- right through a Sunday night game.
+create or replace function public.daily_check_in()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  -- Keep in step with src/data/achievements.ts's daily_check_in
+  -- pointsEach, which is the number the Challenges card promises.
+  v_points constant integer := 100;
+  v_today date := (now() at time zone 'America/New_York')::date;
+  v_uid uuid := auth.uid();
+  v_last date;
+  v_streak integer;
+  v_longest integer;
+  v_rows integer;
+  v_awarded boolean;
+begin
+  if v_uid is null then
+    raise exception 'Not signed in';
+  end if;
+
+  -- The unique index on (user_id, source, reference_id) is what makes
+  -- this once a day, so two tabs opening at the same moment cannot both
+  -- score. Nothing reads-then-writes.
+  insert into public.point_events (user_id, source, points, reference_id)
+  values (v_uid, 'daily_check_in', v_points, v_today::text)
+  on conflict (user_id, source, reference_id) do nothing;
+  get diagnostics v_rows = row_count;
+  v_awarded := v_rows > 0;
+
+  select last_check_in_on, check_in_streak, longest_check_in_streak
+    into v_last, v_streak, v_longest
+    from public.profiles
+    where id = v_uid
+    for update;
+
+  if v_awarded then
+    if v_last = v_today - 1 then
+      v_streak := coalesce(v_streak, 0) + 1;
+    else
+      v_streak := 1;
+    end if;
+    v_longest := greatest(coalesce(v_longest, 0), v_streak);
+
+    update public.profiles
+      set check_in_streak = v_streak,
+          longest_check_in_streak = v_longest,
+          last_check_in_on = v_today
+      where id = v_uid;
+  end if;
+
+  return jsonb_build_object(
+    'awarded', v_awarded,
+    'points', case when v_awarded then v_points else 0 end,
+    'streak', coalesce(v_streak, 0),
+    'longest', coalesce(v_longest, 0)
+  );
+end;
+$$;
+
+revoke all on function public.daily_check_in() from public;
+grant execute on function public.daily_check_in() to authenticated;
 
 -- Attributes a new signup to whoever referred them (by username, doubling
 -- as the referral code - no separate code system needed) and pays BOTH

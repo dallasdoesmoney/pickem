@@ -14,6 +14,17 @@ export type AchievementDef = {
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   {
+    key: "daily_check_in",
+    label: "Daily Check-In",
+    description: "Open Sideline Brew. That's the whole thing.",
+    icon: "🔥",
+    // Must match v_points in daily_check_in() - see
+    // supabase/migrations/0042_check_in_points_100.sql. This number is
+    // only what the card promises; the database decides what is paid.
+    pointsEach: 100,
+    unitLabel: "days",
+  },
+  {
     key: "predictor_team_complete",
     label: "Season Predictor",
     description: "Predict the outcome of every game on a team's schedule.",
