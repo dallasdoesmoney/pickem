@@ -1,4 +1,5 @@
-// A live daily check-in streak, as a flame and a number.
+// A live daily check-in streak: the flame itself, with the day count
+// sitting on it. No chip, no border - the emoji is the badge.
 //
 // Renders nothing at 0, which is also what the leaderboard view reports
 // for a streak that has already been broken - so this never has to decide
@@ -12,20 +13,39 @@
 // the thing being shown.
 const MIN_VISIBLE = 2;
 
-export function StreakBadge({ streak, size = "sm" }: { streak: number; size?: "xs" | "sm" }) {
+const SIZES = {
+  xs: { emoji: "text-lg", num: "text-[9px]", numWide: "text-[7.5px]", pad: "pb-[1px]" },
+  sm: { emoji: "text-2xl", num: "text-[11px]", numWide: "text-[9px]", pad: "pb-[2px]" },
+} as const;
+
+export function StreakBadge({ streak, size = "sm" }: { streak: number; size?: keyof typeof SIZES }) {
   if (!streak || streak < MIN_VISIBLE) return null;
 
-  const text = size === "xs" ? "text-[10px]" : "text-[11px]";
-  const pad = size === "xs" ? "px-1 py-0" : "px-1.5 py-0.5";
+  const s = SIZES[size];
 
   return (
     <span
       title={`${streak}-day check-in streak`}
       aria-label={`${streak} day check-in streak`}
-      className={`shrink-0 inline-flex items-center gap-0.5 rounded-full border border-orange-400/30 bg-orange-400/10 ${pad} ${text} text-orange-300 tabular-nums whitespace-nowrap`}
+      className="relative inline-flex shrink-0 items-center justify-center leading-none"
     >
-      <span aria-hidden>🔥</span>
-      {streak}
+      <span aria-hidden className={`${s.emoji} leading-none`}>
+        🔥
+      </span>
+      {/* Pinned low and centred: the flame's widest, calmest area is its
+          base, and a number sitting up in the tip reads as floating
+          beside it rather than on it. The dark halo is doing real work -
+          white on that yellow is otherwise unreadable at 9px. Three
+          digits step down a size rather than overhanging the glyph -
+          measured, not guessed: at the full size "128" spills past the
+          flame's base and stops reading as part of it. */}
+      <span
+        aria-hidden
+        className={`absolute inset-0 flex items-end justify-center ${s.pad} ${streak >= 100 ? s.numWide : s.num} font-bold text-white tabular-nums whitespace-nowrap`}
+        style={{ textShadow: "0 1px 2px rgba(0,0,0,.95), 0 0 3px rgba(0,0,0,1)" }}
+      >
+        {streak}
+      </span>
     </span>
   );
 }
