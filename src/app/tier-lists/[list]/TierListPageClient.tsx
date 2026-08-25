@@ -79,9 +79,16 @@ import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
-// Not per list: whichever way you last looked at a board is the way you
-// want to look at the next one too.
-const TIER_VIEW_KEY = "pickem:tier-view";
+// Per list, keyed the same way the board's own state is (see
+// useTierList's storageKey). Which layout suits a list is a property of
+// that list - a pyramid is the right shape for ranking teams and the
+// wrong one for a long list you are sorting into bands - so remembering
+// one answer for all of them gets it wrong for most of them.
+const viewKeyFor = (slug: string) => `pickem:tier-view:${slug}`;
+// The last layout used anywhere, which is only ever a FALLBACK: it is
+// what a list you have never opened comes up in, so someone who works in
+// pyramids does not get dropped into rows by every new board.
+const TIER_VIEW_LAST_KEY = "pickem:tier-view";
 
 export default function TierListPageClient({
   template,
@@ -105,37 +112,58 @@ export default function TierListPageClient({
   // Which layout the board is in. "rows" is the tier list and is the only
   // one that edits it; see the pyramid block below.
   //
-  // Remembered across reloads. It is a way of looking at the board, not a
-  // step in a task, so being thrown back to the tier list every refresh
-  // is the app forgetting something it watched you choose. Per browser
-  // rather than saved with the list, because it is how YOU want to see
-  // the board, not part of the board.
+  // Remembered per list, across reloads. It is a way of looking at a
+  // board, not a step in a task, so being thrown back to the tier list
+  // every time you open one is the app forgetting something it watched
+  // you choose. Kept in the browser rather than saved with the list,
+  // because it is how YOU want to see that board and not part of it.
   const [view, setView] = useState<"rows" | "pyramid">("rows");
 
   // Read after mount, never during render: there is no localStorage on
   // the server, and seeding state from it would make the first client
   // render disagree with the HTML that came down.
   useEffect(() => {
+    let next: "rows" | "pyramid" = "rows";
     try {
-      const saved = localStorage.getItem(TIER_VIEW_KEY);
-      // Reading browser storage after mount is the point of this effect.
-      // Doing it in the state initialiser would have the server render
-      // "rows" and the client render "pyramid" off the same HTML, which
-      // is a hydration mismatch. One setState, once, on mount.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved === "rows" || saved === "pyramid") setView(saved);
+      // This list's own answer first; the last one used anywhere only if
+      // this list has never been opened.
+      const saved = localStorage.getItem(viewKeyFor(template.slug)) ?? localStorage.getItem(TIER_VIEW_LAST_KEY);
+      if (saved === "rows" || saved === "pyramid") next = saved;
     } catch {
       // Private mode, or site data switched off. The default is fine.
     }
-  }, []);
+    // Reading browser storage after mount is the point of this effect.
+    // Doing it in the state initialiser would have the server render
+    // "rows" and the client render "pyramid" off the same HTML, which is
+    // a hydration mismatch. One setState per list, on arrival.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setView(next);
+  }, [template.slug]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(TIER_VIEW_KEY, view);
-    } catch {
-      // Nothing to do - not remembering the layout is not worth an error.
-    }
-  }, [view]);
+  // Written where the choice is MADE, not from an effect watching `view`.
+  //
+  // An effect could not do this correctly. On arrival it fires once with
+  // `view` still at its default, before the read above has been applied -
+  // so it writes "rows" over the "pyramid" it is about to load. React's
+  // development double-invoke then re-runs the read against the value
+  // that write just destroyed, and the setting is gone for good. Saving
+  // on the click has no such window: nothing writes unless somebody
+  // presses something.
+  const rememberView = useCallback(
+    (next: "rows" | "pyramid") => {
+      // Somebody else's board, arrived at by link. Whichever way you look
+      // at theirs should not overwrite how you look at your own copy of
+      // the same template.
+      if (readOnlySnapshot) return;
+      try {
+        localStorage.setItem(viewKeyFor(template.slug), next);
+        localStorage.setItem(TIER_VIEW_LAST_KEY, next);
+      } catch {
+        // Nothing to do - not remembering the layout is not worth an error.
+      }
+    },
+    [template.slug, readOnlySnapshot]
+  );
   const [editing, setEditing] = useState(false);
   // Which tier is being edited. Double-clicking a name is the way into
   // edit mode, and it would be no use if the caret then appeared in the
@@ -461,6 +489,7 @@ export default function TierListPageClient({
   const switchView = useCallback(
     (next: "rows" | "pyramid") => {
       setSelectedId(null);
+      rememberView(next);
       const board = boardRef.current;
       const reduced =
         typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -475,7 +504,7 @@ export default function TierListPageClient({
       flushSync(() => setView(next));
       runCascade(board, next, pyrShape, before);
     },
-    [pyrShape],
+    [pyrShape, rememberView],
   );
 
   const sensors = useSensors(
