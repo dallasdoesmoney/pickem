@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { DailyPuzzle } from "@/components/DailyPuzzle";
 
-// Narrower than the leaderboard on purpose: the board is a stack of one
-// player per row, and stretched to 2xl the chips end up marooned from the
-// name they belong to.
+// Widens in two steps rather than one. A phone stacks each guess into its
+// own card and wants the narrow column; a desktop lays the same guess out
+// as a row of eight hints and needs the room, which is what it was not
+// getting when this was max-w-lg at every size - the board could not fit
+// and grew a horizontal scrollbar instead.
 export default function DailyPage() {
   const { user, loading } = useAuth();
 
   return (
-    <main className="flex-1 px-4 pb-16 pt-10 max-w-lg w-full mx-auto">
+    <main className="flex-1 px-4 pb-16 pt-10 max-w-lg md:max-w-3xl lg:max-w-4xl w-full mx-auto">
       <div className="text-center mb-8">
         <div className="text-xs text-white/45 tracking-[0.25em] mb-1">DAILY GAME</div>
         <h1 className="text-[clamp(2rem,8vw,3rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>

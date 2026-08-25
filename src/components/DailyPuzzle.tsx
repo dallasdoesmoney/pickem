@@ -48,11 +48,26 @@ function formatCell(key: ColumnKey, value: string | number | null): string {
   return String(value);
 }
 
+// Yellow is a real yellow. It was orange-400 before, which sat close
+// enough to the cream ground and to the team oranges to read as "some
+// warm colour" rather than as a status.
 const TONE: Record<Verdict, { bg: string; ink: string }> = {
   hit: { bg: "#22c55e", ink: "#04240f" },
-  close: { bg: "#fb923c", ink: INK },
+  close: { bg: "#ffd230", ink: INK },
   miss: { bg: "#e8e0cd", ink: "#8a8171" },
   unknown: { bg: "#efe9d8", ink: "#b3ab98" },
+};
+
+// What a yellow in each column actually means, which is worth saying out
+// loud now that three of them can produce one. Drives the legend.
+const CLOSE_MEANS: Partial<Record<ColumnKey, string>> = {
+  division: "same conference",
+  position: "same position group",
+  college: "same college conference",
+  age: "within 2 years",
+  height: "within 2 inches",
+  weight: "within 15 lb",
+  jersey: "within 5",
 };
 
 // The one column that can be painted in something other than green. A
@@ -71,10 +86,12 @@ function cellStyle(key: ColumnKey, cell: { value: string | number | null; status
 export function DailyPuzzle() {
   const [state, setState] = useState<PuzzleState | null>(null);
   const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchDailyPuzzle()
@@ -89,11 +106,31 @@ export function DailyPuzzle() {
     return COLUMNS.filter((c) => c.base || guesses.some((g) => cellOf(g, c.key).status !== "unknown"));
   }, [state]);
 
+  // Fixed player column, hint columns share the remainder. Nothing here
+  // has a minimum width, which is the whole reason the board can no
+  // longer push a scrollbar out the side of its card.
+  const columnTrack = `var(--puzzle-player-col) repeat(${visibleColumns.length}, minmax(0, 1fr))`;
+
+  // Someone typing "jam" wants Jameson before Benjamin. Starts-with wins,
+  // then contains, and the tie inside each is alphabetical because the
+  // list is already sorted that way.
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return PUZZLE_PLAYERS.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 8);
+    const starts: PuzzlePlayer[] = [];
+    const contains: PuzzlePlayer[] = [];
+    for (const p of PUZZLE_PLAYERS) {
+      const name = p.name.toLowerCase();
+      if (name.startsWith(q)) starts.push(p);
+      else if (name.includes(q)) contains.push(p);
+      if (starts.length >= 8) break;
+    }
+    return [...starts, ...contains].slice(0, 8);
   }, [query]);
+
+  useEffect(() => {
+    menuRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [active]);
 
   async function guess(player: PuzzlePlayer) {
     if (busy || guessedIds.has(player.espnId)) return;
@@ -109,6 +146,25 @@ export function DailyPuzzle() {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Arrow keys and enter, because a name you have already typed most of
+  // should not need the mouse to finish.
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!matches.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((i) => (i + 1) % matches.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((i) => (i - 1 + matches.length) % matches.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const pick = matches[active];
+      if (pick && !guessedIds.has(pick.espnId)) guess(pick);
+    } else if (e.key === "Escape") {
+      setQuery("");
     }
   }
 
@@ -189,44 +245,65 @@ export function DailyPuzzle() {
             <input
               ref={inputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                // A new search is a new list, so the highlight goes back
+                // to the top rather than pointing at whatever happens to
+                // be in that slot now.
+                setActive(0);
+              }}
+              onKeyDown={onKeyDown}
               placeholder="Type a player's name…"
               autoComplete="off"
               disabled={busy}
-              className="w-full font-semibold outline-none disabled:opacity-60"
+              aria-label="Guess a player"
+              aria-autocomplete="list"
+              className="w-full font-semibold outline-none transition-shadow duration-150 focus:shadow-[5px_5px_0_#16181c] disabled:opacity-60"
               style={{
                 background: "#fff",
                 border: EDGE,
                 borderRadius: 12,
                 boxShadow: `3px 3px 0 ${INK}`,
-                padding: "10px 12px",
+                padding: "11px 13px",
                 color: INK,
-                fontSize: ".85rem",
+                fontSize: ".9rem",
               }}
             />
-            {matches.length > 0 && (
+            {query.trim().length > 0 && (
               <div
-                className="absolute z-20 mt-2 w-full overflow-hidden"
+                ref={menuRef}
+                role="listbox"
+                className="puzzle-menu absolute z-20 mt-2 max-h-[19rem] w-full overflow-y-auto overflow-x-hidden"
                 style={{ background: "#fff", border: EDGE, borderRadius: 12, boxShadow: DROP }}
               >
-                {matches.map((p) => {
+                {matches.length === 0 && (
+                  <p className="px-3.5 py-3 text-sm font-semibold" style={{ color: "#a89f8b" }}>
+                    No player by that name.
+                  </p>
+                )}
+                {matches.map((p, i) => {
                   const already = guessedIds.has(p.espnId);
                   return (
                     <button
                       key={p.espnId}
                       type="button"
+                      role="option"
+                      aria-selected={i === active}
+                      data-active={i === active && !already}
                       disabled={already}
+                      onMouseEnter={() => setActive(i)}
                       onClick={() => guess(p)}
-                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left ${
-                        already ? "opacity-40" : "hover:bg-black/5"
+                      className={`puzzle-option flex w-full items-center gap-2.5 py-2 pr-3 text-left ${
+                        already ? "opacity-40" : ""
                       }`}
+                      style={{ paddingLeft: 10 }}
                     >
-                      <PlayerFace espnId={p.espnId} name={p.name} team={p.team} size={26} ring={2} />
+                      <PlayerFace espnId={p.espnId} name={p.name} team={p.team} size={28} ring={2} />
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold" style={{ color: INK }}>
                         {p.name}
                       </span>
                       <span className="shrink-0 text-[10px] font-bold" style={{ color: "#8a8171" }}>
-                        {p.team} · {p.position}
+                        {already ? "GUESSED" : `${p.team} · ${p.position}`}
                       </span>
                     </button>
                   );
@@ -238,9 +315,9 @@ export function DailyPuzzle() {
           {error && <p className="mt-2 text-xs font-bold text-red-600">{error}</p>}
 
           {state.guesses.length === 0 && (
-            <p className="mt-3 text-xs" style={{ color: "#8a8171" }}>
-              Eight guesses. Every one tells you what it has in common with the mystery player — green is a match, orange is
-              close, and an arrow points the way.
+            <p className="mt-3 text-xs leading-relaxed" style={{ color: "#8a8171" }}>
+              Eight guesses. Every one tells you what it has in common with the mystery player — green is an exact match,
+              yellow is close, and an arrow points the way.
             </p>
           )}
         </div>
@@ -248,58 +325,147 @@ export function DailyPuzzle() {
 
       {state.guesses.length > 0 && (
         <div
+          className="puzzle-board"
           style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP, padding: 14 }}
         >
-          {/* Sideways once the extra columns arrive, with the player pinned
-              left - a row of numbers you cannot match to a name is not a
-              hint. */}
-          <div className="overflow-x-auto">
-            <div className="flex min-w-max flex-col gap-2">
-              <div className="flex items-end gap-1.5 text-[9px] font-bold tracking-wider" style={{ color: "#a89f8b" }}>
-                <div className="sticky left-0 z-10 w-[128px] shrink-0 pr-2" style={{ background: CREAM }}>
-                  PLAYER
-                </div>
-                {visibleColumns.map((c) => (
-                  <div key={c.key} className="w-[62px] shrink-0 text-center">
-                    {c.label}
-                  </div>
-                ))}
+          {/* One header row on desktop, where the columns line up under it.
+              On a phone the board stacks into a card per guess and every
+              chip carries its own label instead - same information, no
+              row of headings marooned above a grid it no longer describes. */}
+          <div
+            className="mb-2 hidden gap-1.5 text-[9px] font-bold tracking-wider md:grid"
+            style={{ gridTemplateColumns: columnTrack, color: "#a89f8b" }}
+          >
+            <div className="pr-2">PLAYER</div>
+            {visibleColumns.map((c) => (
+              <div key={c.key} className="text-center">
+                {c.label}
               </div>
-
-              {state.guesses.map((g) => (
-                <div key={g.espnId} className="flex items-stretch gap-1.5">
-                  <div
-                    className="sticky left-0 z-10 flex w-[128px] shrink-0 items-center gap-2 pr-2"
-                    style={{ background: CREAM }}
-                  >
-                    <PlayerFace espnId={g.espnId} name={g.name} team={(PUZZLE_PLAYERS_BY_ID.get(g.espnId)?.team ?? "KC") as TeamAbbr} size={28} />
-                    <span className="min-w-0 truncate text-xs font-bold" style={{ color: INK }}>
-                      {g.name}
-                    </span>
-                  </div>
-                  {visibleColumns.map((c) => {
-                    const cell = cellOf(g, c.key);
-                    const { bg, ink } = cellStyle(c.key, cell);
-                    return (
-                      <div
-                        key={c.key}
-                        title={`${c.label}: ${formatCell(c.key, cell.value)}`}
-                        className="flex w-[62px] shrink-0 items-center justify-center gap-0.5 text-[11px] font-bold tabular-nums"
-                        style={{ background: bg, color: ink, border: EDGE, borderRadius: 10, boxShadow: DROP_SM, padding: ".55rem .1rem" }}
-                      >
-                        <span className="truncate">{formatCell(c.key, cell.value)}</span>
-                        {cell.direction === "up" && <span aria-label="higher">↑</span>}
-                        {cell.direction === "down" && <span aria-label="lower">↓</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
+
+          <div className="flex flex-col gap-3 md:gap-2">
+            {state.guesses.map((g) => (
+              <div
+                key={g.espnId}
+                className="puzzle-row flex flex-col gap-2 md:grid md:items-stretch md:gap-1.5"
+                style={{ gridTemplateColumns: columnTrack }}
+              >
+                <div className="flex min-w-0 items-center gap-2 md:pr-2">
+                  <PlayerFace
+                    espnId={g.espnId}
+                    name={g.name}
+                    team={(PUZZLE_PLAYERS_BY_ID.get(g.espnId)?.team ?? "KC") as TeamAbbr}
+                    size={30}
+                  />
+                  <span className="min-w-0 truncate text-sm font-bold md:text-xs" style={{ color: INK }} title={g.name}>
+                    {g.name}
+                  </span>
+                </div>
+
+                {/* md:contents dissolves this wrapper on desktop so the
+                    chips become cells of the row's own grid and line up
+                    with the header. On a phone it stays a 4-up grid. */}
+                <div className="grid grid-cols-4 gap-2 md:contents">
+                  {visibleColumns.map((c, i) => (
+                    <Chip key={c.key} column={c} cell={cellOf(g, c.key)} index={i} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Legend columns={visibleColumns} />
         </div>
       )}
     </div>
+  );
+}
+
+// One hint. Carries its own label below the md breakpoint, because that
+// is where the header row stops existing.
+function Chip({
+  column,
+  cell,
+  index,
+}: {
+  column: (typeof COLUMNS)[number];
+  cell: { value: string | number | null; status: Verdict; direction?: NumCell["direction"] };
+  index: number;
+}) {
+  const { bg, ink } = cellStyle(column.key, cell);
+  const text = formatCell(column.key, cell.value);
+  // "Northwestern" in a 76px chip needs the smaller size or it is three
+  // letters and an ellipsis. The threshold is 8 rather than 9 because
+  // "AFC North" is exactly nine characters and was the thing truncating.
+  const long = text.length > 8;
+
+  return (
+    <div
+      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 md:py-2.5"
+      title={`${column.label}: ${text}`}
+      style={{
+        background: bg,
+        color: ink,
+        border: EDGE,
+        borderRadius: 10,
+        boxShadow: DROP_SM,
+        animationDelay: `${index * 45}ms`,
+      }}
+    >
+      <span className="text-[8px] font-bold uppercase tracking-wider md:hidden" style={{ opacity: 0.6 }}>
+        {column.label}
+      </span>
+      <span className="flex w-full items-center justify-center gap-0.5 px-1">
+        <span className={`truncate font-bold tabular-nums ${long ? "text-[9px]" : "text-[11px]"}`}>{text}</span>
+        {cell.direction === "up" && <span aria-label="higher">↑</span>}
+        {cell.direction === "down" && <span aria-label="lower">↓</span>}
+      </span>
+    </div>
+  );
+}
+
+// Yellow means something different in every column it can appear in, and
+// a colour whose meaning you have to guess at is not a hint. Built from
+// the columns actually on the board, so it never explains a column that
+// is not there.
+function Legend({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
+  const explained = columns.filter((c) => CLOSE_MEANS[c.key]);
+
+  return (
+    <div className="mt-4 flex flex-col gap-2 border-t pt-3" style={{ borderColor: "#e4d9bd" }}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] font-bold" style={{ color: "#8a8171" }}>
+        <span className="flex items-center gap-1.5">
+          <Swatch bg={TONE.hit.bg} /> EXACT
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Swatch bg={TONE.close.bg} /> CLOSE
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Swatch bg={TONE.miss.bg} /> NO MATCH
+        </span>
+      </div>
+      <p className="text-[10px] leading-relaxed" style={{ color: "#a89f8b" }}>
+        Close means{" "}
+        {explained.map((c, i) => (
+          <span key={c.key}>
+            {i > 0 && (i === explained.length - 1 ? ", and " : ", ")}
+            <span style={{ color: "#8a8171", fontWeight: 700 }}>{c.label}</span> {CLOSE_MEANS[c.key]}
+          </span>
+        ))}
+        .
+      </p>
+    </div>
+  );
+}
+
+function Swatch({ bg }: { bg: string }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block"
+      style={{ width: 12, height: 12, background: bg, border: `2px solid ${INK}`, borderRadius: 4 }}
+    />
   );
 }
 
@@ -325,7 +491,10 @@ function Reveal({
     .join(" · ");
 
   return (
-    <div style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP, overflow: "hidden" }}>
+    <div
+      className="puzzle-reveal"
+      style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP, overflow: "hidden" }}
+    >
       <div
         className="relative flex flex-col items-center gap-2 overflow-hidden px-4 pt-6 pb-5"
         style={{ background: bg, color: ink, borderBottom: EDGE }}
@@ -353,7 +522,7 @@ function Reveal({
         <span className="relative z-10 text-[.72rem] font-bold uppercase tracking-wider">{meta}</span>
       </div>
 
-      <div className="flex flex-col gap-2.5 px-4 pt-3 pb-4">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-2.5 px-4 pt-3 pb-4">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-bold" style={{ color: INK }}>
             {state.solved ? `Solved in ${state.guessesUsed}` : "Out of guesses"}
@@ -378,14 +547,16 @@ function Reveal({
         <p className="text-xs" style={{ color: "#8a8171" }}>
           {state.solved ? "New player tomorrow at midnight ET." : "New player tomorrow — the streak survives."}
         </p>
+        {/* Orange rather than yellow: yellow is a verdict on this board
+            now, and a button wearing a verdict's colour reads as one. */}
         <button
           type="button"
           onClick={onShare}
-          className="active:scale-95 transition-transform duration-150"
+          className="puzzle-press"
           style={{
             fontFamily: "var(--font-display)",
             fontSize: ".85rem",
-            background: "#ffc93c",
+            background: "#ff7a45",
             color: INK,
             border: EDGE,
             borderRadius: 12,

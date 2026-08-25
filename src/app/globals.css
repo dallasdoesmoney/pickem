@@ -488,3 +488,154 @@ body {
     transform: translate(0, 0) rotate(var(--peek-rot)) scale(1);
   }
 }
+
+/* ---------------------------------------------------------------
+   Daily game (Who Am I?)
+
+   The sticker language is hard edges and hard shadows, so the motion
+   matches it: things land rather than fade, and hovering lifts a card
+   off the page toward you by shrinking its shadow offset. Nothing here
+   loops, and nothing moves once you have stopped interacting with it.
+   --------------------------------------------------------------- */
+
+/* A chip lands, one after the next along the row, so a new guess reads
+   left to right the way you would read it out loud. */
+@keyframes puzzle-chip-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.86);
+  }
+  70% {
+    transform: translateY(0) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.puzzle-chip {
+  animation: puzzle-chip-in 340ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+/* Lift toward the reader: the shadow gets shorter as the chip rises, the
+   way a real sticker peeling up would behave. */
+@media (hover: hover) {
+  .puzzle-chip:hover {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 #16181c;
+    z-index: 1;
+  }
+}
+
+/* The guessed player slides in under the input it came from. */
+@keyframes puzzle-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.puzzle-row {
+  animation: puzzle-row-in 260ms ease-out both;
+}
+
+@keyframes puzzle-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.puzzle-menu {
+  animation: puzzle-menu-in 130ms ease-out both;
+  transform-origin: top center;
+}
+
+/* Dropdown rows. The bar on the left is what the keyboard highlight and
+   the mouse highlight share, so arrowing down and hovering look like the
+   same thing happening - because they are. */
+.puzzle-option {
+  transition: background-color 120ms ease, padding-left 120ms ease;
+  border-left: 4px solid transparent;
+}
+
+.puzzle-option[data-active="true"] {
+  background: #fff3d6;
+  border-left-color: #16181c;
+  padding-left: 14px;
+}
+
+/* The reveal is the part people screenshot, so it gets the one piece of
+   motion with any weight to it. */
+@keyframes puzzle-reveal-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.puzzle-reveal {
+  animation: puzzle-reveal-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A pressable sticker: down and into its own shadow. */
+.puzzle-press {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.puzzle-press:active {
+  transform: translate(3px, 4px);
+  box-shadow: 0 0 0 #16181c;
+}
+
+@media (hover: hover) {
+  .puzzle-press:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 5px 0 #16181c;
+  }
+}
+
+/* Reduced motion keeps every state - the highlight, the lift, the press -
+   and drops only the entrances, which are the part that moves without
+   being asked to. */
+@media (prefers-reduced-motion: reduce) {
+  .puzzle-chip,
+  .puzzle-row,
+  .puzzle-menu,
+  .puzzle-reveal {
+    animation: none;
+  }
+}
+
+/* The board's column track. The player column is a fixed width so every
+   guess lines its name up with the one above; the hint columns split
+   what is left, which is what keeps the board inside its card at any
+   width instead of growing a horizontal scrollbar.
+
+   188px at desktop is measured, not picked: the face and its gap take
+   38, leaving ~150 for the name, which covers 99% of the pool. The
+   handful past that ("Demetrius Flannigan-Fowles") truncate, and the
+   full name is on the element's title. */
+.puzzle-board {
+  --puzzle-player-col: 140px;
+}
+
+@media (min-width: 1024px) {
+  .puzzle-board {
+    --puzzle-player-col: 188px;
+  }
+}
