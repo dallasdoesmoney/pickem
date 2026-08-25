@@ -1,16 +1,22 @@
 import { TeamAbbr, TEAMS, Conference, Division } from "@/data/teams";
+import { ACTIVE_PLAYERS } from "@/data/rosters/all";
 import { QUARTERBACKS } from "@/data/rosters/qbs";
 import { RUNNING_BACKS } from "@/data/rosters/rbs";
 import { WIDE_RECEIVERS } from "@/data/rosters/wrs";
 import { TIGHT_ENDS } from "@/data/rosters/tes";
 import { KICKERS } from "@/data/rosters/ks";
 
-// The pool the daily player puzzle draws from and guesses against: every
-// synced roster, flattened, with the position each file already implies.
+// The pool the daily puzzle draws from, and the one it grades guesses
+// against. They are not the same pool, and that is the design:
 //
-// This is a view over the roster files rather than a list of its own, so
-// the weekly sync keeps it current for free and there is no second place
-// to remember to update when someone is traded.
+//   guessable   every active player, ~1,700
+//   answerable  the ones ESPN's depth chart mentions, ~400-600
+//
+// An answer pool of everybody would include third-string guards and
+// practice-squad safeties, and no set of hints rescues a player nobody
+// can name. Poeltl and Weddle draw the same line. Guessing stays wide
+// open, because being told "not a player" when you have named a real one
+// is the most annoying thing these games do.
 //
 // The DATABASE holds a copy of this (see
 // supabase/migrations/0046_daily_player_puzzle.sql) because the answer
@@ -20,20 +26,21 @@ import { KICKERS } from "@/data/rosters/ks";
 // apart otherwise, and the symptom is a guess the server says it has
 // never heard of.
 
-export type PuzzlePosition = "QB" | "RB" | "WR" | "TE" | "K";
-
 export type PuzzlePlayer = {
   espnId: string;
   name: string;
   team: TeamAbbr;
-  position: PuzzlePosition;
+  // ESPN's own abbreviation once the full roster has been synced - OT,
+  // CB, EDGE and the rest, not just the five skill buckets.
+  position: string;
   conference: Conference;
   division: Division;
-  // Optional on purpose. The roster sync currently keeps only id, name
-  // and team; these light up once scripts/sync-players.mjs is run with
-  // the wider field set it now captures. Every hint column checks for
-  // its own value, so the puzzle plays with four columns today and more
-  // later without any of this being rewritten.
+  // Whether this player can be the answer, as opposed to merely a legal
+  // guess.
+  answerable: boolean;
+  // Optional: ESPN does not publish all of these for everyone. Each hint
+  // column checks for its own value and hides itself when nothing has
+  // one.
   heightIn?: number;
   weightLb?: number;
   age?: number;
@@ -52,7 +59,7 @@ type RosterRow = {
   college?: string;
 };
 
-function withTeam<T extends RosterRow>(rows: T[], position: PuzzlePosition): PuzzlePlayer[] {
+function fromPositionFile(rows: RosterRow[], position: string): PuzzlePlayer[] {
   return rows.map((r) => ({
     espnId: r.espnId,
     name: r.name,
@@ -60,9 +67,9 @@ function withTeam<T extends RosterRow>(rows: T[], position: PuzzlePosition): Puz
     position,
     conference: TEAMS[r.team].conference,
     division: TEAMS[r.team].division,
-    // Forwarded rather than dropped even though the board is graded
-    // server-side and never reads these here: a type that claims a field
-    // and never carries one is a trap for whatever uses it next.
+    // Everyone in these files is a depth-chart pick by construction -
+    // that is how syncPosition chooses them.
+    answerable: true,
     heightIn: r.heightIn,
     weightLb: r.weightLb,
     age: r.age,
@@ -71,17 +78,37 @@ function withTeam<T extends RosterRow>(rows: T[], position: PuzzlePosition): Puz
   }));
 }
 
-export const PUZZLE_PLAYERS: PuzzlePlayer[] = [
-  ...withTeam(QUARTERBACKS, "QB"),
-  ...withTeam(RUNNING_BACKS, "RB"),
-  ...withTeam(WIDE_RECEIVERS, "WR"),
-  ...withTeam(TIGHT_ENDS, "TE"),
-  ...withTeam(KICKERS, "K"),
-]
-  // A player can hold two roster slots (a backup listed at two spots, or
-  // a mid-season move landing them in both files before the next sync).
-  // Two rows for one man would let the same guess be typed twice and
-  // would put a duplicate in the dropdown.
+// The five position files, as a pool. Used only until the full roster has
+// been synced once - an unsynced checkout plays a 192-player game rather
+// than no game, which matters because that is also what a fresh clone and
+// a preview deploy look like.
+const FROM_POSITION_FILES: PuzzlePlayer[] = [
+  ...fromPositionFile(QUARTERBACKS, "QB"),
+  ...fromPositionFile(RUNNING_BACKS, "RB"),
+  ...fromPositionFile(WIDE_RECEIVERS, "WR"),
+  ...fromPositionFile(TIGHT_ENDS, "TE"),
+  ...fromPositionFile(KICKERS, "K"),
+];
+
+const FROM_FULL_ROSTER: PuzzlePlayer[] = ACTIVE_PLAYERS.map((p) => ({
+  espnId: p.espnId,
+  name: p.name,
+  team: p.team,
+  position: p.position,
+  conference: TEAMS[p.team].conference,
+  division: TEAMS[p.team].division,
+  answerable: p.answerable,
+  heightIn: p.heightIn,
+  weightLb: p.weightLb,
+  age: p.age,
+  jersey: p.jersey,
+  college: p.college,
+}));
+
+export const PUZZLE_PLAYERS: PuzzlePlayer[] = (FROM_FULL_ROSTER.length ? FROM_FULL_ROSTER : FROM_POSITION_FILES)
+  // A player can hold two roster slots, or appear on two teams' pages
+  // mid-trade. Two rows for one man would put a duplicate in the dropdown
+  // and let the same guess be spent twice.
   .filter((p, i, all) => all.findIndex((q) => q.espnId === p.espnId) === i)
   .sort((a, b) => a.name.localeCompare(b.name));
 
