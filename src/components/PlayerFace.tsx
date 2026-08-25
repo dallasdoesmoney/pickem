@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { teamTile } from "@/lib/colorUtils";
-import { playerHeadshot } from "@/data/puzzlePlayers";
+import { playerHeadshot } from "@/lib/espnHeadshot";
 
 // A player's face, with the fallback built in rather than bolted on.
 //

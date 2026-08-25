@@ -131,7 +131,7 @@ export const PUZZLE_PLAYERS: PuzzlePlayer[] = (FROM_FULL_ROSTER.length ? FROM_FU
 
 export const PUZZLE_PLAYERS_BY_ID = new Map(PUZZLE_PLAYERS.map((p) => [p.espnId, p]));
 
-// ESPN keys headshots on the same id the roster rows carry.
-export function playerHeadshot(espnId: string): string {
-  return `https://a.espncdn.com/i/headshots/nfl/players/full/${espnId}.png`;
-}
+// Re-exported so callers that already hold a player can reach for the
+// URL here; the function itself lives in its own module so anything that
+// needs ONLY the URL does not pull this whole list in with it.
+export { playerHeadshot } from "@/lib/espnHeadshot";
