@@ -626,16 +626,22 @@ body {
    what is left, which is what keeps the board inside its card at any
    width instead of growing a horizontal scrollbar.
 
-   188px at desktop is measured, not picked: the face and its gap take
-   38, leaving ~150 for the name, which covers 99% of the pool. The
-   handful past that ("Demetrius Flannigan-Fowles") truncate, and the
-   full name is on the element's title. */
+   The desktop widths are measured, not picked: the face and its gap take
+   46, and the rest is name at the size that breakpoint sets. 215 covers
+   99% of the pool at 15px. The handful past that ("Demetrius
+   Flannigan-Fowles") truncate, with the full name on the title. */
 .puzzle-board {
-  --puzzle-player-col: 140px;
+  --puzzle-player-col: 150px;
 }
 
 @media (min-width: 1024px) {
   .puzzle-board {
-    --puzzle-player-col: 188px;
+    --puzzle-player-col: 215px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .puzzle-board {
+    --puzzle-player-col: 230px;
   }
 }

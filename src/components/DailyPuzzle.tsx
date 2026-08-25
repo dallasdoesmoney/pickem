@@ -48,26 +48,37 @@ function formatCell(key: ColumnKey, value: string | number | null): string {
   return String(value);
 }
 
-// Yellow is a real yellow. It was orange-400 before, which sat close
-// enough to the cream ground and to the team oranges to read as "some
-// warm colour" rather than as a status.
+// Gold and a deeper green rather than the highlighter versions. The
+// first pass used tailwind's green-500 against a near-neon yellow, which
+// on a cream ground read as two warning lights.
+//
+// Black ink on every one of them, including the misses. A greyed-out
+// value in a grey chip says "ignore me" twice, and the value is the part
+// you are reading the board for - you need to know it was MIA even when
+// MIA is wrong. The colour carries the verdict; the text carries the
+// fact. Measured against black: 7.03:1 on the green, 10.9 on the gold,
+// 13.5 on the grey - all clear of AA.
 const TONE: Record<Verdict, { bg: string; ink: string }> = {
-  hit: { bg: "#22c55e", ink: "#04240f" },
-  close: { bg: "#ffd230", ink: INK },
-  miss: { bg: "#e8e0cd", ink: "#8a8171" },
-  unknown: { bg: "#efe9d8", ink: "#b3ab98" },
+  hit: { bg: "#35b96b", ink: INK },
+  close: { bg: "#f5c518", ink: INK },
+  miss: { bg: "#e8e0cd", ink: INK },
+  unknown: { bg: "#efe9d8", ink: INK },
 };
 
 // What a yellow in each column actually means, which is worth saying out
-// loud now that three of them can produce one. Drives the legend.
+// loud now that more than the numbers can produce one. Drives the legend.
+//
+// POS is deliberately absent: it has no close any more. Grouping corners
+// with safeties barely narrowed a pool where a quarter of the league is a
+// defensive back, and a yellow that does not narrow anything teaches
+// people to ignore yellow.
 const CLOSE_MEANS: Partial<Record<ColumnKey, string>> = {
   division: "same conference",
-  position: "same position group",
   college: "same college conference",
-  age: "within 2 years",
+  age: "within 3 years",
   height: "within 2 inches",
   weight: "within 15 lb",
-  jersey: "within 5",
+  jersey: "within 3",
 };
 
 // The one column that can be painted in something other than green. A
@@ -224,19 +235,22 @@ export function DailyPuzzle() {
     <div className="flex flex-col gap-5" style={{ fontFamily: "var(--font-game)" }}>
       {state.finished && state.answer && <Reveal state={state} answer={answer} onShare={share} copied={copied} />}
 
+      {/* The board goes as wide as the screen allows; the input does not.
+          A search field stretched to 1150px is a lot of runway for a
+          name, and it drifts away from the list it drops down over. */}
       {!state.finished && (
         <div
-          className="flex flex-col"
-          style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP, padding: 16 }}
+          className="mx-auto flex w-full max-w-2xl flex-col p-4 lg:p-5"
+          style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP }}
         >
           {/* No title here - the page already says WHO AM I? above the
               card, and repeating it inside cost a line of height for a
               word already on screen. */}
           <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#a89f8b" }}>
+            <span className="text-xs font-bold uppercase tracking-wider lg:text-[13px]" style={{ color: "#a89f8b" }}>
               Guess the player
             </span>
-            <span className="text-sm font-bold" style={{ color: "#e0483a" }}>
+            <span className="text-sm font-bold lg:text-base" style={{ color: "#e0483a" }}>
               {left} of {state.maxGuesses} left
             </span>
           </div>
@@ -258,15 +272,13 @@ export function DailyPuzzle() {
               disabled={busy}
               aria-label="Guess a player"
               aria-autocomplete="list"
-              className="w-full font-semibold outline-none transition-shadow duration-150 focus:shadow-[5px_5px_0_#16181c] disabled:opacity-60"
+              className="w-full px-3.5 py-3 text-[.95rem] font-semibold outline-none transition-shadow duration-150 focus:shadow-[5px_5px_0_#16181c] disabled:opacity-60 lg:px-4 lg:py-3.5 lg:text-base"
               style={{
                 background: "#fff",
                 border: EDGE,
                 borderRadius: 12,
                 boxShadow: `3px 3px 0 ${INK}`,
-                padding: "11px 13px",
                 color: INK,
-                fontSize: ".9rem",
               }}
             />
             {query.trim().length > 0 && (
@@ -325,15 +337,15 @@ export function DailyPuzzle() {
 
       {state.guesses.length > 0 && (
         <div
-          className="puzzle-board"
-          style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP, padding: 14 }}
+          className="puzzle-board p-3.5 md:p-[18px] lg:p-6"
+          style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP }}
         >
           {/* One header row on desktop, where the columns line up under it.
               On a phone the board stacks into a card per guess and every
               chip carries its own label instead - same information, no
               row of headings marooned above a grid it no longer describes. */}
           <div
-            className="mb-2 hidden gap-1.5 text-[9px] font-bold tracking-wider md:grid"
+            className="mb-2 hidden gap-2 text-[10px] font-bold tracking-wider md:grid lg:mb-2.5 lg:text-[11px]"
             style={{ gridTemplateColumns: columnTrack, color: "#a89f8b" }}
           >
             <div className="pr-2">PLAYER</div>
@@ -348,17 +360,21 @@ export function DailyPuzzle() {
             {state.guesses.map((g) => (
               <div
                 key={g.espnId}
-                className="puzzle-row flex flex-col gap-2 md:grid md:items-stretch md:gap-1.5"
+                className="puzzle-row flex flex-col gap-2 md:grid md:items-stretch md:gap-2"
                 style={{ gridTemplateColumns: columnTrack }}
               >
-                <div className="flex min-w-0 items-center gap-2 md:pr-2">
+                <div className="flex min-w-0 items-center gap-2.5 md:pr-2">
                   <PlayerFace
                     espnId={g.espnId}
                     name={g.name}
                     team={(PUZZLE_PLAYERS_BY_ID.get(g.espnId)?.team ?? "KC") as TeamAbbr}
-                    size={30}
+                    size={36}
                   />
-                  <span className="min-w-0 truncate text-sm font-bold md:text-xs" style={{ color: INK }} title={g.name}>
+                  <span
+                    className="min-w-0 truncate text-sm font-bold md:text-[13px] lg:text-[15px]"
+                    style={{ color: INK }}
+                    title={g.name}
+                  >
                     {g.name}
                   </span>
                 </div>
@@ -402,7 +418,7 @@ function Chip({
 
   return (
     <div
-      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 md:py-2.5"
+      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 md:py-3 lg:py-3.5"
       title={`${column.label}: ${text}`}
       style={{
         background: bg,
@@ -417,7 +433,13 @@ function Chip({
         {column.label}
       </span>
       <span className="flex w-full items-center justify-center gap-0.5 px-1">
-        <span className={`truncate font-bold tabular-nums ${long ? "text-[9px]" : "text-[11px]"}`}>{text}</span>
+        <span
+          className={`truncate font-bold tabular-nums ${
+            long ? "text-[9px] md:text-[11px] lg:text-[12px]" : "text-[11px] md:text-[13px] lg:text-[15px]"
+          }`}
+        >
+          {text}
+        </span>
         {cell.direction === "up" && <span aria-label="higher">↑</span>}
         {cell.direction === "down" && <span aria-label="lower">↓</span>}
       </span>
@@ -433,8 +455,11 @@ function Legend({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
   const explained = columns.filter((c) => CLOSE_MEANS[c.key]);
 
   return (
-    <div className="mt-4 flex flex-col gap-2 border-t pt-3" style={{ borderColor: "#e4d9bd" }}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] font-bold" style={{ color: "#8a8171" }}>
+    <div className="mt-4 flex flex-col gap-2 border-t pt-3 lg:mt-5 lg:pt-4" style={{ borderColor: "#e4d9bd" }}>
+      <div
+        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] font-bold lg:gap-x-5 lg:text-xs"
+        style={{ color: "#8a8171" }}
+      >
         <span className="flex items-center gap-1.5">
           <Swatch bg={TONE.hit.bg} /> EXACT
         </span>
@@ -445,7 +470,7 @@ function Legend({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
           <Swatch bg={TONE.miss.bg} /> NO MATCH
         </span>
       </div>
-      <p className="text-[10px] leading-relaxed" style={{ color: "#a89f8b" }}>
+      <p className="text-[10px] leading-relaxed lg:text-xs" style={{ color: "#a89f8b" }}>
         Close means{" "}
         {explained.map((c, i) => (
           <span key={c.key}>
@@ -492,7 +517,7 @@ function Reveal({
 
   return (
     <div
-      className="puzzle-reveal"
+      className="puzzle-reveal mx-auto w-full max-w-2xl"
       style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP, overflow: "hidden" }}
     >
       <div

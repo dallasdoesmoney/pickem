@@ -4,15 +4,22 @@ import { useState } from "react";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { teamTile } from "@/lib/colorUtils";
 import { playerHeadshot } from "@/lib/espnHeadshot";
+import { BACKDROP_OPACITY, BACKDROP_SCALE } from "@/lib/teamBackdrop";
 
 // A player's face, with the fallback built in rather than bolted on.
 //
-// The disc is ALWAYS the team's colour and the photo sits on top of it, so
-// a player ESPN has no picture for shows their initials on their own
-// colour instead of a hole. That matters more than it used to: ESPN has a
-// headshot for most starters and for far fewer of the three thousand
-// players the guess list now opens up to, so "no photo" is the common case
-// down the roster rather than the rare one.
+// Three layers, and each one is doing a job:
+//
+//   1. the team's colour, always
+//   2. the team's mark, ghosted - the same backdrop the tier list puts
+//      behind its players, because ESPN's headshots are cut out on
+//      transparency and whatever sits behind them IS the picture. Without
+//      it a board of faces is a board of coloured discs; with it you can
+//      tell a Raven from a Viking before you have read the name.
+//   3. the headshot
+//
+// A player ESPN has no picture for therefore shows their initials on
+// their own colour over their own mark, instead of a hole.
 //
 // onError rather than a pre-flight check: there is no way to know whether
 // a CDN URL resolves without asking for it, and asking twice to find out
@@ -32,6 +39,7 @@ export function PlayerFace({
 }) {
   const [broken, setBroken] = useState(false);
   const { bg, ink } = teamTile(TEAMS[team]?.color ?? "#334155");
+  const logo = TEAMS[team]?.logo;
 
   const initials = name
     .split(/\s+/)
@@ -53,7 +61,27 @@ export function PlayerFace({
         fontWeight: 800,
       }}
     >
-      {initials}
+      {/* Centred by translate rather than by insets: the mark is wider
+          than the disc on purpose, and insets would squash it back to fit
+          instead of letting it bleed. */}
+      {logo && (
+        <img
+          src={logo}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          className="pointer-events-none absolute max-w-none object-contain"
+          style={{
+            width: `${BACKDROP_SCALE * 100}%`,
+            height: `${BACKDROP_SCALE * 100}%`,
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            opacity: BACKDROP_OPACITY,
+          }}
+        />
+      )}
+      <span className="relative">{initials}</span>
       {!broken && (
         <img
           src={playerHeadshot(espnId)}
