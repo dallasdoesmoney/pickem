@@ -104,14 +104,20 @@ export function fitCaps(caps: readonly number[], tierCount: number): number[] {
 // A band per row, taking its look from the tier at the same depth so the
 // pyramid is recognisably the same list. A shape with more rows than the
 // board has tiers falls back to the ladder's own colours.
-export type PyramidBand = { id: string | null; label: string; accent: string };
+// `label` is what the band READS - the tier's name, or "TIER n" when it
+// has not been given one. `raw` is what the tier actually stores, which
+// is a different string whenever the name is blank or has spaces on the
+// end, and is the one the rename field has to be seeded from: seeding it
+// from `label` meant clearing the box put "TIER 1" straight back into it,
+// and a trailing space was trimmed away as you typed it.
+export type PyramidBand = { id: string | null; label: string; raw: string; accent: string };
 
 export function pyramidBands(tiers: Tier[], caps: readonly number[]): PyramidBand[] {
   return caps.map((_, i) => {
     const tier = tiers[i];
     return tier
-      ? { id: tier.id, label: tierLabelFor(tier, i), accent: tier.accent }
-      : { id: null, label: "", accent: accentForIndex(i) };
+      ? { id: tier.id, label: tierLabelFor(tier, i), raw: tier.label, accent: tier.accent }
+      : { id: null, label: "", raw: "", accent: accentForIndex(i) };
   });
 }
 

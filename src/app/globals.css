@@ -645,3 +645,39 @@ body {
     --puzzle-player-col: 230px;
   }
 }
+
+/* A pyramid trade. The team that was displaced is drawn starting at the
+   square the incoming one came from and runs to its own, so the exchange
+   is something you watch rather than something you notice afterwards.
+
+   The distance comes in as a pair of custom properties because it is
+   arithmetic the board already knows - both squares' positions come out
+   of the pyramid's shape - so nothing here has to measure the DOM.
+
+   Slightly overshooting scale on the way past sells it as a thing with
+   weight being thrown across, rather than a sprite being teleported. */
+@keyframes tier-swap-glide {
+  0% {
+    transform: translate(var(--swap-dx, 0), var(--swap-dy, 0)) scale(1);
+  }
+  55% {
+    transform: translate(calc(var(--swap-dx, 0) * 0.28), calc(var(--swap-dy, 0) * 0.28)) scale(1.14);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+.tier-anim-swap {
+  display: block;
+  animation: tier-swap-glide 340ms cubic-bezier(0.32, 0.9, 0.36, 1) both;
+  /* Above the squares it passes over, or it slides underneath them. */
+  position: relative;
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tier-anim-swap {
+    animation: none;
+  }
+}

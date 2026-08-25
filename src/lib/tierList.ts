@@ -118,6 +118,15 @@ export type TierListAction =
   // dragOver, plus the final drop) into one undo step - without it,
   // undoing a drag would rewind it one hover at a time.
   | { type: "moveItem"; itemId: string; toTier: string | null; toIndex: number | null; mergeToken?: string }
+  // Exchange two teams' places, wherever each of them is. The pyramid
+  // needs this and the tier list does not, because a pyramid ROW HAS
+  // CAPACITY: dropping onto an occupied place in a full row used to
+  // insert and push the last team out of the row entirely, which reads
+  // as "the board threw somebody away" rather than "those two traded
+  // places". moveItem cannot express it - it is a remove and an insert,
+  // so the second team's place is gone by the time you would put it
+  // back - and two dispatches would be two undo steps for one gesture.
+  | { type: "swapItems"; aId: string; bId: string }
   | { type: "renameTier"; tierId: string; label: string }
   | { type: "addTier"; afterTierId?: string }
   | { type: "deleteTier"; tierId: string }
@@ -170,6 +179,42 @@ export function tierListReducer(state: TierListState, action: TierListAction): T
         unranked: stripped.unranked,
         placements: { ...stripped.placements, [toTier]: insertAt(stripped.placements[toTier] ?? [], itemId, toIndex) },
       };
+    }
+
+    case "swapItems": {
+      const { aId, bId } = action;
+      if (aId === bId) return state;
+      // Where a team is right now: a tier and a place in it, or the pool
+      // and a place in that. Both are "an array and an index", which is
+      // what makes the exchange below a straight write rather than a
+      // remove-and-reinsert.
+      const locate = (id: string): { tier: string | null; index: number } | null => {
+        for (const t of state.tiers) {
+          const at = (state.placements[t.id] ?? []).indexOf(id);
+          if (at >= 0) return { tier: t.id, index: at };
+        }
+        const at = state.unranked.indexOf(id);
+        return at >= 0 ? { tier: null, index: at } : null;
+      };
+      const a = locate(aId);
+      const b = locate(bId);
+      if (!a || !b) return state;
+
+      const placements = { ...state.placements };
+      let unranked = state.unranked;
+      // Overwrite in place, never splice. Every array keeps its length,
+      // so the second write cannot be knocked off by the first even when
+      // both teams are in the same tier.
+      const put = (at: { tier: string | null; index: number }, id: string) => {
+        if (at.tier === null) {
+          unranked = unranked.map((x, i) => (i === at.index ? id : x));
+        } else {
+          placements[at.tier] = (placements[at.tier] ?? []).map((x, i) => (i === at.index ? id : x));
+        }
+      };
+      put(a, bId);
+      put(b, aId);
+      return { ...state, placements, unranked };
     }
 
     case "renameTier": {

@@ -2,6 +2,7 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
+import { MAX_TIER_LABEL } from "@/lib/tierList";
 import { DraggableTierItem } from "./TierItemChip";
 import { TIER_LABEL_FONT, pickTierLabelSize } from "./tierLabel";
 import {
@@ -176,8 +177,10 @@ export function PyramidView({
   onRemoveRow,
   editing,
   onRename,
+  onCommitRename,
   onActivateBand,
   frameWidth,
+  swap,
 }: {
   template: TierTemplate;
   shape: PyramidShape;
@@ -197,10 +200,16 @@ export function PyramidView({
   // EDIT TIERS, without leaving the pyramid.
   editing?: boolean;
   onRename?: (tierId: string, label: string) => void;
+  onCommitRename?: () => void;
   onActivateBand?: (tierId: string) => void;
   // The board's full width. The shape is only as wide as its widest row,
   // so this is what the row buttons are pinned to.
   frameWidth?: number;
+  // A trade that just happened: the team now sitting in `to` came from
+  // `from`, and slides across from it so the exchange is something you
+  // watch rather than something you notice afterwards. The token re-arms
+  // it when the same two places trade twice in a row.
+  swap?: { from: number; to: number; token: number } | null;
 }) {
   const { w, T, chip, height, leftEdgeAt } = shape;
   const rowOf = rowsOf(shape.caps);
@@ -257,21 +266,50 @@ export function PyramidView({
                   // throw you back to the tier list to change a name. Same
                   // font, same box, same clip as the label it replaces -
                   // the only difference is that you can type in it.
+                  //
+                  // UNCONTROLLED, seeded from the tier's raw label, which
+                  // is exactly what the tier list's own field does and is
+                  // the whole bug that was here. Bound to `band.label`
+                  // instead, every keystroke round-tripped through
+                  // tierLabelFor - `label.trim() || "TIER n"` - so
+                  // emptying the box refilled it with "TIER 1" and a
+                  // space on the end was trimmed off before it could be
+                  // typed. The DOM holds the text; React only reads it.
                   <textarea
                     data-plabel
-                    value={band.label}
+                    defaultValue={band.raw}
                     onChange={(e) => onRename(band.id!, e.target.value)}
-                    onFocus={() => onActivateBand?.(band.id!)}
+                    onFocus={(e) => {
+                      onActivateBand?.(band.id!);
+                      const end = e.currentTarget.value.length;
+                      e.currentTarget.setSelectionRange(end, end);
+                    }}
+                    onKeyDown={(e) => {
+                      // A tier name is one line of text however many
+                      // lines it wraps to, so Enter commits rather than
+                      // inserting a break - same as the tier list.
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                        onCommitRename?.();
+                      }
+                      if (e.key === "Escape") e.currentTarget.blur();
+                    }}
                     rows={1}
+                    maxLength={MAX_TIER_LABEL}
                     spellCheck={false}
-                    aria-label={`Rename this tier`}
+                    aria-label="Rename this tier"
                     className="absolute top-1/2 resize-none overflow-hidden bg-transparent text-center leading-[1.18] uppercase outline-none rounded-[3px] ring-1 ring-dashed ring-black/25 focus:ring-black/60 [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
                     style={{
                       ...TIER_LABEL_FONT,
                       left: 0,
                       width: T - 12,
                       transform: `translate(${leftEdgeAt(row * shape.rowH + shape.rowH / 2) + T / 2}px, -50%) translateX(-50%)`,
+                      // Sized off what is READ, not what is stored, so an
+                      // empty box keeps the size "TIER 1" will be drawn at
+                      // rather than jumping when the first letter lands.
                       fontSize: pickTierLabelSize(band.label, true),
+                      caretColor: TIER_LABEL_FONT.color,
                     }}
                   />
                 ) : (
@@ -310,6 +348,19 @@ export function PyramidView({
 
         {Array.from({ length: rankedIn(shape.caps) }, (_, slot) => {
           const id = slots[slot];
+          // The displaced team starts drawn at the place it came from and
+          // runs home. The offset is arithmetic, not a measurement: both
+          // squares' rects come straight out of the shape, so there is
+          // nothing to read off the DOM and nothing to get wrong on the
+          // frame the board happens to re-render.
+          const travelling = swap && swap.to === slot;
+          const glide = travelling
+            ? (() => {
+                const here = slotRect(shape, swap.to);
+                const there = slotRect(shape, swap.from);
+                return { dx: there.x - here.x, dy: there.y - here.y };
+              })()
+            : null;
           return (
             <Slot
               key={slot}
@@ -319,16 +370,39 @@ export function PyramidView({
               armed={armed}
               onTap={() => onPlaceSlot(slot)}
             >
-              {id && (
-                <DraggableTierItem
-                  item={resolveItem(template, id)}
-                  style={template.itemStyle}
-                  size={chip}
-                  selected={selectedId === id}
-                  landed={landedId === id}
-                  onActivate={() => onItemActivate(resolveItem(template, id))}
-                />
-              )}
+              {id &&
+                (() => {
+                  const mark = (
+                    <DraggableTierItem
+                      item={resolveItem(template, id)}
+                      style={template.itemStyle}
+                      size={chip}
+                      selected={selectedId === id}
+                      landed={landedId === id}
+                      onActivate={() => onItemActivate(resolveItem(template, id))}
+                    />
+                  );
+                  // Wrapped ONLY while it is travelling. A slot centres
+                  // nothing - the mark is the slot's only child and sized
+                  // to it - so a wrapper left in place the rest of the
+                  // time would put the mark in a line box and nudge it
+                  // down by the leading.
+                  if (!glide) return mark;
+                  return (
+                    <span
+                      // Keyed on the token so re-swapping the same pair
+                      // restarts the run rather than the browser deciding
+                      // this animation has already been played.
+                      key={`swap-${swap!.token}`}
+                      className="tier-anim-swap"
+                      style={
+                        { ["--swap-dx"]: `${glide.dx}px`, ["--swap-dy"]: `${glide.dy}px` } as React.CSSProperties
+                      }
+                    >
+                      {mark}
+                    </span>
+                  );
+                })()}
             </Slot>
           );
         })}

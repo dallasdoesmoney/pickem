@@ -79,6 +79,9 @@ import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
+// Not per list: whichever way you last looked at a board is the way you
+// want to look at the next one too.
+const TIER_VIEW_KEY = "pickem:tier-view";
 
 export default function TierListPageClient({
   template,
@@ -101,7 +104,38 @@ export default function TierListPageClient({
   const [viewportWidth, setViewportWidth] = useState(390);
   // Which layout the board is in. "rows" is the tier list and is the only
   // one that edits it; see the pyramid block below.
+  //
+  // Remembered across reloads. It is a way of looking at the board, not a
+  // step in a task, so being thrown back to the tier list every refresh
+  // is the app forgetting something it watched you choose. Per browser
+  // rather than saved with the list, because it is how YOU want to see
+  // the board, not part of the board.
   const [view, setView] = useState<"rows" | "pyramid">("rows");
+
+  // Read after mount, never during render: there is no localStorage on
+  // the server, and seeding state from it would make the first client
+  // render disagree with the HTML that came down.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(TIER_VIEW_KEY);
+      // Reading browser storage after mount is the point of this effect.
+      // Doing it in the state initialiser would have the server render
+      // "rows" and the client render "pyramid" off the same HTML, which
+      // is a hydration mismatch. One setState, once, on mount.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved === "rows" || saved === "pyramid") setView(saved);
+    } catch {
+      // Private mode, or site data switched off. The default is fine.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TIER_VIEW_KEY, view);
+    } catch {
+      // Nothing to do - not remembering the layout is not worth an error.
+    }
+  }, [view]);
   const [editing, setEditing] = useState(false);
   // Which tier is being edited. Double-clicking a name is the way into
   // edit mode, and it would be no use if the caret then appeared in the
@@ -353,12 +387,35 @@ export default function TierListPageClient({
   // it belongs to is revealed again.
   const poolIds = useMemo(() => [...hiddenRanked, ...state.unranked], [hiddenRanked, state.unranked]);
 
+  // The two places a swap just exchanged, so the pyramid can show the
+  // displaced team travelling to where the incoming one came from. The
+  // token is what re-arms the animation when the same pair swaps twice.
+  const [pyrSwap, setPyrSwap] = useState<{ from: number; to: number; token: number } | null>(null);
+  const swapToken = useRef(0);
+
   const placeInSlot = useCallback(
     (itemId: string, slot: number) => {
+      const sitting = pyrSlots[slot];
+      // Dropping onto an OCCUPIED place trades the two teams rather than
+      // inserting between them. A pyramid row has a fixed number of
+      // places, so inserting has to push somebody out of the row - and
+      // being told "you moved one team, so this other one is now
+      // unranked" is not what the gesture looks like it should do.
+      if (sitting && sitting !== itemId) {
+        const wasAt = pyrSlots.indexOf(itemId);
+        dispatch({ type: "swapItems", aId: itemId, bId: sitting });
+        // Only animate a place-to-place trade. A team arriving from the
+        // pool has no square to send the other one back to.
+        if (wasAt >= 0) {
+          swapToken.current += 1;
+          setPyrSwap({ from: slot, to: wasAt, token: swapToken.current });
+        }
+        return;
+      }
       const { tier, index } = tierSlotFor(state, caps, slot);
       dispatch({ type: "moveItem", itemId, toTier: tier, toIndex: index });
     },
-    [state, dispatch, caps]
+    [state, dispatch, caps, pyrSlots]
   );
 
   // Dropping on the cut takes the team off the board. The cut also holds
@@ -1186,8 +1243,13 @@ export default function TierListPageClient({
             onAddRow={readOnlySnapshot ? undefined : handleAddRow}
             onRemoveRow={readOnlySnapshot ? undefined : handleRemoveRow}
             frameWidth={boardWidth}
+            swap={pyrSwap}
             editing={editing}
             onRename={(tierId, label) => dispatch({ type: "renameTier", tierId, label })}
+            onCommitRename={() => {
+              setEditing(false);
+              setEditingTierId(null);
+            }}
             onActivateBand={(tierId) => setEditingTierId(tierId)}
           />
         )}
