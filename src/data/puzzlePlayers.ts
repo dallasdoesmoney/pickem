@@ -11,7 +11,8 @@ import { KICKERS } from "@/data/rosters/ks";
 //
 //   guessable   every active player, ~3,000 (ESPN's rosters include the
 //               practice squad and injured reserve)
-//   answerable  the ones a depth chart ranks FIRST at some slot, ~800
+//   answerable  the ones a depth chart ranks first or second at some
+//               slot, ~1,400
 //
 // An answer pool of everybody would include third-string guards and
 // practice-squad safeties, and no set of hints rescues a player nobody
@@ -19,8 +20,8 @@ import { KICKERS } from "@/data/rosters/ks";
 // open, because being told "not a player" when you have named a real one
 // is the most annoying thing these games do.
 //
-// "Ranked first" and not "on the chart": ESPN ranks essentially the whole
-// roster, so mere presence marked 2,985 of 3,021 and selected nothing.
+// A rank and not "on the chart": ESPN ranks essentially the whole roster,
+// so mere presence marked 2,985 of 3,021 and selected nothing.
 //
 // The DATABASE holds a copy of this (see
 // supabase/migrations/0046_daily_player_puzzle.sql) because the answer
@@ -31,17 +32,26 @@ import { KICKERS } from "@/data/rosters/ks";
 // never heard of.
 
 // How far down a depth chart still counts as an answer. 1 is starters
-// only.
+// only; 2 takes their backups too.
 //
 // This exists as a number because the first attempt used "is on the depth
 // chart at all", which marked 2,985 of 3,021 players - ESPN ranks
 // essentially the whole roster, so that test selected nothing. The rank
 // is where the signal is.
 //
+// Each step down roughly doubles the pool and lowers the floor on how
+// famous the answer can be, because the rank is per position slot per
+// team - so 2 means a backup QB (Shedeur Sanders, Joe Flacco) but also a
+// backup long snapper. The cumulative share of the 3,015-player roster:
+//
+//   1   775 (26%)   2  1,441 (48%)   3  2,042 (68%)   4  2,396 (79%)
+//
 // Raise it to widen the pool. scripts/gen-puzzle-seed.mjs reads this
 // exact line, so changing it here and regenerating is the whole change -
-// no second trip to ESPN.
-export const ANSWER_MAX_DEPTH_RANK = 1;
+// no second trip to ESPN. If the pool ever needs to be wide at QB and
+// narrow on the line, this becomes a per-position map rather than a
+// bigger number.
+export const ANSWER_MAX_DEPTH_RANK = 2;
 
 export type PuzzlePlayer = {
   espnId: string;
