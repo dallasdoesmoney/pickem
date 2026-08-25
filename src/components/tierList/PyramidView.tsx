@@ -18,6 +18,28 @@ import {
   slotRect,
 } from "./pyramid";
 
+// What the mark in `slot` should be doing right now, given a pending
+// trade. Nothing, unless this is the place the cursor is over.
+//
+// Both squares' positions come out of the shape, so the distance is
+// arithmetic rather than a measurement - the same trick the drop
+// animation uses, and the reason the preview can follow the cursor from
+// square to square without reading anything back from the page.
+function previewStyle(
+  shape: PyramidShape,
+  preview: { slot: number; to: number | null } | null | undefined,
+  slot: number,
+): React.CSSProperties | null {
+  if (!preview || preview.slot !== slot) return null;
+  // Pushed off the board rather than traded: there is nowhere to send it,
+  // so it shrinks out of the way instead of sliding somewhere it is not
+  // going to end up.
+  if (preview.to === null) return { transform: "scale(0.66)", opacity: 0.4 };
+  const here = slotRect(shape, slot);
+  const there = slotRect(shape, preview.to);
+  return { transform: `translate(${there.x - here.x}px, ${there.y - here.y}px)`, opacity: 0.9 };
+}
+
 // The width kept clear down the right for a row's own minus and plus.
 // Reserved rather than borrowed, because there is no dead space inside
 // the shape to put them in: a row's teams run right up to both slopes,
@@ -181,6 +203,7 @@ export function PyramidView({
   onActivateBand,
   frameWidth,
   swap,
+  preview,
 }: {
   template: TierTemplate;
   shape: PyramidShape;
@@ -210,6 +233,10 @@ export function PyramidView({
   // watch rather than something you notice afterwards. The token re-arms
   // it when the same two places trade twice in a row.
   swap?: { from: number; to: number; token: number } | null;
+  // A trade that WOULD happen, shown while the mouse is still down. The
+  // team in `slot` moves to `to` - or shrinks away, when `to` is null and
+  // it is being pushed off the board rather than traded.
+  preview?: { slot: number; to: number | null } | null;
 }) {
   const { w, T, chip, height, leftEdgeAt } = shape;
   const rowOf = rowsOf(shape.caps);
@@ -370,39 +397,34 @@ export function PyramidView({
               armed={armed}
               onTap={() => onPlaceSlot(slot)}
             >
-              {id &&
-                (() => {
-                  const mark = (
-                    <DraggableTierItem
-                      item={resolveItem(template, id)}
-                      style={template.itemStyle}
-                      size={chip}
-                      selected={selectedId === id}
-                      landed={landedId === id}
-                      onActivate={() => onItemActivate(resolveItem(template, id))}
-                    />
-                  );
-                  // Wrapped ONLY while it is travelling. A slot centres
-                  // nothing - the mark is the slot's only child and sized
-                  // to it - so a wrapper left in place the rest of the
-                  // time would put the mark in a line box and nudge it
-                  // down by the leading.
-                  if (!glide) return mark;
-                  return (
-                    <span
-                      // Keyed on the token so re-swapping the same pair
-                      // restarts the run rather than the browser deciding
-                      // this animation has already been played.
-                      key={`swap-${swap!.token}`}
-                      className="tier-anim-swap"
-                      style={
-                        { ["--swap-dx"]: `${glide.dx}px`, ["--swap-dy"]: `${glide.dy}px` } as React.CSSProperties
-                      }
-                    >
-                      {mark}
-                    </span>
-                  );
-                })()}
+              {id && (
+                // Always wrapped, never conditionally: this element is
+                // the drag preview's handle as well as the drop
+                // animation's, and adding or removing it mid-drag would
+                // remount the draggable underneath the pointer.
+                <span
+                  // Keyed on the token so re-swapping the same pair
+                  // restarts the run rather than the browser deciding
+                  // this animation has already been played.
+                  key={glide ? `swap-${swap!.token}` : "mark"}
+                  className={`pyr-mark${glide ? " tier-anim-swap" : ""}`}
+                  style={
+                    {
+                      ...(glide ? { ["--swap-dx"]: `${glide.dx}px`, ["--swap-dy"]: `${glide.dy}px` } : null),
+                      ...previewStyle(shape, preview, slot),
+                    } as React.CSSProperties
+                  }
+                >
+                  <DraggableTierItem
+                    item={resolveItem(template, id)}
+                    style={template.itemStyle}
+                    size={chip}
+                    selected={selectedId === id}
+                    landed={landedId === id}
+                    onActivate={() => onItemActivate(resolveItem(template, id))}
+                  />
+                </span>
+              )}
             </Slot>
           );
         })}

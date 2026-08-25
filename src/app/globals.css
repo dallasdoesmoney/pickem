@@ -509,8 +509,27 @@ body {
   }
 }
 
-.tier-anim-swap {
+/* The mark's own box inside a place. It exists whether anything is
+   moving or not - it is the handle both the drag preview and the drop
+   animation take hold of, and creating it only when needed would remount
+   the draggable underneath the pointer mid-drag.
+
+   The transition is what makes the PREVIEW read: while the mouse is
+   down, the displaced team is given the offset to the place the dragged
+   one came from, and this walks it there and back again as the cursor
+   moves between squares. */
+.pyr-mark {
   display: block;
+  transition:
+    transform 190ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 190ms ease;
+}
+
+.tier-anim-swap {
+  /* The drop animation is for tap-to-place, where there was no drag and
+     so no preview. A transition and an animation on one element fight;
+     the animation wins, and the transition is left with nothing to do. */
+  transition: none;
   animation: tier-swap-glide 340ms cubic-bezier(0.32, 0.9, 0.36, 1) both;
   /* Above the squares it passes over, or it slides underneath them. */
   position: relative;
@@ -520,5 +539,11 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .tier-anim-swap {
     animation: none;
+  }
+
+  /* The preview still happens - it is what tells you what the drop will
+     do - it just arrives rather than travels. */
+  .pyr-mark {
+    transition: none;
   }
 }
