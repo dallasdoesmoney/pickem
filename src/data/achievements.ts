@@ -32,6 +32,18 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     unitLabel: "days",
   },
   {
+    key: "daily_puzzle",
+    label: "Daily Game",
+    description: "Guess the mystery player in eight tries.",
+    icon: "🧠",
+    // The headline figure is a perfect solve. Every extra guess costs 25,
+    // down to a floor of 125 - see puzzle_points() in
+    // supabase/migrations/0046_daily_player_puzzle.sql, which is the only
+    // place that number is actually decided.
+    pointsEach: 300,
+    unitLabel: "solved",
+  },
+  {
     key: "predictor_team_complete",
     label: "Season Predictor",
     description: "Predict the outcome of every game on a team's schedule.",

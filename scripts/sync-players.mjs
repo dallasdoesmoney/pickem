@@ -102,6 +102,31 @@ async function json(url) {
   return res.json();
 }
 
+// The attributes the daily puzzle grades a guess against. Every one is
+// optional: ESPN omits them for some players, and the puzzle hides a
+// column nobody has a value for rather than showing a row of "?".
+//
+// This used to keep only id and name and throw the rest of the payload
+// away. Nothing extra is fetched to get these - they were already in the
+// response, and were being discarded.
+function attrsOf(a) {
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+  };
+  return {
+    // ESPN reports height in inches and weight in pounds.
+    heightIn: num(a.height),
+    weightLb: num(a.weight),
+    age: num(a.age),
+    jersey: num(a.jersey),
+    // college is a $ref on the core API and an object on the roster
+    // endpoint. Only the inline form is used - chasing the ref would be
+    // one more request per player for one hint column.
+    college: typeof a.college?.name === "string" ? a.college.name : undefined,
+  };
+}
+
 // Everyone on the roster at a position, in the order ESPN returns them.
 // Used as the fallback, and as the "behind:" column that makes a wrong
 // pick obvious in the pull request rather than on the site.
@@ -111,7 +136,7 @@ async function rosterAt(teamId, matches) {
     .flatMap((g) => g.items ?? g.athletes ?? [g])
     .filter(Boolean)
     .filter((a) => matches(String(a.position?.abbreviation ?? a.position?.name ?? "").toUpperCase()))
-    .map((a) => ({ espnId: String(a.id), name: a.fullName ?? a.displayName }));
+    .map((a) => ({ espnId: String(a.id), name: a.fullName ?? a.displayName, ...attrsOf(a) }));
 }
 
 // The players the depth chart ranks highest at a position, deduped.
@@ -157,7 +182,7 @@ async function depthChartAt(season, teamId, matches, count) {
     // A player can occupy more than one slot or formation.
     if (seen.has(espnId)) continue;
     seen.add(espnId);
-    out.push({ espnId, name: athlete.fullName ?? athlete.displayName });
+    out.push({ espnId, name: athlete.fullName ?? athlete.displayName, ...attrsOf(athlete) });
   }
   return out;
 }
@@ -182,12 +207,30 @@ export type ${position.typeName} = {
   espnId: string;
   name: string;
   team: TeamAbbr;
+  // Hint columns for the daily player puzzle. Optional because ESPN does
+  // not publish all of them for everyone; the puzzle hides a column it
+  // has no values for rather than showing a row of "?".
+  heightIn?: number;
+  weightLb?: number;
+  age?: number;
+  jersey?: number;
+  college?: string;
 };
 
 export const ${position.exportName}: ${position.typeName}[] = [
 `;
+  // Optional fields are omitted rather than written as undefined, so a
+  // player ESPN says nothing about stays a short line.
+  const extra = (r) =>
+    [
+      r.heightIn ? `, heightIn: ${r.heightIn}` : "",
+      r.weightLb ? `, weightLb: ${r.weightLb}` : "",
+      r.age ? `, age: ${r.age}` : "",
+      r.jersey ? `, jersey: ${r.jersey}` : "",
+      r.college ? `, college: ${JSON.stringify(r.college)}` : "",
+    ].join("");
   const body = rows
-    .map((r) => `  { espnId: "${r.espnId}", name: ${JSON.stringify(r.name)}, team: "${r.team}" },`)
+    .map((r) => `  { espnId: "${r.espnId}", name: ${JSON.stringify(r.name)}, team: "${r.team}"${extra(r)} },`)
     .join("\n");
   return `${header}${body}\n];\n`;
 }

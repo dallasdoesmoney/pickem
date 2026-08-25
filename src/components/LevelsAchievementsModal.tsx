@@ -77,6 +77,7 @@ export function LevelsAchievementsModal({
   const [perfectWeeks, setPerfectWeeks] = useState<number | null>(null);
   const [predictorCorrect, setPredictorCorrect] = useState<number | null>(null);
   const [discordClaimed, setDiscordClaimed] = useState<boolean | null>(null);
+  const [puzzlesSolved, setPuzzlesSolved] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export function LevelsAchievementsModal({
     setPerfectWeeks(null);
     setPredictorCorrect(null);
     setDiscordClaimed(null);
+    setPuzzlesSolved(null);
     setError(null);
     Promise.all([
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)),
@@ -154,6 +156,9 @@ export function LevelsAchievementsModal({
       fetchPointSourceCount(user.id, "discord_join")
         .then((n) => setDiscordClaimed(n > 0))
         .catch((err) => setError(errorMessage(err)));
+      fetchPointSourceCount(user.id, "daily_puzzle")
+        .then(setPuzzlesSolved)
+        .catch((err) => setError(errorMessage(err)));
     });
   }, [open, user]);
 
@@ -168,6 +173,7 @@ export function LevelsAchievementsModal({
   const perfectWeekDef = ACHIEVEMENTS.find((a) => a.key === "perfect_week")!;
   const predictorCorrectDef = ACHIEVEMENTS.find((a) => a.key === "predictor_correct")!;
   const discordDef = ACHIEVEMENTS.find((a) => a.key === "discord_join")!;
+  const puzzleDef = ACHIEVEMENTS.find((a) => a.key === "daily_puzzle")!;
 
   const completedTeams = predictorProgress
     ? TEAMS_SORTED.filter((t) => (predictorProgress[t.abbr] ?? 0) >= (REQUIRED_PREDICTOR_WEEKS[t.abbr] ?? Infinity))
@@ -186,7 +192,8 @@ export function LevelsAchievementsModal({
     correctPicks !== null &&
     perfectWeeks !== null &&
     predictorCorrect !== null &&
-    discordClaimed !== null;
+    discordClaimed !== null &&
+    puzzlesSolved !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
@@ -253,9 +260,48 @@ export function LevelsAchievementsModal({
                   {(() => {
                     const items = [
                       {
-                        // First in the list because it is the only one
-                        // that is already done by the time you read it -
-                        // it exists to be noticed, not to be worked at.
+                        // Top of the list: it is the only challenge here
+                        // that is a game rather than a record of
+                        // something, so it is the one worth landing on.
+                        key: "daily-game",
+                        group: "daily" as Group,
+                        complete: false,
+                        node: (
+                          <AchievementCard
+                            key="daily-game"
+                            icon={puzzleDef.icon}
+                            label={puzzleDef.label}
+                            description={puzzleDef.description}
+                            pointsEach={puzzleDef.pointsEach}
+                            pointsLabel="PTS FOR A PERFECT SOLVE"
+                            unitLabel={puzzleDef.unitLabel}
+                            doneCount={puzzlesSolved!}
+                          >
+                            <div className="flex flex-col gap-2 mt-1">
+                              <p className="text-xs text-white/50">
+                                A new player every day, the same one for everyone. Eight guesses, and each one is worth less than
+                                the last &mdash; 300 down to 125.
+                              </p>
+                              <Link
+                                href="/daily"
+                                onClick={onClose}
+                                className="rounded-full px-4 py-2 text-xs text-center active:scale-95 transition-transform duration-150"
+                                style={{
+                                  fontFamily: "var(--font-display)",
+                                  background: "linear-gradient(135deg, #4ade80, #22c55e)",
+                                  color: "#0e1b33",
+                                }}
+                              >
+                                PLAY TODAY&apos;S
+                              </Link>
+                            </div>
+                          </AchievementCard>
+                        ),
+                      },
+                      {
+                        // Second because it is the only one that is
+                        // already done by the time you read it - it
+                        // exists to be noticed, not to be worked at.
                         key: "check-in",
                         group: "daily" as Group,
                         complete: false,
