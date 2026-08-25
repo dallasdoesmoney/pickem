@@ -38,6 +38,7 @@ export function PlayerFace({
   ring?: number;
 }) {
   const [broken, setBroken] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const { bg, ink } = teamTile(TEAMS[team]?.color ?? "#334155");
   const logo = TEAMS[team]?.logo;
 
@@ -81,11 +82,17 @@ export function PlayerFace({
           }}
         />
       )}
-      <span className="relative">{initials}</span>
+      {/* Only until the photo arrives. These headshots are cut out on
+          transparency, so initials left underneath one do not sit behind
+          the player - they show THROUGH him, around the shoulders and
+          under the chin. The mark behind is meant to show through; a pair
+          of letters is not. */}
+      {!loaded && <span className="relative">{initials}</span>}
       {!broken && (
         <img
           src={playerHeadshot(espnId)}
           alt=""
+          onLoad={() => setLoaded(true)}
           onError={() => setBroken(true)}
           className="absolute inset-0 h-full w-full object-cover"
         />

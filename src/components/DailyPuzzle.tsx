@@ -247,10 +247,10 @@ export function DailyPuzzle() {
               card, and repeating it inside cost a line of height for a
               word already on screen. */}
           <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider lg:text-[13px]" style={{ color: "#a89f8b" }}>
+            <span className="text-xs font-semibold uppercase tracking-wider lg:text-[13px]" style={{ color: "#a89f8b" }}>
               Guess the player
             </span>
-            <span className="text-sm font-bold lg:text-base" style={{ color: "#e0483a" }}>
+            <span className="text-sm font-semibold lg:text-base" style={{ color: "#e0483a" }}>
               {left} of {state.maxGuesses} left
             </span>
           </div>
@@ -272,7 +272,7 @@ export function DailyPuzzle() {
               disabled={busy}
               aria-label="Guess a player"
               aria-autocomplete="list"
-              className="w-full px-3.5 py-3 text-[.95rem] font-semibold outline-none transition-shadow duration-150 focus:shadow-[5px_5px_0_#16181c] disabled:opacity-60 lg:px-4 lg:py-3.5 lg:text-base"
+              className="w-full px-3.5 py-3 text-[.95rem] font-medium outline-none transition-shadow duration-150 focus:shadow-[5px_5px_0_#16181c] disabled:opacity-60 lg:px-4 lg:py-3.5 lg:text-base"
               style={{
                 background: "#fff",
                 border: EDGE,
@@ -289,7 +289,7 @@ export function DailyPuzzle() {
                 style={{ background: "#fff", border: EDGE, borderRadius: 12, boxShadow: DROP }}
               >
                 {matches.length === 0 && (
-                  <p className="px-3.5 py-3 text-sm font-semibold" style={{ color: "#a89f8b" }}>
+                  <p className="px-3.5 py-3 text-sm font-medium" style={{ color: "#a89f8b" }}>
                     No player by that name.
                   </p>
                 )}
@@ -311,10 +311,10 @@ export function DailyPuzzle() {
                       style={{ paddingLeft: 10 }}
                     >
                       <PlayerFace espnId={p.espnId} name={p.name} team={p.team} size={28} ring={2} />
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold" style={{ color: INK }}>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium" style={{ color: INK }}>
                         {p.name}
                       </span>
-                      <span className="shrink-0 text-[10px] font-bold" style={{ color: "#8a8171" }}>
+                      <span className="shrink-0 text-[10px] font-semibold" style={{ color: "#8a8171" }}>
                         {already ? "GUESSED" : `${p.team} · ${p.position}`}
                       </span>
                     </button>
@@ -324,7 +324,7 @@ export function DailyPuzzle() {
             )}
           </div>
 
-          {error && <p className="mt-2 text-xs font-bold text-red-600">{error}</p>}
+          {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
 
           {state.guesses.length === 0 && (
             <p className="mt-3 text-xs leading-relaxed" style={{ color: "#8a8171" }}>
@@ -345,7 +345,7 @@ export function DailyPuzzle() {
               chip carries its own label instead - same information, no
               row of headings marooned above a grid it no longer describes. */}
           <div
-            className="mb-2 hidden gap-2 text-[10px] font-bold tracking-wider md:grid lg:mb-2.5 lg:text-[11px]"
+            className="mb-2 hidden gap-2 text-[10px] font-semibold tracking-wider md:grid lg:mb-2.5 lg:text-[11px]"
             style={{ gridTemplateColumns: columnTrack, color: "#a89f8b" }}
           >
             <div className="pr-2">PLAYER</div>
@@ -371,7 +371,7 @@ export function DailyPuzzle() {
                     size={36}
                   />
                   <span
-                    className="min-w-0 truncate text-sm font-bold md:text-[13px] lg:text-[15px]"
+                    className="min-w-0 truncate text-sm font-semibold md:text-[13px] lg:text-[15px]"
                     style={{ color: INK }}
                     title={g.name}
                   >
@@ -415,6 +415,13 @@ function Chip({
   // letters and an ellipsis. The threshold is 8 rather than 9 because
   // "AFC North" is exactly nine characters and was the thing truncating.
   const long = text.length > 8;
+  // College is the one column that wraps. "Mississippi State" is two
+  // words and a chip is not wide enough for either of them shrunk to fit,
+  // so it takes two lines and the row grows - which costs nothing,
+  // because the row was going to be the height of its tallest chip
+  // anyway. Nothing else wraps: every other value is short, or a number,
+  // or an abbreviation that means nothing broken in half.
+  const wraps = column.key === "college";
 
   return (
     <div
@@ -429,13 +436,15 @@ function Chip({
         animationDelay: `${index * 45}ms`,
       }}
     >
-      <span className="text-[8px] font-bold uppercase tracking-wider md:hidden" style={{ opacity: 0.6 }}>
+      <span className="text-[8px] font-semibold uppercase tracking-wider md:hidden" style={{ opacity: 0.6 }}>
         {column.label}
       </span>
       <span className="flex w-full items-center justify-center gap-0.5 px-1">
         <span
-          className={`truncate font-bold tabular-nums ${
-            long ? "text-[9px] md:text-[11px] lg:text-[12px]" : "text-[11px] md:text-[13px] lg:text-[15px]"
+          className={`font-medium tabular-nums ${
+            wraps
+              ? "break-words text-center leading-[1.15] text-[10px] md:text-[11px] lg:text-[13px]"
+              : `truncate ${long ? "text-[9px] md:text-[11px] lg:text-[12px]" : "text-[11px] md:text-[13px] lg:text-[15px]"}`
           }`}
         >
           {text}
@@ -457,7 +466,7 @@ function Legend({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
   return (
     <div className="mt-4 flex flex-col gap-2 border-t pt-3 lg:mt-5 lg:pt-4" style={{ borderColor: "#e4d9bd" }}>
       <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] font-bold lg:gap-x-5 lg:text-xs"
+        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] font-semibold lg:gap-x-5 lg:text-xs"
         style={{ color: "#8a8171" }}
       >
         <span className="flex items-center gap-1.5">
@@ -544,12 +553,12 @@ function Reveal({
         >
           {state.answer?.name}
         </span>
-        <span className="relative z-10 text-[.72rem] font-bold uppercase tracking-wider">{meta}</span>
+        <span className="relative z-10 text-[.72rem] font-semibold uppercase tracking-wider">{meta}</span>
       </div>
 
       <div className="mx-auto flex w-full max-w-md flex-col gap-2.5 px-4 pt-3 pb-4">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-bold" style={{ color: INK }}>
+          <span className="text-sm font-semibold" style={{ color: INK }}>
             {state.solved ? `Solved in ${state.guessesUsed}` : "Out of guesses"}
           </span>
           {state.solved && (
