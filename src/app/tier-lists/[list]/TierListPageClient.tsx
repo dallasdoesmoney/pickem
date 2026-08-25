@@ -421,8 +421,25 @@ export default function TierListPageClient({
   const [pyrSwap, setPyrSwap] = useState<{ from: number; to: number; token: number } | null>(null);
   const swapToken = useRef(0);
 
+  // What a drop would do, shown while the mouse is still down. If the
+  // place under the cursor is taken, its team slides over to the one the
+  // dragged team came from - the trade, previewed, so you can see what
+  // you are about to do instead of finding out afterwards.
+  const pyrPreview = useMemo(() => {
+    if (view !== "pyramid" || !draggingId || typeof pyrOver !== "number") return null;
+    const sitting = pyrSlots[pyrOver];
+    if (!sitting || sitting === draggingId) return null;
+    const from = pyrSlots.indexOf(draggingId);
+    // from < 0 means it is being dragged in from the cut, so there is no
+    // square to send this one back to: it is leaving the board instead.
+    return { slot: pyrOver, to: from >= 0 ? from : null };
+  }, [view, draggingId, pyrOver, pyrSlots]);
+
   const placeInSlot = useCallback(
-    (itemId: string, slot: number) => {
+    // `animate` is false when the drop came from a drag, because the
+    // preview above has already walked the displaced team across -
+    // replaying it would snap them back and run it a second time.
+    (itemId: string, slot: number, animate = true) => {
       const sitting = pyrSlots[slot];
       // Dropping onto an OCCUPIED place trades the two teams rather than
       // inserting between them. A pyramid row has a fixed number of
@@ -434,7 +451,7 @@ export default function TierListPageClient({
         dispatch({ type: "swapItems", aId: itemId, bId: sitting });
         // Only animate a place-to-place trade. A team arriving from the
         // pool has no square to send the other one back to.
-        if (wasAt >= 0) {
+        if (animate && wasAt >= 0) {
           swapToken.current += 1;
           setPyrSwap({ from: slot, to: wasAt, token: swapToken.current });
         }
@@ -671,7 +688,8 @@ export default function TierListPageClient({
     if (view === "pyramid") {
       const target = pyramidTarget(String(over.id));
       if (target === "pool") dropFromPyramid(id);
-      else if (target !== null) placeInSlot(id, target);
+      // false: the drag preview already moved the displaced team.
+      else if (target !== null) placeInSlot(id, target, false);
       setSelectedId(null);
       return;
     }
@@ -1273,6 +1291,7 @@ export default function TierListPageClient({
             onRemoveRow={readOnlySnapshot ? undefined : handleRemoveRow}
             frameWidth={boardWidth}
             swap={pyrSwap}
+            preview={pyrPreview}
             editing={editing}
             onRename={(tierId, label) => dispatch({ type: "renameTier", tierId, label })}
             onCommitRename={() => {
