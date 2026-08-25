@@ -195,45 +195,76 @@ export function DailyPuzzle() {
 
       {error && <p className="text-xs text-red-400">{error}</p>}
 
+      {state.guesses.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-white/40">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm border border-emerald-400/60 bg-emerald-400/25" />
+            match
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm border border-amber-400/50 bg-amber-400/25" />
+            close
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-sm border border-white/15 bg-white/[0.06]" />
+            no
+          </span>
+          <span>↑ higher &middot; ↓ lower</span>
+        </div>
+      )}
+
+      {/* A grid with one header rather than a label repeated on every
+          chip. The point of this shape is reading DOWN a column - four
+          greys in the TEAM column is the fact you act on, and that was
+          invisible when each row restated its own labels.
+
+          It scrolls sideways once the extra columns arrive; the player
+          stays pinned to the left, because a row of numbers you cannot
+          match to a name is not a hint. */}
+      {state.guesses.length > 0 && (
+        <div className="overflow-x-auto -mx-4 px-4">
+          <div className="min-w-max flex flex-col gap-1.5">
+            <div className="flex items-end gap-1.5 text-[9px] tracking-wider text-white/35">
+              <div className="sticky left-0 z-10 w-[124px] shrink-0 bg-[#070e1c] pr-2">PLAYER</div>
+              {visibleColumns.map((c) => (
+                <div key={c.key} className="w-[62px] shrink-0 text-center">
+                  {c.label}
+                </div>
+              ))}
+            </div>
+
+            {state.guesses.map((g) => (
+              <div key={g.espnId} className="flex items-stretch gap-1.5">
+                <div className="sticky left-0 z-10 flex w-[124px] shrink-0 items-center gap-2 bg-[#070e1c] pr-2">
+                  <img src={playerHeadshot(g.espnId)} alt="" className="h-7 w-7 shrink-0 rounded-full bg-white/10 object-cover" />
+                  <span className={`min-w-0 truncate text-xs ${g.correct ? "text-emerald-300" : ""}`}>{g.name}</span>
+                </div>
+                {visibleColumns.map((c) => {
+                  const cell = cellOf(g, c.key);
+                  return (
+                    <div
+                      key={c.key}
+                      title={`${c.label}: ${formatCell(c.key, cell.value)}`}
+                      className={`flex w-[62px] shrink-0 items-center justify-center gap-0.5 rounded-lg border px-1 py-2 text-[11px] tabular-nums ${TONE[cell.status]}`}
+                    >
+                      <span className="truncate">{formatCell(c.key, cell.value)}</span>
+                      {cell.direction === "up" && <span aria-label="higher">↑</span>}
+                      {cell.direction === "down" && <span aria-label="lower">↓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {state.guesses.length === 0 && !state.finished && (
         <p className="text-xs text-white/40">
           Eight tries. Every guess tells you what it has in common with the mystery player — green is a match, amber is close,
           and an arrow points the way.
         </p>
       )}
-
-      <div className="flex flex-col gap-2">
-        {state.guesses.map((g) => (
-          <div
-            key={g.espnId}
-            className={`rounded-xl border px-3 py-2.5 ${
-              g.correct ? "border-emerald-400 bg-emerald-400/10" : "border-white/10 bg-white/[0.03]"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <img src={playerHeadshot(g.espnId)} alt="" className="h-8 w-8 rounded-full bg-white/10 object-cover shrink-0" />
-              <span className="flex-1 min-w-0 truncate text-sm">{g.name}</span>
-              {g.correct && <span className="shrink-0 text-xs text-emerald-400">✓</span>}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {visibleColumns.map((c) => {
-                const cell = cellOf(g, c.key);
-                return (
-                  <span
-                    key={c.key}
-                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] tabular-nums ${TONE[cell.status]}`}
-                  >
-                    <span className="opacity-60">{c.label}</span>
-                    {formatCell(c.key, cell.value)}
-                    {cell.direction === "up" && <span aria-label="higher">↑</span>}
-                    {cell.direction === "down" && <span aria-label="lower">↓</span>}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
 
       {state.finished && state.answer && (
         <div className="rounded-2xl border border-white/15 bg-white/5 p-4 flex flex-col items-center gap-2 text-center">

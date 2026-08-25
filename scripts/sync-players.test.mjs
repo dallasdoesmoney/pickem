@@ -20,6 +20,16 @@ const ATHLETES = {
   3: "Receiver Three",
   4: "Receiver Four",
   5: "Receiver Five",
+  6: "Attributed Six",
+};
+
+// Attributes the daily puzzle grades on. Keyed by athlete id so a case
+// can opt one player into having them and leave the others bare, which
+// is the real ESPN behaviour - it publishes these for most players and
+// not all.
+// Athlete 6 and nobody else, so the bare-row cases above stay bare.
+const ATTRS = {
+  6: { height: 74, weight: 225, age: 41, jersey: "8", college: { name: "California" } },
 };
 
 function stubFetch(payloads) {
@@ -27,7 +37,7 @@ function stubFetch(payloads) {
     const athlete = /athletes\/(\d+)/.exec(url);
     if (athlete) {
       const id = athlete[1];
-      return { ok: true, json: async () => ({ id: Number(id), fullName: ATHLETES[id] }) };
+      return { ok: true, json: async () => ({ id: Number(id), fullName: ATHLETES[id], ...(ATTRS[id] ?? {}) }) };
     }
     if (url in payloads) return { ok: true, json: async () => payloads[url] };
     return { ok: false, status: 404, statusText: "Not Found" };
@@ -151,5 +161,31 @@ assert.equal(coachFrom({ coach: { id: 10 } }), null);
 assert.equal(coachFrom({ coach: { firstName: "No", lastName: "Id" } }), null);
 assert.equal(coachFrom({}), null);
 assert.equal(coachFrom(undefined), null);
+
+// The puzzle attributes: captured when ESPN publishes them, and the key
+// LEFT OUT when it does not. Writing `undefined` instead looks identical
+// in most comparisons and is not - it broke the two cases above when
+// this capture was first added.
+stubFetch({
+  [CHART]: {
+    items: [{ positions: { QB: { position: { abbreviation: "QB" }, athletes: [
+      { rank: 1, athlete: { $ref: ref(6) } },
+      { rank: 2, athlete: { $ref: ref(2) } },
+    ] } } }],
+  },
+});
+const withAttrs = await depthChartAt(2026, "T", QB.slots, 2);
+assert.deepEqual(withAttrs[0], {
+  espnId: "6",
+  name: "Attributed Six",
+  heightIn: 74,
+  weightLb: 225,
+  age: 41,
+  jersey: 8,
+  college: "California",
+});
+// Athlete 2 has none of them, and carries none of the keys.
+assert.deepEqual(withAttrs[1], { espnId: "2", name: "Backup Two" });
+assert.equal("heightIn" in withAttrs[1], false);
 
 console.log("all depth chart cases pass");

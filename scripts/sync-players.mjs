@@ -109,22 +109,29 @@ async function json(url) {
 // This used to keep only id and name and throw the rest of the payload
 // away. Nothing extra is fetched to get these - they were already in the
 // response, and were being discarded.
+// Absent keys are LEFT OUT rather than set to undefined. A row is
+// compared and written as a whole, so `{ heightIn: undefined }` is not
+// the same object as `{}` - the offline test caught exactly that, which
+// is the only reason it did not reach a live run.
 function attrsOf(a) {
   const num = (v) => {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
   };
-  return {
-    // ESPN reports height in inches and weight in pounds.
-    heightIn: num(a.height),
-    weightLb: num(a.weight),
-    age: num(a.age),
-    jersey: num(a.jersey),
-    // college is a $ref on the core API and an object on the roster
-    // endpoint. Only the inline form is used - chasing the ref would be
-    // one more request per player for one hint column.
-    college: typeof a.college?.name === "string" ? a.college.name : undefined,
+  const out = {};
+  // ESPN reports height in inches and weight in pounds.
+  const put = (key, value) => {
+    if (value !== undefined) out[key] = value;
   };
+  put("heightIn", num(a.height));
+  put("weightLb", num(a.weight));
+  put("age", num(a.age));
+  put("jersey", num(a.jersey));
+  // college is a $ref on the core API and an object on the roster
+  // endpoint. Only the inline form is used - chasing the ref would be one
+  // more request per player for one hint column.
+  put("college", typeof a.college?.name === "string" ? a.college.name : undefined);
+  return out;
 }
 
 // Everyone on the roster at a position, in the order ESPN returns them.
