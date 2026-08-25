@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Bungee } from "next/font/google";
+import { Geist, Geist_Mono, Bungee, Fredoka } from "next/font/google";
 import { NavShell } from "@/components/NavShell";
 import { UsernameGate } from "@/components/UsernameGate";
 import { AvatarPromptGate } from "@/components/AvatarPromptGate";
@@ -24,6 +24,15 @@ const bungee = Bungee({
   weight: "400",
 });
 
+// The daily games' face. Rounded and friendly where Geist is neutral -
+// the sticker board is meant to read as a toy, and the type is half of
+// that. Scoped to the games rather than made the site's body face.
+const fredoka = Fredoka({
+  variable: "--font-fredoka",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
+
 export const metadata: Metadata = {
   title: "Pickem",
   description: "Pick the winner of every NFL game, every week.",
@@ -33,7 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${bungee.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${bungee.variable} ${fredoka.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-20">
