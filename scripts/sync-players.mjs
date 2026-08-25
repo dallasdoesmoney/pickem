@@ -205,30 +205,41 @@ async function depthChartAt(season, teamId, matches, count) {
 // So this writes one file with both facts in it - the roster, and whether
 // ESPN's depth chart mentions the player anywhere at any rank.
 
-// Every athlete id that appears anywhere on a team's depth chart, at any
-// position and any rank. Deliberately not the top-N-per-position that
-// syncPosition asks for: a second-string corner is a fine answer, a
-// player the chart has never heard of is not.
-async function depthChartIdsAt(season, teamId) {
-  const ids = new Set();
+// Each charted athlete's BEST rank across every slot they appear in.
+//
+// The first version of this returned "is on the chart at all", which
+// turned out to be worthless: ESPN ranks essentially the whole roster, so
+// 2,985 of 3,021 players qualified and the answer pool was the roster
+// again. The rank is the part that carries the signal - rank 1 is the
+// starter - and it was being discarded.
+//
+// Storing the number rather than a yes/no means the threshold can be
+// retuned later by editing one constant and regenerating, with no second
+// trip to ESPN.
+async function depthRanksAt(season, teamId) {
+  const best = new Map();
   let chart;
   try {
     chart = await json(`${CORE}/seasons/${season}/teams/${teamId}/depthcharts`);
   } catch {
     // No published chart. Everyone on this roster stays guess-only rather
-    // than the whole team becoming answerable.
-    return ids;
+    // than the whole team becoming answerable off a missing response.
+    return best;
   }
   for (const item of chart.items ?? []) {
     for (const slot of Object.values(item.positions ?? {})) {
       for (const entry of slot.athletes ?? []) {
         const ref = entry.athlete?.$ref;
         const hit = ref && /athletes\/(\d+)/.exec(ref);
-        if (hit) ids.add(hit[1]);
+        if (!hit || typeof entry.rank !== "number") continue;
+        const id = hit[1];
+        // A player listed at several slots keeps the best of them: a
+        // starting corner who is also the third safety is a starter.
+        if (!best.has(id) || entry.rank < best.get(id)) best.set(id, entry.rank);
       }
     }
   }
-  return ids;
+  return best;
 }
 
 // Everyone on a team's roster, at every position, with their real
@@ -267,9 +278,13 @@ export type ActivePlayer = {
   // ESPN's own abbreviation: QB, RB, WR, TE, K, but also OT, CB, EDGE,
   // LS and the rest. Not one of our five buckets.
   position: string;
-  // On a depth chart somewhere, at any rank. Only these can be the
-  // answer.
-  answerable: boolean;
+  // Best depth chart rank across every slot they are listed at, or
+  // absent when the chart does not rank them. 1 is a starter.
+  //
+  // Stored as the number rather than a yes/no so which ranks count as
+  // answerable can be retuned without another trip to ESPN - see
+  // ANSWER_MAX_DEPTH_RANK in src/data/puzzlePlayers.ts.
+  depthRank?: number;
   heightIn?: number;
   weightLb?: number;
   age?: number;
@@ -286,12 +301,13 @@ export const ACTIVE_PLAYERS: ActivePlayer[] = [
       r.age ? `, age: ${r.age}` : "",
       r.jersey ? `, jersey: ${r.jersey}` : "",
       r.college ? `, college: ${JSON.stringify(r.college)}` : "",
+      r.depthRank ? `, depthRank: ${r.depthRank}` : "",
     ].join("");
   const body = rows
     .map(
       (r) =>
         `  { espnId: "${r.espnId}", name: ${JSON.stringify(r.name)}, team: "${r.team}", ` +
-        `position: "${r.position}", answerable: ${r.answerable}${extra(r)} },`,
+        `position: "${r.position}"${extra(r)} },`,
     )
     .join("\n");
   return `${header}${body}\n];\n`;
@@ -304,30 +320,36 @@ async function syncAllPlayers(season, teams) {
 
   for (const team of teams) {
     const abbr = (ESPN_TO_OURS[team.abbreviation] ?? team.abbreviation).toUpperCase();
-    const [roster, charted] = await Promise.all([fullRosterAt(team.id), depthChartIdsAt(season, team.id)]);
-    let answerable = 0;
+    const [roster, ranks] = await Promise.all([fullRosterAt(team.id), depthRanksAt(season, team.id)]);
+    let starters = 0;
     for (const player of roster) {
       // A player on two teams' pages mid-trade would otherwise appear
       // twice in the dropdown and break the guess-once rule.
       if (seen.has(player.espnId)) continue;
       seen.add(player.espnId);
-      const isAnswerable = charted.has(player.espnId);
-      if (isAnswerable) answerable += 1;
-      rows.push({ ...player, team: abbr, answerable: isAnswerable });
+      const depthRank = ranks.get(player.espnId);
+      if (depthRank === 1) starters += 1;
+      rows.push({ ...player, team: abbr, depthRank });
     }
-    console.log(`${abbr.padEnd(4)} ${String(roster.length).padStart(3)} players, ${String(answerable).padStart(3)} answerable`);
+    console.log(`${abbr.padEnd(4)} ${String(roster.length).padStart(3)} players, ${String(starters).padStart(3)} rank-1`);
   }
 
   // A roster this short means ESPN changed shape or half the requests
   // failed, and writing it would shrink the guess list to something that
   // rejects real names.
   if (rows.length < 1000) throw new Error(`Only ${rows.length} active players - expected upwards of 1,500`);
-  const answerable = rows.filter((r) => r.answerable).length;
-  if (answerable < 200) throw new Error(`Only ${answerable} answerable players - the depth chart parse found almost nothing`);
+  const starters = rows.filter((r) => r.depthRank === 1).length;
+  // Both ends. Too few means the rank parse broke; too many means it is
+  // no longer selecting anything, which is the bug this replaced - it
+  // marked 2,985 of 3,021 and nobody noticed until the pool was counted.
+  if (starters < 300) throw new Error(`Only ${starters} rank-1 players - the depth chart rank parse found almost nothing`);
+  if (starters > rows.length * 0.6) {
+    throw new Error(`${starters} of ${rows.length} are rank 1 - that is not a starter list, the rank parse is wrong`);
+  }
 
   rows.sort((a, b) => a.name.localeCompare(b.name));
   writeFileSync(join(DATA, "all.ts"), allPlayersFile(rows));
-  console.log(`Wrote ${rows.length} to src/data/rosters/all.ts (${answerable} answerable)`);
+  console.log(`Wrote ${rows.length} to src/data/rosters/all.ts (${starters} at rank 1)`);
 }
 
 function fileFor(position, rows) {
@@ -663,4 +685,4 @@ if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {
   });
 }
 
-export { depthChartAt, rosterAt, fullRosterAt, depthChartIdsAt, syncPosition, syncAllPlayers, POSITIONS, main };
+export { depthChartAt, rosterAt, fullRosterAt, depthRanksAt, syncPosition, syncAllPlayers, POSITIONS, main };

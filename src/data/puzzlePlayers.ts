@@ -9,14 +9,18 @@ import { KICKERS } from "@/data/rosters/ks";
 // The pool the daily puzzle draws from, and the one it grades guesses
 // against. They are not the same pool, and that is the design:
 //
-//   guessable   every active player, ~1,700
-//   answerable  the ones ESPN's depth chart mentions, ~400-600
+//   guessable   every active player, ~3,000 (ESPN's rosters include the
+//               practice squad and injured reserve)
+//   answerable  the ones a depth chart ranks FIRST at some slot, ~800
 //
 // An answer pool of everybody would include third-string guards and
 // practice-squad safeties, and no set of hints rescues a player nobody
 // can name. Poeltl and Weddle draw the same line. Guessing stays wide
 // open, because being told "not a player" when you have named a real one
 // is the most annoying thing these games do.
+//
+// "Ranked first" and not "on the chart": ESPN ranks essentially the whole
+// roster, so mere presence marked 2,985 of 3,021 and selected nothing.
 //
 // The DATABASE holds a copy of this (see
 // supabase/migrations/0046_daily_player_puzzle.sql) because the answer
@@ -25,6 +29,19 @@ import { KICKERS } from "@/data/rosters/ks";
 // `node scripts/gen-puzzle-seed.mjs` after a roster sync; the two drift
 // apart otherwise, and the symptom is a guess the server says it has
 // never heard of.
+
+// How far down a depth chart still counts as an answer. 1 is starters
+// only.
+//
+// This exists as a number because the first attempt used "is on the depth
+// chart at all", which marked 2,985 of 3,021 players - ESPN ranks
+// essentially the whole roster, so that test selected nothing. The rank
+// is where the signal is.
+//
+// Raise it to widen the pool. scripts/gen-puzzle-seed.mjs reads this
+// exact line, so changing it here and regenerating is the whole change -
+// no second trip to ESPN.
+export const ANSWER_MAX_DEPTH_RANK = 1;
 
 export type PuzzlePlayer = {
   espnId: string;
@@ -97,7 +114,7 @@ const FROM_FULL_ROSTER: PuzzlePlayer[] = ACTIVE_PLAYERS.map((p) => ({
   position: p.position,
   conference: TEAMS[p.team].conference,
   division: TEAMS[p.team].division,
-  answerable: p.answerable,
+  answerable: p.depthRank !== undefined && p.depthRank <= ANSWER_MAX_DEPTH_RANK,
   heightIn: p.heightIn,
   weightLb: p.weightLb,
   age: p.age,

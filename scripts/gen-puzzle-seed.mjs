@@ -46,19 +46,30 @@ function readDivisions() {
 // still the empty placeholder, and the caller falls back to the five
 // position files - the same fallback src/data/puzzlePlayers.ts makes, and
 // it has to be the same or the app offers players the server rejects.
-function readAllPlayers() {
+// Read back out of puzzlePlayers.ts rather than restated here. The app
+// and this script must agree on who can be the answer, and two copies of
+// a threshold are two things to get wrong.
+function readAnswerMaxDepthRank() {
+  const src = readFileSync(join(ROOT, "src/data/puzzlePlayers.ts"), "utf8");
+  const hit = src.match(/export const ANSWER_MAX_DEPTH_RANK = (\d+);/);
+  if (!hit) throw new Error("ANSWER_MAX_DEPTH_RANK not found in src/data/puzzlePlayers.ts");
+  return Number(hit[1]);
+}
+
+function readAllPlayers(maxRank) {
   const src = readFileSync(join(ROOT, "src/data/rosters/all.ts"), "utf8");
-  const re = /\{ espnId: "([^"]+)", name: "([^"]+)", team: "([A-Z]{2,3})", position: "([^"]*)", answerable: (true|false)([^}]*)\}/g;
+  const re = /\{ espnId: "([^"]+)", name: "([^"]+)", team: "([A-Z]{2,3})", position: "([^"]*)"([^}]*)\}/g;
   const rows = [];
   let m;
   while ((m = re.exec(src))) {
+    const extras = extrasFrom(m[5] ?? "");
     rows.push({
       espnId: m[1],
       name: m[2],
       team: m[3],
       position: m[4],
-      answerable: m[5] === "true",
-      ...extrasFrom(m[6] ?? ""),
+      answerable: extras.depthRank !== null && extras.depthRank <= maxRank,
+      ...extras,
     });
   }
   return rows;
@@ -80,6 +91,7 @@ function extrasFrom(extra) {
     age: num("age"),
     jersey: num("jersey"),
     college: str("college"),
+    depthRank: num("depthRank"),
   };
 }
 
@@ -98,7 +110,8 @@ const divisions = readDivisions();
 const seen = new Set();
 const players = [];
 
-const full = readAllPlayers();
+const maxRank = readAnswerMaxDepthRank();
+const full = readAllPlayers(maxRank);
 // Everyone in the five position files is a depth-chart pick by
 // construction, so the fallback pool is entirely answerable.
 const source = full.length
@@ -192,7 +205,13 @@ const withExtras = players.filter((p) => p.heightIn || p.weightLb || p.age || p.
 const answerable = players.filter((p) => p.answerable).length;
 console.log(`Wrote ${out}`);
 console.log(`  ${players.length} players across ${new Set(players.map((p) => p.team)).size} teams`);
-console.log(`  ${answerable} can be the answer, ${players.length - answerable} are guess-only`);
+console.log(`  ${answerable} can be the answer (depth rank <= ${maxRank}), ${players.length - answerable} are guess-only`);
+// The bug this guard exists for marked 2,985 of 3,021 answerable, which
+// is the roster wearing a different name.
+if (full.length && answerable > players.length * 0.6) {
+  console.error(`\n  ${answerable} of ${players.length} answerable - that is not a starter list. Check depthRank in all.ts.`);
+  process.exit(1);
+}
 console.log(`  ${withExtras} carry height/weight/age/jersey`);
 if (!full.length) console.log("  (from the five position files - run scripts/sync-players.mjs for every roster)");
 if (!withExtras) {
