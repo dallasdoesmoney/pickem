@@ -28,7 +28,7 @@ export type Quarterback = {
 };
 
 export const QUARTERBACKS: Quarterback[] = [
-  { espnId: "14012", name: "Andy Dalton", team: "PHI", heightIn: 74, weightLb: 220, age: 38, jersey: 14, college: "TCU" },
+  { espnId: "8439", name: "Aaron Rodgers", team: "PIT", heightIn: 74, weightLb: 223, age: 42, jersey: 8 },
   { espnId: "3052587", name: "Baker Mayfield", team: "TB", heightIn: 73, weightLb: 215, age: 31, jersey: 6 },
   { espnId: "4426338", name: "Bo Nix", team: "DEN", heightIn: 74, weightLb: 217, age: 26, jersey: 10 },
   { espnId: "4361741", name: "Brock Purdy", team: "SF", heightIn: 73, weightLb: 220, age: 26, jersey: 13 },
@@ -39,9 +39,10 @@ export const QUARTERBACKS: Quarterback[] = [
   { espnId: "2577417", name: "Dak Prescott", team: "DAL", heightIn: 74, weightLb: 230, age: 33, jersey: 4 },
   { espnId: "3917792", name: "Daniel Jones", team: "IND", heightIn: 77, weightLb: 230, age: 29, jersey: 17 },
   { espnId: "3122840", name: "Deshaun Watson", team: "CLE", heightIn: 75, weightLb: 223, age: 30, jersey: 4 },
-  { espnId: "4714771", name: "Drew Allar", team: "PIT", heightIn: 77, weightLb: 228, age: 22, jersey: 16, college: "Penn State" },
+  { espnId: "4431452", name: "Drake Maye", team: "NE", heightIn: 76, weightLb: 225, age: 23, jersey: 10 },
   { espnId: "15864", name: "Geno Smith", team: "NYJ", heightIn: 74, weightLb: 221, age: 35, jersey: 7 },
   { espnId: "2578570", name: "Jacoby Brissett", team: "ARI", heightIn: 76, weightLb: 235, age: 33, jersey: 7 },
+  { espnId: "4040715", name: "Jalen Hurts", team: "PHI", heightIn: 73, weightLb: 223, age: 28, jersey: 1 },
   { espnId: "3046779", name: "Jared Goff", team: "DET", heightIn: 76, weightLb: 217, age: 31, jersey: 16 },
   { espnId: "4689114", name: "Jaxson Dart", team: "NYG", heightIn: 74, weightLb: 223, age: 23, jersey: 6 },
   { espnId: "4426348", name: "Jayden Daniels", team: "WAS", heightIn: 76, weightLb: 210, age: 25, jersey: 5 },
@@ -56,7 +57,6 @@ export const QUARTERBACKS: Quarterback[] = [
   { espnId: "12483", name: "Matthew Stafford", team: "LAR", heightIn: 75, weightLb: 214, age: 38, jersey: 9 },
   { espnId: "3139477", name: "Patrick Mahomes", team: "KC", heightIn: 74, weightLb: 225, age: 30, jersey: 15 },
   { espnId: "3912547", name: "Sam Darnold", team: "SEA", heightIn: 75, weightLb: 225, age: 29, jersey: 14 },
-  { espnId: "4240391", name: "Tommy DeVito", team: "NE", heightIn: 74, weightLb: 210, age: 28, jersey: 16, college: "Illinois" },
   { espnId: "4360310", name: "Trevor Lawrence", team: "JAX", heightIn: 78, weightLb: 220, age: 26, jersey: 16 },
   { espnId: "4241479", name: "Tua Tagovailoa", team: "ATL", heightIn: 73, weightLb: 225, age: 28, jersey: 1 },
   { espnId: "4360689", name: "Tyler Shough", team: "NO", heightIn: 77, weightLb: 219, age: 26, jersey: 6 },
