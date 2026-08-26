@@ -9,7 +9,8 @@
 // the position key's case moving around, an athlete $ref coming back as
 // http, a receiver occupying two slots, and a team with no chart at all.
 import assert from "node:assert/strict";
-import { coachFrom, depthChartAt, POSITIONS } from "./sync-players.mjs";
+import { readFileSync } from "node:fs";
+import { coachFrom, depthChartAt, POSITIONS, readOverrides, OVERRIDES } from "./sync-players.mjs";
 
 const QB = POSITIONS.find((p) => p.exportName === "QUARTERBACKS");
 const WR = POSITIONS.find((p) => p.exportName === "WIDE_RECEIVERS");
@@ -189,3 +190,33 @@ assert.deepEqual(withAttrs[1], { espnId: "2", name: "Backup Two" });
 assert.equal("heightIn" in withAttrs[1], false);
 
 console.log("all depth chart cases pass");
+
+// ---------------------------------------------------------------- overrides
+//
+// The first version of this shipped broken and the run still reported
+// success: readFileSync was never imported, so every call threw, the
+// catch turned that into "no overrides", and Seattle kept the player a
+// person had explicitly replaced. An override that silently does nothing
+// is worse than none, because the board looks hand-checked and is not.
+// So the parse is tested, and it is tested against the REAL file.
+const overrides = readOverrides();
+assert.ok(overrides instanceof Map, "readOverrides returns a Map");
+
+// Whatever src/data/rosterOverrides.ts currently holds has to parse. An
+// entry that does not parse is an entry that does nothing.
+const raw = readFileSync(new URL("../src/data/rosterOverrides.ts", import.meta.url), "utf8");
+const declared = [...raw.matchAll(/^\s*"([A-Z]{2,3} [A-Z]{1,3})":/gm)].map((m) => m[1]);
+assert.deepEqual(
+  [...overrides.keys()].sort(),
+  declared.sort(),
+  `every override in the file must parse - declared ${declared.length}, parsed ${overrides.size}`,
+);
+for (const [key, ids] of overrides) {
+  assert.ok(ids.length > 0, `${key} names at least one player`);
+  for (const id of ids) assert.match(id, /^\d+$/, `${key} holds ESPN ids`);
+}
+
+// And the module-level OVERRIDES, which is what syncPosition actually
+// consults - the bug was that this was empty while the file was fine.
+assert.equal(OVERRIDES.size, overrides.size, "the module read the same overrides the parser does");
+console.log(`overrides parse: ${overrides.size} entr${overrides.size === 1 ? "y" : "ies"} (${[...overrides.keys()].join(", ") || "none"})`);

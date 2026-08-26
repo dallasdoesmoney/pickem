@@ -18,7 +18,7 @@
 // depth chart endpoint, which ranks them, and only falls back to roster
 // order when a team has no published chart - shouting about it when it
 // does, because a silent fallback here is how the wrong 32 faces ship.
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, join } from "node:path";
 
@@ -28,6 +28,7 @@ import { basename, dirname, join } from "node:path";
 // commit - the sort of gap that shows up a month later as "why is that
 // tier list stale".
 const DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data", "rosters");
+const SRC_DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data");
 
 // One entry per category. `slots` decides which depth chart positions
 // count, and `perTeam` how many players to take from them.
@@ -413,9 +414,15 @@ export const ${position.exportName}: ${position.typeName}[] = [
 function readOverrides() {
   let src;
   try {
-    src = readFileSync(join(ROOT, "src/data/rosterOverrides.ts"), "utf8");
-  } catch {
-    return new Map();
+    src = readFileSync(join(SRC_DATA, "rosterOverrides.ts"), "utf8");
+  } catch (err) {
+    // No file at all is fine - there may simply be no overrides. Anything
+    // else is not, and swallowing it is exactly how the first version of
+    // this failed: readFileSync was not even imported, every call threw,
+    // the catch turned that into "no overrides" and the run reported
+    // success while ignoring the one thing a person had asked for.
+    if (err?.code === "ENOENT") return new Map();
+    throw err;
   }
   const out = new Map();
   const block = src.slice(src.indexOf("ROSTER_OVERRIDES"));
@@ -747,4 +754,4 @@ if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {
   });
 }
 
-export { depthChartAt, rosterAt, fullRosterAt, depthRanksAt, syncPosition, syncAllPlayers, POSITIONS, main };
+export { depthChartAt, rosterAt, fullRosterAt, depthRanksAt, syncPosition, syncAllPlayers, readOverrides, POSITIONS, OVERRIDES, main };
