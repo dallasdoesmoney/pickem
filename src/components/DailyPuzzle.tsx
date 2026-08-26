@@ -122,7 +122,7 @@ function cellStyle(key: ColumnKey, cell: { value: string | number | null; status
   return { bg: tone.bg, ink: tone.ink };
 }
 
-export function DailyPuzzle() {
+export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const { profile } = useAuth();
   const [state, setState] = useState<PuzzleState | null>(null);
   const [query, setQuery] = useState("");
@@ -275,6 +275,15 @@ export function DailyPuzzle() {
 
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "var(--font-game)" }}>
+      {/* Finished: the result comes FIRST, above the title as well as the
+          board. It is the thing somebody came back for and the only part
+          anyone screenshots, and it was sitting under a header that says
+          the same word every day. Unfinished, the header leads as normal.
+          The title lives in the page above this component, so the page
+          hands it in and this decides where it sits. */}
+      {state.finished && state.answer && <Reveal state={state} answer={answer} onShare={share} copied={copied} />}
+      {header}
+
       {/* The board goes as wide as the screen allows; the input does not.
           A search field stretched to 1150px is a lot of runway for a
           name, and it drifts away from the list it drops down over. */}
@@ -433,8 +442,6 @@ export function DailyPuzzle() {
           <Legend columns={visibleColumns} />
         </div>
       )}
-
-      {state.finished && state.answer && <Reveal state={state} answer={answer} onShare={share} copied={copied} />}
     </div>
   );
 }

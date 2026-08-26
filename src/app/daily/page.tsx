@@ -12,8 +12,11 @@ import { DailyPuzzle } from "@/components/DailyPuzzle";
 export default function DailyPage() {
   const { user, loading } = useAuth();
 
-  return (
-    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-full mx-auto">
+  // Built here and handed to the game, because where it belongs depends
+  // on something only the game knows: once there is a result, the result
+  // goes above the title.
+  const header = (
+    <>
       {/* The title ends up in every clip anyone records of this, so the
           mark has to be IN it rather than in the nav bar that gets cropped
           off. A bar rather than a stack: the logo sits in rows the title
@@ -23,7 +26,7 @@ export default function DailyPage() {
           and the whole header is shorter than the wordmark-only version it
           replaces. */}
       <div
-        className="mb-4 flex items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-center sm:gap-4 sm:px-4"
+        className="flex items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-center sm:gap-4 sm:px-4"
         style={{ border: "1px solid rgba(143,164,196,0.4)", background: "linear-gradient(180deg, #12203a, #0b1730)" }}
       >
         <img
@@ -50,17 +53,26 @@ export default function DailyPage() {
           </p>
         </div>
       </div>
+    </>
+  );
 
+  return (
+    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-full mx-auto">
       {loading ? (
-        <div className="flex justify-center py-16">
-          <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-        </div>
+        <>
+          {header}
+          <div className="flex justify-center py-16">
+            <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+          </div>
+        </>
       ) : user ? (
-        <DailyPuzzle />
+        <DailyPuzzle header={header} />
       ) : (
-        /* Signed out gets the pitch rather than a wall. The guesses have
-           to be recorded against someone - eight tries only means
-           anything if they cannot be reset by reloading. */
+        <>
+          {header}
+          {/* Signed out gets the pitch rather than a wall. The guesses
+              have to be recorded against someone - eight tries only means
+              anything if they cannot be reset by reloading. */}
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-10 text-center">
           <span className="text-3xl">🧠</span>
           <p className="text-base text-white">A new player every day</p>
@@ -79,7 +91,8 @@ export default function DailyPage() {
           >
             CREATE A PROFILE
           </Link>
-        </div>
+          </div>
+        </>
       )}
     </main>
   );
