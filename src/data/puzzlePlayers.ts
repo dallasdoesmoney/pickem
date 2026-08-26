@@ -4,21 +4,17 @@ import { QUARTERBACKS } from "@/data/rosters/qbs";
 import { RUNNING_BACKS } from "@/data/rosters/rbs";
 import { WIDE_RECEIVERS } from "@/data/rosters/wrs";
 import { TIGHT_ENDS } from "@/data/rosters/tes";
-import { KICKERS } from "@/data/rosters/ks";
 
 // The pool the daily puzzle draws from, and the one it grades guesses
-// against. They are not the same pool, and that is the design:
+// against. In CLASSIC MODE - the only mode there is today - they are the
+// same set: the four skill positions off the top of the depth chart, and
+// nothing else. You can guess exactly the players who can be the answer,
+// so being told "not a player" after typing a real name cannot happen.
 //
-//   guessable   every active player, ~3,000 (ESPN's rosters include the
-//               practice squad and injured reserve)
-//   answerable  the ones a depth chart ranks first or second at some
-//               slot, ~1,400
-//
-// An answer pool of everybody would include third-string guards and
-// practice-squad safeties, and no set of hints rescues a player nobody
-// can name. Poeltl and Weddle draw the same line. Guessing stays wide
-// open, because being told "not a player" when you have named a real one
-// is the most annoying thing these games do.
+// It was briefly the other way round, with every one of the ~3,000
+// players on an ESPN roster guessable and about 1,400 of them answerable.
+// That is the shape hard mode will want, and it is why the full roster is
+// still synced and still in the database - see CLASSIC_MEMBERS below.
 //
 // A rank and not "on the chart": ESPN ranks essentially the whole roster,
 // so mere presence marked 2,985 of 3,021 and selected nothing.
@@ -31,39 +27,16 @@ import { KICKERS } from "@/data/rosters/ks";
 // apart otherwise, and the symptom is a guess the server says it has
 // never heard of.
 
-// How far down a depth chart still counts as an answer. 1 is starters
-// only; 2 takes their backups too.
-//
-// This exists as a number because the first attempt used "is on the depth
-// chart at all", which marked 2,985 of 3,021 players - ESPN ranks
-// essentially the whole roster, so that test selected nothing. The rank
-// is where the signal is.
-//
-// Each step down roughly doubles the pool and lowers the floor on how
-// famous the answer can be, because the rank is per position slot per
-// team - so 2 means a backup QB (Shedeur Sanders, Joe Flacco) but also a
-// backup long snapper. The cumulative share of the 3,015-player roster:
-//
-//   1   775 (26%)   2  1,441 (48%)   3  2,042 (68%)   4  2,396 (79%)
-//
-// Raise it to widen the pool. scripts/gen-puzzle-seed.mjs reads this
-// exact line, so changing it here and regenerating is the whole change -
-// no second trip to ESPN. If the pool ever needs to be wide at QB and
-// narrow on the line, this becomes a per-position map rather than a
-// bigger number.
-export const ANSWER_MAX_DEPTH_RANK = 2;
-
 export type PuzzlePlayer = {
   espnId: string;
   name: string;
   team: TeamAbbr;
-  // ESPN's own abbreviation once the full roster has been synced - OT,
-  // CB, EDGE and the rest, not just the five skill buckets.
   position: string;
   conference: Conference;
   division: Division;
-  // Whether this player can be the answer, as opposed to merely a legal
-  // guess.
+  // Kept even though classic mode makes it true for everybody: the
+  // database column exists for hard mode, and the two want the same
+  // shape.
   answerable: boolean;
   // Optional: ESPN does not publish all of these for everyone. Each hint
   // column checks for its own value and hides itself when nothing has
@@ -75,6 +48,8 @@ export type PuzzlePlayer = {
   college?: string;
 };
 
+// A row as the position files store it - no position, because the file
+// it lives in is the position.
 type RosterRow = {
   espnId: string;
   name: string;
@@ -86,57 +61,77 @@ type RosterRow = {
   college?: string;
 };
 
-function fromPositionFile(rows: RosterRow[], position: string): PuzzlePlayer[] {
-  return rows.map((r) => ({
-    espnId: r.espnId,
-    name: r.name,
-    team: r.team,
-    position,
-    conference: TEAMS[r.team].conference,
-    division: TEAMS[r.team].division,
-    // Everyone in these files is a depth-chart pick by construction -
-    // that is how syncPosition chooses them.
-    answerable: true,
-    heightIn: r.heightIn,
-    weightLb: r.weightLb,
-    age: r.age,
-    jersey: r.jersey,
-    college: r.college,
-  }));
-}
-
-// The five position files, as a pool. Used only until the full roster has
-// been synced once - an unsynced checkout plays a 192-player game rather
-// than no game, which matters because that is also what a fresh clone and
-// a preview deploy look like.
-const FROM_POSITION_FILES: PuzzlePlayer[] = [
-  ...fromPositionFile(QUARTERBACKS, "QB"),
-  ...fromPositionFile(RUNNING_BACKS, "RB"),
-  ...fromPositionFile(WIDE_RECEIVERS, "WR"),
-  ...fromPositionFile(TIGHT_ENDS, "TE"),
-  ...fromPositionFile(KICKERS, "K"),
+// CLASSIC MODE. The only mode there is today, and the whole pool: these
+// players are the answers AND they are the only names you can guess.
+//
+// The membership comes from the four position files, NOT from filtering
+// the full roster by depth-chart rank. That was the first attempt and it
+// was wrong twice over.
+//
+// Wrong on WR, because ESPN splits receivers across separate left, right
+// and slot entries that each rank their own occupant first - so "rank 1"
+// is two or three receivers a team and they are the wrong ones.
+// Cincinnati's rank 1 is Ja'Marr Chase and Charlie Jones, with TEE
+// HIGGINS at rank 2. syncPosition already solves this properly: it takes
+// two a team by rank and then by the order the chart lists the slots,
+// which lands on Chase and Higgins, Rice and Worthy, Jefferson and
+// Addison. Exactly WR1 and WR2.
+//
+// And wrong on coverage, because three teams came back from the last
+// depth-chart sync with ranks for their defence and NONE at QB, RB, WR or
+// TE - which would have quietly dropped Philadelphia, New England and
+// Pittsburgh out of the game entirely. The position files have all 32
+// teams at all four positions.
+//
+// So: 32 quarterbacks, 32 running backs, 32 tight ends, 64 receivers.
+// 160 players, one per team per position and two at receiver.
+const CLASSIC_MEMBERS: { espnId: string; position: string; row: RosterRow }[] = [
+  ...QUARTERBACKS.map((row) => ({ espnId: row.espnId, position: "QB", row })),
+  ...RUNNING_BACKS.map((row) => ({ espnId: row.espnId, position: "RB", row })),
+  ...WIDE_RECEIVERS.map((row) => ({ espnId: row.espnId, position: "WR", row })),
+  ...TIGHT_ENDS.map((row) => ({ espnId: row.espnId, position: "TE", row })),
 ];
 
-const FROM_FULL_ROSTER: PuzzlePlayer[] = ACTIVE_PLAYERS.map((p) => ({
-  espnId: p.espnId,
-  name: p.name,
-  team: p.team,
-  position: p.position,
-  conference: TEAMS[p.team].conference,
-  division: TEAMS[p.team].division,
-  answerable: p.depthRank !== undefined && p.depthRank <= ANSWER_MAX_DEPTH_RANK,
-  heightIn: p.heightIn,
-  weightLb: p.weightLb,
-  age: p.age,
-  jersey: p.jersey,
-  college: p.college,
-}));
+// The full roster, by id, for the hints. The position files come off the
+// depth-chart path, where college is a $ref rather than a value - only 15
+// of the 160 carry one - so the COLLEGE column would be empty on the
+// board that has it. all.ts comes off the roster endpoint and has a
+// college for every one of them, so membership is taken from one place
+// and the attributes from the other.
+//
+// This is also why the full roster is still synced and still in the
+// database when classic mode uses a twentieth of it: hard mode wants all
+// of it, and these hints want the rest.
+const BY_ID = new Map(ACTIVE_PLAYERS.map((p) => [p.espnId, p]));
 
-export const PUZZLE_PLAYERS: PuzzlePlayer[] = (FROM_FULL_ROSTER.length ? FROM_FULL_ROSTER : FROM_POSITION_FILES)
-  // A player can hold two roster slots, or appear on two teams' pages
-  // mid-trade. Two rows for one man would put a duplicate in the dropdown
-  // and let the same guess be spent twice.
-  .filter((p, i, all) => all.findIndex((q) => q.espnId === p.espnId) === i)
+export const PUZZLE_PLAYERS: PuzzlePlayer[] = CLASSIC_MEMBERS
+  // A player can hold two slots - a receiver listed outside and in the
+  // slot - and would otherwise appear twice in the dropdown and let the
+  // same guess be spent twice.
+  .filter((m, i, all) => all.findIndex((q) => q.espnId === m.espnId) === i)
+  .map(({ espnId, position, row }) => {
+    // The full roster where it has been synced, the position file where
+    // it has not. A fresh clone and a preview deploy get the second one
+    // and play the same 160-player game with a thinner set of hints,
+    // rather than no game at all.
+    const full = BY_ID.get(espnId);
+    const team = (full?.team ?? row.team) as TeamAbbr;
+    return {
+      espnId,
+      name: full?.name ?? row.name,
+      team,
+      position,
+      conference: TEAMS[team].conference,
+      division: TEAMS[team].division,
+      // Classic draws no line between the two: everybody here is both.
+      answerable: true,
+      heightIn: full?.heightIn ?? row.heightIn,
+      weightLb: full?.weightLb ?? row.weightLb,
+      age: full?.age ?? row.age,
+      jersey: full?.jersey ?? row.jersey,
+      college: full?.college ?? row.college,
+    };
+  })
   .sort((a, b) => a.name.localeCompare(b.name));
 
 export const PUZZLE_PLAYERS_BY_ID = new Map(PUZZLE_PLAYERS.map((p) => [p.espnId, p]));
