@@ -8,6 +8,8 @@ import { teamTile } from "@/lib/colorUtils";
 import { PlayerFace } from "@/components/PlayerFace";
 import { fetchDailyPuzzle, submitDailyGuess, PuzzleState, PuzzleGuess, Verdict, NumCell } from "@/lib/supabase/dailyPuzzle";
 import { errorMessage } from "@/lib/errorMessage";
+import { buildReferralLinkTo } from "@/lib/referralStorage";
+import { useAuth } from "@/hooks/useAuth";
 
 // The sticker language, in one place - moved down the scale. Same four
 // rules as the cream board it replaces (solid ground, hard outline, hard
@@ -121,6 +123,7 @@ function cellStyle(key: ColumnKey, cell: { value: string | number | null; status
 }
 
 export function DailyPuzzle() {
+  const { profile } = useAuth();
   const [state, setState] = useState<PuzzleState | null>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -209,7 +212,15 @@ export function DailyPuzzle() {
   // carries NO name, team or position - only squares, the date and the
   // score. A result you cannot post without spoiling the day for whoever
   // reads it does not get posted.
-  function shareText(s: PuzzleState): string {
+  // The link a result carries. Points at the game itself rather than the
+  // front door, and carries the sharer's referral code so a share that
+  // becomes a signup is credited - the same code the invite card uses,
+  // just aimed somewhere useful.
+  //
+  // Built at share time rather than held in state: it needs `window`,
+  // which is not there when this renders on the server, and it is wanted
+  // exactly once - at the moment somebody taps the button.
+  function shareText(s: PuzzleState, dailyLink: string): string {
     const grid = s.guesses
       .map((g) =>
         visibleColumns
@@ -221,15 +232,20 @@ export function DailyPuzzle() {
       )
       .join("\n");
     const score = s.solved ? `${s.guessesUsed}/${s.maxGuesses}` : `X/${s.maxGuesses}`;
-    return `Sideline Brew \u2014 Nameplate\n${s.puzzleOn}  ${score}\n\n${grid}\n\nsidelinebrew.com/daily`;
+    return `Sideline Brew \u2014 Nameplate\n${s.puzzleOn}  ${score}\n\n${grid}\n\n${dailyLink}`;
   }
 
   async function share() {
     if (!state) return;
-    const text = shareText(state);
+    const dailyLink = buildReferralLinkTo("/daily", profile?.username);
+    const text = shareText(state, dailyLink);
     if (navigator.share) {
       try {
-        await navigator.share({ text });
+        // url separately from text, not just pasted on the end of it.
+        // The share sheet needs to KNOW something is a link before it
+        // will unfurl it into a card - handed the same string inside
+        // `text` it stays a line of characters.
+        await navigator.share({ title: "Nameplate - Sideline Brew", text, url: dailyLink });
         posthog.capture("daily_puzzle_shared", { method: "native_share" });
         return;
       } catch {
@@ -259,8 +275,6 @@ export function DailyPuzzle() {
 
   return (
     <div className="flex flex-col gap-5" style={{ fontFamily: "var(--font-game)" }}>
-      {state.finished && state.answer && <Reveal state={state} answer={answer} onShare={share} copied={copied} />}
-
       {/* The board goes as wide as the screen allows; the input does not.
           A search field stretched to 1150px is a lot of runway for a
           name, and it drifts away from the list it drops down over. */}
@@ -419,6 +433,8 @@ export function DailyPuzzle() {
           <Legend columns={visibleColumns} />
         </div>
       )}
+
+      {state.finished && state.answer && <Reveal state={state} answer={answer} onShare={share} copied={copied} />}
     </div>
   );
 }

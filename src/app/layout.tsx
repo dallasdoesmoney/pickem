@@ -33,9 +33,32 @@ const fredoka = Fredoka({
   weight: ["500", "600", "700"],
 });
 
+// Everything below openGraph is new, and it is the reason a shared link
+// used to paste as a bare URL: there were no card tags on this site at
+// all, so nothing - not a result, not an invite - had anything to unfurl
+// into. metadataBase is what turns "/og-default.png" into the absolute
+// URL every scraper requires; without it Next emits a relative path and
+// the card silently comes back blank.
+const SITE = "https://sidelinebrew.com";
+
 export const metadata: Metadata = {
-  title: "Pickem",
-  description: "Pick the winner of every NFL game, every week.",
+  metadataBase: new URL(SITE),
+  title: "Sideline Brew",
+  description: "Picks, tier lists and a daily game. Pick the winner of every NFL game, every week.",
+  openGraph: {
+    type: "website",
+    siteName: "Sideline Brew",
+    title: "Sideline Brew",
+    description: "Picks, tier lists and a daily game.",
+    url: SITE,
+    images: [{ url: "/og-default.png", width: 1200, height: 630, alt: "Sideline Brew" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sideline Brew",
+    description: "Picks, tier lists and a daily game.",
+    images: ["/og-default.png"],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

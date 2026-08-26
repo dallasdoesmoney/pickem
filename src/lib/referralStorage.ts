@@ -14,3 +14,19 @@ export function getPendingReferralCode(): string | null {
 export function buildReferralLink(username: string | null | undefined): string {
   return username ? `${window.location.origin}/?ref=${username}` : window.location.origin;
 }
+
+// The same link, pointed at a page rather than the front door.
+//
+// A result posted from the daily game should land whoever taps it ON the
+// daily game - sending them to the home page to go and find it loses most
+// of them on the way. Attribution still works from anywhere: useAuth
+// reads ?ref= off window.location.search on whatever page it first sees,
+// not just "/".
+//
+// Absolute, always. A share is read somewhere this site is not, so a
+// relative path is not a link at all - and a share sheet will only unfurl
+// something it can recognise as a URL.
+export function buildReferralLinkTo(path: string, username: string | null | undefined): string {
+  const base = `${window.location.origin}${path}`;
+  return username ? `${base}?ref=${username}` : base;
+}

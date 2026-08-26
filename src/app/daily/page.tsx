@@ -23,7 +23,7 @@ export default function DailyPage() {
           and the whole header is shorter than the wordmark-only version it
           replaces. */}
       <div
-        className="mb-4 flex items-center gap-3 rounded-2xl px-3 py-2.5 sm:gap-4 sm:px-4"
+        className="mb-4 flex items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-center sm:gap-4 sm:px-4"
         style={{ border: "1px solid rgba(143,164,196,0.4)", background: "linear-gradient(180deg, #12203a, #0b1730)" }}
       >
         <img
@@ -32,7 +32,12 @@ export default function DailyPage() {
           className="h-16 w-16 shrink-0 sm:h-[92px] sm:w-[92px]"
           style={{ objectFit: "contain" }}
         />
-        <div className="min-w-0">
+        {/* Left-aligned inside a centred pair: the logo and the type read
+            as one lockup that happens to sit in the middle, where
+            centring the text as well would leave the eyebrow and the
+            tagline drifting on their own axes under a title of a
+            different width. */}
+        <div className="min-w-0 text-left">
           <div className="text-[10px] tracking-[0.25em] text-white/45 sm:text-xs">DAILY GAME</div>
           <h1
             className="text-[clamp(1.6rem,7vw,2.4rem)] leading-none tracking-wide"
