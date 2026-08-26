@@ -337,6 +337,12 @@ console.log(`  QB/RB/TE starters + WR1 and WR2, from the position files`);
     if (missing.length) holes.push(`${position}: ${missing.join(", ")}`);
   }
   if (teams.length !== 32) holes.push(`only ${teams.length} teams in the pool`);
+  if (holes.length) {
+    console.error(`\n  TEAMS MISSING FROM THE POOL - the seed was NOT written:`);
+    for (const h of holes) console.error(`    ${h}`);
+    console.error(`  Re-run scripts/sync-players.mjs; the position files should hold all 32.`);
+    process.exit(1);
+  }
 }
 
 // A pick with NO depth-chart rank was never chosen by a depth chart. When
@@ -362,12 +368,6 @@ console.log(`  QB/RB/TE starters + WR1 and WR2, from the position files`);
     console.error(`  ESPN published no ranks for these, so the sync filled them from roster`);
     console.error(`  order. Re-run scripts/sync-players.mjs; if they are still unranked, these`);
     console.error(`  teams need naming by hand before classic mode can ship.`);
-    process.exit(1);
-  }
-  if (holes.length) {
-    console.error(`\n  TEAMS MISSING FROM THE POOL - the seed was NOT written:`);
-    for (const h of holes) console.error(`    ${h}`);
-    console.error(`  Re-run scripts/sync-players.mjs; the position files should hold all 32.`);
     process.exit(1);
   }
 }
