@@ -30,7 +30,10 @@ const COLUMNS = [
   { key: "position", label: "POS", base: true },
   { key: "age", label: "AGE", base: false },
   { key: "height", label: "HT", base: false },
-  { key: "weight", label: "WT", base: false },
+  // WEIGHT is off the board for now. The server still grades it - see
+  // puzzle_num('weight', ...) in the migrations - and the value still
+  // arrives on every guess, so putting it back is this one line and no
+  // SQL. Nothing else has to change.
   { key: "jersey", label: "#", base: false },
   { key: "college", label: "COLLEGE", base: false },
 ] as const;
@@ -77,7 +80,6 @@ const CLOSE_MEANS: Partial<Record<ColumnKey, string>> = {
   college: "same college conference",
   age: "within 3 years",
   height: "within 2 inches",
-  weight: "within 15 lb",
   jersey: "within 3",
 };
 
