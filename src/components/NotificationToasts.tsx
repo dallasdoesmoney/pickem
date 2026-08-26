@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreadNotifications, markNotificationRead, syncLevelUpNotifications, NotificationRow } from "@/lib/supabase/notifications";
-import { dailyCheckIn } from "@/lib/supabase/checkIn";
+import { dailyCheckIn, CheckInResult } from "@/lib/supabase/checkIn";
+import { StreakRenewedModal } from "@/components/StreakRenewedModal";
 import { fetchMyReferrals, ReferralRow } from "@/lib/supabase/referrals";
 import { fetchProfilesByIds, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { ALL_LEVELS, subLevelRoman } from "@/lib/levels";
@@ -31,15 +32,6 @@ type ToastContent = {
 // marks it as having no database row, so dismissing it does not try to
 // mark one read.
 const LOCAL_ID = "local:";
-function checkInToast(points: number, streak: number): NotificationRow {
-  return {
-    id: `${LOCAL_ID}check-in`,
-    type: "daily_check_in" as NotificationRow["type"],
-    data: { points, streak },
-    created_at: new Date().toISOString(),
-  };
-}
-
 function buildToastContent(n: NotificationRow, referrals: ReferralRow[], actors: Map<string, Actor>): ToastContent {
   if (n.type === ("daily_check_in" as NotificationRow["type"])) {
     const streak = Number(n.data.streak);
@@ -117,6 +109,7 @@ export function NotificationToasts() {
   const router = useRouter();
   const [queue, setQueue] = useState<NotificationRow[]>([]);
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
+  const [checkIn, setCheckIn] = useState<CheckInResult | null>(null);
   const [actors, setActors] = useState<Map<string, Actor>>(new Map());
   const [current, setCurrent] = useState<NotificationRow | null>(null);
 
@@ -128,9 +121,14 @@ export function NotificationToasts() {
     // that notification back until the next load.
     dailyCheckIn()
       .then((result) => {
-        if (!cancelled && result.awarded) {
-          setQueue((q) => [checkInToast(result.points, result.streak), ...q]);
-        }
+        // A pop-up rather than a toast. Renewing the streak is the one
+        // thing that happens once a day and cannot be done again, and a
+        // notification that slides away after five seconds is the wrong
+        // shape for it - half the time nobody was looking at that corner
+        // of the screen. The toast builder for daily_check_in stays put:
+        // the same row still arrives through the normal notification
+        // feed on other devices.
+        if (!cancelled && result.awarded) setCheckIn(result);
       })
       .catch((err) => console.error("Daily check-in failed", err))
       .then(() => syncLevelUpNotifications())
@@ -195,11 +193,25 @@ export function NotificationToasts() {
     router.push(target);
   }
 
-  if (!current) return null;
+  // Ahead of the toast's early return: the streak pop-up is not a toast
+  // and must still appear on a load with nothing else queued, which is
+  // the normal case for it.
+  const streakModal = checkIn ? (
+    <StreakRenewedModal
+      streak={checkIn.streak}
+      points={checkIn.points}
+      longest={checkIn.longest}
+      onClose={() => setCheckIn(null)}
+    />
+  ) : null;
+
+  if (!current) return streakModal;
 
   const content = buildToastContent(current, referrals, actors);
 
   return (
+    <>
+      {streakModal}
     <div className="fixed top-[84px] left-1/2 -translate-x-1/2 z-[70] w-full max-w-sm px-4">
       <div
         role="button"
@@ -243,5 +255,6 @@ export function NotificationToasts() {
         </button>
       </div>
     </div>
+    </>
   );
 }

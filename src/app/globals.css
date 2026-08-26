@@ -706,3 +706,123 @@ body {
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------
+   Daily check-in: the streak renewing.
+
+   The number is the point. Yesterday's count is thrown up and out as
+   today's arrives from below, because a total on its own is a fact and
+   a total replacing the one before it is the streak advancing - and the
+   advancing is what somebody came back for.
+   --------------------------------------------------------------- */
+@keyframes streak-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes streak-card-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.86) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Catches rather than appears: up past its size and back down. */
+@keyframes streak-ignite {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-16deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.24) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* The flame keeps living after it has landed. Brightness only - moving it
+   would drag the number sitting on it out of place. */
+@keyframes streak-flicker {
+  0%,
+  100% { filter: brightness(1); }
+  40% { filter: brightness(1.16); }
+  70% { filter: brightness(0.95); }
+}
+
+@keyframes streak-number-out {
+  to {
+    opacity: 0;
+    transform: translateY(-26px) scale(0.7);
+  }
+}
+
+@keyframes streak-number-in {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes streak-ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--ex, 0), var(--ey, 0)) scale(0);
+  }
+}
+
+.streak-scrim { animation: streak-scrim-in 220ms ease-out both; }
+.streak-card { animation: streak-card-in 460ms cubic-bezier(0.2, 1.5, 0.4, 1) both 80ms; }
+.streak-flame {
+  animation:
+    streak-ignite 620ms cubic-bezier(0.2, 1.4, 0.4, 1) both 200ms,
+    streak-flicker 2400ms ease-in-out 900ms infinite;
+}
+.streak-old { animation: streak-number-out 340ms cubic-bezier(0.4, 0, 0.7, 0) both 520ms; }
+.streak-new { animation: streak-number-in 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both 640ms; }
+.streak-pts { animation: streak-card-in 420ms cubic-bezier(0.2, 1.6, 0.4, 1) both 940ms; }
+
+.streak-ember {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  opacity: 0;
+  animation: streak-ember 900ms cubic-bezier(0.2, 0.7, 0.4, 1) both;
+}
+
+/* Everything still arrives, it just does not fly. The flicker and the
+   embers go entirely - a loop and a shower of particles are exactly what
+   this setting is asking not to see. */
+@media (prefers-reduced-motion: reduce) {
+  .streak-card,
+  .streak-old,
+  .streak-new,
+  .streak-pts,
+  .streak-flame {
+    animation: none;
+  }
+
+  .streak-ember {
+    display: none;
+  }
+}
