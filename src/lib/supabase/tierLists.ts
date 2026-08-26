@@ -1,5 +1,34 @@
 import { supabase } from "@/lib/supabase/client";
-import { TierListState } from "@/lib/tierList";
+import { getTierTemplate } from "@/data/tierTemplates";
+import { TierListState, sanitizeState } from "@/lib/tierList";
+
+// A saved blob is a snapshot of a roster that has since moved on. The
+// rosters are regenerated from ESPN's depth chart every week, so the week
+// a starter changes, every saved board in that category is holding an id
+// the template no longer has - and resolveItem draws those as a face with
+// no name, because a saved board keeps the ids it was ranked with.
+//
+// That is exactly what Zach Charbonnet turned into when Jadarian Price
+// took Seattle's back slot: still on the board, nameless, and the new
+// back nowhere to be found.
+//
+// So every row is rebuilt against the live template on the way OUT of the
+// database rather than at each place that draws one. sanitizeState drops
+// ids the template no longer has and drops anyone newly added into the
+// pool, which is the behaviour the local draft and the share snapshot
+// have always had - this closes the one path that skipped it. Nothing is
+// written back: the stored blob keeps its stale id until the owner next
+// saves, and nothing reads it unsanitised any more.
+//
+// An unknown template means the category itself is gone. There is nothing
+// to rebuild against, so the row is passed through untouched and the
+// callers show it as a category they can't draw.
+function rebuild<T extends { template: string; state: TierListState }>(row: T): T {
+  const template = getTierTemplate(row.template);
+  if (!template) return row;
+  const clean = sanitizeState(row.state, template);
+  return clean ? { ...row, state: clean } : row;
+}
 
 export type SavedTierList = {
   id: string;
@@ -31,7 +60,7 @@ export async function listMyTierLists(userId: string): Promise<SavedTierListSumm
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
   if (error) throw error;
-  return (data as SavedTierListSummary[]) ?? [];
+  return ((data as SavedTierListSummary[]) ?? []).map(rebuild);
 }
 
 // One saved list, by id. Scoped to the user as well as the id so a
@@ -45,7 +74,7 @@ export async function fetchTierList(userId: string, id: string): Promise<SavedTi
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
-  return (data as SavedTierList) ?? null;
+  return data ? rebuild(data as SavedTierList) : null;
 }
 
 // How many distinct people have saved a list in each category, keyed by
