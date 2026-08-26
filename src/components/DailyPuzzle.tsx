@@ -9,15 +9,31 @@ import { PlayerFace } from "@/components/PlayerFace";
 import { fetchDailyPuzzle, submitDailyGuess, PuzzleState, PuzzleGuess, Verdict, NumCell } from "@/lib/supabase/dailyPuzzle";
 import { errorMessage } from "@/lib/errorMessage";
 
-// The sticker language, in one place. Four rules and nothing else: cream
-// ground, black outline, hard offset shadow, no transparency anywhere.
-// Every daily game we add should be able to import these and look like it
-// belongs without anyone redesigning it.
-const CREAM = "#fff3d6";
-const INK = "#16181c";
-const EDGE = `3px solid ${INK}`;
-const DROP = `8px 8px 0 ${INK}`;
-const DROP_SM = `2px 3px 0 ${INK}`;
+// The sticker language, in one place - moved down the scale. Same four
+// rules as the cream board it replaces (solid ground, hard outline, hard
+// offset shadow, no transparency), with one thing kept deliberately: the
+// CARD IS LIGHTER THAN THE PAGE. That is what makes an offset shadow read
+// as depth on a dark ground instead of as a smudge, and it is the whole
+// trick behind this palette.
+//
+// The chips stay light, so black type on them survives the change - the
+// board is dark, the stickers on it are not.
+const CARD = "#141d31";
+const FIELD = "#0e1626";
+const RULE = "#2b3a56";
+const TEXT = "#eef3fb";
+const MUTED = "#7d8ca6";
+const ALARM = "#ff6f61";
+// Ink is the colour of type ON A CHIP, and only that. Everything written
+// on the card itself uses TEXT.
+const INK = "#0a1020";
+const EDGE = `2px solid #0a1120`;
+// The card sits on the page, so it gets an ambient shadow; the chips sit
+// on the card, so they keep the hard offset. Two different jobs that were
+// one constant when everything was cream.
+const CARD_EDGE = `1px solid ${RULE}`;
+const DROP = `0 24px 60px -22px #000000`;
+const DROP_SM = `3px 4px 0 #05090f`;
 
 // Columns, in board order. `base` marks the three that come from the team
 // a player is on, so they are known for everybody. The rest depend on
@@ -51,21 +67,29 @@ function formatCell(key: ColumnKey, value: string | number | null): string {
   return String(value);
 }
 
-// Gold and a deeper green rather than the highlighter versions. The
-// first pass used tailwind's green-500 against a near-neon yellow, which
-// on a cream ground read as two warning lights.
-//
 // Black ink on every one of them, including the misses. A greyed-out
 // value in a grey chip says "ignore me" twice, and the value is the part
 // you are reading the board for - you need to know it was MIA even when
 // MIA is wrong. The colour carries the verdict; the text carries the
-// fact. Measured against black: 7.03:1 on the green, 10.9 on the gold,
-// 13.5 on the grey - all clear of AA.
+// fact. Against black: 9.0:1 on the green, 12.8 on the gold, 9.0 on the
+// grey, all clear of AA - which is the reason the chips stayed light
+// when the board went dark.
+//
+// The miss grey is the one that has been got wrong twice. On the cream
+// board it was a cream, which was right there. Ported straight down the
+// scale it became a navy DARKER than the card behind it - 1.29:1, which
+// is not a chip, it is a hole in the row.
+//
+// The ceiling is that a miss must never be LOUDER than a hit. This grey
+// is 7.9:1 against the card and the green is 8.0, so it sits a hair
+// under, which is as bright as a wrong answer is allowed to get.
+// `unknown` is a step quieter again: "nobody has this value" is less
+// than a miss, not more.
 const TONE: Record<Verdict, { bg: string; ink: string }> = {
-  hit: { bg: "#35b96b", ink: INK },
-  close: { bg: "#f5c518", ink: INK },
-  miss: { bg: "#e8e0cd", ink: INK },
-  unknown: { bg: "#efe9d8", ink: INK },
+  hit: { bg: "#3ecb78", ink: INK },
+  close: { bg: "#ffce3a", ink: INK },
+  miss: { bg: "#aab3c1", ink: INK },
+  unknown: { bg: "#8d96a5", ink: INK },
 };
 
 // What a yellow in each column actually means, which is worth saying out
@@ -197,7 +221,7 @@ export function DailyPuzzle() {
       )
       .join("\n");
     const score = s.solved ? `${s.guessesUsed}/${s.maxGuesses}` : `X/${s.maxGuesses}`;
-    return `Sideline Brew — Who Am I?\n${s.puzzleOn}  ${score}\n\n${grid}\n\nsidelinebrew.com/daily`;
+    return `Sideline Brew \u2014 Nameplate\n${s.puzzleOn}  ${score}\n\n${grid}\n\nsidelinebrew.com/daily`;
   }
 
   async function share() {
@@ -243,16 +267,16 @@ export function DailyPuzzle() {
       {!state.finished && (
         <div
           className="mx-auto flex w-full max-w-2xl flex-col p-4 lg:p-5"
-          style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP }}
+          style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }}
         >
-          {/* No title here - the page already says WHO AM I? above the
+          {/* No title here - the page already says NAMEPLATE above the
               card, and repeating it inside cost a line of height for a
               word already on screen. */}
           <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider lg:text-[13px]" style={{ color: "#a89f8b" }}>
+            <span className="text-xs font-semibold uppercase tracking-wider lg:text-[13px]" style={{ color: MUTED }}>
               Guess the player
             </span>
-            <span className="text-sm font-semibold lg:text-base" style={{ color: "#e0483a" }}>
+            <span className="text-sm font-semibold lg:text-base" style={{ color: ALARM }}>
               {left} of {state.maxGuesses} left
             </span>
           </div>
@@ -274,13 +298,12 @@ export function DailyPuzzle() {
               disabled={busy}
               aria-label="Guess a player"
               aria-autocomplete="list"
-              className="w-full px-3.5 py-3 text-[.95rem] font-medium outline-none transition-shadow duration-150 focus:shadow-[5px_5px_0_#16181c] disabled:opacity-60 lg:px-4 lg:py-3.5 lg:text-base"
+              className="w-full px-3.5 py-3 text-[.95rem] font-medium outline-none transition-shadow duration-150 focus:shadow-[0_0_0_3px_#2b3a56] disabled:opacity-60 lg:px-4 lg:py-3.5 lg:text-base"
               style={{
-                background: "#fff",
-                border: EDGE,
+                background: FIELD,
+                border: CARD_EDGE,
                 borderRadius: 12,
-                boxShadow: `3px 3px 0 ${INK}`,
-                color: INK,
+                color: TEXT,
               }}
             />
             {query.trim().length > 0 && (
@@ -288,10 +311,10 @@ export function DailyPuzzle() {
                 ref={menuRef}
                 role="listbox"
                 className="puzzle-menu absolute z-20 mt-2 max-h-[19rem] w-full overflow-y-auto overflow-x-hidden"
-                style={{ background: "#fff", border: EDGE, borderRadius: 12, boxShadow: DROP }}
+                style={{ background: FIELD, border: CARD_EDGE, borderRadius: 12, boxShadow: DROP }}
               >
                 {matches.length === 0 && (
-                  <p className="px-3.5 py-3 text-sm font-medium" style={{ color: "#a89f8b" }}>
+                  <p className="px-3.5 py-3 text-sm font-medium" style={{ color: MUTED }}>
                     No player by that name.
                   </p>
                 )}
@@ -313,10 +336,10 @@ export function DailyPuzzle() {
                       style={{ paddingLeft: 10 }}
                     >
                       <PlayerFace espnId={p.espnId} name={p.name} team={p.team} size={28} ring={2} />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium" style={{ color: INK }}>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium" style={{ color: TEXT }}>
                         {p.name}
                       </span>
-                      <span className="shrink-0 text-[10px] font-semibold" style={{ color: "#8a8171" }}>
+                      <span className="shrink-0 text-[10px] font-semibold" style={{ color: MUTED }}>
                         {already ? "GUESSED" : `${p.team} · ${p.position}`}
                       </span>
                     </button>
@@ -326,10 +349,10 @@ export function DailyPuzzle() {
             )}
           </div>
 
-          {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+          {error && <p className="mt-2 text-xs font-semibold text-red-400">{error}</p>}
 
           {state.guesses.length === 0 && (
-            <p className="mt-3 text-xs leading-relaxed" style={{ color: "#8a8171" }}>
+            <p className="mt-3 text-xs leading-relaxed" style={{ color: MUTED }}>
               Eight guesses. Every one tells you what it has in common with the mystery player — green is an exact match,
               yellow is close, and an arrow points the way.
             </p>
@@ -340,7 +363,7 @@ export function DailyPuzzle() {
       {state.guesses.length > 0 && (
         <div
           className="puzzle-board p-3.5 md:p-[18px] lg:p-6"
-          style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP }}
+          style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }}
         >
           {/* One header row on desktop, where the columns line up under it.
               On a phone the board stacks into a card per guess and every
@@ -348,7 +371,7 @@ export function DailyPuzzle() {
               row of headings marooned above a grid it no longer describes. */}
           <div
             className="mb-2 hidden gap-2 text-[10px] font-semibold tracking-wider md:grid lg:mb-2.5 lg:text-[11px]"
-            style={{ gridTemplateColumns: columnTrack, color: "#a89f8b" }}
+            style={{ gridTemplateColumns: columnTrack, color: MUTED }}
           >
             <div className="pr-2">PLAYER</div>
             {visibleColumns.map((c) => (
@@ -370,11 +393,11 @@ export function DailyPuzzle() {
                     espnId={g.espnId}
                     name={g.name}
                     team={(PUZZLE_PLAYERS_BY_ID.get(g.espnId)?.team ?? "KC") as TeamAbbr}
-                    size={36}
+                    size={46}
                   />
                   <span
                     className="min-w-0 truncate text-sm font-semibold md:text-[13px] lg:text-[15px]"
-                    style={{ color: INK }}
+                    style={{ color: TEXT }}
                     title={g.name}
                   >
                     {g.name}
@@ -466,10 +489,10 @@ function Legend({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
   const explained = columns.filter((c) => CLOSE_MEANS[c.key]);
 
   return (
-    <div className="mt-4 flex flex-col gap-2 border-t pt-3 lg:mt-5 lg:pt-4" style={{ borderColor: "#e4d9bd" }}>
+    <div className="mt-4 flex flex-col gap-2 border-t pt-3 lg:mt-5 lg:pt-4" style={{ borderColor: RULE }}>
       <div
         className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] font-semibold lg:gap-x-5 lg:text-xs"
-        style={{ color: "#8a8171" }}
+        style={{ color: MUTED }}
       >
         <span className="flex items-center gap-1.5">
           <Swatch bg={TONE.hit.bg} /> EXACT
@@ -481,12 +504,12 @@ function Legend({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
           <Swatch bg={TONE.miss.bg} /> NO MATCH
         </span>
       </div>
-      <p className="text-[10px] leading-relaxed lg:text-xs" style={{ color: "#a89f8b" }}>
+      <p className="text-[10px] leading-relaxed lg:text-xs" style={{ color: MUTED }}>
         Close means{" "}
         {explained.map((c, i) => (
           <span key={c.key}>
             {i > 0 && (i === explained.length - 1 ? ", and " : ", ")}
-            <span style={{ color: "#8a8171", fontWeight: 700 }}>{c.label}</span> {CLOSE_MEANS[c.key]}
+            <span style={{ color: TEXT, fontWeight: 700 }}>{c.label}</span> {CLOSE_MEANS[c.key]}
           </span>
         ))}
         .
@@ -500,7 +523,7 @@ function Swatch({ bg }: { bg: string }) {
     <span
       aria-hidden
       className="inline-block"
-      style={{ width: 12, height: 12, background: bg, border: `2px solid ${INK}`, borderRadius: 4 }}
+      style={{ width: 12, height: 12, background: bg, border: EDGE, borderRadius: 4 }}
     />
   );
 }
@@ -529,7 +552,7 @@ function Reveal({
   return (
     <div
       className="puzzle-reveal mx-auto w-full max-w-2xl"
-      style={{ background: CREAM, border: EDGE, borderRadius: 18, boxShadow: DROP, overflow: "hidden" }}
+      style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP, overflow: "hidden" }}
     >
       <div
         className="relative flex flex-col items-center gap-2 overflow-hidden px-4 pt-6 pb-5"
@@ -560,7 +583,7 @@ function Reveal({
 
       <div className="mx-auto flex w-full max-w-md flex-col gap-2.5 px-4 pt-3 pb-4">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold" style={{ color: INK }}>
+          <span className="text-sm font-semibold" style={{ color: TEXT }}>
             {state.solved ? `Solved in ${state.guessesUsed}` : "Out of guesses"}
           </span>
           {state.solved && (
@@ -580,7 +603,7 @@ function Reveal({
             </span>
           )}
         </div>
-        <p className="text-xs" style={{ color: "#8a8171" }}>
+        <p className="text-xs" style={{ color: MUTED }}>
           {state.solved ? "New player tomorrow at midnight ET." : "New player tomorrow — the streak survives."}
         </p>
         {/* Orange rather than yellow: yellow is a verdict on this board
@@ -602,7 +625,7 @@ function Reveal({
         >
           {copied ? "COPIED" : "SHARE RESULT"}
         </button>
-        <p className="text-center text-[10px]" style={{ color: "#a89f8b" }}>
+        <p className="text-center text-[10px]" style={{ color: MUTED }}>
           Shares squares only — no name, no team.
         </p>
       </div>

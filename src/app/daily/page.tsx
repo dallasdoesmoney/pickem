@@ -13,13 +13,37 @@ export default function DailyPage() {
   const { user, loading } = useAuth();
 
   return (
-    <main className="flex-1 px-4 pb-16 pt-10 max-w-lg md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-full mx-auto">
-      <div className="text-center mb-8">
-        <div className="text-xs text-white/45 tracking-[0.25em] mb-1">DAILY GAME</div>
-        <h1 className="text-[clamp(2rem,8vw,3rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-          WHO AM I?
-        </h1>
-        <p className="text-white/50 text-sm mt-3">One mystery player a day. Same player for everyone.</p>
+    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-full mx-auto">
+      {/* The title ends up in every clip anyone records of this, so the
+          mark has to be IN it rather than in the nav bar that gets cropped
+          off. A bar rather than a stack: the logo sits in rows the title
+          already occupies, so a 92px cup costs nothing - stacking it above
+          the title would have added 84px, most of a guess row.
+          The eyebrow and tagline live inside the bar for the same reason,
+          and the whole header is shorter than the wordmark-only version it
+          replaces. */}
+      <div
+        className="mb-4 flex items-center gap-3 rounded-2xl px-3 py-2.5 sm:gap-4 sm:px-4"
+        style={{ border: "1px solid rgba(143,164,196,0.4)", background: "linear-gradient(180deg, #12203a, #0b1730)" }}
+      >
+        <img
+          src="/press-logo.png"
+          alt="Sideline Brew"
+          className="h-16 w-16 shrink-0 sm:h-[92px] sm:w-[92px]"
+          style={{ objectFit: "contain" }}
+        />
+        <div className="min-w-0">
+          <div className="text-[10px] tracking-[0.25em] text-white/45 sm:text-xs">DAILY GAME</div>
+          <h1
+            className="text-[clamp(1.6rem,7vw,2.4rem)] leading-none tracking-wide"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            NAMEPLATE
+          </h1>
+          <p className="mt-1 truncate text-[11px] text-white/45 sm:text-[13px]">
+            One mystery player a day. Same player for everyone.
+          </p>
+        </div>
       </div>
 
       {loading ? (
