@@ -370,10 +370,10 @@ export default function TierListPageClient({
   // the one above it, the same, or fewer - and those three are the only
   // things an edge can do, which is what keeps every slope in the
   // silhouette at one angle.
-  // Sanitised here as well as in sanitizeState, because a row loaded from
-  // the database goes straight into the reducer without passing through
-  // it - so this is the only guard on a list saved before shapes existed,
-  // or one whose blob has been tampered with.
+  // Sanitised here as well as in sanitizeState. Every path into the
+  // reducer now passes through that - the database read was the last one
+  // that didn't - so this is belt and braces rather than the only guard,
+  // and it is what a list saved before shapes existed lands on.
   // One entry per tier, always: a row IS a tier, so a tier added or
   // removed in either layout has to show up in the shape.
   // One list of tiers, two layouts that each reveal as much of it as they
