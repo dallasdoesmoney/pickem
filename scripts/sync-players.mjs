@@ -42,6 +42,7 @@ const DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data", 
 const POSITIONS = [
   {
     file: "qbs.ts",
+    code: "QB",
     typeName: "Quarterback",
     exportName: "QUARTERBACKS",
     noun: "quarterback",
@@ -50,6 +51,7 @@ const POSITIONS = [
   },
   {
     file: "rbs.ts",
+    code: "RB",
     typeName: "RunningBack",
     exportName: "RUNNING_BACKS",
     noun: "running back",
@@ -59,6 +61,7 @@ const POSITIONS = [
   },
   {
     file: "wrs.ts",
+    code: "WR",
     typeName: "WideReceiver",
     exportName: "WIDE_RECEIVERS",
     noun: "wide receiver",
@@ -68,6 +71,7 @@ const POSITIONS = [
   },
   {
     file: "tes.ts",
+    code: "TE",
     typeName: "TightEnd",
     exportName: "TIGHT_ENDS",
     noun: "tight end",
@@ -79,6 +83,7 @@ const POSITIONS = [
   },
   {
     file: "ks.ts",
+    code: "K",
     typeName: "Kicker",
     exportName: "KICKERS",
     noun: "kicker",
@@ -400,11 +405,35 @@ export const ${position.exportName}: ${position.typeName}[] = [
   return `${header}${body}\n];\n`;
 }
 
+
+// Hand-picked replacements for what the chart says - see
+// src/data/rosterOverrides.ts for the rules. Read with a regex rather
+// than imported because that file is TypeScript and this is a plain node
+// script, which is how every other file here is read.
+function readOverrides() {
+  let src;
+  try {
+    src = readFileSync(join(ROOT, "src/data/rosterOverrides.ts"), "utf8");
+  } catch {
+    return new Map();
+  }
+  const out = new Map();
+  const block = src.slice(src.indexOf("ROSTER_OVERRIDES"));
+  for (const hit of block.matchAll(/"([A-Z]{2,3} [A-Z]{1,3})":\s*\[([^\]]*)\]/g)) {
+    const ids = [...hit[2].matchAll(/"(\d+)"/g)].map((m) => m[1]);
+    if (ids.length) out.set(hit[1], ids);
+  }
+  return out;
+}
+
+const OVERRIDES = readOverrides();
+
 async function syncPosition(season, teams, position) {
   console.log(`\n=== ${position.exportName} (${position.perTeam} per team) ===`);
   const rows = [];
   const guessed = [];
   const short = [];
+  const overridden = [];
 
   for (const team of teams) {
     const abbr = (ESPN_TO_OURS[team.abbreviation] ?? team.abbreviation).toUpperCase();
@@ -424,6 +453,36 @@ async function syncPosition(season, teams, position) {
       source = picks.length ? "PARTLY ROSTER ORDER" : source;
       if (picks.length) guessed.push(abbr);
     }
+    // A person overruling the feed. Applied AFTER the chart so it is the
+    // last word, and resolved against the roster we already fetched, so
+    // an override carries the same name and hint columns as any other
+    // pick. An id that is not on this team's roster at this position is a
+    // stale override - it fails the run rather than silently doing
+    // nothing, because an override that has quietly stopped applying is
+    // worse than none.
+    const override = OVERRIDES.get(`${abbr} ${position.code}`);
+    if (override) {
+      const picked = [];
+      for (const id of override) {
+        const found = roster.find((r) => r.espnId === id);
+        if (!found) {
+          throw new Error(
+            `Override "${abbr} ${position.code}" names ${id}, who is not a ${position.noun} on ${abbr}. ` +
+              `Fix or remove it in src/data/rosterOverrides.ts.`,
+          );
+        }
+        picked.push(found);
+      }
+      if (picked.length !== position.perTeam) {
+        throw new Error(
+          `Override "${abbr} ${position.code}" has ${picked.length} player(s); ${position.noun} takes ${position.perTeam}.`,
+        );
+      }
+      picks = picked;
+      source = "OVERRIDE";
+      overridden.push(abbr);
+    }
+
     if (picks.length < position.perTeam) short.push(`${abbr} (${picks.length})`);
 
     const taken = new Set(picks.map((p) => p.espnId));
@@ -438,6 +497,9 @@ async function syncPosition(season, teams, position) {
   // A partial file is worse than none: a category quietly missing five
   // teams looks like a finished list to everyone who didn't run this.
   if (short.length) throw new Error(`Not enough ${position.noun}s for: ${short.join(", ")}`);
+  if (overridden.length) {
+    console.log(`\n${overridden.length} hand-picked override(s) applied: ${overridden.join(", ")} - see src/data/rosterOverrides.ts`);
+  }
   if (guessed.length) {
     console.log(
       `\nWARNING: ${position.exportName} fell back to roster order for ${guessed.join(", ")} - ` +
