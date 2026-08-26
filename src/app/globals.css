@@ -826,3 +826,123 @@ body {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------
+   The same fire, in the notification bar.
+   ---------------------------------------------------------------
+   Day one gets the pop-up above; every day after it gets a toast, and
+   the toast carries the flame rather than a static emoji. Same
+   keyframes, same curves, same delays as the pop-up - a check-in should
+   feel like the same event whichever surface it lands on, and two
+   different fires would say it was two different things.
+
+   Written out rather than sharing the streak-* classes because the two
+   live at different sizes: the pop-up's flame is 92px with embers thrown
+   64-108px, and at 26px in a 44px mark those distances put every spark
+   outside the toast. Only the geometry differs; the timing is copied
+   exactly, deliberately.
+   --------------------------------------------------------------- */
+
+/* Arrives instead of blinking on. Every toast gets this, not just the
+   streak - the bar was the one animated-worthy moment on the site that
+   wasn't animated. */
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-ignite {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-16deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.24) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes toast-flicker {
+  0%,
+  100% { filter: brightness(1); }
+  40% { filter: brightness(1.16); }
+  70% { filter: brightness(0.95); }
+}
+
+@keyframes toast-ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--ex, 0), var(--ey, 0)) scale(0);
+  }
+}
+
+/* Shorter throws than the pop-up's number, for the same reason as the
+   embers: the travel has to stay inside a 44px mark. */
+@keyframes toast-num-out {
+  to {
+    opacity: 0;
+    transform: translateY(-13px) scale(0.7);
+  }
+}
+
+@keyframes toast-num-in {
+  0% {
+    opacity: 0;
+    transform: translateY(15px) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-card { animation: toast-in 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.toast-flame {
+  animation:
+    toast-ignite 620ms cubic-bezier(0.2, 1.4, 0.4, 1) both 200ms,
+    toast-flicker 2400ms ease-in-out 900ms infinite;
+}
+.toast-ember {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  opacity: 0;
+  animation: toast-ember 900ms cubic-bezier(0.2, 0.7, 0.4, 1) both;
+}
+.toast-num-old { animation: toast-num-out 340ms cubic-bezier(0.4, 0, 0.7, 0) both 520ms; }
+.toast-num-new { animation: toast-num-in 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both 640ms; }
+
+/* Same bargain as the pop-up: it still arrives, it just does not fly,
+   and the loop and the particles go entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .toast-card,
+  .toast-flame,
+  .toast-num-old,
+  .toast-num-new {
+    animation: none;
+  }
+
+  .toast-ember {
+    display: none;
+  }
+}
