@@ -36,6 +36,7 @@ export const RUNNING_BACKS: RunningBack[] = [
   { espnId: "3043078", name: "Derrick Henry", team: "BAL" },
   { espnId: "4241985", name: "J.K. Dobbins", team: "DEN" },
   { espnId: "4575131", name: "Jacory Croskey-Merritt", team: "WAS" },
+  { espnId: "4685512", name: "Jadarian Price", team: "SEA" },
   { espnId: "4429795", name: "Jahmyr Gibbs", team: "DET" },
   { espnId: "4379399", name: "James Cook III", team: "BUF" },
   { espnId: "4361579", name: "Javonte Williams", team: "DAL" },
@@ -51,5 +52,4 @@ export const RUNNING_BACKS: RunningBack[] = [
   { espnId: "3929630", name: "Saquon Barkley", team: "PHI" },
   { espnId: "3916148", name: "Tony Pollard", team: "TEN" },
   { espnId: "4239996", name: "Travis Etienne Jr.", team: "NO" },
-  { espnId: "4426385", name: "Zach Charbonnet", team: "SEA" },
 ];

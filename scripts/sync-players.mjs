@@ -18,7 +18,7 @@
 // depth chart endpoint, which ranks them, and only falls back to roster
 // order when a team has no published chart - shouting about it when it
 // does, because a silent fallback here is how the wrong 32 faces ship.
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, join } from "node:path";
 
@@ -28,6 +28,9 @@ import { basename, dirname, join } from "node:path";
 // commit - the sort of gap that shows up a month later as "why is that
 // tier list stale".
 const DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data", "rosters");
+// The directory above it, for the one file here that is read rather than
+// written. Built from the same anchor as DATA so the two cannot drift.
+const SRC_DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data");
 
 // One entry per category. `slots` decides which depth chart positions
 // count, and `perTeam` how many players to take from them.
@@ -44,6 +47,8 @@ const POSITIONS = [
     file: "qbs.ts",
     typeName: "Quarterback",
     exportName: "QUARTERBACKS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "QB",
     noun: "quarterback",
     slots: (abbr) => abbr === "QB",
     perTeam: 1,
@@ -52,6 +57,8 @@ const POSITIONS = [
     file: "rbs.ts",
     typeName: "RunningBack",
     exportName: "RUNNING_BACKS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "RB",
     noun: "running back",
     // ESPN has used both over the years, depending on the formation.
     slots: (abbr) => abbr === "RB" || abbr === "HB",
@@ -61,6 +68,8 @@ const POSITIONS = [
     file: "wrs.ts",
     typeName: "WideReceiver",
     exportName: "WIDE_RECEIVERS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "WR",
     noun: "wide receiver",
     // LWR / RWR / SWR, and plain WR in some formations.
     slots: (abbr) => abbr.endsWith("WR"),
@@ -70,6 +79,8 @@ const POSITIONS = [
     file: "tes.ts",
     typeName: "TightEnd",
     exportName: "TIGHT_ENDS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "TE",
     noun: "tight end",
     // One apiece, like quarterback: a team has a starting tight end even
     // when it lines two up, and the second is a blocker nobody is
@@ -81,6 +92,8 @@ const POSITIONS = [
     file: "ks.ts",
     typeName: "Kicker",
     exportName: "KICKERS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "K",
     noun: "kicker",
     // ESPN has used PK for the place kicker and plain K in places.
     // Matching both, and NOT the punter, who is a different job however
@@ -192,11 +205,40 @@ export const ${position.exportName}: ${position.typeName}[] = [
   return `${header}${body}\n];\n`;
 }
 
+// Hand-picked replacements for what the chart says - see
+// src/data/rosterOverrides.ts for the rules. Read with a regex rather
+// than imported because that file is TypeScript and this is a plain node
+// script, which is how every other file here is read.
+function readOverrides() {
+  let src;
+  try {
+    src = readFileSync(join(SRC_DATA, "rosterOverrides.ts"), "utf8");
+  } catch (err) {
+    // No file at all is fine - there may simply be no overrides. Anything
+    // else is not, and swallowing it is exactly how the first version of
+    // this failed: readFileSync was not even imported, every call threw,
+    // the catch turned that into "no overrides" and the run reported
+    // success while ignoring the one thing a person had asked for.
+    if (err?.code === "ENOENT") return new Map();
+    throw err;
+  }
+  const out = new Map();
+  const block = src.slice(src.indexOf("ROSTER_OVERRIDES"));
+  for (const hit of block.matchAll(/"([A-Z]{2,3} [A-Z]{1,3})":\s*\[([^\]]*)\]/g)) {
+    const ids = [...hit[2].matchAll(/"(\d+)"/g)].map((m) => m[1]);
+    if (ids.length) out.set(hit[1], ids);
+  }
+  return out;
+}
+
+const OVERRIDES = readOverrides();
+
 async function syncPosition(season, teams, position) {
   console.log(`\n=== ${position.exportName} (${position.perTeam} per team) ===`);
   const rows = [];
   const guessed = [];
   const short = [];
+  const overridden = [];
 
   for (const team of teams) {
     const abbr = (ESPN_TO_OURS[team.abbreviation] ?? team.abbreviation).toUpperCase();
@@ -216,6 +258,36 @@ async function syncPosition(season, teams, position) {
       source = picks.length ? "PARTLY ROSTER ORDER" : source;
       if (picks.length) guessed.push(abbr);
     }
+    // A person overruling the feed. Applied AFTER the chart so it is the
+    // last word, and resolved against the roster we already fetched, so
+    // an override carries the same name column as any other pick. An id
+    // that is not on this team's roster at this position is a stale
+    // override - it fails the run rather than silently doing nothing,
+    // because an override that has quietly stopped applying is worse
+    // than none.
+    const override = OVERRIDES.get(`${abbr} ${position.code}`);
+    if (override) {
+      const picked = [];
+      for (const id of override) {
+        const found = roster.find((r) => r.espnId === id);
+        if (!found) {
+          throw new Error(
+            `Override "${abbr} ${position.code}" names ${id}, who is not a ${position.noun} on ${abbr}. ` +
+              `Fix or remove it in src/data/rosterOverrides.ts.`,
+          );
+        }
+        picked.push(found);
+      }
+      if (picked.length !== position.perTeam) {
+        throw new Error(
+          `Override "${abbr} ${position.code}" has ${picked.length} player(s); ${position.noun} takes ${position.perTeam}.`,
+        );
+      }
+      picks = picked;
+      source = "OVERRIDE";
+      overridden.push(abbr);
+    }
+
     if (picks.length < position.perTeam) short.push(`${abbr} (${picks.length})`);
 
     const taken = new Set(picks.map((p) => p.espnId));
@@ -230,6 +302,9 @@ async function syncPosition(season, teams, position) {
   // A partial file is worse than none: a category quietly missing five
   // teams looks like a finished list to everyone who didn't run this.
   if (short.length) throw new Error(`Not enough ${position.noun}s for: ${short.join(", ")}`);
+  if (overridden.length) {
+    console.log(`\n${overridden.length} hand-picked override(s) applied: ${overridden.join(", ")} - see src/data/rosterOverrides.ts`);
+  }
   if (guessed.length) {
     console.log(
       `\nWARNING: ${position.exportName} fell back to roster order for ${guessed.join(", ")} - ` +
@@ -473,4 +548,4 @@ if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {
   });
 }
 
-export { depthChartAt, rosterAt, syncPosition, POSITIONS, main };
+export { depthChartAt, rosterAt, syncPosition, readOverrides, POSITIONS, OVERRIDES, main };
