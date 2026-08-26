@@ -65,8 +65,12 @@ export default function DailyPage() {
           <span className="text-3xl">🧠</span>
           <p className="text-base text-white">A new player every day</p>
           <p className="max-w-xs text-sm text-white/50">
-            Eight guesses, and every one tells you something. Create a free profile to play — it keeps your streak and pays up to
-            300 points a day.
+            {/* No points figure here on purpose. "Pays up to 300 a day"
+                reads like cash to somebody who has not yet learned what
+                points are in this app, and a free game that looks like it
+                is offering money is a game people bounce off. */}
+            Eight guesses, and every one tells you something. Create a free profile to play — it keeps your streak going
+            day to day.
           </p>
           <Link
             href="/account"
