@@ -55,3 +55,63 @@ export async function submitDailyGuess(espnId: string): Promise<PuzzleState> {
   if (error) throw error;
   return data as PuzzleState;
 }
+
+// ---------------------------------------------------------------- guests
+//
+// A signed-out player gets the same board and the same grading; what they
+// do not get is a record. The server grades one guess and forgets it (see
+// 0051_guest_play.sql), and the browser keeps the running board until
+// either the day rolls over or an account turns up to hand it to.
+const GUEST_KEY = "pickem:daily-guest";
+
+export async function submitGuestGuess(espnId: string): Promise<PuzzleGuess> {
+  const { data, error } = await supabase.rpc("puzzle_guest_compare", { p_espn_id: espnId });
+  if (error) throw error;
+  return data as PuzzleGuess;
+}
+
+// Keyed by date so yesterday's board is not sitting there tomorrow, and
+// so the storage cannot silently grow one entry per day forever - reading
+// today's key is what clears every other one.
+export function readGuestGuesses(puzzleOn: string): PuzzleGuess[] {
+  try {
+    const raw = localStorage.getItem(GUEST_KEY);
+    if (!raw) return [];
+    const held = JSON.parse(raw) as { on?: string; guesses?: PuzzleGuess[] };
+    if (held.on !== puzzleOn || !Array.isArray(held.guesses)) {
+      localStorage.removeItem(GUEST_KEY);
+      return [];
+    }
+    return held.guesses;
+  } catch {
+    // Hand-edited, or storage is off. A guest with no history is the
+    // same as a guest who has not played, which is a survivable place to
+    // land - unlike throwing on a page load.
+    return [];
+  }
+}
+
+export function writeGuestGuesses(puzzleOn: string, guesses: PuzzleGuess[]): void {
+  try {
+    localStorage.setItem(GUEST_KEY, JSON.stringify({ on: puzzleOn, guesses }));
+  } catch {
+    // Private mode or quota. Losing the board on reload is bad; refusing
+    // to accept the guess that was just made is worse.
+  }
+}
+
+export function clearGuestGuesses(): void {
+  try {
+    localStorage.removeItem(GUEST_KEY);
+  } catch {
+    // Nothing to recover - the read side treats junk as "no history".
+  }
+}
+
+// Today's date the way the database reckons it, so the browser and the
+// server agree on which day a held board belongs to. The puzzle rolls at
+// midnight in New York (puzzle_today()), not at midnight wherever the
+// player happens to be.
+export function puzzleToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+}

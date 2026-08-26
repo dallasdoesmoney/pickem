@@ -950,3 +950,65 @@ body {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------
+   The sign-up ask, at guess three.
+   ---------------------------------------------------------------
+   The mug pours rather than grows: the coffee is a rect clipped to the
+   cup's inside and slid up from its own height, so what moves is the
+   SURFACE. Filling by height alone inflates the shape from the base,
+   which reads as a balloon, not a drink.
+   --------------------------------------------------------------- */
+@keyframes brew-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes brew-card-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes brew-pour {
+  from { transform: translateY(var(--drop, 40px)); }
+  to { transform: translateY(0); }
+}
+
+@keyframes brew-steam {
+  0% {
+    transform: translateY(6px) scaleX(0.9);
+    opacity: 0;
+  }
+  28% { opacity: 0.72; }
+  100% {
+    transform: translateY(-26px) scaleX(1.6);
+    opacity: 0;
+  }
+}
+
+.brew-scrim { animation: brew-scrim-in 220ms ease-out both; }
+.brew-card { animation: brew-card-in 460ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.brew-liquid { animation: brew-pour 1300ms cubic-bezier(0.4, 0, 0.2, 1) both 300ms; }
+.brew-wisp {
+  transform-origin: 50% 100%;
+  animation: brew-steam 1900ms ease-out infinite;
+}
+
+/* It still arrives, it just does not pour, and the steam goes entirely -
+   a loop is exactly what this setting is asking not to see. */
+@media (prefers-reduced-motion: reduce) {
+  .brew-card,
+  .brew-liquid {
+    animation: none;
+  }
+
+  .brew-wisp {
+    display: none;
+  }
+}

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { DailyPuzzle } from "@/components/DailyPuzzle";
 
@@ -10,7 +9,7 @@ import { DailyPuzzle } from "@/components/DailyPuzzle";
 // getting when this was max-w-lg at every size - the board could not fit
 // and grew a horizontal scrollbar instead.
 export default function DailyPage() {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
 
   // Built here and handed to the game, because where it belongs depends
   // on something only the game knows: once there is a result, the result
@@ -65,34 +64,13 @@ export default function DailyPage() {
             <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
           </div>
         </>
-      ) : user ? (
-        <DailyPuzzle header={header} />
       ) : (
-        <>
-          {header}
-          {/* Signed out gets the pitch rather than a wall. The guesses
-              have to be recorded against someone - eight tries only means
-              anything if they cannot be reset by reloading. */}
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-10 text-center">
-          <span className="text-3xl">🧠</span>
-          <p className="text-base text-white">A new player every day</p>
-          <p className="max-w-xs text-sm text-white/50">
-            {/* No points figure here on purpose. "Pays up to 300 a day"
-                reads like cash to somebody who has not yet learned what
-                points are in this app, and a free game that looks like it
-                is offering money is a game people bounce off. */}
-            Eight guesses, and every one tells you something. Create a free profile to play — it keeps your streak going
-            day to day.
-          </p>
-          <Link
-            href="/account"
-            className="mt-3 rounded-full px-6 py-2.5 text-sm active:scale-95 transition-transform duration-150"
-            style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
-          >
-            CREATE A PROFILE
-          </Link>
-          </div>
-        </>
+        // No wall. Anybody can play; the board keeps a signed-out run in
+        // the browser and hands it over if they sign up, and the ask
+        // arrives at the third guess rather than at the door. Asking for
+        // an account before somebody has seen what the game is was the
+        // most expensive thing on this page.
+        <DailyPuzzle header={header} />
       )}
     </main>
   );

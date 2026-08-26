@@ -6,10 +6,23 @@ import { PUZZLE_PLAYERS, PUZZLE_PLAYERS_BY_ID, PuzzlePlayer } from "@/data/puzzl
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { teamTile } from "@/lib/colorUtils";
 import { PlayerFace } from "@/components/PlayerFace";
-import { fetchDailyPuzzle, submitDailyGuess, PuzzleState, PuzzleGuess, Verdict, NumCell } from "@/lib/supabase/dailyPuzzle";
+import {
+  fetchDailyPuzzle,
+  submitDailyGuess,
+  submitGuestGuess,
+  readGuestGuesses,
+  writeGuestGuesses,
+  clearGuestGuesses,
+  puzzleToday,
+  PuzzleState,
+  PuzzleGuess,
+  Verdict,
+  NumCell,
+} from "@/lib/supabase/dailyPuzzle";
 import { errorMessage } from "@/lib/errorMessage";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
+import { StillBrewingModal } from "@/components/StillBrewingModal";
 
 // The sticker language, in one place - moved down the scale. Same four
 // rules as the cream board it replaces (solid ground, hard outline, hard
@@ -122,8 +135,40 @@ function cellStyle(key: ColumnKey, cell: { value: string | number | null; status
   return { bg: tone.bg, ink: tone.ink };
 }
 
+// A guest's board in the server's own shape, so every renderer below is
+// unaware there are two kinds of player.
+//
+// `answer` is the one field that cannot be filled in honestly. A guest
+// who SOLVES it knows the answer - it is the guess they just made - so
+// the reveal is theirs. A guest who runs out does not get told, because
+// the only way to tell them is an endpoint that hands the day's answer to
+// anybody who asks, and that is a spoiler API rather than a feature.
+function guestBoard(puzzleOn: string, guesses: PuzzleGuess[]): PuzzleState {
+  const max = 8;
+  const solved = guesses.some((g) => g.correct);
+  const won = solved ? guesses.find((g) => g.correct)! : null;
+  return {
+    puzzleOn,
+    maxGuesses: max,
+    guessesUsed: guesses.length,
+    guesses,
+    solved,
+    finished: solved || guesses.length >= max,
+    // Nothing is paid to a board nobody is keeping.
+    pointsAwarded: 0,
+    answer: won
+      ? {
+          espnId: won.espnId,
+          name: won.name,
+          team: won.team.value,
+          position: won.position.value,
+        }
+      : null,
+  };
+}
+
 export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [state, setState] = useState<PuzzleState | null>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -133,11 +178,67 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // How many guesses in before the sign-up prompt appears. Three is
+  // enough to have seen what the game is and to have something to lose,
+  // and early enough that the ask is not arriving at the door on the way
+  // out.
+  const PROMPT_AT = 3;
+  const [prompted, setPrompted] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
+
   useEffect(() => {
-    fetchDailyPuzzle()
-      .then(setState)
-      .catch((err) => setError(errorMessage(err)));
-  }, []);
+    let cancelled = false;
+    // Signed in: the server holds the board, as it always has - it is the
+    // only copy that can be trusted with a guess limit and a payout.
+    if (user) {
+      fetchDailyPuzzle()
+        .then((next) => {
+          if (cancelled) return;
+          setState(next);
+          // Anything played as a guest today is handed over on the way
+          // in, one guess at a time through the real function, so it
+          // lands with the limit and the points applied properly rather
+          // than being trusted wholesale.
+          const held = readGuestGuesses(next.puzzleOn).filter(
+            (g) => !next.guesses.some((existing) => existing.espnId === g.espnId)
+          );
+          clearGuestGuesses();
+          if (!held.length) return;
+          void (async () => {
+            let board = next;
+            for (const g of held) {
+              if (board.finished) break;
+              try {
+                board = await submitDailyGuess(g.espnId);
+              } catch {
+                // A guess the server refuses (already used, day over)
+                // stops the handover rather than failing the page - the
+                // board it has is still the true one.
+                break;
+              }
+            }
+            if (!cancelled) setState(board);
+          })();
+        })
+        .catch((err) => !cancelled && setError(errorMessage(err)));
+      return () => {
+        cancelled = true;
+      };
+    }
+    // Signed out: the browser holds it. Nothing is recorded, nothing is
+    // paid, and it survives a reload but not a new device.
+    const on = puzzleToday();
+    // Reading browser storage after mount is the point of this branch.
+    // Doing it in the state initialiser would have the server render an
+    // empty board and the client render a played one off the same HTML,
+    // which is a hydration mismatch. Same trade the tier list's saved
+    // view makes, for the same reason.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setState(guestBoard(on, readGuestGuesses(on)));
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const guessedIds = useMemo(() => new Set(state?.guesses.map((g) => g.espnId) ?? []), [state]);
 
@@ -177,10 +278,29 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     setError(null);
     setBusy(true);
     try {
-      const next = await submitDailyGuess(player.espnId);
+      let next: PuzzleState;
+      if (user) {
+        next = await submitDailyGuess(player.espnId);
+      } else {
+        // Graded by the server, held by the browser. The limit is
+        // enforced here rather than there, which is fine precisely
+        // because nothing a guest does is recorded - the worst somebody
+        // can cheat themselves out of is the surprise.
+        const graded = await submitGuestGuess(player.espnId);
+        const held = [...(state?.guesses ?? []), graded];
+        writeGuestGuesses(state?.puzzleOn ?? puzzleToday(), held);
+        next = guestBoard(state?.puzzleOn ?? puzzleToday(), held);
+      }
       setState(next);
       setQuery("");
-      posthog.capture("daily_puzzle_guess", { used: next.guessesUsed, solved: next.solved });
+      // The ask, once, at the third guess - and never to somebody who
+      // already has an account.
+      if (!user && next.guessesUsed >= PROMPT_AT && !next.finished && !prompted) {
+        setPrompted(true);
+        setShowJoin(true);
+        posthog.capture("daily_puzzle_join_prompted", { used: next.guessesUsed });
+      }
+      posthog.capture("daily_puzzle_guess", { used: next.guessesUsed, solved: next.solved, guest: !user });
       inputRef.current?.focus();
     } catch (err) {
       setError(errorMessage(err));
@@ -281,6 +401,10 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           the same word every day. Unfinished, the header leads as normal.
           The title lives in the page above this component, so the page
           hands it in and this decides where it sits. */}
+      {showJoin && (
+        <StillBrewingModal used={state.guessesUsed} max={state.maxGuesses} onClose={() => setShowJoin(false)} />
+      )}
+
       {state.finished && state.answer && <Reveal state={state} answer={answer} onShare={share} copied={copied} />}
       {header}
 
