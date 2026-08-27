@@ -85,6 +85,41 @@ assert.deepEqual(await depthChartAt(2026, "T", WR.slots, 2), [
   { espnId: "4", name: "Receiver Four" },
 ]);
 
+// 3b. THE ONE THE ANSWER POOL RELIES ON. A team's three WR rows each
+//     have their own STARTER, and all three are answers - so asking for
+//     three has to return all three rank-1 receivers and stop, rather
+//     than reaching into anybody's second string. This is what
+//     `perTeam: 3` is buying, and the ordering is slot order because
+//     every rank is 1.
+assert.deepEqual(await depthChartAt(2026, "T", WR.slots, WR.perTeam), [
+  { espnId: "3", name: "Receiver Three" },
+  { espnId: "4", name: "Receiver Four" },
+  { espnId: "5", name: "Receiver Five" },
+]);
+assert.equal(WR.perTeam, 3, "a team starts three receivers, and all three can be the answer");
+
+// 3c. A rank-2 receiver must NOT displace a rank-1 in a different slot,
+//     which is the exact way an offline reconstruction gets this wrong:
+//     the depth ranks stored on the roster are a player's best across
+//     every slot, so a returner listed second at WR can carry a 1.
+stubFetch({
+  [CHART]: {
+    items: [{ positions: {
+      lwr: { position: { abbreviation: "LWR" }, athletes: [
+        { rank: 1, athlete: { $ref: ref(3) } },
+        { rank: 2, athlete: { $ref: ref(6) } },
+      ] },
+      rwr: { position: { abbreviation: "RWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(4) } }] },
+      swr: { position: { abbreviation: "SWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(5) } }] },
+    } }],
+  },
+});
+assert.deepEqual(await depthChartAt(2026, "T", WR.slots, WR.perTeam), [
+  { espnId: "3", name: "Receiver Three" },
+  { espnId: "4", name: "Receiver Four" },
+  { espnId: "5", name: "Receiver Five" },
+]);
+
 // 4. The same receiver in two slots must not fill both places.
 stubFetch({
   [CHART]: {
