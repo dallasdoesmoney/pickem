@@ -24,7 +24,11 @@ export function PlayerPlate({
   espnId,
   name,
   team,
-  size = 40,
+  // The photo IS the plate's height now, so this is the row height too.
+  // 48 rather than the 40 it was: the picture fills the card instead of
+  // sitting inside a margin, which buys eight pixels of player for none
+  // of row.
+  size = 48,
 }: {
   espnId: string;
   name: string;
@@ -50,13 +54,17 @@ export function PlayerPlate({
 
   return (
     <span
-      className="puzzle-plate relative flex min-w-0 items-center gap-2 overflow-hidden rounded-[10px]"
+      className="puzzle-plate relative flex w-full min-w-0 items-center overflow-hidden rounded-[10px]"
       style={{
         background: `linear-gradient(100deg, ${bg}, ${bg}cc)`,
         border: "2px solid #0a1120",
         boxShadow: "3px 4px 0 #05090f",
-        padding: 4,
-        paddingRight: 10,
+        // No padding on the photo's side. The picture is flush with the
+        // left, the top AND the bottom, so a player stands on the edge of
+        // his own card rather than floating in a 4px moat - and the
+        // headshot gets the full height to fill instead of 40 of 48.
+        paddingRight: 12,
+        height: size + 4,
       }}
       title={name}
     >
@@ -76,9 +84,9 @@ export function PlayerPlate({
             // losing so much of the crest off the top and bottom of the
             // plate that it stops being recognisable. The plate clips it,
             // the photo does not.
-            height: size * 1.7,
-            width: size * 1.7,
-            left: size * -0.14,
+            height: size * 1.5,
+            width: size * 1.5,
+            left: size * -0.16,
             top: "50%",
             transform: "translateY(-50%)",
             opacity: 0.26,
@@ -86,9 +94,11 @@ export function PlayerPlate({
         />
       )}
 
+      {/* Square, full-bleed, and the plate's own rounded corners do the
+          clipping - so no radius here, or the corners double up. */}
       <span
-        className="relative grid shrink-0 place-items-center overflow-hidden rounded-lg"
-        style={{ width: size, height: size, fontSize: Math.round(size * 0.34), fontWeight: 800, color: ink }}
+        className="relative grid h-full shrink-0 place-items-center overflow-hidden"
+        style={{ width: size, fontSize: Math.round(size * 0.34), fontWeight: 800, color: ink }}
       >
         {/* Only until the photo arrives. The headshots are cut out on
             transparency, so initials left underneath one show THROUGH
@@ -107,7 +117,7 @@ export function PlayerPlate({
       </span>
 
       <span
-        className="relative min-w-0 truncate text-sm font-semibold md:text-[13px]"
+        className="relative ml-2.5 min-w-0 truncate text-sm font-semibold md:text-[13px]"
         style={{ color: ink, textShadow: ink === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.45)" : "none" }}
       >
         {name}
