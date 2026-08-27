@@ -425,6 +425,17 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       .join("\n");
   }
 
+  // "2026-08-27" is a database talking. Built from the parts rather than
+  // through Date, because new Date("2026-08-27") is midnight UTC and
+  // renders as the 26th for anybody west of Greenwich - which is most of
+  // the people playing this.
+  function prettyDate(iso: string): string {
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const [y, m, d] = iso.split("-").map(Number);
+    if (!y || !m || !d) return iso;
+    return `${MONTHS[m - 1]} ${d}, ${y}`;
+  }
+
   // The body WITHOUT the link on the end. The share sheet takes the link
   // as its own field and appends it itself, so a copy pasted in here as
   // well arrives twice - once as a line of text and once as the attached
@@ -439,8 +450,22 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     // the one place the result is read by people who have never played.
     //
     // Same words as the reveal card, so what you shared is what you saw.
-    const score = s.solved ? `Solved in ${s.guessesUsed}` : "Out of guesses";
-    return `Sideline Brew \u2014 Nameplate\n${s.puzzleOn}  ${score}\n\n${grid}`;
+    // One fact per line. Two lines carrying three facts between them -
+    // "2026-08-27  Solved in 3" - asks somebody who has never played to
+    // parse a date and a score out of the same run of characters.
+    const score = s.solved
+      ? `Solved in ${s.guessesUsed} ${s.guessesUsed === 1 ? "Guess" : "Guesses"}`
+      : "Out of Guesses";
+    return `Sideline Brew \u2014 Nameplate\n${prettyDate(s.puzzleOn)}\n${score}\n\n${grid}`;
+  }
+
+  // Exactly what lands, link included. The preview used to show the grid
+  // alone, which left the one question people ask about a share - "what
+  // does it say about me, and does it give the answer away?" - answerable
+  // only by sending it to somebody.
+  function sharePreview(s: PuzzleState): string {
+    const link = typeof window === "undefined" ? "" : buildReferralLinkTo("/daily", profile?.username);
+    return link ? `${shareBody(s)}\n\n${link}` : shareBody(s);
   }
 
   async function share() {
@@ -501,9 +526,17 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         <StillBrewingModal used={state.guessesUsed} max={state.maxGuesses} onClose={() => setShowJoin(false)} />
       )}
 
+      {/* scroll-mt, because /daily carries 106px of sticky chrome: the 72px
+          header and the 34px back rail pinned under it. block: "start"
+          puts an element's top at the top of the VIEWPORT, which is behind
+          both of them - so the reveal arrived with its top half covered.
+          scroll-margin-top is what scrollIntoView measures against, so
+          this is the fix rather than a magic number in the scroll call.
+          118 = 106 + a little air.
+          Re-measure if the header or the rail ever changes height. */}
       {state.finished && state.answer && !celebrating && (
-        <div ref={revealRef}>
-          <Reveal state={state} answer={answer} onShare={share} copied={copied} grid={shareGrid(state)} />
+        <div ref={revealRef} className="scroll-mt-[118px]">
+          <Reveal state={state} answer={answer} onShare={share} copied={copied} grid={sharePreview(state)} />
         </div>
       )}
 
