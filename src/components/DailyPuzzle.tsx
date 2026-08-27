@@ -712,7 +712,16 @@ function Chip({
 }) {
   const { bg, ink } = cellStyle(column.key, cell);
   const text = formatCell(column.key, cell.value);
-  const arrow = cell.direction === "up" ? "↑" : cell.direction === "down" ? "↓" : null;
+  // A filled triangle rather than a thin arrow. Same place, more weight:
+  // the hairline ↑ is the first thing video compression eats, and this
+  // title ends up in every clip anybody records of the game. It also
+  // survives the phone board, where a 45px chip left the old arrow at
+  // about two visible pixels.
+  //
+  // Small, because a solid glyph reads far heavier than an outlined one
+  // at the same size - 8px of triangle sits about level with 11px of
+  // arrow, and anything more competes with the number it is modifying.
+  const arrow = cell.direction === "up" ? "▲" : cell.direction === "down" ? "▼" : null;
 
   // ONE type size on every chip in the row. There used to be three - 15px
   // for short values, 12px for anything over eight characters, 13px for
@@ -794,7 +803,7 @@ function Chip({
           {arrow && (
             <span
               aria-label={cell.direction === "up" ? "higher" : "lower"}
-              className="absolute left-full top-1/2 ml-[3px] -translate-y-1/2 font-semibold"
+              className="absolute left-full top-1/2 ml-[2px] -translate-y-1/2 text-[5px] leading-none md:ml-[3px] md:text-[7px] lg:text-[8px]"
             >
               {arrow}
             </span>
