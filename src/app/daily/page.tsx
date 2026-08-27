@@ -43,16 +43,17 @@ export default function DailyPage() {
             tagline drifting on their own axes under a title of a
             different width. */}
         <div className="min-w-0 text-left">
-          <div className="text-[10px] tracking-[0.25em] text-white/45 sm:text-xs">DAILY GAME</div>
+          {/* The "DAILY GAME" eyebrow is gone: the line under the title
+              already says what kind of thing this is, and the card on the
+              home page is captioned DAILY GAME too, so it was the third
+              time in two screens. */}
           <h1
             className="text-[clamp(1.6rem,7vw,2.4rem)] leading-none tracking-wide"
             style={{ fontFamily: "var(--font-display)" }}
           >
             NAMEPLATE
           </h1>
-          <p className="mt-1 truncate text-[11px] text-white/45 sm:text-[13px]">
-            One mystery player a day. Same player for everyone.
-          </p>
+          <p className="mt-1 truncate text-[11px] text-white/45 sm:text-[13px]">NFL Guessing Game</p>
         </div>
       </div>
     </>

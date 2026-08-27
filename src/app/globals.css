@@ -515,16 +515,38 @@ body {
 }
 
 .puzzle-chip {
-  animation: puzzle-chip-in 340ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  /* BACKWARDS, not BOTH. `both` holds the final keyframe forever, and a
+     running-or-filled animation beats a plain declaration in the cascade
+     - so `transform` stayed pinned to the entrance's end state and no
+     :hover rule could ever move the chip. That is why hovering a chip
+     has never done anything. `backwards` still applies the 0% frame
+     before the animation starts, which is the bit that stops the flash,
+     and releases the property once it is done. */
+  animation: puzzle-chip-in 340ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+  /* The resting shadow lives here rather than as an inline style for the
+     same reason: an inline style outranks a stylesheet rule, so a hover
+     shadow set in CSS could never take effect either. */
+  box-shadow: 3px 4px 0 #05090f;
   transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
-/* Lift toward the reader: the shadow gets shorter as the chip rises, the
-   way a real sticker peeling up would behave. */
+/* Hovering a guess should feel like picking the row up, not pressing it
+   down. The old version moved the chip INTO its shadow, which is the
+   gesture for a button being clicked - wrong for a row that is a record
+   of something rather than a control.
+   Two levels: the whole row lifts together, because a guess is one thing
+   and hovering half of it should not make it look like seven; and the
+   chip under the cursor lifts a little further, so it is clear which
+   value you are reading. */
 @media (hover: hover) {
-  .puzzle-chip:hover {
-    transform: translate(1px, 1px);
-    box-shadow: 1px 1px 0 #05090f;
+  .puzzle-row:hover .puzzle-chip {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 5px 0 #05090f;
+  }
+
+  .puzzle-row:hover .puzzle-chip:hover {
+    transform: translate(-2px, -3px);
+    box-shadow: 6px 8px 0 #05090f;
     z-index: 1;
   }
 }
@@ -634,19 +656,29 @@ body {
    46, and the rest is name at the size that breakpoint sets. 215 covers
    99% of the pool at 15px. The handful past that ("Demetrius
    Flannigan-Fowles") truncate, with the full name on the title. */
+/* Wide enough for the longest name on the board and no wider.
+   The column is fixed, so it has to hold the WORST case - "Jacory
+   Croskey-Merritt" - and every shorter name then sits in the leftover,
+   which is where the gulf between a name and the first chip of its own
+   row came from. Narrowing the column alone would just truncate that
+   name, so the name dropped from 15px to 13px instead: 158px of it
+   becomes 137, and the column comes down from 230 to 205 with nothing
+   cut off. A typical name now leaves about 30px of air rather than 100.
+   46px face + 10px gap + name + 8px padding is what these add up to.
+   Re-measure them if the face size or the name's font ever changes. */
 .puzzle-board {
-  --puzzle-player-col: 150px;
+  --puzzle-player-col: 196px;
 }
 
 @media (min-width: 1024px) {
   .puzzle-board {
-    --puzzle-player-col: 215px;
+    --puzzle-player-col: 200px;
   }
 }
 
 @media (min-width: 1280px) {
   .puzzle-board {
-    --puzzle-player-col: 230px;
+    --puzzle-player-col: 205px;
   }
 }
 

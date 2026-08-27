@@ -48,7 +48,6 @@ const EDGE = `2px solid #0a1120`;
 // one constant when everything was cream.
 const CARD_EDGE = `1px solid ${RULE}`;
 const DROP = `0 24px 60px -22px #000000`;
-const DROP_SM = `3px 4px 0 #05090f`;
 
 // Columns, in board order. `base` marks the three that come from the team
 // a player is on, so they are known for everybody. The rest depend on
@@ -414,7 +413,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           which made a single activity look like three unrelated widgets
           stacked up. Inside, the sections are divided by a hairline
           rather than by air - the same rule the legend already used. */}
-      <div style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP, overflow: "hidden" }}>
+      <div style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }}>
         {header}
 
         {/* The board goes as wide as the card allows; the input does not.
@@ -466,7 +465,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               <div
                 ref={menuRef}
                 role="listbox"
-                className="puzzle-menu absolute z-20 mt-2 max-h-[19rem] w-full overflow-y-auto overflow-x-hidden"
+                className="puzzle-menu absolute z-30 mt-2 max-h-[70vh] w-full overflow-y-auto overflow-x-hidden"
                 style={{ background: FIELD, border: CARD_EDGE, borderRadius: 12, boxShadow: DROP }}
               >
                 {matches.length === 0 && (
@@ -549,7 +548,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                     size={46}
                   />
                   <span
-                    className="min-w-0 truncate text-sm font-semibold md:text-[13px] lg:text-[15px]"
+                    className="min-w-0 truncate text-sm font-semibold md:text-[13px]"
                     style={{ color: TEXT }}
                     title={g.name}
                   >
@@ -620,7 +619,9 @@ function Chip({
         color: ink,
         border: EDGE,
         borderRadius: 10,
-        boxShadow: DROP_SM,
+        // boxShadow lives in .puzzle-chip, not here - inline styles
+        // outrank stylesheet rules, and it was stopping the hover shadow
+        // from ever applying.
         animationDelay: `${index * 45}ms`,
       }}
     >
