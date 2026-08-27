@@ -15,6 +15,8 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-bungee);
+  /* The daily games only - see src/app/layout.tsx. */
+  --font-game: var(--font-fredoka);
 }
 
 /* The header's own breakpoint, which is not any of Tailwind's.
@@ -22,12 +24,28 @@
    centered, so its left edge is (viewport - 192) / 2. Where those cross
    is where the nav starts running underneath the logo, and this is that
    crossover plus room to breathe.
-   Five items end the nav at 571px, so they cross at 1334 - a Home item
-   moved this out from 1240. Re-measure and move it again if the nav's
-   items ever change: an item added without moving this puts the nav back
-   under the logo, which is the bug this exists to prevent. */
+   Six items end the nav at 668px, so they cross at 1576 - a Daily Games
+   item moved this out from 1370, which five items reached at 1334, which
+   a Home item had moved out from 1240. Re-measure and move it again if
+   the nav's items ever change: an item added without moving this puts
+   the nav back under the logo, which is the bug this exists to prevent.
+
+   Measured, not derived - the pill's padding, gap, display face and
+   tracking all feed into it, so the number comes from putting the real
+   labels in the real pills and reading off where the nav's right edge
+   meets the logo's left. See scratchpad vnav.mjs in the session that
+   added the daily game.
+
+   1612 is past most laptops, which is a deliberate trade rather than an
+   oversight: it means a 1440 or 1366 screen gets the hamburger instead
+   of the pill row. Six full-length labels do not fit beside a centred
+   logo at those widths, and the alternative was shortening "Record
+   Predictor" and "Daily Games" to make them. Nothing becomes
+   unreachable - the drawer carries every item, including the daily game.
+   If this ever wants reversing, the numbers are: "Predictor" alone buys
+   1494, and "Daily" with it buys 1396. */
 @theme {
-  --breakpoint-navbar: 1370px;
+  --breakpoint-navbar: 1612px;
 }
 
 body {
@@ -487,6 +505,321 @@ body {
   }
 }
 
+/* ---------------------------------------------------------------
+   Daily game (Who Am I?)
+
+   The sticker language is hard edges and hard shadows, so the motion
+   matches it: things land rather than fade, and hovering lifts a card
+   off the page toward you by shrinking its shadow offset. Nothing here
+   loops, and nothing moves once you have stopped interacting with it.
+   --------------------------------------------------------------- */
+
+/* A chip lands, one after the next along the row, so a new guess reads
+   left to right the way you would read it out loud. */
+@keyframes puzzle-chip-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.86);
+  }
+  70% {
+    transform: translateY(0) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.puzzle-chip {
+  /* BACKWARDS, not BOTH. `both` holds the final keyframe forever, and a
+     running-or-filled animation beats a plain declaration in the cascade
+     - so `transform` stayed pinned to the entrance's end state and no
+     :hover rule could ever move the chip. That is why hovering a chip
+     has never done anything. `backwards` still applies the 0% frame
+     before the animation starts, which is the bit that stops the flash,
+     and releases the property once it is done. */
+  animation: puzzle-chip-in 340ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+  /* The resting shadow lives here rather than as an inline style for the
+     same reason: an inline style outranks a stylesheet rule, so a hover
+     shadow set in CSS could never take effect either. */
+  box-shadow: 3px 4px 0 #05090f;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+/* ---------------------------------------------------------------
+   THE WIN, HELD - "roll call"
+
+   Solving used to swap the reveal card in on the same tick the guess
+   landed, so the row you won with turned green and disappeared in the
+   same frame. For 2.15 seconds now it does not: the seven chips turn
+   over one at a time, left to right, like a hand being laid down, and
+   the rest of the board dims until the winning row is the only thing
+   lit. See CELEBRATE_MS in DailyPuzzle.
+
+   The timings here and there are one clock. 7 chips x 120ms + 420ms of
+   flip = 1.26s of turning; the lift and the dim start at 1.32s, just
+   after the last chip settles; the reveal mounts at 2.15s.
+   --------------------------------------------------------------- */
+@keyframes puzzle-roll-call {
+  0% {
+    transform: rotateX(0deg) scale(1);
+    /* The miss grey, so every chip starts from the same nothing and the
+       green is something that HAPPENS rather than something that was
+       already there under a transition. */
+    background: #aab3c1;
+  }
+  49% {
+    transform: rotateX(90deg) scale(1.07);
+    background: #aab3c1;
+  }
+  51% {
+    background: var(--chip-bg, #3ecb78);
+  }
+  100% {
+    transform: rotateX(0deg) scale(1);
+    background: var(--chip-bg, #3ecb78);
+  }
+}
+
+/* More specific than the .puzzle-chip entrance rule above, so it replaces
+   it outright - a chip in the winning row does not land and then flip, it
+   only flips. `both` is correct here where it is wrong there: the chip
+   has to hold its final colour until the reveal takes over, and nothing
+   hovers mid-celebration. */
+/* Gated on data-celebrate, NOT on data-win alone. The winning row carries
+   data-win forever - it is a fact about the row, not a state - so without
+   this every refresh of a solved board replayed the flip, and a chip
+   caught mid-animation on load sat there grey. */
+.puzzle-board[data-celebrate="1"] .puzzle-row[data-win="1"] .puzzle-chip {
+  animation: puzzle-roll-call 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* A transition rather than an animation, because these rows already have
+   an entrance animation of their own and two animations on one element
+   is a fight over which was declared last. The delay is what sequences
+   it: nothing dims until the last chip has turned. */
+.puzzle-board .puzzle-row {
+  transition: opacity 460ms ease, filter 460ms ease, transform 460ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.puzzle-board[data-celebrate="1"] .puzzle-row {
+  transition-delay: 1320ms;
+}
+.puzzle-board[data-celebrate="1"] .puzzle-row:not([data-win="1"]) {
+  opacity: 0.3;
+  filter: saturate(0.25);
+}
+
+/* The winning row gets an ANIMATION where the others get a transition,
+   because it does not exist yet when the celebration starts - it is the
+   guess that just landed. A transition needs a before and an after, and
+   a row that mounts with the board already celebrating has no before, so
+   it would have jumped to the lifted state on its first frame.
+
+   This replaces puzzle-row-in for that row, which is the right trade:
+   during a celebration the chips turning over are the event, and a row
+   sliding in underneath them is noise.
+
+   The lift is small on purpose and only from md up. A row is as wide as
+   the board, so anything past about 1.02 pushes it out past the card's
+   own padding and it gets clipped at both edges - 24px of padding at lg
+   against a ~1030px row is 10px of headroom each side. */
+@keyframes puzzle-win-lift {
+  from {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(62, 203, 120, 0));
+  }
+  to {
+    transform: scale(1.015);
+    filter: drop-shadow(0 10px 26px rgba(62, 203, 120, 0.34));
+  }
+}
+
+@media (min-width: 768px) {
+  .puzzle-board[data-celebrate="1"] .puzzle-row[data-win="1"] {
+    animation: puzzle-win-lift 460ms 1320ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .puzzle-board[data-celebrate="1"] .puzzle-row[data-win="1"] .puzzle-chip,
+  .puzzle-board[data-celebrate="1"] .puzzle-row[data-win="1"] {
+    animation: none;
+  }
+  .puzzle-board .puzzle-row {
+    transition: none;
+  }
+}
+
+/* Hovering a guess should feel like picking the row up, not pressing it
+   down. The old version moved the chip INTO its shadow, which is the
+   gesture for a button being clicked - wrong for a row that is a record
+   of something rather than a control.
+   Two levels: the whole row lifts together, because a guess is one thing
+   and hovering half of it should not make it look like seven; and the
+   chip under the cursor lifts a little further, so it is clear which
+   value you are reading. */
+@media (hover: hover) {
+  .puzzle-row:hover .puzzle-chip {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 5px 0 #05090f;
+  }
+
+  .puzzle-row:hover .puzzle-chip:hover {
+    transform: translate(-2px, -3px);
+    box-shadow: 6px 8px 0 #05090f;
+    z-index: 1;
+  }
+}
+
+/* The guessed player slides in under the input it came from. */
+@keyframes puzzle-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.puzzle-row {
+  /* BACKWARDS, not BOTH - the same trap the chip entrance was in. `both`
+     holds the final keyframe forever, and a filled animation outranks a
+     plain declaration, so opacity stayed pinned at 1 and transform at
+     translateY(0) for the life of the row. The celebration's dim and
+     lift could never take effect. `backwards` still applies the `from`
+     frame before the animation starts, which is the part that stops the
+     flash, and lets go afterwards. */
+  animation: puzzle-row-in 260ms ease-out backwards;
+}
+
+@keyframes puzzle-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.puzzle-menu {
+  animation: puzzle-menu-in 130ms ease-out both;
+  transform-origin: top center;
+}
+
+/* Dropdown rows. The bar on the left is what the keyboard highlight and
+   the mouse highlight share, so arrowing down and hovering look like the
+   same thing happening - because they are. */
+.puzzle-option {
+  transition: background-color 120ms ease, padding-left 120ms ease;
+  border-left: 4px solid transparent;
+}
+
+.puzzle-option[data-active="true"] {
+  /* Was the cream ground with a black rule, which on the dark menu lit
+     the hovered row up like a torch. A lift off the menu's own colour
+     instead, with the rule in the board's green so the highlight and the
+     "exact match" chip are saying the same thing. */
+  background: #1c2942;
+  border-left-color: #3ecb78;
+  padding-left: 14px;
+}
+
+/* The reveal is the part people screenshot, so it gets the one piece of
+   motion with any weight to it. */
+@keyframes puzzle-reveal-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.puzzle-reveal {
+  animation: puzzle-reveal-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A pressable sticker: down and into its own shadow. */
+.puzzle-press {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.puzzle-press:active {
+  transform: translate(3px, 4px);
+  box-shadow: 0 0 0 #05090f;
+}
+
+@media (hover: hover) {
+  .puzzle-press:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 5px 0 #05090f;
+  }
+}
+
+/* Reduced motion keeps every state - the highlight, the lift, the press -
+   and drops only the entrances, which are the part that moves without
+   being asked to. */
+@media (prefers-reduced-motion: reduce) {
+  .puzzle-chip,
+  .puzzle-row,
+  .puzzle-menu,
+  .puzzle-reveal {
+    animation: none;
+  }
+}
+
+/* The board's column track. The player column is a fixed width so every
+   guess lines its name up with the one above; the hint columns split
+   what is left, which is what keeps the board inside its card at any
+   width instead of growing a horizontal scrollbar.
+
+   The desktop widths are measured, not picked: the face and its gap take
+   46, and the rest is name at the size that breakpoint sets. 215 covers
+   99% of the pool at 15px. The handful past that ("Demetrius
+   Flannigan-Fowles") truncate, with the full name on the title. */
+/* Wide enough for the longest name on the board and no wider.
+   The column is fixed, so it has to hold the WORST case - "Jacory
+   Croskey-Merritt" - and every shorter name then sits in the leftover,
+   which is where the gulf between a name and the first chip of its own
+   row came from. Narrowing the column alone would just truncate that
+   name, so the name dropped from 15px to 13px instead: 158px of it
+   becomes 137, and the column comes down from 230 to 205 with nothing
+   cut off. A typical name now leaves about 30px of air rather than 100.
+   46px face + 10px gap + name + 8px padding is what these add up to.
+   Re-measure them if the face size or the name's font ever changes.
+
+   All three went up by 10 when the plate started filling the row's full
+   height: a square photo of a 62px row is 58px wide where it used to be
+   48, and those ten pixels came straight out of the name - "Michael
+   Pittman Jr." started truncating. Giving them back costs the chips
+   1.1px each, which is the right way round.
+
+   And up again when the whole board went up a size. The name is 15px at
+   lg now rather than 13, which is about 15% more name, and the photo
+   follows the row height - so the column has to grow with them or the
+   thing it exists to hold stops fitting. */
+.puzzle-board {
+  --puzzle-player-col: 226px;
+}
+
+@media (min-width: 1024px) {
+  .puzzle-board {
+    --puzzle-player-col: 258px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .puzzle-board {
+    --puzzle-player-col: 266px;
+  }
+}
+
 /* A pyramid trade. The team that was displaced is drawn starting at the
    square the incoming one came from and runs to its own, so the exchange
    is something you watch rather than something you notice afterwards.
@@ -545,5 +878,307 @@ body {
      do - it just arrives rather than travels. */
   .pyr-mark {
     transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Daily check-in: the streak renewing.
+
+   The number is the point. Yesterday's count is thrown up and out as
+   today's arrives from below, because a total on its own is a fact and
+   a total replacing the one before it is the streak advancing - and the
+   advancing is what somebody came back for.
+   --------------------------------------------------------------- */
+@keyframes streak-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes streak-card-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.86) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Catches rather than appears: up past its size and back down. */
+@keyframes streak-ignite {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-16deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.24) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* The flame keeps living after it has landed. Brightness only - moving it
+   would drag the number sitting on it out of place. */
+@keyframes streak-flicker {
+  0%,
+  100% { filter: brightness(1); }
+  40% { filter: brightness(1.16); }
+  70% { filter: brightness(0.95); }
+}
+
+@keyframes streak-number-out {
+  to {
+    opacity: 0;
+    transform: translateY(-26px) scale(0.7);
+  }
+}
+
+@keyframes streak-number-in {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes streak-ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--ex, 0), var(--ey, 0)) scale(0);
+  }
+}
+
+.streak-scrim { animation: streak-scrim-in 220ms ease-out both; }
+.streak-card { animation: streak-card-in 460ms cubic-bezier(0.2, 1.5, 0.4, 1) both 80ms; }
+.streak-flame {
+  animation:
+    streak-ignite 620ms cubic-bezier(0.2, 1.4, 0.4, 1) both 200ms,
+    streak-flicker 2400ms ease-in-out 900ms infinite;
+}
+.streak-old { animation: streak-number-out 340ms cubic-bezier(0.4, 0, 0.7, 0) both 520ms; }
+.streak-new { animation: streak-number-in 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both 640ms; }
+.streak-pts { animation: streak-card-in 420ms cubic-bezier(0.2, 1.6, 0.4, 1) both 940ms; }
+
+.streak-ember {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  opacity: 0;
+  animation: streak-ember 900ms cubic-bezier(0.2, 0.7, 0.4, 1) both;
+}
+
+/* Everything still arrives, it just does not fly. The flicker and the
+   embers go entirely - a loop and a shower of particles are exactly what
+   this setting is asking not to see. */
+@media (prefers-reduced-motion: reduce) {
+  .streak-card,
+  .streak-old,
+  .streak-new,
+  .streak-pts,
+  .streak-flame {
+    animation: none;
+  }
+
+  .streak-ember {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------
+   The same fire, in the notification bar.
+   ---------------------------------------------------------------
+   Day one gets the pop-up above; every day after it gets a toast, and
+   the toast carries the flame rather than a static emoji. Same
+   keyframes, same curves, same delays as the pop-up - a check-in should
+   feel like the same event whichever surface it lands on, and two
+   different fires would say it was two different things.
+
+   Written out rather than sharing the streak-* classes because the two
+   live at different sizes: the pop-up's flame is 92px with embers thrown
+   64-108px, and at 26px in a 44px mark those distances put every spark
+   outside the toast. Only the geometry differs; the timing is copied
+   exactly, deliberately.
+   --------------------------------------------------------------- */
+
+/* Arrives instead of blinking on. Every toast gets this, not just the
+   streak - the bar was the one animated-worthy moment on the site that
+   wasn't animated. */
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-ignite {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-16deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.24) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes toast-flicker {
+  0%,
+  100% { filter: brightness(1); }
+  40% { filter: brightness(1.16); }
+  70% { filter: brightness(0.95); }
+}
+
+@keyframes toast-ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--ex, 0), var(--ey, 0)) scale(0);
+  }
+}
+
+/* Shorter throws than the pop-up's number, for the same reason as the
+   embers: the travel has to stay inside a 44px mark. */
+@keyframes toast-num-out {
+  to {
+    opacity: 0;
+    transform: translateY(-13px) scale(0.7);
+  }
+}
+
+@keyframes toast-num-in {
+  0% {
+    opacity: 0;
+    transform: translateY(15px) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-card { animation: toast-in 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.toast-flame {
+  animation:
+    toast-ignite 620ms cubic-bezier(0.2, 1.4, 0.4, 1) both 200ms,
+    toast-flicker 2400ms ease-in-out 900ms infinite;
+}
+.toast-ember {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  opacity: 0;
+  animation: toast-ember 900ms cubic-bezier(0.2, 0.7, 0.4, 1) both;
+}
+.toast-num-old { animation: toast-num-out 340ms cubic-bezier(0.4, 0, 0.7, 0) both 520ms; }
+.toast-num-new { animation: toast-num-in 520ms cubic-bezier(0.2, 1.5, 0.4, 1) both 640ms; }
+
+/* Same bargain as the pop-up: it still arrives, it just does not fly,
+   and the loop and the particles go entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .toast-card,
+  .toast-flame,
+  .toast-num-old,
+  .toast-num-new {
+    animation: none;
+  }
+
+  .toast-ember {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------
+   The sign-up ask, at guess three.
+   ---------------------------------------------------------------
+   The mug pours rather than grows: the coffee is a rect clipped to the
+   cup's inside and slid up from its own height, so what moves is the
+   SURFACE. Filling by height alone inflates the shape from the base,
+   which reads as a balloon, not a drink.
+   --------------------------------------------------------------- */
+@keyframes brew-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes brew-card-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes brew-pour {
+  from { transform: translateY(var(--drop, 40px)); }
+  to { transform: translateY(0); }
+}
+
+@keyframes brew-steam {
+  0% {
+    transform: translateY(6px) scaleX(0.9);
+    opacity: 0;
+  }
+  28% { opacity: 0.72; }
+  100% {
+    transform: translateY(-26px) scaleX(1.6);
+    opacity: 0;
+  }
+}
+
+.brew-scrim { animation: brew-scrim-in 220ms ease-out both; }
+.brew-card { animation: brew-card-in 460ms cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.brew-liquid { animation: brew-pour 1300ms cubic-bezier(0.4, 0, 0.2, 1) both 300ms; }
+.brew-wisp {
+  transform-origin: 50% 100%;
+  animation: brew-steam 1900ms ease-out infinite;
+}
+
+/* It still arrives, it just does not pour, and the steam goes entirely -
+   a loop is exactly what this setting is asking not to see. */
+@media (prefers-reduced-motion: reduce) {
+  .brew-card,
+  .brew-liquid {
+    animation: none;
+  }
+
+  .brew-wisp {
+    display: none;
   }
 }

@@ -23,7 +23,10 @@
 //   likely it is the chart has moved on and this is now the wrong answer.
 //
 // The count must match what the position expects: one for QB, RB and TE,
-// two for WR. The sync refuses the run rather than shipping a short list.
+// THREE for WR - a team lists three starting receivers and all three can
+// be the answer. The sync refuses the run rather than shipping a short
+// list, so an old two-player WR override will stop it until it gains a
+// third; there are none today.
 export const ROSTER_OVERRIDES: Record<string, string[]> = {
   // Zach Charbonnet (4426385) is out for an extended spell; Jadarian
   // Price is Seattle's second back and the one taking the carries.

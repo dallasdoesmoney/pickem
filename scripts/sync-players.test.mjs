@@ -21,6 +21,16 @@ const ATHLETES = {
   3: "Receiver Three",
   4: "Receiver Four",
   5: "Receiver Five",
+  6: "Attributed Six",
+};
+
+// Attributes the daily puzzle grades on. Keyed by athlete id so a case
+// can opt one player into having them and leave the others bare, which
+// is the real ESPN behaviour - it publishes these for most players and
+// not all.
+// Athlete 6 and nobody else, so the bare-row cases above stay bare.
+const ATTRS = {
+  6: { height: 74, weight: 225, age: 41, jersey: "8", college: { name: "California" } },
 };
 
 function stubFetch(payloads) {
@@ -28,7 +38,7 @@ function stubFetch(payloads) {
     const athlete = /athletes\/(\d+)/.exec(url);
     if (athlete) {
       const id = athlete[1];
-      return { ok: true, json: async () => ({ id: Number(id), fullName: ATHLETES[id] }) };
+      return { ok: true, json: async () => ({ id: Number(id), fullName: ATHLETES[id], ...(ATTRS[id] ?? {}) }) };
     }
     if (url in payloads) return { ok: true, json: async () => payloads[url] };
     return { ok: false, status: 404, statusText: "Not Found" };
@@ -73,6 +83,41 @@ stubFetch({
 assert.deepEqual(await depthChartAt(2026, "T", WR.slots, 2), [
   { espnId: "3", name: "Receiver Three" },
   { espnId: "4", name: "Receiver Four" },
+]);
+
+// 3b. THE ONE THE ANSWER POOL RELIES ON. A team's three WR rows each
+//     have their own STARTER, and all three are answers - so asking for
+//     three has to return all three rank-1 receivers and stop, rather
+//     than reaching into anybody's second string. This is what
+//     `perTeam: 3` is buying, and the ordering is slot order because
+//     every rank is 1.
+assert.deepEqual(await depthChartAt(2026, "T", WR.slots, WR.perTeam), [
+  { espnId: "3", name: "Receiver Three" },
+  { espnId: "4", name: "Receiver Four" },
+  { espnId: "5", name: "Receiver Five" },
+]);
+assert.equal(WR.perTeam, 3, "a team starts three receivers, and all three can be the answer");
+
+// 3c. A rank-2 receiver must NOT displace a rank-1 in a different slot,
+//     which is the exact way an offline reconstruction gets this wrong:
+//     the depth ranks stored on the roster are a player's best across
+//     every slot, so a returner listed second at WR can carry a 1.
+stubFetch({
+  [CHART]: {
+    items: [{ positions: {
+      lwr: { position: { abbreviation: "LWR" }, athletes: [
+        { rank: 1, athlete: { $ref: ref(3) } },
+        { rank: 2, athlete: { $ref: ref(6) } },
+      ] },
+      rwr: { position: { abbreviation: "RWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(4) } }] },
+      swr: { position: { abbreviation: "SWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(5) } }] },
+    } }],
+  },
+});
+assert.deepEqual(await depthChartAt(2026, "T", WR.slots, WR.perTeam), [
+  { espnId: "3", name: "Receiver Three" },
+  { espnId: "4", name: "Receiver Four" },
+  { espnId: "5", name: "Receiver Five" },
 ]);
 
 // 4. The same receiver in two slots must not fill both places.
@@ -152,6 +197,32 @@ assert.equal(coachFrom({ coach: { id: 10 } }), null);
 assert.equal(coachFrom({ coach: { firstName: "No", lastName: "Id" } }), null);
 assert.equal(coachFrom({}), null);
 assert.equal(coachFrom(undefined), null);
+
+// The puzzle attributes: captured when ESPN publishes them, and the key
+// LEFT OUT when it does not. Writing `undefined` instead looks identical
+// in most comparisons and is not - it broke the two cases above when
+// this capture was first added.
+stubFetch({
+  [CHART]: {
+    items: [{ positions: { QB: { position: { abbreviation: "QB" }, athletes: [
+      { rank: 1, athlete: { $ref: ref(6) } },
+      { rank: 2, athlete: { $ref: ref(2) } },
+    ] } } }],
+  },
+});
+const withAttrs = await depthChartAt(2026, "T", QB.slots, 2);
+assert.deepEqual(withAttrs[0], {
+  espnId: "6",
+  name: "Attributed Six",
+  heightIn: 74,
+  weightLb: 225,
+  age: 41,
+  jersey: 8,
+  college: "California",
+});
+// Athlete 2 has none of them, and carries none of the keys.
+assert.deepEqual(withAttrs[1], { espnId: "2", name: "Backup Two" });
+assert.equal("heightIn" in withAttrs[1], false);
 
 console.log("all depth chart cases pass");
 

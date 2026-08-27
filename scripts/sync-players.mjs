@@ -35,16 +35,27 @@ const SRC_DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "dat
 // One entry per category. `slots` decides which depth chart positions
 // count, and `perTeam` how many players to take from them.
 //
-// Quarterback and running back are one apiece because both positions
-// have a real starter. Wide receiver does not - a team lines up three,
-// and ESPN splits them across separate left/right/slot entries that each
-// rank their own occupant first. So there is no "the WR2" to read off a
-// chart; there are three rank-1 receivers and an ordering between the
-// slots. Taking two gives the two the chart lists soonest, which is the
-// closest thing to "the guys who start outside" that the data supports.
+// Quarterback, running back and tight end are one apiece because each
+// has a real starter. Wide receiver is three, and that number is not a
+// guess: ESPN's depth chart draws THREE WR rows for a team in eleven
+// personnel, each with its own STARTER column - so a team has exactly
+// three starting receivers and the chart says which.
+//
+// It reads as three separate rank-1 receivers rather than a 1-2-3,
+// because the rows are separate slots (LWR / RWR / SWR). Sorting by rank
+// and then by the order the chart lists the slots picks up all three
+// before it reaches anybody's second string, which is why `perTeam: 3`
+// is all this needs. Dallas comes back Lamb, Pickens and Flournoy -
+// NOT KaVontae Turpin, who is second on Lamb's row and whose best rank
+// across all his slots is 1 because he returns kicks.
+//
+// This was 2, which cut every team's third starter out of the answer
+// pool for no reason other than that "WR1 and WR2" sounded like the
+// safer read of a chart that does not work that way.
 const POSITIONS = [
   {
     file: "qbs.ts",
+    code: "QB",
     typeName: "Quarterback",
     exportName: "QUARTERBACKS",
     // How src/data/rosterOverrides.ts names this position.
@@ -55,6 +66,7 @@ const POSITIONS = [
   },
   {
     file: "rbs.ts",
+    code: "RB",
     typeName: "RunningBack",
     exportName: "RUNNING_BACKS",
     // How src/data/rosterOverrides.ts names this position.
@@ -66,6 +78,7 @@ const POSITIONS = [
   },
   {
     file: "wrs.ts",
+    code: "WR",
     typeName: "WideReceiver",
     exportName: "WIDE_RECEIVERS",
     // How src/data/rosterOverrides.ts names this position.
@@ -73,10 +86,11 @@ const POSITIONS = [
     noun: "wide receiver",
     // LWR / RWR / SWR, and plain WR in some formations.
     slots: (abbr) => abbr.endsWith("WR"),
-    perTeam: 2,
+    perTeam: 3,
   },
   {
     file: "tes.ts",
+    code: "TE",
     typeName: "TightEnd",
     exportName: "TIGHT_ENDS",
     // How src/data/rosterOverrides.ts names this position.
@@ -90,6 +104,7 @@ const POSITIONS = [
   },
   {
     file: "ks.ts",
+    code: "K",
     typeName: "Kicker",
     exportName: "KICKERS",
     // How src/data/rosterOverrides.ts names this position.
@@ -115,6 +130,38 @@ async function json(url) {
   return res.json();
 }
 
+// The attributes the daily puzzle grades a guess against. Every one is
+// optional: ESPN omits them for some players, and the puzzle hides a
+// column nobody has a value for rather than showing a row of "?".
+//
+// This used to keep only id and name and throw the rest of the payload
+// away. Nothing extra is fetched to get these - they were already in the
+// response, and were being discarded.
+// Absent keys are LEFT OUT rather than set to undefined. A row is
+// compared and written as a whole, so `{ heightIn: undefined }` is not
+// the same object as `{}` - the offline test caught exactly that, which
+// is the only reason it did not reach a live run.
+function attrsOf(a) {
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+  };
+  const out = {};
+  // ESPN reports height in inches and weight in pounds.
+  const put = (key, value) => {
+    if (value !== undefined) out[key] = value;
+  };
+  put("heightIn", num(a.height));
+  put("weightLb", num(a.weight));
+  put("age", num(a.age));
+  put("jersey", num(a.jersey));
+  // college is a $ref on the core API and an object on the roster
+  // endpoint. Only the inline form is used - chasing the ref would be one
+  // more request per player for one hint column.
+  put("college", typeof a.college?.name === "string" ? a.college.name : undefined);
+  return out;
+}
+
 // Everyone on the roster at a position, in the order ESPN returns them.
 // Used as the fallback, and as the "behind:" column that makes a wrong
 // pick obvious in the pull request rather than on the site.
@@ -124,7 +171,7 @@ async function rosterAt(teamId, matches) {
     .flatMap((g) => g.items ?? g.athletes ?? [g])
     .filter(Boolean)
     .filter((a) => matches(String(a.position?.abbreviation ?? a.position?.name ?? "").toUpperCase()))
-    .map((a) => ({ espnId: String(a.id), name: a.fullName ?? a.displayName }));
+    .map((a) => ({ espnId: String(a.id), name: a.fullName ?? a.displayName, ...attrsOf(a) }));
 }
 
 // The players the depth chart ranks highest at a position, deduped.
@@ -170,9 +217,167 @@ async function depthChartAt(season, teamId, matches, count) {
     // A player can occupy more than one slot or formation.
     if (seen.has(espnId)) continue;
     seen.add(espnId);
-    out.push({ espnId, name: athlete.fullName ?? athlete.displayName });
+    out.push({ espnId, name: athlete.fullName ?? athlete.displayName, ...attrsOf(athlete) });
   }
   return out;
+}
+
+// ---------------------------------------------------------- every player
+//
+// The daily puzzle lets you GUESS anyone on a 53-man roster but only ever
+// ANSWERS with someone off a depth chart. That split is the whole point:
+// an answer pool of everybody includes third-string guards and practice
+// squad safeties, and no set of hints rescues a player nobody can name.
+// Poeltl and Weddle draw the same line.
+//
+// So this writes one file with both facts in it - the roster, and whether
+// ESPN's depth chart mentions the player anywhere at any rank.
+
+// Each charted athlete's BEST rank across every slot they appear in.
+//
+// The first version of this returned "is on the chart at all", which
+// turned out to be worthless: ESPN ranks essentially the whole roster, so
+// 2,985 of 3,021 players qualified and the answer pool was the roster
+// again. The rank is the part that carries the signal - rank 1 is the
+// starter - and it was being discarded.
+//
+// Storing the number rather than a yes/no means the threshold can be
+// retuned later by editing one constant and regenerating, with no second
+// trip to ESPN.
+async function depthRanksAt(season, teamId) {
+  const best = new Map();
+  let chart;
+  try {
+    chart = await json(`${CORE}/seasons/${season}/teams/${teamId}/depthcharts`);
+  } catch {
+    // No published chart. Everyone on this roster stays guess-only rather
+    // than the whole team becoming answerable off a missing response.
+    return best;
+  }
+  for (const item of chart.items ?? []) {
+    for (const slot of Object.values(item.positions ?? {})) {
+      for (const entry of slot.athletes ?? []) {
+        const ref = entry.athlete?.$ref;
+        const hit = ref && /athletes\/(\d+)/.exec(ref);
+        if (!hit || typeof entry.rank !== "number") continue;
+        const id = hit[1];
+        // A player listed at several slots keeps the best of them: a
+        // starting corner who is also the third safety is a starter.
+        if (!best.has(id) || entry.rank < best.get(id)) best.set(id, entry.rank);
+      }
+    }
+  }
+  return best;
+}
+
+// Everyone on a team's roster, at every position, with their real
+// position abbreviation rather than one of our five buckets.
+async function fullRosterAt(teamId) {
+  const roster = await json(`${SITE}/teams/${teamId}/roster`);
+  return (roster.athletes ?? [])
+    .flatMap((g) => g.items ?? g.athletes ?? [g])
+    .filter(Boolean)
+    .filter((a) => a.id && (a.fullName || a.displayName))
+    .map((a) => ({
+      espnId: String(a.id),
+      name: a.fullName ?? a.displayName,
+      position: String(a.position?.abbreviation ?? a.position?.name ?? "").toUpperCase() || "?",
+      ...attrsOf(a),
+    }));
+}
+
+function allPlayersFile(rows) {
+  const header = `// Generated by scripts/sync-players.mjs - do not edit by hand.
+//
+// Every active player, for the daily puzzle. You can guess anyone in
+// here; the answer is only ever drawn from the ones marked answerable,
+// which means ESPN's depth chart mentions them somewhere. An answer pool
+// of all 1,700 would include third-string guards nobody can name.
+//
+// Empty until the script has been run once, and the puzzle falls back to
+// the five position rosters when it is - see src/data/puzzlePlayers.ts -
+// so an unsynced checkout plays a smaller game rather than none.
+import { TeamAbbr } from "@/data/teams";
+
+export type ActivePlayer = {
+  espnId: string;
+  name: string;
+  team: TeamAbbr;
+  // ESPN's own abbreviation: QB, RB, WR, TE, K, but also OT, CB, EDGE,
+  // LS and the rest. Not one of our five buckets.
+  position: string;
+  // Best depth chart rank across every slot they are listed at, or
+  // absent when the chart does not rank them. 1 is a starter.
+  //
+  // Stored as the number rather than a yes/no so which ranks count as
+  // answerable can be retuned without another trip to ESPN - see
+  // ANSWER_MAX_DEPTH_RANK in src/data/puzzlePlayers.ts.
+  depthRank?: number;
+  heightIn?: number;
+  weightLb?: number;
+  age?: number;
+  jersey?: number;
+  college?: string;
+};
+
+export const ACTIVE_PLAYERS: ActivePlayer[] = [
+`;
+  const extra = (r) =>
+    [
+      r.heightIn ? `, heightIn: ${r.heightIn}` : "",
+      r.weightLb ? `, weightLb: ${r.weightLb}` : "",
+      r.age ? `, age: ${r.age}` : "",
+      r.jersey ? `, jersey: ${r.jersey}` : "",
+      r.college ? `, college: ${JSON.stringify(r.college)}` : "",
+      r.depthRank ? `, depthRank: ${r.depthRank}` : "",
+    ].join("");
+  const body = rows
+    .map(
+      (r) =>
+        `  { espnId: "${r.espnId}", name: ${JSON.stringify(r.name)}, team: "${r.team}", ` +
+        `position: "${r.position}"${extra(r)} },`,
+    )
+    .join("\n");
+  return `${header}${body}\n];\n`;
+}
+
+async function syncAllPlayers(season, teams) {
+  console.log(`\n=== ACTIVE_PLAYERS (every roster) ===`);
+  const rows = [];
+  const seen = new Set();
+
+  for (const team of teams) {
+    const abbr = (ESPN_TO_OURS[team.abbreviation] ?? team.abbreviation).toUpperCase();
+    const [roster, ranks] = await Promise.all([fullRosterAt(team.id), depthRanksAt(season, team.id)]);
+    let starters = 0;
+    for (const player of roster) {
+      // A player on two teams' pages mid-trade would otherwise appear
+      // twice in the dropdown and break the guess-once rule.
+      if (seen.has(player.espnId)) continue;
+      seen.add(player.espnId);
+      const depthRank = ranks.get(player.espnId);
+      if (depthRank === 1) starters += 1;
+      rows.push({ ...player, team: abbr, depthRank });
+    }
+    console.log(`${abbr.padEnd(4)} ${String(roster.length).padStart(3)} players, ${String(starters).padStart(3)} rank-1`);
+  }
+
+  // A roster this short means ESPN changed shape or half the requests
+  // failed, and writing it would shrink the guess list to something that
+  // rejects real names.
+  if (rows.length < 1000) throw new Error(`Only ${rows.length} active players - expected upwards of 1,500`);
+  const starters = rows.filter((r) => r.depthRank === 1).length;
+  // Both ends. Too few means the rank parse broke; too many means it is
+  // no longer selecting anything, which is the bug this replaced - it
+  // marked 2,985 of 3,021 and nobody noticed until the pool was counted.
+  if (starters < 300) throw new Error(`Only ${starters} rank-1 players - the depth chart rank parse found almost nothing`);
+  if (starters > rows.length * 0.6) {
+    throw new Error(`${starters} of ${rows.length} are rank 1 - that is not a starter list, the rank parse is wrong`);
+  }
+
+  rows.sort((a, b) => a.name.localeCompare(b.name));
+  writeFileSync(join(DATA, "all.ts"), allPlayersFile(rows));
+  console.log(`Wrote ${rows.length} to src/data/rosters/all.ts (${starters} at rank 1)`);
 }
 
 function fileFor(position, rows) {
@@ -195,15 +400,34 @@ export type ${position.typeName} = {
   espnId: string;
   name: string;
   team: TeamAbbr;
+  // Hint columns for the daily player puzzle. Optional because ESPN does
+  // not publish all of them for everyone; the puzzle hides a column it
+  // has no values for rather than showing a row of "?".
+  heightIn?: number;
+  weightLb?: number;
+  age?: number;
+  jersey?: number;
+  college?: string;
 };
 
 export const ${position.exportName}: ${position.typeName}[] = [
 `;
+  // Optional fields are omitted rather than written as undefined, so a
+  // player ESPN says nothing about stays a short line.
+  const extra = (r) =>
+    [
+      r.heightIn ? `, heightIn: ${r.heightIn}` : "",
+      r.weightLb ? `, weightLb: ${r.weightLb}` : "",
+      r.age ? `, age: ${r.age}` : "",
+      r.jersey ? `, jersey: ${r.jersey}` : "",
+      r.college ? `, college: ${JSON.stringify(r.college)}` : "",
+    ].join("");
   const body = rows
-    .map((r) => `  { espnId: "${r.espnId}", name: ${JSON.stringify(r.name)}, team: "${r.team}" },`)
+    .map((r) => `  { espnId: "${r.espnId}", name: ${JSON.stringify(r.name)}, team: "${r.team}"${extra(r)} },`)
     .join("\n");
   return `${header}${body}\n];\n`;
 }
+
 
 // Hand-picked replacements for what the chart says - see
 // src/data/rosterOverrides.ts for the rules. Read with a regex rather
@@ -260,11 +484,11 @@ async function syncPosition(season, teams, position) {
     }
     // A person overruling the feed. Applied AFTER the chart so it is the
     // last word, and resolved against the roster we already fetched, so
-    // an override carries the same name column as any other pick. An id
-    // that is not on this team's roster at this position is a stale
-    // override - it fails the run rather than silently doing nothing,
-    // because an override that has quietly stopped applying is worse
-    // than none.
+    // an override carries the same name and hint columns as any other
+    // pick. An id that is not on this team's roster at this position is a
+    // stale override - it fails the run rather than silently doing
+    // nothing, because an override that has quietly stopped applying is
+    // worse than none.
     const override = OVERRIDES.get(`${abbr} ${position.code}`);
     if (override) {
       const picked = [];
@@ -521,6 +745,10 @@ async function main() {
 
   for (const position of POSITIONS) await syncPosition(season, teams, position);
 
+  // After the five, because it is the one that would take the longest to
+  // redo by hand if a later step throws.
+  await syncAllPlayers(season, teams);
+
   // Parked, and OFF by default. Two runs established that ESPN gives us
   // a coach list with no head coach marked on it and no photographs:
   // the output was 32 rows, six of them coordinators, and 28 with no
@@ -548,4 +776,4 @@ if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {
   });
 }
 
-export { depthChartAt, rosterAt, syncPosition, readOverrides, POSITIONS, OVERRIDES, main };
+export { depthChartAt, rosterAt, fullRosterAt, depthRanksAt, syncPosition, syncAllPlayers, readOverrides, POSITIONS, OVERRIDES, main };

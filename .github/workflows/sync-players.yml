@@ -43,6 +43,15 @@ jobs:
       - name: Pull rosters from ESPN
         run: node scripts/sync-players.mjs
 
+      # Postgres keeps its own copy of the pool, because the daily
+      # puzzle's answer and grading are server-side. Regenerated here so
+      # the copy arrives in the same pull request as the rosters it came
+      # from - left as a manual step it would be forgotten, and the
+      # symptom is subtle: the dropdown offers a player the server has
+      # never heard of.
+      - name: Regenerate the daily puzzle seed
+        run: node scripts/gen-puzzle-seed.mjs
+
       # The script writes every team or throws, so anything that reaches
       # here is a complete roster. No diff means nothing moved this week.
       - name: Open a pull request if anything moved
@@ -59,7 +68,14 @@ jobs:
             the template no longer lists. Those degrade to a face with no
             name (see `resolveItem`), which is fine, but it is worth
             knowing when it happens.
+
+            If `supabase/seeds/puzzle_players.sql` changed, run it in the
+            Supabase SQL Editor after merging. It is an upsert and never
+            reshuffles existing slots, so it will not move which player
+            belongs to which day.
           # The whole directory, not a list. Every generated roster lives
           # in it and nothing else does, so a category added later is
           # picked up without anyone remembering to edit this file.
-          add-paths: src/data/rosters/
+          add-paths: |
+            src/data/rosters/
+            supabase/seeds/

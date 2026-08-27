@@ -19,16 +19,26 @@ type NavItem = {
   matchPrefix: string;
 };
 
-// The four destinations, flat. There used to be an intermediate
-// "Pick'em hub" page between the nav and the two pick'em modes; the home
-// page now fronts all four directly, so a nav item that pointed at a
-// menu of the same four links was a stop on the way to nowhere. Every
-// entry here goes straight to the thing it names.
+// The destinations, flat. There used to be an intermediate "Pick'em hub"
+// page between the nav and the two pick'em modes; the home page now
+// fronts them directly, so a nav item that pointed at a menu of the same
+// links was a stop on the way to nowhere. Every entry here goes straight
+// to the thing it names.
 const NAV_ITEMS: NavItem[] = [
   // Home earns a slot of its own. The logo has always linked here, but a
   // logo is a thing you learn, not a thing you see - and home is where
-  // all four of the others are laid out side by side.
+  // all the others are laid out side by side.
   { href: "/", label: "Home", icon: HomeIcon, matchPrefix: "/" },
+  // Second, because it is first on the home page and first in the title
+  // above it - PLAY leads PICK - and because it is the only one of these
+  // you can finish in a minute, which makes it the cheapest reason to
+  // come back tomorrow.
+  //
+  // "Daily Games" rather than "Nameplate", matching the card it sits
+  // under on the home page: Nameplate is one of the daily games, not the
+  // category, and the page's own title is where it says which one. A
+  // second game lands here without the nav needing to be renamed.
+  { href: "/daily", label: "Daily Games", icon: NameplateIcon, matchPrefix: "/daily" },
   { href: "/weekly", label: "Pick’em", icon: PicksIcon, matchPrefix: "/weekly" },
   { href: "/predictor", label: "Record Predictor", icon: TeamIcon, matchPrefix: "/predictor" },
   { href: "/tier-lists", label: "Tier Lists", icon: TierListIcon, matchPrefix: "/tier-lists" },
@@ -42,6 +52,25 @@ function HomeIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 10.5 12 3l9 7.5" />
       <path d="M5.5 9.5V20h13V9.5" />
+    </svg>
+  );
+}
+
+// The board's own player plate, at 24px: a card with the photo square on
+// the left and the name beside it. Drawn rather than borrowed because
+// every other candidate was already taken or already wrong - a grid is
+// what Pick'em uses, and a person silhouette is the account menu. This
+// is the one shape on the daily board that appears nowhere else on the
+// site, which is what makes it legible as an icon.
+function NameplateIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="5.5" width="19" height="13" rx="2.5" />
+      {/* Filled, so the photo reads as a photo at 20px rather than as a
+          second empty box inside the first. */}
+      <rect x="5.5" y="8.5" width="6" height="7" rx="1.5" fill="currentColor" stroke="none" />
+      <path d="M14.5 10.5h4" />
+      <path d="M14.5 14h2.5" />
     </svg>
   );
 }

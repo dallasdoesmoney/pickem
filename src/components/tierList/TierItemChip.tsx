@@ -4,6 +4,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TierItem, TierItemStyle } from "@/data/tierTemplates";
+import { BACKDROP_OPACITY, BACKDROP_SCALE } from "@/lib/teamBackdrop";
 
 // Marks render bare, by product decision, so the accessible name has to
 // come from somewhere else entirely: aria-label carries the full name
@@ -178,11 +179,10 @@ export function TierItemChip({
 // has.
 export const SUFFIXES = new Set(["jr.", "sr.", "ii", "iii", "iv", "v"]);
 
-// Slightly larger than the chip so the mark bleeds past the corners
-// rather than sitting in the middle of a frame, and faint enough to stay
-// behind the player instead of competing with him.
-export const BACKDROP_SCALE = 1.2;
-export const BACKDROP_OPACITY = 0.22;
+// Re-exported so the callers that already import these from here keep
+// working; they moved to src/lib/teamBackdrop.ts when the daily game
+// started drawing the same backdrop behind its faces.
+export { BACKDROP_SCALE, BACKDROP_OPACITY };
 
 // em per character. 0.72 was measured off lowercase; these captions are
 // uppercased, and caps run wider - measured at 0.80-0.82 across the

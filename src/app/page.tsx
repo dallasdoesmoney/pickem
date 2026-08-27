@@ -6,8 +6,11 @@ import { fetchWeeks, WeekRow } from "@/lib/supabase/admin";
 import { fetchWeeklyPicks } from "@/lib/supabase/picks";
 import { fetchPredictorProgress } from "@/lib/supabase/achievements";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
+import { fetchDailyPuzzle, readGuestGuesses, puzzleToday, PuzzleState, Verdict } from "@/lib/supabase/dailyPuzzle";
 import { CURRENT_WEEK, GAMES_BY_WEEK, Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
+import { teamTile } from "@/lib/colorUtils";
+import { playerHeadshot } from "@/lib/espnHeadshot";
 import { PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
 import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
 import { getTierTemplate } from "@/data/tierTemplates";
@@ -188,6 +191,222 @@ function MatchupGrid({ games }: { games: Game[] }) {
         <Matchup key={game.id} game={game} scale={scale} />
       ))}
     </div>
+  );
+}
+
+// ----------------------------------------------------------------- daily
+//
+// Same shape as the weekly hero and sitting above it: full width, art,
+// one name, one meta line, the whole card a link.
+//
+// The preview is a real board: two wrong guesses and then the one that
+// lands, all six green. It used to be an abstract stripe of colour -
+// three rows of anonymous bars - which had the right palette and none of
+// the meaning. A stranger looking at bars sees a colour test; looking at
+// this they see football players, and the run of solid green along the
+// bottom says what winning looks like before they have read a word.
+//
+// Fixed, not random: this must draw the same on the server and the client
+// or it tears on hydration, and a preview that reshuffles every render is
+// noise. It is also not today's actual puzzle, and must never be - the
+// card would be spoiling the game it is advertising.
+//
+// The verdicts are DERIVED, not typed. Every value here is the player's
+// real row out of src/data/rosters/all.ts and every colour is what the
+// game itself would return for that guess, so the card cannot drift into
+// claiming a comparison the board would grade the other way.
+const DAILY_ANSWER = { team: "LAR", conf: "NFC", div: "NFC West", pos: "WR", age: 25, heightIn: 74, jersey: 12 };
+const DAILY_GUESSES = [
+  { espnId: "4239993", name: "Tee Higgins", team: "CIN" as TeamAbbr,
+    conf: "AFC", div: "AFC North", pos: "WR", age: 27, heightIn: 76, jersey: 5 },
+  { espnId: "4361370", name: "Chris Olave", team: "NO" as TeamAbbr,
+    conf: "NFC", div: "NFC South", pos: "WR", age: 26, heightIn: 72, jersey: 12 },
+  { espnId: "4426515", name: "Puka Nacua", team: "LAR" as TeamAbbr,
+    conf: "NFC", div: "NFC West", pos: "WR", age: 25, heightIn: 74, jersey: 12 },
+];
+
+// The board's own thresholds, from CLOSE_MEANS in DailyPuzzle: a division
+// is close inside the same conference, and a number is close inside its
+// column's tolerance. Kept to one place so the card and the game cannot
+// disagree about what gold means.
+const near = (a: number, b: number, within: number): Verdict =>
+  a === b ? "hit" : Math.abs(a - b) <= within ? "close" : "miss";
+
+const feet = (inches: number) => `${Math.floor(inches / 12)}'${inches % 12}"`;
+
+type DailyCell = { text: string; verdict: Verdict };
+
+function dailyRow(g: (typeof DAILY_GUESSES)[number]): DailyCell[] {
+  const a = DAILY_ANSWER;
+  return [
+    { text: g.team, verdict: g.team === a.team ? "hit" : "miss" },
+    { text: g.div, verdict: g.div === a.div ? "hit" : g.conf === a.conf ? "close" : "miss" },
+    { text: g.pos, verdict: g.pos === a.pos ? "hit" : "miss" },
+    { text: String(g.age), verdict: near(g.age, a.age, 3) },
+    { text: feet(g.heightIn), verdict: near(g.heightIn, a.heightIn, 2) },
+    { text: String(g.jersey), verdict: near(g.jersey, a.jersey, 3) },
+  ];
+}
+
+const DAILY_TONE: Record<Verdict, string> = {
+  hit: "#3ecb78",
+  close: "#ffce3a",
+  miss: "#aab3c1",
+  unknown: "#8d96a5",
+};
+
+// The board's plate at preview size. Not PlayerPlate itself: that one is
+// built for a 62px guess row and hard-codes its type sizes to it, and
+// every number here is smaller than the smallest number there.
+function MiniPlate({ guess }: { guess: (typeof DAILY_GUESSES)[number] }) {
+  const [broken, setBroken] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const { bg, ink } = teamTile(TEAMS[guess.team]?.color ?? "#334155");
+  const logo = TEAMS[guess.team]?.logo;
+  const initials = guess.name.split(/\s+/).slice(0, 2).map((p) => p.charAt(0)).join("");
+
+  return (
+    <span
+      className="relative flex h-full w-full min-w-0 items-center overflow-hidden rounded-[4px] pr-1.5 sm:rounded-md sm:pr-2"
+      style={{ background: `linear-gradient(100deg, ${bg}, ${bg}cc)`, border: "2px solid #0a1120", boxShadow: "2px 3px 0 #05090f" }}
+    >
+      {logo && (
+        <img
+          src={logo}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          crossOrigin="anonymous"
+          className="pointer-events-none absolute left-[-6px] top-1/2 aspect-square h-[150%] max-w-none -translate-y-1/2 select-none object-contain opacity-[0.26]"
+        />
+      )}
+      <span
+        className="relative grid aspect-square h-full shrink-0 place-items-center overflow-hidden font-extrabold"
+        style={{ color: ink, fontSize: "clamp(7px, 2.1cqw, 15px)" }}
+      >
+        {/* The headshots are cut out on transparency, so initials left
+            underneath one show THROUGH him rather than behind him. */}
+        {!loaded && <span>{initials}</span>}
+        {!broken && (
+          <img
+            src={playerHeadshot(guess.espnId)}
+            alt=""
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+            onError={() => setBroken(true)}
+            className="absolute inset-0 h-full w-full select-none object-cover object-top"
+          />
+        )}
+      </span>
+      <span
+        className="relative ml-1.5 min-w-0 truncate font-semibold sm:ml-2"
+        style={{
+          color: ink,
+          // Container-relative, so the name shrinks in step with the
+          // plate that holds it. A fixed size plus a percentage column is
+          // the combination that truncates on the narrowest phones: the
+          // box gets smaller and the words do not.
+          fontSize: "clamp(7px, 2.4cqw, 17px)",
+          textShadow: ink === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.45)" : "none",
+        }}
+      >
+        {guess.name}
+      </span>
+    </span>
+  );
+}
+
+function DailyHero({ state }: { state: PuzzleState | null }) {
+  // A count is all a result is allowed to say out here. "SOLVED IN 4"
+  // gives away nothing about WHO, which is the one thing that would ruin
+  // somebody else's day - the same rule the share grid follows.
+  //
+  // Every branch now names the game, because the card above it no longer
+  // does: "DAILY GAMES" is the category, and this is the line that says
+  // which one is behind it today.
+  const meta = !state
+    ? "NAMEPLATE \u00b7 TODAY \u00b7 8 GUESSES"
+    : state.solved
+      ? `NAMEPLATE \u00b7 SOLVED IN ${state.guessesUsed}`
+      : state.finished
+        ? "NAMEPLATE \u00b7 OUT OF GUESSES TODAY"
+        : state.guessesUsed > 0
+          ? `NAMEPLATE \u00b7 ${state.guessesUsed} OF ${state.maxGuesses} USED`
+          : `NAMEPLATE \u00b7 TODAY \u00b7 ${state.maxGuesses} GUESSES`;
+
+  return (
+    <Link href="/daily" className={CARD}>
+      {/* Full width. It used to be capped at 580 and centred, because the
+          art was six featureless bars and letting them fill a 992px card
+          made each one seven times wider than it was tall - a stack of
+          ribbons. That cap bought nothing once the bars became chips with
+          words in them, and cost two hundred pixels of empty gutter on
+          either side of the biggest card on the page. What keeps the
+          proportion honest now is that the ROW HEIGHT and the type grow
+          with the card as well, so a chip stays a chip instead of
+          stretching on its own.
+          aria-hidden because the caption already announces the card, and
+          the board is decoration here: read out, it is thirty-two
+          fragments of a game nobody has started. */}
+      <div className={ART} aria-hidden>
+        <div className="flex w-full flex-col gap-1.5 px-1 py-1.5 sm:gap-2">
+          {DAILY_GUESSES.map((guess) => (
+            <div
+              key={guess.espnId}
+              // The plate takes a share of the row and the six hints
+              // split what is left, exactly as the board does it.
+              //
+              // A SHARE, not a fixed 124px. Fixed, the plate keeps its
+              // width as the card narrows and takes it out of the chips
+              // instead - and "South" is the tightest word on the board,
+              // so it ran out of chip at 360px while the plate beside it
+              // sat there with room to spare. Clamped at the top so the
+              // hero does not hand a 200px column to an eleven-letter
+              // name, and at the bottom so the smallest phone still has
+              // somewhere to put one. Between those it is one ratio at
+              // every width, which is why the height, the gap and the
+              // type are all sized in cqw too.
+              className="grid"
+              style={{
+                gridTemplateColumns: "clamp(88px, 30%, 230px) repeat(6, minmax(0, 1fr))",
+                height: "clamp(30px, 5.4cqw, 56px)",
+                gap: "clamp(4px, 0.75cqw, 9px)",
+              }}
+            >
+              <MiniPlate guess={guess} />
+              {dailyRow(guess).map((cell, c) => (
+                <span
+                  key={c}
+                  className="grid place-items-center rounded-[4px] px-0.5 text-center font-medium leading-[1.1] tabular-nums sm:rounded-md"
+                  style={{
+                    fontSize: "clamp(6px, 2.1cqw, 15px)",
+                    background: DAILY_TONE[cell.verdict],
+                    color: "#0a1020",
+                    border: "2px solid #0a1120",
+                    boxShadow: "2px 3px 0 #05090f",
+                  }}
+                >
+                  {/* DIV is the one column whose value is two words, and
+                      at this size it cannot have them side by side - so
+                      it stacks, the same way the board's own DIV chip
+                      does. */}
+                  {cell.text.includes(" ") ? (
+                    cell.text.split(" ").map((word) => <span key={word} className="block">{word}</span>)
+                  ) : (
+                    cell.text
+                  )}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* DAILY GAMES, not NAMEPLATE. Nameplate is one of the daily games
+          rather than the name of the category - the meta line underneath
+          is where it says which one - so the card can hold tomorrow's
+          second game without being renamed. */}
+      <Caption name={"DAILY GAMES"} color="#fb923c" meta={meta} />
+    </Link>
   );
 }
 
@@ -381,6 +600,7 @@ export default function HomePage() {
   const [picks, setPicks] = useState<Record<string, TeamAbbr> | null>(null);
   const [progress, setProgress] = useState<Partial<Record<TeamAbbr, number>> | null>(null);
   const [board, setBoard] = useState<LeaderboardRow[]>([]);
+  const [daily, setDaily] = useState<PuzzleState | null>(null);
 
   useEffect(() => {
     fetchWeeks()
@@ -395,6 +615,38 @@ export default function HomePage() {
     const openWeeks = weeks.filter((w) => w.is_open).map((w) => w.week);
     return openWeeks.length > 0 ? Math.max(...openWeeks) : CURRENT_WEEK;
   }, [weeks]);
+
+  // Today's daily, for the card's meta line. Two sources, because a
+  // signed-out player's run lives in their browser and a signed-in one
+  // lives on the server - the card should say "3 OF 8 USED" either way
+  // rather than pretending a guest has not played.
+  useEffect(() => {
+    if (user) {
+      fetchDailyPuzzle()
+        .then(setDaily)
+        .catch(() => setDaily(null));
+      return;
+    }
+    const on = puzzleToday();
+    const held = readGuestGuesses(on);
+    // Only what the card needs. Building a whole board here would mean
+    // duplicating the game's own assembly for one line of text.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDaily(
+      held.length
+        ? {
+            puzzleOn: on,
+            maxGuesses: 8,
+            guessesUsed: held.length,
+            guesses: held,
+            solved: held.some((g) => g.correct),
+            finished: held.some((g) => g.correct) || held.length >= 8,
+            pointsAwarded: 0,
+            answer: null,
+          }
+        : null
+    );
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -420,14 +672,19 @@ export default function HomePage() {
             Pick'em is one of them, so titling the whole page after one
             of its own children read as though you had already arrived
             somewhere - the same reason the old Pick'em hub had to go.
-            These three name what you can actually do here, in the order
-            the cards run: pick this week, predict a season, rank the
-            league. The leaderboard underneath is where all three land,
-            which is why it isn't a fourth verb. */}
-        <h1 className="text-[clamp(2rem,8vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-          PICK. PREDICT. RANK.
+            These name what you can actually do here, in the order the
+            cards run: play today's game, pick this week, predict a
+            season, rank the league. The leaderboard underneath is where
+            they all land, which is why it isn't a fifth verb.
+            PLAY leads because the daily card does, and because it is the
+            only one of the four you can finish in a minute - which makes
+            it the cheapest reason for a stranger to come back tomorrow. */}
+        <h1 className="text-[clamp(1.7rem,7vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+          PLAY. PICK. PREDICT. RANK.
         </h1>
       </div>
+
+      <DailyHero state={daily} />
 
       <WeeklyHero week={activeWeek} games={games} picks={picks} signedIn={!!user} />
 

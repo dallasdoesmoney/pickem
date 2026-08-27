@@ -17,39 +17,47 @@ export type TightEnd = {
   espnId: string;
   name: string;
   team: TeamAbbr;
+  // Hint columns for the daily player puzzle. Optional because ESPN does
+  // not publish all of them for everyone; the puzzle hides a column it
+  // has no values for rather than showing a row of "?".
+  heightIn?: number;
+  weightLb?: number;
+  age?: number;
+  jersey?: number;
+  college?: string;
 };
 
 export const TIGHT_ENDS: TightEnd[] = [
-  { espnId: "4576297", name: "AJ Barner", team: "SEA" },
-  { espnId: "4430539", name: "Brenton Strange", team: "JAX" },
-  { espnId: "4432665", name: "Brock Bowers", team: "LV" },
-  { espnId: "4243331", name: "Cade Otton", team: "TB" },
-  { espnId: "4360635", name: "Chig Okonkwo", team: "WAS" },
-  { espnId: "4242557", name: "Colby Parkinson", team: "LAR" },
-  { espnId: "4723086", name: "Colston Loveland", team: "CHI" },
-  { espnId: "3121023", name: "Dallas Goedert", team: "PHI" },
-  { espnId: "4385690", name: "Dalton Kincaid", team: "BUF" },
-  { espnId: "3117256", name: "Dalton Schultz", team: "HOU" },
-  { espnId: "3051876", name: "Evan Engram", team: "DEN" },
-  { espnId: "3040151", name: "George Kittle", team: "SF" },
-  { espnId: "4367209", name: "Greg Dulcich", team: "MIA" },
-  { espnId: "4686728", name: "Gunnar Helm", team: "TEN" },
-  { espnId: "5083076", name: "Harold Fannin Jr.", team: "CLE" },
-  { espnId: "3046439", name: "Hunter Henry", team: "NE" },
-  { espnId: "4361050", name: "Isaiah Likely", team: "NYG" },
-  { espnId: "4242355", name: "Jake Ferguson", team: "DAL" },
-  { espnId: "3929645", name: "Juwan Johnson", team: "NO" },
-  { espnId: "5083315", name: "Kenyon Sadiq", team: "NYJ" },
-  { espnId: "4360248", name: "Kyle Pitts Sr.", team: "ATL" },
-  { espnId: "3116365", name: "Mark Andrews", team: "BAL" },
-  { espnId: "3116164", name: "Mike Gesicki", team: "CIN" },
-  { espnId: "4595342", name: "Oronde Gadsden", team: "LAC" },
-  { espnId: "4361411", name: "Pat Freiermuth", team: "PIT" },
-  { espnId: "4430027", name: "Sam LaPorta", team: "DET" },
-  { espnId: "4036133", name: "T.J. Hockenson", team: "MIN" },
-  { espnId: "4372780", name: "Tommy Tremble", team: "CAR" },
-  { espnId: "15847", name: "Travis Kelce", team: "KC" },
-  { espnId: "4361307", name: "Trey McBride", team: "ARI" },
-  { espnId: "4572680", name: "Tucker Kraft", team: "GB" },
-  { espnId: "4431459", name: "Tyler Warren", team: "IND" },
+  { espnId: "4576297", name: "AJ Barner", team: "SEA", heightIn: 78, weightLb: 251, age: 24, jersey: 88 },
+  { espnId: "4430539", name: "Brenton Strange", team: "JAX", heightIn: 76, weightLb: 253, age: 25, jersey: 85 },
+  { espnId: "4432665", name: "Brock Bowers", team: "LV", heightIn: 76, weightLb: 235, age: 23, jersey: 89 },
+  { espnId: "4243331", name: "Cade Otton", team: "TB", heightIn: 77, weightLb: 247, age: 27, jersey: 88 },
+  { espnId: "4241263", name: "Charlie Kolar", team: "LAC", heightIn: 78, weightLb: 250, age: 27, jersey: 88 },
+  { espnId: "4360635", name: "Chig Okonkwo", team: "WAS", heightIn: 75, weightLb: 238, age: 26, jersey: 85 },
+  { espnId: "4242557", name: "Colby Parkinson", team: "LAR", heightIn: 79, weightLb: 266, age: 27, jersey: 84 },
+  { espnId: "4723086", name: "Colston Loveland", team: "CHI", heightIn: 78, weightLb: 241, age: 22, jersey: 84 },
+  { espnId: "3121023", name: "Dallas Goedert", team: "PHI", heightIn: 77, weightLb: 256, age: 31, jersey: 88 },
+  { espnId: "4385690", name: "Dalton Kincaid", team: "BUF", heightIn: 75, weightLb: 246, age: 26, jersey: 86 },
+  { espnId: "3117256", name: "Dalton Schultz", team: "HOU", heightIn: 77, weightLb: 242, age: 30, jersey: 86 },
+  { espnId: "3051876", name: "Evan Engram", team: "DEN", heightIn: 75, weightLb: 240, age: 31, jersey: 1 },
+  { espnId: "3040151", name: "George Kittle", team: "SF", heightIn: 76, weightLb: 250, age: 32, jersey: 85 },
+  { espnId: "4367209", name: "Greg Dulcich", team: "MIA", heightIn: 76, weightLb: 245, age: 26, jersey: 85 },
+  { espnId: "4686728", name: "Gunnar Helm", team: "TEN", heightIn: 77, weightLb: 241, age: 23, jersey: 84 },
+  { espnId: "5083076", name: "Harold Fannin Jr.", team: "CLE", heightIn: 76, weightLb: 241, age: 22, jersey: 44 },
+  { espnId: "3046439", name: "Hunter Henry", team: "NE", heightIn: 77, weightLb: 249, age: 31, jersey: 85 },
+  { espnId: "4361050", name: "Isaiah Likely", team: "NYG", heightIn: 76, weightLb: 241, age: 26, jersey: 9 },
+  { espnId: "4242355", name: "Jake Ferguson", team: "DAL", heightIn: 77, weightLb: 250, age: 27, jersey: 87 },
+  { espnId: "3929645", name: "Juwan Johnson", team: "NO", heightIn: 76, weightLb: 231, age: 29, jersey: 83 },
+  { espnId: "4360248", name: "Kyle Pitts Sr.", team: "ATL", heightIn: 78, weightLb: 250, age: 25, jersey: 8 },
+  { espnId: "3116365", name: "Mark Andrews", team: "BAL", heightIn: 77, weightLb: 250, age: 30, jersey: 89 },
+  { espnId: "4808766", name: "Mason Taylor", team: "NYJ", heightIn: 77, weightLb: 251, age: 22, jersey: 85 },
+  { espnId: "3116164", name: "Mike Gesicki", team: "CIN", heightIn: 78, weightLb: 245, age: 30, jersey: 88 },
+  { espnId: "4361411", name: "Pat Freiermuth", team: "PIT", heightIn: 77, weightLb: 258, age: 27, jersey: 88 },
+  { espnId: "4430027", name: "Sam LaPorta", team: "DET", heightIn: 75, weightLb: 245, age: 25, jersey: 87 },
+  { espnId: "4036133", name: "T.J. Hockenson", team: "MIN", heightIn: 77, weightLb: 248, age: 29, jersey: 87 },
+  { espnId: "4372780", name: "Tommy Tremble", team: "CAR", heightIn: 76, weightLb: 250, age: 26, jersey: 82 },
+  { espnId: "15847", name: "Travis Kelce", team: "KC", heightIn: 77, weightLb: 250, age: 36, jersey: 87 },
+  { espnId: "4361307", name: "Trey McBride", team: "ARI", heightIn: 76, weightLb: 246, age: 26, jersey: 85 },
+  { espnId: "4572680", name: "Tucker Kraft", team: "GB", heightIn: 77, weightLb: 259, age: 25, jersey: 85 },
+  { espnId: "4431459", name: "Tyler Warren", team: "IND", heightIn: 78, weightLb: 256, age: 24, jersey: 84 },
 ];
