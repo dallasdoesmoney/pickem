@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
 import { PUZZLE_PLAYERS, PUZZLE_PLAYERS_BY_ID, PuzzlePlayer } from "@/data/puzzlePlayers";
 import { TEAMS, TeamAbbr } from "@/data/teams";
@@ -188,6 +188,52 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const [prompted, setPrompted] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
 
+  // THE WIN IS HELD. Solving used to swap the reveal card in on the same
+  // tick the guess landed, so the board turned green and vanished in the
+  // same frame and you never saw the thing you had just done. For these
+  // 2.15 seconds the reveal does not exist yet: the row turns over one
+  // chip at a time, the rest of the board dims, and only then does the
+  // page move.
+  //
+  // It is set from the guess handler and nowhere else, which is what
+  // keeps a refresh from replaying it - come back to a solved board and
+  // there is no celebration, because there was no guess.
+  const CELEBRATE_MS = 2150;
+  const [celebrating, setCelebrating] = useState(false);
+  const celebrateTimer = useRef<number | null>(null);
+  const revealRef = useRef<HTMLDivElement>(null);
+
+  const endCelebration = useCallback(() => {
+    if (celebrateTimer.current !== null) {
+      window.clearTimeout(celebrateTimer.current);
+      celebrateTimer.current = null;
+    }
+    setCelebrating(false);
+    // The reveal only mounts once celebrating is false, so the scroll has
+    // to wait a frame for something to scroll to.
+    window.setTimeout(() => {
+      revealRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 40);
+  }, []);
+
+  // Any tap or key cuts it short. Somebody on their fourth day does not
+  // want to watch this again, and an animation you cannot get out of
+  // stops being a reward on about the third viewing.
+  useEffect(() => {
+    if (!celebrating) return;
+    const skip = () => endCelebration();
+    window.addEventListener("pointerdown", skip);
+    window.addEventListener("keydown", skip);
+    return () => {
+      window.removeEventListener("pointerdown", skip);
+      window.removeEventListener("keydown", skip);
+    };
+  }, [celebrating, endCelebration]);
+
+  useEffect(() => () => {
+    if (celebrateTimer.current !== null) window.clearTimeout(celebrateTimer.current);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     // Signed in: the server holds the board, as it always has - it is the
@@ -295,6 +341,19 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       }
       setState(next);
       setQuery("");
+      // A solve that happened just now, on this guess - which is the only
+      // kind that gets the celebration. Anybody who reduces motion goes
+      // straight to the reveal.
+      if (next.solved && !state?.solved) {
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          window.setTimeout(() => {
+            revealRef.current?.scrollIntoView({ block: "start" });
+          }, 40);
+        } else {
+          setCelebrating(true);
+          celebrateTimer.current = window.setTimeout(endCelebration, CELEBRATE_MS);
+        }
+      }
       // The ask, once, at the third guess - and never to somebody who
       // already has an account.
       if (!user && next.guessesUsed >= PROMPT_AT && !next.finished && !prompted) {
@@ -407,7 +466,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         <StillBrewingModal used={state.guessesUsed} max={state.maxGuesses} onClose={() => setShowJoin(false)} />
       )}
 
-      {state.finished && state.answer && <Reveal state={state} answer={answer} onShare={share} copied={copied} />}
+      {state.finished && state.answer && !celebrating && (
+        <div ref={revealRef}>
+          <Reveal state={state} answer={answer} onShare={share} copied={copied} />
+        </div>
+      )}
 
       {/* ONE card: title, guess field, board. They used to be three
           separately bordered things floating with 20px between them,
@@ -530,7 +593,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         )}
 
       {state.guesses.length > 0 && (
-        <div className="puzzle-board px-2 py-3 md:p-[18px] lg:p-6" style={{ borderTop: CARD_EDGE }}>
+        <div
+          className="puzzle-board px-2 py-3 md:p-[18px] lg:p-6"
+          data-celebrate={celebrating ? "1" : undefined}
+          style={{ borderTop: CARD_EDGE }}
+        >
           {/* One header row on desktop, where the columns line up under it.
               On a phone the board stacks into a card per guess and every
               chip carries its own label instead - same information, no
@@ -552,6 +619,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               <div
                 key={g.espnId}
                 className="puzzle-row flex flex-col gap-2 md:grid md:items-stretch md:gap-2"
+                data-win={g.correct ? "1" : undefined}
                 style={{ gridTemplateColumns: columnTrack }}
               >
                 {/* items-STRETCH, so the plate can be h-full and match the
@@ -577,7 +645,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                     you stop and read. */}
                 <div className="grid grid-cols-7 gap-1 md:contents">
                   {visibleColumns.map((c, i) => (
-                    <Chip key={c.key} column={c} cell={cellOf(g, c.key)} index={i} />
+                    <Chip
+                      key={c.key}
+                      column={c}
+                      cell={cellOf(g, c.key)}
+                      index={i}
+                      rollCall={celebrating && g.correct}
+                    />
                   ))}
                 </div>
               </div>
@@ -598,10 +672,13 @@ function Chip({
   column,
   cell,
   index,
+  rollCall = false,
 }: {
   column: (typeof COLUMNS)[number];
   cell: { value: string | number | null; status: Verdict; direction?: NumCell["direction"] };
   index: number;
+  // This chip is in the row that just won, and the win is being played.
+  rollCall?: boolean;
 }) {
   const { bg, ink } = cellStyle(column.key, cell);
   const text = formatCell(column.key, cell.value);
@@ -649,10 +726,20 @@ function Chip({
         color: ink,
         border: EDGE,
         borderRadius: 10,
+        // The colour this chip lands on, for the roll-call keyframes to
+        // finish at. Read off the chip rather than assumed to be green:
+        // a winning row is normally seven hits, but a column the answer
+        // has no data for is a grey "?" even when you have named the
+        // right player, and flipping that one to green would be a lie.
+        ["--chip-bg" as string]: bg,
         // boxShadow lives in .puzzle-chip, not here - inline styles
         // outrank stylesheet rules, and it was stopping the hover shadow
         // from ever applying.
-        animationDelay: `${index * 45}ms`,
+        //
+        // 120ms apart during the roll call rather than 45: the entry
+        // stagger is meant to be felt and not seen, and this one is the
+        // whole point of the moment.
+        animationDelay: `${index * (rollCall ? 120 : 45)}ms`,
       }}
     >
       {/* 6px, not 7. The value came down to 7 when every chip went to one

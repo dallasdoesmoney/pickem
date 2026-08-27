@@ -530,6 +530,110 @@ body {
   transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
+/* ---------------------------------------------------------------
+   THE WIN, HELD - "roll call"
+
+   Solving used to swap the reveal card in on the same tick the guess
+   landed, so the row you won with turned green and disappeared in the
+   same frame. For 2.15 seconds now it does not: the seven chips turn
+   over one at a time, left to right, like a hand being laid down, and
+   the rest of the board dims until the winning row is the only thing
+   lit. See CELEBRATE_MS in DailyPuzzle.
+
+   The timings here and there are one clock. 7 chips x 120ms + 420ms of
+   flip = 1.26s of turning; the lift and the dim start at 1.32s, just
+   after the last chip settles; the reveal mounts at 2.15s.
+   --------------------------------------------------------------- */
+@keyframes puzzle-roll-call {
+  0% {
+    transform: rotateX(0deg) scale(1);
+    /* The miss grey, so every chip starts from the same nothing and the
+       green is something that HAPPENS rather than something that was
+       already there under a transition. */
+    background: #aab3c1;
+  }
+  49% {
+    transform: rotateX(90deg) scale(1.07);
+    background: #aab3c1;
+  }
+  51% {
+    background: var(--chip-bg, #3ecb78);
+  }
+  100% {
+    transform: rotateX(0deg) scale(1);
+    background: var(--chip-bg, #3ecb78);
+  }
+}
+
+/* More specific than the .puzzle-chip entrance rule above, so it replaces
+   it outright - a chip in the winning row does not land and then flip, it
+   only flips. `both` is correct here where it is wrong there: the chip
+   has to hold its final colour until the reveal takes over, and nothing
+   hovers mid-celebration. */
+/* Gated on data-celebrate, NOT on data-win alone. The winning row carries
+   data-win forever - it is a fact about the row, not a state - so without
+   this every refresh of a solved board replayed the flip, and a chip
+   caught mid-animation on load sat there grey. */
+.puzzle-board[data-celebrate="1"] .puzzle-row[data-win="1"] .puzzle-chip {
+  animation: puzzle-roll-call 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* A transition rather than an animation, because these rows already have
+   an entrance animation of their own and two animations on one element
+   is a fight over which was declared last. The delay is what sequences
+   it: nothing dims until the last chip has turned. */
+.puzzle-board .puzzle-row {
+  transition: opacity 460ms ease, filter 460ms ease, transform 460ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.puzzle-board[data-celebrate="1"] .puzzle-row {
+  transition-delay: 1320ms;
+}
+.puzzle-board[data-celebrate="1"] .puzzle-row:not([data-win="1"]) {
+  opacity: 0.3;
+  filter: saturate(0.25);
+}
+
+/* The winning row gets an ANIMATION where the others get a transition,
+   because it does not exist yet when the celebration starts - it is the
+   guess that just landed. A transition needs a before and an after, and
+   a row that mounts with the board already celebrating has no before, so
+   it would have jumped to the lifted state on its first frame.
+
+   This replaces puzzle-row-in for that row, which is the right trade:
+   during a celebration the chips turning over are the event, and a row
+   sliding in underneath them is noise.
+
+   The lift is small on purpose and only from md up. A row is as wide as
+   the board, so anything past about 1.02 pushes it out past the card's
+   own padding and it gets clipped at both edges - 24px of padding at lg
+   against a ~1030px row is 10px of headroom each side. */
+@keyframes puzzle-win-lift {
+  from {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(62, 203, 120, 0));
+  }
+  to {
+    transform: scale(1.015);
+    filter: drop-shadow(0 10px 26px rgba(62, 203, 120, 0.34));
+  }
+}
+
+@media (min-width: 768px) {
+  .puzzle-board[data-celebrate="1"] .puzzle-row[data-win="1"] {
+    animation: puzzle-win-lift 460ms 1320ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .puzzle-board[data-celebrate="1"] .puzzle-row[data-win="1"] .puzzle-chip,
+  .puzzle-board[data-celebrate="1"] .puzzle-row[data-win="1"] {
+    animation: none;
+  }
+  .puzzle-board .puzzle-row {
+    transition: none;
+  }
+}
+
 /* Hovering a guess should feel like picking the row up, not pressing it
    down. The old version moved the chip INTO its shadow, which is the
    gesture for a button being clicked - wrong for a row that is a record
@@ -564,7 +668,14 @@ body {
 }
 
 .puzzle-row {
-  animation: puzzle-row-in 260ms ease-out both;
+  /* BACKWARDS, not BOTH - the same trap the chip entrance was in. `both`
+     holds the final keyframe forever, and a filled animation outranks a
+     plain declaration, so opacity stayed pinned at 1 and transform at
+     translateY(0) for the life of the row. The celebration's dim and
+     lift could never take effect. `backwards` still applies the `from`
+     frame before the animation starts, which is the part that stops the
+     flash, and lets go afterwards. */
+  animation: puzzle-row-in 260ms ease-out backwards;
 }
 
 @keyframes puzzle-menu-in {
