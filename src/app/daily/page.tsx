@@ -8,6 +8,22 @@ import { DailyPuzzle } from "@/components/DailyPuzzle";
 // as a row of eight hints and needs the room, which is what it was not
 // getting when this was max-w-lg at every size - the board could not fit
 // and grew a horizontal scrollbar instead.
+//
+// It stops at 4xl rather than running on to 6xl. The chips are 1fr tracks,
+// so they divide whatever width they are handed: on a wide screen they were
+// growing to 116px to hold values like "QB" and "26" - a board of
+// mostly-empty cards stretched across the monitor. Capped, they measure
+// 79px, which still fits every value on one line except the long colleges,
+// and those wrap to two ("Mississippi State" is the worst case and it fits
+// in the row's existing height).
+//
+// 4xl is the floor, not a preference. One step further down, at 3xl, the
+// chips come out at 61px and "NFC North" - which truncates rather than
+// wraps - loses its tail. Measured, not guessed; re-measure if the chip
+// type sizes change.
+//
+// A shorter line is easier to read across anyway: seven hints you can take
+// in without moving your head beats seven you have to scan.
 export default function DailyPage() {
   const { loading } = useAuth();
 
@@ -65,7 +81,7 @@ export default function DailyPage() {
   );
 
   return (
-    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-5xl xl:max-w-6xl w-full mx-auto">
+    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-4xl w-full mx-auto">
       {loading ? (
         <>
           {header}
