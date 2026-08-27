@@ -24,12 +24,28 @@
    centered, so its left edge is (viewport - 192) / 2. Where those cross
    is where the nav starts running underneath the logo, and this is that
    crossover plus room to breathe.
-   Five items end the nav at 571px, so they cross at 1334 - a Home item
-   moved this out from 1240. Re-measure and move it again if the nav's
-   items ever change: an item added without moving this puts the nav back
-   under the logo, which is the bug this exists to prevent. */
+   Six items end the nav at 668px, so they cross at 1576 - a Daily Games
+   item moved this out from 1370, which five items reached at 1334, which
+   a Home item had moved out from 1240. Re-measure and move it again if
+   the nav's items ever change: an item added without moving this puts
+   the nav back under the logo, which is the bug this exists to prevent.
+
+   Measured, not derived - the pill's padding, gap, display face and
+   tracking all feed into it, so the number comes from putting the real
+   labels in the real pills and reading off where the nav's right edge
+   meets the logo's left. See scratchpad vnav.mjs in the session that
+   added the daily game.
+
+   1612 is past most laptops, which is a deliberate trade rather than an
+   oversight: it means a 1440 or 1366 screen gets the hamburger instead
+   of the pill row. Six full-length labels do not fit beside a centred
+   logo at those widths, and the alternative was shortening "Record
+   Predictor" and "Daily Games" to make them. Nothing becomes
+   unreachable - the drawer carries every item, including the daily game.
+   If this ever wants reversing, the numbers are: "Predictor" alone buys
+   1494, and "Daily" with it buys 1396. */
 @theme {
-  --breakpoint-navbar: 1370px;
+  --breakpoint-navbar: 1612px;
 }
 
 body {
