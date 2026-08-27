@@ -418,7 +418,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       .join("\n");
   }
 
-  function shareText(s: PuzzleState, dailyLink: string): string {
+  // The body WITHOUT the link on the end. The share sheet takes the link
+  // as its own field and appends it itself, so a copy pasted in here as
+  // well arrives twice - once as a line of text and once as the attached
+  // URL. The clipboard path, which has no url field, adds it back.
+  function shareBody(s: PuzzleState): string {
     const grid = shareGrid(s);
     // Words, not a fraction. "4/8" reads as four out of eight RIGHT - a
     // score on a test - which is the opposite of what it means: it took
@@ -429,20 +433,27 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     //
     // Same words as the reveal card, so what you shared is what you saw.
     const score = s.solved ? `Solved in ${s.guessesUsed}` : "Out of guesses";
-    return `Sideline Brew \u2014 Nameplate\n${s.puzzleOn}  ${score}\n\n${grid}\n\n${dailyLink}`;
+    return `Sideline Brew \u2014 Nameplate\n${s.puzzleOn}  ${score}\n\n${grid}`;
   }
 
   async function share() {
     if (!state) return;
+    // Absolute, and carrying the sharer's referral code when there is one
+    // to carry - buildReferralLinkTo returns origin + /daily, plus
+    // ?ref=username for anybody signed in. A signed-out player shares the
+    // same link without the code, because there is no account to credit.
     const dailyLink = buildReferralLinkTo("/daily", profile?.username);
-    const text = shareText(state, dailyLink);
+    const body = shareBody(state);
     if (navigator.share) {
       try {
-        // url separately from text, not just pasted on the end of it.
-        // The share sheet needs to KNOW something is a link before it
-        // will unfurl it into a card - handed the same string inside
-        // `text` it stays a line of characters.
-        await navigator.share({ title: "Nameplate - Sideline Brew", text, url: dailyLink });
+        // No title. Messages ignores it, and the ones that do use it put
+        // it above a body that already opens with the same two words.
+        //
+        // url as its own field rather than pasted on the end of text: a
+        // share sheet will only unfurl something it has been TOLD is a
+        // URL, and it appends it to the message itself - so the body
+        // deliberately stops at the grid.
+        await navigator.share({ text: body, url: dailyLink });
         posthog.capture("daily_puzzle_shared", { method: "native_share" });
         return;
       } catch {
@@ -450,7 +461,8 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         // rather than leaving the button looking broken.
       }
     }
-    await navigator.clipboard.writeText(text);
+    // Nothing appends the link here, so it goes on the end by hand.
+    await navigator.clipboard.writeText(`${body}\n\n${dailyLink}`);
     posthog.capture("daily_puzzle_shared", { method: "clipboard" });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
