@@ -6,6 +6,7 @@ import { PUZZLE_PLAYERS, PUZZLE_PLAYERS_BY_ID, PuzzlePlayer } from "@/data/puzzl
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { teamTile } from "@/lib/colorUtils";
 import { PlayerFace } from "@/components/PlayerFace";
+import { PlayerPlate } from "@/components/PlayerPlate";
 import {
   fetchDailyPuzzle,
   submitDailyGuess,
@@ -540,20 +541,12 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 className="puzzle-row flex flex-col gap-2 md:grid md:items-stretch md:gap-2"
                 style={{ gridTemplateColumns: columnTrack }}
               >
-                <div className="flex min-w-0 items-center gap-2.5 md:pr-2">
-                  <PlayerFace
+                <div className="flex min-w-0 md:items-center md:pr-2">
+                  <PlayerPlate
                     espnId={g.espnId}
                     name={g.name}
                     team={(PUZZLE_PLAYERS_BY_ID.get(g.espnId)?.team ?? "KC") as TeamAbbr}
-                    size={46}
                   />
-                  <span
-                    className="min-w-0 truncate text-sm font-semibold md:text-[13px]"
-                    style={{ color: TEXT }}
-                    title={g.name}
-                  >
-                    {g.name}
-                  </span>
                 </div>
 
                 {/* md:contents dissolves this wrapper on desktop so the
