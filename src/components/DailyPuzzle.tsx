@@ -412,7 +412,15 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           .join("")
       )
       .join("\n");
-    const score = s.solved ? `${s.guessesUsed}/${s.maxGuesses}` : `X/${s.maxGuesses}`;
+    // Words, not a fraction. "4/8" reads as four out of eight RIGHT - a
+    // score on a test - which is the opposite of what it means: it took
+    // four guesses out of the eight you were allowed, and fewer is
+    // better. Wordle can get away with 4/6 because everybody already
+    // knows the convention; nobody knows this one yet, and the share is
+    // the one place the result is read by people who have never played.
+    //
+    // Same words as the reveal card, so what you shared is what you saw.
+    const score = s.solved ? `Solved in ${s.guessesUsed}` : "Out of guesses";
     return `Sideline Brew \u2014 Nameplate\n${s.puzzleOn}  ${score}\n\n${grid}\n\n${dailyLink}`;
   }
 
