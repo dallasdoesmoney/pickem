@@ -122,15 +122,17 @@ const CLOSE_MEANS: Partial<Record<ColumnKey, string>> = {
   jersey: "within 3",
 };
 
-// The one column that can be painted in something other than green. A
-// correct TEAM cell takes that team's own colour: Ravens purple and Chiefs
-// red are different facts, where two greens are the same fact twice. Every
-// other column keeps the plain green, so "right" still means one thing.
-function cellStyle(key: ColumnKey, cell: { value: string | number | null; status: Verdict }) {
-  if (key === "team" && cell.status === "hit" && typeof cell.value === "string") {
-    const brand = TEAMS[cell.value as TeamAbbr]?.color;
-    if (brand) return teamTile(brand);
-  }
+// Every column, one colour language. A correct TEAM cell used to take
+// that team's own colour, on the theory that Ravens purple and Chiefs red
+// are different facts where two greens are the same fact twice.
+//
+// It was the wrong call. The board teaches exactly three colours in its
+// own legend - green right, gold close, grey wrong - and then broke that
+// promise in the first column, where a correct Ravens guess came back
+// purple. Somebody who has played twice reads purple as a fourth verdict
+// they have not learned yet, and the only way to find out it means "right"
+// is to already know it. A rule with one exception is two rules.
+function cellStyle(_key: ColumnKey, cell: { value: string | number | null; status: Verdict }) {
   const tone = TONE[cell.status];
   return { bg: tone.bg, ink: tone.ink };
 }
@@ -406,16 +408,23 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       )}
 
       {state.finished && state.answer && <Reveal state={state} answer={answer} onShare={share} copied={copied} />}
-      {header}
 
-      {/* The board goes as wide as the screen allows; the input does not.
-          A search field stretched to 1150px is a lot of runway for a
-          name, and it drifts away from the list it drops down over. */}
-      {!state.finished && (
-        <div
-          className="mx-auto flex w-full max-w-2xl flex-col p-4 lg:p-5"
-          style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }}
-        >
+      {/* ONE card: title, guess field, board. They used to be three
+          separately bordered things floating with 20px between them,
+          which made a single activity look like three unrelated widgets
+          stacked up. Inside, the sections are divided by a hairline
+          rather than by air - the same rule the legend already used. */}
+      <div style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP, overflow: "hidden" }}>
+        {header}
+
+        {/* The board goes as wide as the card allows; the input does not.
+            A search field stretched to 1150px is a lot of runway for a
+            name, and it drifts away from the list it drops down over. */}
+        {!state.finished && (
+          <div
+            className="mx-auto flex w-full max-w-2xl flex-col px-4 py-4 lg:px-5 lg:py-5"
+            style={{ borderTop: CARD_EDGE }}
+          >
           {/* No title here - the page already says NAMEPLATE above the
               card, and repeating it inside cost a line of height for a
               word already on screen. */}
@@ -504,14 +513,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               yellow is close, and an arrow points the way.
             </p>
           )}
-        </div>
-      )}
+          </div>
+        )}
 
       {state.guesses.length > 0 && (
-        <div
-          className="puzzle-board p-3.5 md:p-[18px] lg:p-6"
-          style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }}
-        >
+        <div className="puzzle-board px-2 py-3 md:p-[18px] lg:p-6" style={{ borderTop: CARD_EDGE }}>
           {/* One header row on desktop, where the columns line up under it.
               On a phone the board stacks into a card per guess and every
               chip carries its own label instead - same information, no
@@ -553,8 +559,15 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
 
                 {/* md:contents dissolves this wrapper on desktop so the
                     chips become cells of the row's own grid and line up
-                    with the header. On a phone it stays a 4-up grid. */}
-                <div className="grid grid-cols-4 gap-2 md:contents">
+                    with the header.
+                    All seven across on a phone too, not four and then
+                    three. A row that wraps stops being a row: the eye
+                    reads two half-rows and has to work out that they are
+                    one guess. Seven narrow chips that each take two lines
+                    of text is the trade, and it is the right way round -
+                    the SHAPE of a row is what you scan, the text is what
+                    you stop and read. */}
+                <div className="grid grid-cols-7 gap-1 md:contents">
                   {visibleColumns.map((c, i) => (
                     <Chip key={c.key} column={c} cell={cellOf(g, c.key)} index={i} />
                   ))}
@@ -566,6 +579,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           <Legend columns={visibleColumns} />
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -587,17 +601,19 @@ function Chip({
   // letters and an ellipsis. The threshold is 8 rather than 9 because
   // "AFC North" is exactly nine characters and was the thing truncating.
   const long = text.length > 8;
-  // College is the one column that wraps. "Mississippi State" is two
-  // words and a chip is not wide enough for either of them shrunk to fit,
-  // so it takes two lines and the row grows - which costs nothing,
-  // because the row was going to be the height of its tallest chip
-  // anyway. Nothing else wraps: every other value is short, or a number,
-  // or an abbreviation that means nothing broken in half.
+  // Every value wraps on a phone now that seven chips share the width of
+  // one. Truncating instead would put an ellipsis where the answer is:
+  // "Mississippi State" and "AFC South" are both facts you are reading
+  // the board FOR, and half of either is worth nothing. The row grows to
+  // its tallest chip either way, so two lines cost nothing but height
+  // that was already going to be spent.
+  //
+  // From md up the chips are wide enough that only college needs it.
   const wraps = column.key === "college";
 
   return (
     <div
-      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 py-2 md:py-3 lg:py-3.5"
+      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 md:px-0 md:py-3 lg:py-3.5"
       title={`${column.label}: ${text}`}
       style={{
         background: bg,
@@ -608,15 +624,21 @@ function Chip({
         animationDelay: `${index * 45}ms`,
       }}
     >
-      <span className="text-[8px] font-semibold uppercase tracking-wider md:hidden" style={{ opacity: 0.6 }}>
+      <span className="text-[7px] font-semibold uppercase leading-none tracking-tight md:text-[8px] md:tracking-wider md:hidden" style={{ opacity: 0.6 }}>
         {column.label}
       </span>
-      <span className="flex w-full items-center justify-center gap-0.5 px-1">
+      <span className="flex w-full items-center justify-center gap-0.5 px-0.5 md:px-1">
         <span
-          className={`font-medium tabular-nums ${
+          // The long ones get a step smaller on a phone, or the break
+          // lands mid-word: "Mississippi" does not fit a 37px chip at
+          // 8.5px, and overflow-wrap will cut a word in half rather than
+          // overflow. "Mississip / pi State" is worse than small.
+          className={`min-w-0 break-words text-center font-medium leading-[1.12] tabular-nums md:leading-normal ${
+            long ? "text-[7px]" : "text-[8.5px]"
+          } ${
             wraps
-              ? "break-words text-center leading-[1.15] text-[10px] md:text-[11px] lg:text-[13px]"
-              : `truncate ${long ? "text-[9px] md:text-[11px] lg:text-[12px]" : "text-[11px] md:text-[13px] lg:text-[15px]"}`
+              ? "md:break-words md:text-[11px] lg:text-[13px]"
+              : `md:truncate ${long ? "md:text-[11px] lg:text-[12px]" : "md:text-[13px] lg:text-[15px]"}`
           }`}
         >
           {text}

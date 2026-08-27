@@ -24,10 +24,13 @@ export default function DailyPage() {
           The eyebrow and tagline live inside the bar for the same reason,
           and the whole header is shorter than the wordmark-only version it
           replaces. */}
-      <div
-        className="flex items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-center sm:gap-4 sm:px-4"
-        style={{ border: "1px solid rgba(143,164,196,0.4)", background: "linear-gradient(180deg, #12203a, #0b1730)" }}
-      >
+      {/* No box of its own any more. The title, the guess field and the
+          board were three separate bordered cards floating on the page,
+          which made one activity look like three unrelated widgets. The
+          game owns a single card now and this is its top section - so
+          the header brings padding and nothing else, and the rule under
+          it is what separates it from the field. */}
+      <div className="flex items-center justify-center gap-3 px-3 py-3 text-center sm:gap-4 sm:px-4">
         <img
           src="/press-logo.png"
           alt="Sideline Brew"
