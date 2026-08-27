@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "sync:players": "node scripts/sync-players.mjs",
+    "og": "node scripts/gen-og-cards.mjs",
     "test:sync": "node scripts/sync-players.test.mjs"
   },
   "dependencies": {
