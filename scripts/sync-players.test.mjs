@@ -251,6 +251,16 @@ for (const [key, ids] of overrides) {
   for (const id of ids) assert.match(id, /^\d+$/, `${key} holds ESPN ids`);
 }
 
+// Every override has to name a position the sync actually knows about,
+// and give it the number of players that position takes - otherwise it
+// either never fires or fails the run at the very end of a long fetch.
+for (const [key, ids] of overrides) {
+  const code = key.split(" ")[1];
+  const position = POSITIONS.find((p) => p.code === code);
+  assert.ok(position, `${key} names a position the sync knows (${POSITIONS.map((p) => p.code).join(", ")})`);
+  assert.equal(ids.length, position.perTeam, `${key} names ${position.perTeam} player(s)`);
+}
+
 // And the module-level OVERRIDES, which is what syncPosition actually
 // consults - the bug was that this was empty while the file was fine.
 assert.equal(OVERRIDES.size, overrides.size, "the module read the same overrides the parser does");

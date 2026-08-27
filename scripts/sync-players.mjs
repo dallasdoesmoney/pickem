@@ -28,6 +28,8 @@ import { basename, dirname, join } from "node:path";
 // commit - the sort of gap that shows up a month later as "why is that
 // tier list stale".
 const DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data", "rosters");
+// The directory above it, for the one file here that is read rather than
+// written. Built from the same anchor as DATA so the two cannot drift.
 const SRC_DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "data");
 
 // One entry per category. `slots` decides which depth chart positions
@@ -56,6 +58,8 @@ const POSITIONS = [
     code: "QB",
     typeName: "Quarterback",
     exportName: "QUARTERBACKS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "QB",
     noun: "quarterback",
     slots: (abbr) => abbr === "QB",
     perTeam: 1,
@@ -65,6 +69,8 @@ const POSITIONS = [
     code: "RB",
     typeName: "RunningBack",
     exportName: "RUNNING_BACKS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "RB",
     noun: "running back",
     // ESPN has used both over the years, depending on the formation.
     slots: (abbr) => abbr === "RB" || abbr === "HB",
@@ -75,6 +81,8 @@ const POSITIONS = [
     code: "WR",
     typeName: "WideReceiver",
     exportName: "WIDE_RECEIVERS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "WR",
     noun: "wide receiver",
     // LWR / RWR / SWR, and plain WR in some formations.
     slots: (abbr) => abbr.endsWith("WR"),
@@ -85,6 +93,8 @@ const POSITIONS = [
     code: "TE",
     typeName: "TightEnd",
     exportName: "TIGHT_ENDS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "TE",
     noun: "tight end",
     // One apiece, like quarterback: a team has a starting tight end even
     // when it lines two up, and the second is a blocker nobody is
@@ -97,6 +107,8 @@ const POSITIONS = [
     code: "K",
     typeName: "Kicker",
     exportName: "KICKERS",
+    // How src/data/rosterOverrides.ts names this position.
+    code: "K",
     noun: "kicker",
     // ESPN has used PK for the place kicker and plain K in places.
     // Matching both, and NOT the punter, who is a different job however
