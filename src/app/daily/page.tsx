@@ -30,7 +30,12 @@ export default function DailyPage() {
           game owns a single card now and this is its top section - so
           the header brings padding and nothing else, and the rule under
           it is what separates it from the field. */}
-      <div className="flex items-center justify-center gap-3 px-3 py-3 text-center sm:gap-4 sm:px-4">
+      {/* items-END, not items-center. The cup is 92px and the type block
+          is about 55, so centring the two left the title floating in the
+          middle of the logo with air above and below it. Sitting them on
+          a common baseline drops the title to where the cup's own
+          wordmark is and takes the slack out of the whole header. */}
+      <div className="flex items-end justify-center gap-3 px-3 pb-2.5 pt-3 text-center sm:gap-4 sm:px-4">
         <img
           src="/press-logo.png"
           alt="Sideline Brew"
@@ -53,7 +58,7 @@ export default function DailyPage() {
           >
             NAMEPLATE
           </h1>
-          <p className="mt-1 truncate text-[11px] text-white/45 sm:text-[13px]">NFL Guessing Game</p>
+          <p className="mt-0.5 truncate text-[11px] leading-tight text-white/45 sm:text-[13px]">NFL Guessing Game</p>
         </div>
       </div>
     </>

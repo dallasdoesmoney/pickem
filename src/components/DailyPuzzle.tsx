@@ -425,19 +425,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             className="mx-auto flex w-full max-w-2xl flex-col px-4 py-4 lg:px-5 lg:py-5"
             style={{ borderTop: CARD_EDGE }}
           >
-          {/* No title here - the page already says NAMEPLATE above the
-              card, and repeating it inside cost a line of height for a
-              word already on screen. */}
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider lg:text-[13px]" style={{ color: MUTED }}>
-              Guess the player
-            </span>
-            <span className="text-sm font-semibold lg:text-base" style={{ color: ALARM }}>
-              {left} of {state.maxGuesses} left
-            </span>
-          </div>
-
-          <div className="relative">
+          {/* No title and no label. The field's own placeholder says
+              "Guess the player", so a heading above it saying the same
+              three words was a line of height for nothing - and the
+              count reads better next to the box it is counting than
+              stranded on a row of its own. */}
+          <div className="flex items-center gap-3">
+          <div className="relative flex-1">
             <input
               ref={inputRef}
               value={query}
@@ -449,7 +443,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 setActive(0);
               }}
               onKeyDown={onKeyDown}
-              placeholder="Type a player's name…"
+              placeholder="Guess the player"
               autoComplete="off"
               disabled={busy}
               aria-label="Guess a player"
@@ -503,6 +497,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 })}
               </div>
             )}
+          </div>
+
+            <span className="shrink-0 whitespace-nowrap text-sm font-semibold lg:text-base" style={{ color: ALARM }}>
+              {left} of {state.maxGuesses} left
+            </span>
           </div>
 
           {error && <p className="mt-2 text-xs font-semibold text-red-400">{error}</p>}
