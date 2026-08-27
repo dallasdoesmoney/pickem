@@ -23,7 +23,7 @@ import {
 import { errorMessage } from "@/lib/errorMessage";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
-import { StillBrewingModal } from "@/components/StillBrewingModal";
+import { useSignInModal } from "@/hooks/useSignInModal";
 
 // The sticker language, in one place - moved down the scale. Same four
 // rules as the cream board it replaces (solid ground, hard outline, hard
@@ -178,6 +178,7 @@ function guestBoard(puzzleOn: string, guesses: PuzzleGuess[]): PuzzleState {
 
 export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const { user, profile } = useAuth();
+  const { requestSignIn, signInModal } = useSignInModal();
   const [state, setState] = useState<PuzzleState | null>(null);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -186,14 +187,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // How many guesses in before the sign-up prompt appears. Three is
-  // enough to have seen what the game is and to have something to lose,
-  // and early enough that the ask is not arriving at the door on the way
-  // out.
-  const PROMPT_AT = 3;
-  const [prompted, setPrompted] = useState(false);
-  const [showJoin, setShowJoin] = useState(false);
 
   // THE WIN IS HELD. Solving used to swap the reveal card in on the same
   // tick the guess landed, so the board turned green and vanished in the
@@ -209,6 +202,10 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const [celebrating, setCelebrating] = useState(false);
   const celebrateTimer = useRef<number | null>(null);
   const revealRef = useRef<HTMLDivElement>(null);
+  // A losing guest has no reveal to scroll to, so the sign-in card is
+  // what the board scrolls up to instead. Without this the eighth guess
+  // leaves them at the bottom of eight rows with the result off screen.
+  const guestFinishRef = useRef<HTMLDivElement>(null);
 
   const endCelebration = useCallback(() => {
     if (celebrateTimer.current !== null) {
@@ -219,7 +216,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     // The reveal only mounts once celebrating is false, so the scroll has
     // to wait a frame for something to scroll to.
     window.setTimeout(() => {
-      revealRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      (revealRef.current ?? guestFinishRef.current)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 40);
   }, []);
 
@@ -360,13 +357,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           setCelebrating(true);
           celebrateTimer.current = window.setTimeout(endCelebration, CELEBRATE_MS);
         }
-      }
-      // The ask, once, at the third guess - and never to somebody who
-      // already has an account.
-      if (!user && next.guessesUsed >= PROMPT_AT && !next.finished && !prompted) {
-        setPrompted(true);
-        setShowJoin(true);
-        posthog.capture("daily_puzzle_join_prompted", { used: next.guessesUsed });
       }
       posthog.capture("daily_puzzle_guess", { used: next.guessesUsed, solved: next.solved, guest: !user });
       inputRef.current?.focus();
@@ -521,10 +511,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           the same word every day. Unfinished, the header leads as normal.
           The title lives in the page above this component, so the page
           hands it in and this decides where it sits. */}
-      {showJoin && (
-        <StillBrewingModal used={state.guessesUsed} max={state.maxGuesses} onClose={() => setShowJoin(false)} />
-      )}
-
       {/* scroll-mt, because /daily carries 106px of sticky chrome: the 72px
           header and the 34px back rail pinned under it. block: "start"
           puts an element's top at the top of the VIEWPORT, which is behind
@@ -538,6 +524,26 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           <Reveal state={state} answer={answer} onShare={share} copied={copied} grid={shareGrid(state)} />
         </div>
       )}
+
+      {/* The ask, at the end and only at the end.
+          It used to arrive at the third guess, mid-play, interrupting the
+          one thing the person came to do - and it was suppressed once the
+          board finished, so the single moment somebody most wants an
+          account was the moment they were never asked.
+          A guest who LOST has an empty results slot: guestBoard cannot
+          fill in an answer it is not allowed to know, so the reveal above
+          renders nothing and the page simply stopped. This is what goes
+          there. A guest who WON has their reveal already, and this sits
+          under it offering to keep the result rather than to explain it.
+          Inline rather than a modal: for the loser it IS the result, and
+          covering a winner's reveal with a dialog would hide the thing
+          they just earned and came to screenshot. */}
+      {state.finished && !user && !celebrating && (
+        <div ref={guestFinishRef} className="scroll-mt-[118px]">
+          <GuestFinish solved={state.solved} onJoin={() => void requestSignIn()} />
+        </div>
+      )}
+      {signInModal}
 
       {/* ONE card: title, guess field, board. They used to be three
           separately bordered things floating with 20px between them,
@@ -990,7 +996,7 @@ function Reveal({
           <span className="text-sm font-semibold" style={{ color: TEXT }}>
             {state.solved ? `Solved in ${state.guessesUsed}` : "Out of guesses"}
           </span>
-          {state.solved && (
+          {state.solved && state.pointsAwarded > 0 && (
             <span
               style={{
                 fontFamily: "var(--font-display)",
@@ -1052,6 +1058,73 @@ function Reveal({
         <p className="text-center text-[10px]" style={{ color: MUTED }}>
           Shares squares only — no name, no team.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// The end of a guest's game, and the only place this game asks for an
+// account.
+//
+// Two different offers, because the two endings want different things.
+// Somebody who ran out has a question they cannot answer - the board
+// deliberately never learns who it was, since the only way to tell a
+// signed-out player is an endpoint that hands the day's answer to anyone
+// who asks. Signing in genuinely resolves it: the handover replays their
+// guesses through the real function, so the server board comes back
+// finished with the answer attached. Somebody who solved it already has
+// their reveal; what they stand to lose is the result itself, which
+// lives in one browser and is gone on any other device.
+//
+// No dismiss. There is nothing behind it for a loser - it IS the result
+// slot - and for a winner it sits under a reveal that is already theirs.
+function GuestFinish({ solved, onJoin }: { solved: boolean; onJoin: () => void }) {
+  return (
+    <div
+      className="puzzle-reveal mb-3 overflow-hidden lg:mb-4"
+      style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }}
+    >
+      <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 px-5 py-6 text-center">
+        <span
+          className="text-[1.35rem] leading-tight"
+          style={{ fontFamily: "var(--font-display)", color: TEXT }}
+        >
+          {solved ? "KEEP THIS RESULT" : "OUT OF GUESSES"}
+        </span>
+
+        <p className="text-[13.5px] leading-relaxed" style={{ color: MUTED }}>
+          {solved ? (
+            <>
+              Nice one. This result is only in this browser though &mdash; sign in to keep it, start a streak and
+              put the points on the board.
+            </>
+          ) : (
+            <>
+              Today&rsquo;s player stays secret to signed-out boards. Sign in and we&rsquo;ll show you who it was,
+              and keep tomorrow&rsquo;s result when you come back.
+            </>
+          )}
+        </p>
+
+        <button
+          type="button"
+          onClick={onJoin}
+          className="puzzle-press mt-1 w-full max-w-[260px] px-5 py-3 text-[.92rem]"
+          style={{
+            fontFamily: "var(--font-display)",
+            background: "linear-gradient(135deg, #4ade80, #22c55e)",
+            color: "#04240f",
+            border: EDGE,
+            borderRadius: 12,
+            boxShadow: `3px 4px 0 ${INK}`,
+          }}
+        >
+          {solved ? "SAVE MY RESULT" : "SHOW ME WHO IT WAS"}
+        </button>
+
+        <span className="text-[11px]" style={{ color: MUTED }}>
+          Free, and it takes a few seconds.
+        </span>
       </div>
     </div>
   );

@@ -157,8 +157,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message ?? null };
   }, []);
 
+  // emailRedirectTo, so a confirmation link comes back to the page the
+  // person signed up FROM rather than to the site root.
+  //
+  // It matters most on the daily game: somebody signs up from the end of
+  // a lost board specifically to be told who it was, and without this the
+  // link drops them on the home page with no idea where their result
+  // went. Google already did the equivalent through redirectTo below; the
+  // email path was the one that did not.
+  //
+  // Supabase only honours a redirect that matches an allowed URL in the
+  // project's auth settings, so an origin that has not been listed there
+  // falls back to the Site URL - which is the old behaviour, not a break.
   const signUpWithPassword = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: window.location.href },
+    });
     return { error: error?.message ?? null };
   }, []);
 
