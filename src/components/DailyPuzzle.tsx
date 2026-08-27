@@ -751,7 +751,13 @@ function Chip({
   // that number does not change however big the type gets - so scaling md
   // with lg would only make the chips narrower while their contents grew.
   // The size-up lands where there is room to spend it.
-  const SIZE = "hyphens-auto text-[7px] tracking-tight md:text-[11px] md:tracking-normal lg:text-[14px]";
+  // 7px on a phone is a floor, not a choice. A 390px screen leaves each
+  // chip 33px of measure once the page, the card and the chip's own
+  // padding are off it, and "Washington" needs 38 at 7px - stripping
+  // every pixel of padding only gets the measure to 38, so a size up
+  // breaks a common college mid-word in every chip. The phone grows by
+  // getting TALLER instead, which costs nothing.
+  const SIZE = "hyphens-auto text-[7px] tracking-tight md:text-[11px] md:tracking-normal lg:text-[15px]";
 
   // DIV always breaks between its two words, even on a desktop chip wide
   // enough to hold "NFC North" on one line. Left to wrap on its own it
@@ -763,7 +769,7 @@ function Chip({
 
   return (
     <div
-      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-2 md:px-0 md:py-3.5 lg:py-[18px]"
+      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-3 md:px-0 md:py-4 lg:py-5"
       title={`${column.label}: ${text}`}
       style={{
         background: bg,
@@ -792,7 +798,12 @@ function Chip({
       <span className="text-[6px] font-semibold uppercase leading-none tracking-tight md:text-[8px] md:tracking-wider md:hidden" style={{ opacity: 0.55 }}>
         {column.label}
       </span>
-      <span className="flex w-full items-center justify-center px-0.5 md:px-1">
+      {/* No inner padding on a phone. Four pixels of it was the whole
+            difference between "Mississippi" fitting its 33px measure and
+            breaking after the tenth letter - the chip's own px-0.5 still
+            keeps the type off the border. From md up there is room to
+            spare, so the padding comes back. */}
+        <span className="flex w-full items-center justify-center px-0 md:px-1">
         {/* The VALUE is what gets centred, not the value-plus-arrow. When
             the two shared a centred flex row, an arrow shoved the number
             left by half its own width, so 6'4" with a hint sat on a

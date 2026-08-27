@@ -57,7 +57,7 @@ export function PlayerPlate({
       // No padding on the photo's side. The picture is flush with the
       // left, the top AND the bottom, so a player stands on the edge of
       // his own card rather than floating in a moat.
-      className="puzzle-plate relative flex h-[56px] w-full min-w-0 items-center overflow-hidden rounded-[10px] pr-3 md:h-full"
+      className="puzzle-plate relative flex h-[62px] w-full min-w-0 items-center overflow-hidden rounded-[10px] pr-3 md:h-full"
       style={{
         background: `linear-gradient(100deg, ${bg}, ${bg}cc)`,
         border: "2px solid #0a1120",

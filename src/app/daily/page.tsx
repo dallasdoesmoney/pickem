@@ -9,21 +9,16 @@ import { DailyPuzzle } from "@/components/DailyPuzzle";
 // getting when this was max-w-lg at every size - the board could not fit
 // and grew a horizontal scrollbar instead.
 //
-// It stops at 4xl rather than running on to 6xl. The chips are 1fr tracks,
-// so they divide whatever width they are handed: on a wide screen they were
-// growing to 116px to hold values like "QB" and "26" - a board of
-// mostly-empty cards stretched across the monitor. Capped, they measure
-// 79px, which still fits every value on one line except the long colleges,
-// and those wrap to two ("Mississippi State" is the worst case and it fits
-// in the row's existing height).
+// 5xl, and the number matters. The chips are 1fr tracks, so they divide
+// whatever width they are handed - at 6xl they grew to 116px to hold "QB"
+// and "26", which is a row of mostly-empty cards stretched across a
+// monitor. This was cut to 4xl for exactly that reason and is back out to
+// 5xl now that the type inside them grew too: 91px chips holding 15px
+// type is the same fill as 79px chips holding 12px, just bigger.
 //
-// 4xl is the floor, not a preference. One step further down, at 3xl, the
-// chips come out at 61px and "NFC North" - which truncates rather than
-// wraps - loses its tail. Measured, not guessed; re-measure if the chip
-// type sizes change.
-//
-// A shorter line is easier to read across anyway: seven hints you can take
-// in without moving your head beats seven you have to scan.
+// The floor is 3xl, where the chips come out at 61px and "NFC North" -
+// which truncates rather than wraps - loses its tail. Measured, not
+// guessed; re-measure if the chip type sizes change again.
 export default function DailyPage() {
   const { loading } = useAuth();
 
@@ -84,7 +79,7 @@ export default function DailyPage() {
               home page is captioned DAILY GAME too, so it was the third
               time in two screens. */}
           <h1
-            className="text-[clamp(1.6rem,6.4vw,2.9rem)] leading-none tracking-wide"
+            className="text-[clamp(1.75rem,7vw,3.1rem)] leading-none tracking-wide"
             style={{ fontFamily: "var(--font-display)" }}
           >
             NAMEPLATE
