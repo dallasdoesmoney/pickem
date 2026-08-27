@@ -33,13 +33,23 @@ const SRC_DATA = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "dat
 // One entry per category. `slots` decides which depth chart positions
 // count, and `perTeam` how many players to take from them.
 //
-// Quarterback and running back are one apiece because both positions
-// have a real starter. Wide receiver does not - a team lines up three,
-// and ESPN splits them across separate left/right/slot entries that each
-// rank their own occupant first. So there is no "the WR2" to read off a
-// chart; there are three rank-1 receivers and an ordering between the
-// slots. Taking two gives the two the chart lists soonest, which is the
-// closest thing to "the guys who start outside" that the data supports.
+// Quarterback, running back and tight end are one apiece because each
+// has a real starter. Wide receiver is three, and that number is not a
+// guess: ESPN's depth chart draws THREE WR rows for a team in eleven
+// personnel, each with its own STARTER column - so a team has exactly
+// three starting receivers and the chart says which.
+//
+// It reads as three separate rank-1 receivers rather than a 1-2-3,
+// because the rows are separate slots (LWR / RWR / SWR). Sorting by rank
+// and then by the order the chart lists the slots picks up all three
+// before it reaches anybody's second string, which is why `perTeam: 3`
+// is all this needs. Dallas comes back Lamb, Pickens and Flournoy -
+// NOT KaVontae Turpin, who is second on Lamb's row and whose best rank
+// across all his slots is 1 because he returns kicks.
+//
+// This was 2, which cut every team's third starter out of the answer
+// pool for no reason other than that "WR1 and WR2" sounded like the
+// safer read of a chart that does not work that way.
 const POSITIONS = [
   {
     file: "qbs.ts",
@@ -68,7 +78,7 @@ const POSITIONS = [
     noun: "wide receiver",
     // LWR / RWR / SWR, and plain WR in some formations.
     slots: (abbr) => abbr.endsWith("WR"),
-    perTeam: 2,
+    perTeam: 3,
   },
   {
     file: "tes.ts",

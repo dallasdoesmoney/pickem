@@ -789,18 +789,18 @@ body {
    follows the row height - so the column has to grow with them or the
    thing it exists to hold stops fitting. */
 .puzzle-board {
-  --puzzle-player-col: 218px;
+  --puzzle-player-col: 226px;
 }
 
 @media (min-width: 1024px) {
   .puzzle-board {
-    --puzzle-player-col: 244px;
+    --puzzle-player-col: 258px;
   }
 }
 
 @media (min-width: 1280px) {
   .puzzle-board {
-    --puzzle-player-col: 252px;
+    --puzzle-player-col: 266px;
   }
 }
 

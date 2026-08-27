@@ -5,16 +5,24 @@ import { RUNNING_BACKS } from "@/data/rosters/rbs";
 import { WIDE_RECEIVERS } from "@/data/rosters/wrs";
 import { TIGHT_ENDS } from "@/data/rosters/tes";
 
-// The pool the daily puzzle draws from, and the one it grades guesses
-// against. In CLASSIC MODE - the only mode there is today - they are the
-// same set: the four skill positions off the top of the depth chart, and
-// nothing else. You can guess exactly the players who can be the answer,
-// so being told "not a player" after typing a real name cannot happen.
+// TWO POOLS, and they are not the same set.
 //
-// It was briefly the other way round, with every one of the ~3,000
-// players on an ESPN roster guessable and about 1,400 of them answerable.
-// That is the shape hard mode will want, and it is why the full roster is
-// still synced and still in the database - see CLASSIC_MEMBERS below.
+//   GUESSABLE  every quarterback, running back, receiver and tight end on
+//              an NFL roster - about 925 of them. Backups included: if
+//              you want to spend a guess on a third-string quarterback to
+//              rule out a division, that is a legitimate way to play and
+//              the game should not stop you.
+//
+//   ANSWERABLE only the starters - one QB, one RB, one TE and THREE
+//              receivers a team, 192 in all. The answer has to be
+//              somebody a person could name, and a fourth tight end is
+//              not that.
+//
+// They were the same set until now, which meant the only players you
+// could guess were the ones who could be the answer. That is a much
+// smaller game than it looks: eight guesses out of 160 candidates is a
+// different puzzle to eight out of 925, and it also made a guess that
+// merely eliminates - "is he even in the AFC?" - impossible to spend.
 //
 // A rank and not "on the chart": ESPN ranks essentially the whole roster,
 // so mere presence marked 2,985 of 3,021 and selected nothing.
@@ -61,8 +69,8 @@ type RosterRow = {
   college?: string;
 };
 
-// CLASSIC MODE. The only mode there is today, and the whole pool: these
-// players are the answers AND they are the only names you can guess.
+// THE ANSWER POOL. These players can be the answer; everybody else at
+// these positions can only be guessed.
 //
 // The membership comes from the four position files, NOT from filtering
 // the full roster by depth-chart rank. That was the first attempt and it
@@ -83,9 +91,11 @@ type RosterRow = {
 // Pittsburgh out of the game entirely. The position files have all 32
 // teams at all four positions.
 //
-// So: 32 quarterbacks, 32 running backs, 32 tight ends, 64 receivers.
-// 160 players, one per team per position and two at receiver.
-const CLASSIC_MEMBERS: { espnId: string; position: string; row: RosterRow }[] = [
+// So: 32 quarterbacks, 32 running backs, 32 tight ends, and three
+// receivers a team - 192 players once the roster sync has been run with
+// WIDE_RECEIVERS at three per team. Until then wrs.ts holds two apiece
+// and this is 160; the shape does not change, only the count.
+const STARTERS: { espnId: string; position: string; row: RosterRow }[] = [
   ...QUARTERBACKS.map((row) => ({ espnId: row.espnId, position: "QB", row })),
   ...RUNNING_BACKS.map((row) => ({ espnId: row.espnId, position: "RB", row })),
   ...WIDE_RECEIVERS.map((row) => ({ espnId: row.espnId, position: "WR", row })),
@@ -104,7 +114,31 @@ const CLASSIC_MEMBERS: { espnId: string; position: string; row: RosterRow }[] = 
 // of it, and these hints want the rest.
 const BY_ID = new Map(ACTIVE_PLAYERS.map((p) => [p.espnId, p]));
 
-export const PUZZLE_PLAYERS: PuzzlePlayer[] = CLASSIC_MEMBERS
+const STARTER_IDS = new Set(STARTERS.map((m) => m.espnId));
+
+// The positions you can guess at. Everything else on a roster - guards,
+// safeties, long snappers - is off the board entirely: nobody is going
+// to type a third-string centre's name into a game about skill players,
+// and 2,100 of them in the dropdown makes the search worse for everyone.
+const GUESSABLE_POSITIONS = new Set(["QB", "RB", "WR", "TE"]);
+
+// Everybody guessable, starters first so the de-dupe below keeps the row
+// that knows a player is a starter.
+//
+// The starters are appended rather than assumed to be in all.ts: a fresh
+// clone has an empty roster file and falls back to the position files
+// alone, which plays the same game with 160 names instead of 925 rather
+// than no game at all.
+const GUESS_POOL: { espnId: string; position: string; row: RosterRow }[] = [
+  ...STARTERS,
+  ...ACTIVE_PLAYERS.filter((p) => GUESSABLE_POSITIONS.has(p.position)).map((p) => ({
+    espnId: p.espnId,
+    position: p.position,
+    row: p as RosterRow,
+  })),
+];
+
+export const PUZZLE_PLAYERS: PuzzlePlayer[] = GUESS_POOL
   // A player can hold two slots - a receiver listed outside and in the
   // slot - and would otherwise appear twice in the dropdown and let the
   // same guess be spent twice.
@@ -123,8 +157,7 @@ export const PUZZLE_PLAYERS: PuzzlePlayer[] = CLASSIC_MEMBERS
       position,
       conference: TEAMS[team].conference,
       division: TEAMS[team].division,
-      // Classic draws no line between the two: everybody here is both.
-      answerable: true,
+      answerable: STARTER_IDS.has(espnId),
       heightIn: full?.heightIn ?? row.heightIn,
       weightLb: full?.weightLb ?? row.weightLb,
       age: full?.age ?? row.age,

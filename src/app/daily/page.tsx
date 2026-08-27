@@ -9,16 +9,16 @@ import { DailyPuzzle } from "@/components/DailyPuzzle";
 // getting when this was max-w-lg at every size - the board could not fit
 // and grew a horizontal scrollbar instead.
 //
-// 5xl, and the number matters. The chips are 1fr tracks, so they divide
-// whatever width they are handed - at 6xl they grew to 116px to hold "QB"
-// and "26", which is a row of mostly-empty cards stretched across a
-// monitor. This was cut to 4xl for exactly that reason and is back out to
-// 5xl now that the type inside them grew too: 91px chips holding 15px
-// type is the same fill as 79px chips holding 12px, just bigger.
+// Back to 4xl from 5xl, because the board lost a column. Six chips
+// divide the same width seven used to, so at 5xl they came out at 107px
+// to hold "QB" - a row of mostly-empty cards stretched across a monitor,
+// which is the exact thing the cap exists to stop. At 4xl they are 87px
+// holding 16px type, which is more chip AND more type than the seven-wide
+// board ever had.
 //
-// The floor is 3xl, where the chips come out at 61px and "NFC North" -
-// which truncates rather than wraps - loses its tail. Measured, not
-// guessed; re-measure if the chip type sizes change again.
+// Re-measure this whenever a column is added or removed: the chips are
+// 1fr tracks, so the right page width is a function of how many of them
+// there are.
 export default function DailyPage() {
   const { loading } = useAuth();
 
@@ -91,7 +91,7 @@ export default function DailyPage() {
   );
 
   return (
-    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-5xl w-full mx-auto">
+    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-4xl w-full mx-auto">
       {loading ? (
         <>
           {header}

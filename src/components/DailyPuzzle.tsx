@@ -66,7 +66,15 @@ const COLUMNS = [
   // arrives on every guess, so putting it back is this one line and no
   // SQL. Nothing else has to change.
   { key: "jersey", label: "#", base: false },
-  { key: "college", label: "COLLEGE", base: false },
+  // COLLEGE is off the board. It was the widest column by a distance -
+  // "Mississippi State" against "QB" - so it set the width of all seven
+  // and forced the type down to fit it, and a 13-letter word like
+  // "Massachusetts" broke mid-word at every size worth reading. What it
+  // bought for that was the weakest hint on the board: knowing the answer
+  // did not go to USC narrows a 190-player pool by almost nothing.
+  //
+  // The server still grades and returns it - see puzzle_str('college')
+  // in the migrations - so putting it back is this one line and no SQL.
 ] as const;
 
 type ColumnKey = (typeof COLUMNS)[number]["key"];
@@ -116,7 +124,6 @@ const TONE: Record<Verdict, { bg: string; ink: string }> = {
 // people to ignore yellow.
 const CLOSE_MEANS: Partial<Record<ColumnKey, string>> = {
   division: "same conference",
-  college: "same college conference",
   age: "within 3 years",
   height: "within 2 inches",
   jersey: "within 3",
@@ -673,7 +680,15 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                     of text is the trade, and it is the right way round -
                     the SHAPE of a row is what you scan, the text is what
                     you stop and read. */}
-                <div className="grid grid-cols-7 gap-1 md:contents">
+                {/* Built from the column count rather than hard-coded to
+                    seven. Columns already come and go on their own - one
+                    nothing has a value for hides itself - so a fixed
+                    grid-cols-7 left an empty seventh cell the moment that
+                    happened, and dropping COLLEGE made it permanent. */}
+                <div
+                  className="grid gap-1 md:contents"
+                  style={{ gridTemplateColumns: `repeat(${visibleColumns.length}, minmax(0, 1fr))` }}
+                >
                   {visibleColumns.map((c, i) => (
                     <Chip
                       key={c.key}
@@ -751,13 +766,17 @@ function Chip({
   // that number does not change however big the type gets - so scaling md
   // with lg would only make the chips narrower while their contents grew.
   // The size-up lands where there is room to spend it.
-  // 7px on a phone is a floor, not a choice. A 390px screen leaves each
-  // chip 33px of measure once the page, the card and the chip's own
-  // padding are off it, and "Washington" needs 38 at 7px - stripping
-  // every pixel of padding only gets the measure to 38, so a size up
-  // breaks a common college mid-word in every chip. The phone grows by
-  // getting TALLER instead, which costs nothing.
-  const SIZE = "hyphens-auto text-[7px] tracking-tight md:text-[11px] md:tracking-normal lg:text-[15px]";
+  // 7px on a phone WAS a floor: a 390px screen left each of seven chips
+  // 33px of measure, and "Washington" needs 38 at 7px, so any size up
+  // broke a college mid-word in every chip on the board.
+  //
+  // Dropping COLLEGE removed both halves of that. Six chips instead of
+  // seven is more width each, and the longest thing left to fit is
+  // "North" or 5'11" - five characters where the worst case used to be
+  // thirteen. So the phone goes from 7px to 11px, which is where this
+  // should have been all along, and nothing needs hyphenating or
+  // tightening to get there.
+  const SIZE = "text-[11px] md:text-[13px] lg:text-[16px]";
 
   // DIV always breaks between its two words, even on a desktop chip wide
   // enough to hold "NFC North" on one line. Left to wrap on its own it
@@ -795,7 +814,7 @@ function Chip({
       {/* 6px, not 7. The value came down to 7 when every chip went to one
           size, which left the label the same size as the thing it labels
           and in a heavier weight - so TEAM read louder than MIN. */}
-      <span className="text-[6px] font-semibold uppercase leading-none tracking-tight md:text-[8px] md:tracking-wider md:hidden" style={{ opacity: 0.55 }}>
+      <span className="text-[8px] font-semibold uppercase leading-none tracking-tight md:text-[8px] md:tracking-wider md:hidden" style={{ opacity: 0.55 }}>
         {column.label}
       </span>
       {/* No inner padding on a phone. Four pixels of it was the whole
@@ -819,7 +838,7 @@ function Chip({
           {arrow && (
             <span
               aria-label={cell.direction === "up" ? "higher" : "lower"}
-              className="absolute left-full top-1/2 ml-[2px] -translate-y-1/2 text-[5px] leading-none md:ml-[4px] md:text-[8px] lg:text-[9px]"
+              className="absolute left-full top-1/2 ml-[3px] -translate-y-1/2 text-[7px] leading-none md:ml-[4px] md:text-[8px] lg:text-[10px]"
             >
               {arrow}
             </span>
