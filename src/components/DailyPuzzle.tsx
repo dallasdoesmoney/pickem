@@ -456,7 +456,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     const score = s.solved
       ? `Solved in ${s.guessesUsed} ${s.guessesUsed === 1 ? "Guess" : "Guesses"}`
       : "Out of Guesses";
-    return `Sideline Brew \u2014 Nameplate\n${prettyDate(s.puzzleOn)}\n${score}\n\n${grid}`;
+    // Brand on its own line, then what the game IS. "NFL Nameplate"
+    // rather than "Nameplate", because the name alone says nothing to
+    // somebody who has never seen it - and this text is read almost
+    // entirely by people who have never seen it.
+    return `Sideline Brew\nNFL Nameplate\n${prettyDate(s.puzzleOn)}\n${score}\n\n${grid}`;
   }
 
   // Exactly what lands, link included. The preview used to show the grid
