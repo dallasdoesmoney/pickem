@@ -782,20 +782,25 @@ body {
    height: a square photo of a 62px row is 58px wide where it used to be
    48, and those ten pixels came straight out of the name - "Michael
    Pittman Jr." started truncating. Giving them back costs the chips
-   1.1px each, which is the right way round. */
+   1.1px each, which is the right way round.
+
+   And up again when the whole board went up a size. The name is 15px at
+   lg now rather than 13, which is about 15% more name, and the photo
+   follows the row height - so the column has to grow with them or the
+   thing it exists to hold stops fitting. */
 .puzzle-board {
-  --puzzle-player-col: 206px;
+  --puzzle-player-col: 218px;
 }
 
 @media (min-width: 1024px) {
   .puzzle-board {
-    --puzzle-player-col: 210px;
+    --puzzle-player-col: 244px;
   }
 }
 
 @media (min-width: 1280px) {
   .puzzle-board {
-    --puzzle-player-col: 215px;
+    --puzzle-player-col: 252px;
   }
 }
 

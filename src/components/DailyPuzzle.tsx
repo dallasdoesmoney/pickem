@@ -542,7 +542,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               disabled={busy}
               aria-label="Guess a player"
               aria-autocomplete="list"
-              className="w-full px-3.5 py-3 text-[.95rem] font-medium outline-none transition-shadow duration-150 focus:shadow-[0_0_0_3px_#2b3a56] disabled:opacity-60 lg:px-4 lg:py-3.5 lg:text-base"
+              className="w-full px-4 py-3.5 text-base font-medium outline-none transition-shadow duration-150 focus:shadow-[0_0_0_3px_#2b3a56] disabled:opacity-60 lg:px-5 lg:py-4 lg:text-lg"
               style={{
                 background: FIELD,
                 border: CARD_EDGE,
@@ -580,10 +580,10 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                       style={{ paddingLeft: 10 }}
                     >
                       <PlayerFace espnId={p.espnId} name={p.name} team={p.team} size={28} ring={2} />
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium" style={{ color: TEXT }}>
+                      <span className="min-w-0 flex-1 truncate text-[15px] font-medium" style={{ color: TEXT }}>
                         {p.name}
                       </span>
-                      <span className="shrink-0 text-[10px] font-semibold" style={{ color: MUTED }}>
+                      <span className="shrink-0 text-[11px] font-semibold" style={{ color: MUTED }}>
                         {already ? "GUESSED" : `${p.team} · ${p.position}`}
                       </span>
                     </button>
@@ -602,7 +602,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               It goes red for the last two, which is the only point in a
               run where the count is worth looking at. */}
           <p
-            className="mt-1.5 text-center text-[11px] font-normal leading-none"
+            className="mt-2 text-center text-xs font-normal leading-none lg:text-[13px]"
             style={{ color: left <= 2 ? ALARM : MUTED }}
           >
             {left} {left === 1 ? "guess" : "guesses"} remaining
@@ -614,7 +614,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               above it says how many are left, and saying it twice on the
               one screen where both are visible read as a stutter. */}
           {state.guesses.length === 0 && (
-            <p className="mt-3 text-center text-xs leading-relaxed" style={{ color: MUTED }}>
+            <p className="mt-3 text-center text-[13px] leading-relaxed lg:text-sm" style={{ color: MUTED }}>
               Every guess tells you what it has in common with the mystery player — green is an exact match, yellow is
               close, and an arrow points the way.
             </p>
@@ -633,7 +633,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               chip carries its own label instead - same information, no
               row of headings marooned above a grid it no longer describes. */}
           <div
-            className="mb-2 hidden gap-2 text-[10px] font-semibold tracking-wider md:grid lg:mb-2.5 lg:text-[11px]"
+            className="mb-2 hidden gap-2 text-[10px] font-semibold tracking-wider md:grid lg:mb-2.5 lg:text-[13px]"
             style={{ gridTemplateColumns: columnTrack, color: MUTED }}
           >
             <div className="pr-2">PLAYER</div>
@@ -746,7 +746,12 @@ function Chip({
   // room and "Mississippi" wants 33.8 of it. Tightening buys the ~2px
   // that keeps it whole; the alternative was another step down in size,
   // which costs legibility on every chip to fix one.
-  const SIZE = "hyphens-auto text-[7px] tracking-tight md:text-[10px] md:tracking-normal lg:text-[12px]";
+  // md gets almost none of the increase, on purpose. A 768px tablet has
+  // 700px of board to divide between a player column and seven chips, and
+  // that number does not change however big the type gets - so scaling md
+  // with lg would only make the chips narrower while their contents grew.
+  // The size-up lands where there is room to spend it.
+  const SIZE = "hyphens-auto text-[7px] tracking-tight md:text-[11px] md:tracking-normal lg:text-[14px]";
 
   // DIV always breaks between its two words, even on a desktop chip wide
   // enough to hold "NFC North" on one line. Left to wrap on its own it
@@ -758,7 +763,7 @@ function Chip({
 
   return (
     <div
-      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 md:px-0 md:py-3 lg:py-3.5"
+      className="puzzle-chip flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 py-2 md:px-0 md:py-3.5 lg:py-[18px]"
       title={`${column.label}: ${text}`}
       style={{
         background: bg,
@@ -803,7 +808,7 @@ function Chip({
           {arrow && (
             <span
               aria-label={cell.direction === "up" ? "higher" : "lower"}
-              className="absolute left-full top-1/2 ml-[2px] -translate-y-1/2 text-[5px] leading-none md:ml-[3px] md:text-[7px] lg:text-[8px]"
+              className="absolute left-full top-1/2 ml-[2px] -translate-y-1/2 text-[5px] leading-none md:ml-[4px] md:text-[8px] lg:text-[9px]"
             >
               {arrow}
             </span>
@@ -824,7 +829,7 @@ function Legend({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
   return (
     <div className="mt-4 flex flex-col gap-2 border-t pt-3 lg:mt-5 lg:pt-4" style={{ borderColor: RULE }}>
       <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] font-semibold lg:gap-x-5 lg:text-xs"
+        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-semibold lg:gap-x-5 lg:text-[13px]"
         style={{ color: MUTED }}
       >
         <span className="flex items-center gap-1.5">
@@ -837,7 +842,7 @@ function Legend({ columns }: { columns: readonly (typeof COLUMNS)[number][] }) {
           <Swatch bg={TONE.miss.bg} /> NO MATCH
         </span>
       </div>
-      <p className="text-[10px] leading-relaxed lg:text-xs" style={{ color: MUTED }}>
+      <p className="text-[11px] leading-relaxed lg:text-[13px]" style={{ color: MUTED }}>
         Close means{" "}
         {explained.map((c, i) => (
           <span key={c.key}>

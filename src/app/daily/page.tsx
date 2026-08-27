@@ -66,7 +66,7 @@ export default function DailyPage() {
             open the way it did in flow, so the block reserves its height
             instead and sits its own content on the bottom edge - which is
             also what puts the subtitle and the cup on one line. */}
-        <div className="relative flex min-h-14 min-w-0 flex-col justify-end text-center sm:min-h-[76px]">
+        <div className="relative flex min-h-16 min-w-0 flex-col justify-end text-center sm:min-h-[92px]">
           <img
             src="/press-logo.png"
             alt="Sideline Brew"
@@ -76,7 +76,7 @@ export default function DailyPage() {
             // to be reserved - and this header has been cut twice
             // already. 76 still reads as the big version next to a 48px
             // title and costs six pixels of height rather than twenty-six.
-            className="absolute bottom-0 right-full mr-2 h-14 w-14 sm:mr-3 sm:h-[76px] sm:w-[76px]"
+            className="absolute bottom-0 right-full mr-2 h-16 w-16 sm:mr-4 sm:h-[92px] sm:w-[92px]"
             style={{ objectFit: "contain" }}
           />
           {/* The "DAILY GAME" eyebrow is gone: the line under the title
@@ -84,19 +84,19 @@ export default function DailyPage() {
               home page is captioned DAILY GAME too, so it was the third
               time in two screens. */}
           <h1
-            className="text-[clamp(1.5rem,6vw,2.4rem)] leading-none tracking-wide"
+            className="text-[clamp(1.6rem,6.4vw,2.9rem)] leading-none tracking-wide"
             style={{ fontFamily: "var(--font-display)" }}
           >
             NAMEPLATE
           </h1>
-          <p className="mt-0.5 truncate text-[11px] leading-tight text-white/45 sm:text-[13px]">NFL Guessing Game</p>
+          <p className="mt-1 truncate text-xs leading-tight text-white/45 sm:text-[15px]">NFL Guessing Game</p>
         </div>
       </div>
     </>
   );
 
   return (
-    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-4xl w-full mx-auto">
+    <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-5xl w-full mx-auto">
       {loading ? (
         <>
           {header}

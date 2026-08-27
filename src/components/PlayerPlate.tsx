@@ -57,7 +57,7 @@ export function PlayerPlate({
       // No padding on the photo's side. The picture is flush with the
       // left, the top AND the bottom, so a player stands on the edge of
       // his own card rather than floating in a moat.
-      className="puzzle-plate relative flex h-[52px] w-full min-w-0 items-center overflow-hidden rounded-[10px] pr-3 md:h-full"
+      className="puzzle-plate relative flex h-[56px] w-full min-w-0 items-center overflow-hidden rounded-[10px] pr-3 md:h-full"
       style={{
         background: `linear-gradient(100deg, ${bg}, ${bg}cc)`,
         border: "2px solid #0a1120",
@@ -87,7 +87,7 @@ export function PlayerPlate({
       {/* Square, full-bleed, and the plate's own rounded corners do the
           clipping - so no radius here, or the corners double up. */}
       <span
-        className="relative grid aspect-square h-full shrink-0 place-items-center overflow-hidden text-base font-extrabold"
+        className="relative grid aspect-square h-full shrink-0 place-items-center overflow-hidden text-lg font-extrabold"
         style={{ color: ink }}
       >
         {/* Only until the photo arrives. The headshots are cut out on
@@ -107,7 +107,7 @@ export function PlayerPlate({
       </span>
 
       <span
-        className="relative ml-2.5 min-w-0 truncate text-sm font-semibold md:text-[13px]"
+        className="relative ml-2.5 min-w-0 truncate text-[15px] font-semibold md:ml-3 md:text-[13px] lg:text-[15px]"
         style={{ color: ink, textShadow: ink === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.45)" : "none" }}
       >
         {name}
