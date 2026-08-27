@@ -426,12 +426,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             style={{ borderTop: CARD_EDGE }}
           >
           {/* No title and no label. The field's own placeholder says
-              "Guess the player", so a heading above it saying the same
-              three words was a line of height for nothing - and the
-              count reads better next to the box it is counting than
-              stranded on a row of its own. */}
-          <div className="flex items-center gap-3">
-          <div className="relative flex-1">
+              "Guess the Player", so a heading above it saying the same
+              three words was a line of height for nothing.
+              The field is alone on its row so it sits on the card's own
+              centre line - sharing the row with the count pushed it off
+              axis by half the width of the count, which reads as a
+              mistake rather than as a layout. */}
+          <div className="relative">
             <input
               ref={inputRef}
               value={query}
@@ -443,7 +444,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 setActive(0);
               }}
               onKeyDown={onKeyDown}
-              placeholder="Guess the player"
+              placeholder="Guess the Player"
               autoComplete="off"
               disabled={busy}
               aria-label="Guess a player"
@@ -499,17 +500,30 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             )}
           </div>
 
-            <span className="shrink-0 whitespace-nowrap text-sm font-semibold lg:text-base" style={{ color: ALARM }}>
-              {left} of {state.maxGuesses} left
-            </span>
-          </div>
+          {/* A caption under the field rather than a number beside it.
+              "2 of 8 left" needed reading twice to work out which number
+              was which; "2 guesses remaining" is the same fact in words
+              you do not have to parse. Small and unbold on purpose - it
+              is a status line, not a headline, and at 11px it costs one
+              line of leading instead of a whole row of the header.
+              It goes red for the last two, which is the only point in a
+              run where the count is worth looking at. */}
+          <p
+            className="mt-1.5 text-center text-[11px] font-normal leading-none"
+            style={{ color: left <= 2 ? ALARM : MUTED }}
+          >
+            {left} {left === 1 ? "guess" : "guesses"} remaining
+          </p>
 
-          {error && <p className="mt-2 text-xs font-semibold text-red-400">{error}</p>}
+          {error && <p className="mt-2 text-center text-xs font-semibold text-red-400">{error}</p>}
 
+          {/* No longer opens with "Eight guesses" - the caption an inch
+              above it says how many are left, and saying it twice on the
+              one screen where both are visible read as a stutter. */}
           {state.guesses.length === 0 && (
-            <p className="mt-3 text-xs leading-relaxed" style={{ color: MUTED }}>
-              Eight guesses. Every one tells you what it has in common with the mystery player — green is an exact match,
-              yellow is close, and an arrow points the way.
+            <p className="mt-3 text-center text-xs leading-relaxed" style={{ color: MUTED }}>
+              Every guess tells you what it has in common with the mystery player — green is an exact match, yellow is
+              close, and an arrow points the way.
             </p>
           )}
           </div>

@@ -58,12 +58,11 @@ export default function DailyPage() {
           className="h-16 w-16 shrink-0 sm:h-[92px] sm:w-[92px]"
           style={{ objectFit: "contain" }}
         />
-        {/* Left-aligned inside a centred pair: the logo and the type read
-            as one lockup that happens to sit in the middle, where
-            centring the text as well would leave the eyebrow and the
-            tagline drifting on their own axes under a title of a
-            different width. */}
-        <div className="min-w-0 text-left">
+        {/* The block shrinks to the title's width, so "centred" and
+            "left" mean the same thing for NAMEPLATE itself - what this
+            decides is where the shorter line under it sits, and that is
+            set on the line rather than here. */}
+        <div className="min-w-0">
           {/* The "DAILY GAME" eyebrow is gone: the line under the title
               already says what kind of thing this is, and the card on the
               home page is captioned DAILY GAME too, so it was the third
@@ -74,7 +73,13 @@ export default function DailyPage() {
           >
             NAMEPLATE
           </h1>
-          <p className="mt-0.5 truncate text-[11px] leading-tight text-white/45 sm:text-[13px]">NFL Guessing Game</p>
+          {/* Centred under the title, not ranged left with it. The type
+              block is exactly as wide as NAMEPLATE, so this centres on
+              the title's own axis - which is what you want from a line
+              that is a subtitle to it rather than a second line of it. */}
+          <p className="mt-0.5 truncate text-center text-[11px] leading-tight text-white/45 sm:text-[13px]">
+            NFL Guessing Game
+          </p>
         </div>
       </div>
     </>
