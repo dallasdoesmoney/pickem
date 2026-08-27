@@ -554,7 +554,10 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 className="puzzle-row flex flex-col gap-2 md:grid md:items-stretch md:gap-2"
                 style={{ gridTemplateColumns: columnTrack }}
               >
-                <div className="flex min-w-0 md:items-center md:pr-2">
+                {/* items-STRETCH, so the plate can be h-full and match the
+                    chips. Centring it here was what left it 52px tall in
+                    a 62px row. */}
+                <div className="flex min-w-0 md:items-stretch md:pr-2">
                   <PlayerPlate
                     espnId={g.espnId}
                     name={g.name}

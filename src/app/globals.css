@@ -665,20 +665,26 @@ body {
    becomes 137, and the column comes down from 230 to 205 with nothing
    cut off. A typical name now leaves about 30px of air rather than 100.
    46px face + 10px gap + name + 8px padding is what these add up to.
-   Re-measure them if the face size or the name's font ever changes. */
+   Re-measure them if the face size or the name's font ever changes.
+
+   All three went up by 10 when the plate started filling the row's full
+   height: a square photo of a 62px row is 58px wide where it used to be
+   48, and those ten pixels came straight out of the name - "Michael
+   Pittman Jr." started truncating. Giving them back costs the chips
+   1.1px each, which is the right way round. */
 .puzzle-board {
-  --puzzle-player-col: 196px;
+  --puzzle-player-col: 206px;
 }
 
 @media (min-width: 1024px) {
   .puzzle-board {
-    --puzzle-player-col: 200px;
+    --puzzle-player-col: 210px;
   }
 }
 
 @media (min-width: 1280px) {
   .puzzle-board {
-    --puzzle-player-col: 205px;
+    --puzzle-player-col: 215px;
   }
 }
 

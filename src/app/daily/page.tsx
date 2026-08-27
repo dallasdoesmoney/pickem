@@ -46,40 +46,33 @@ export default function DailyPage() {
           game owns a single card now and this is its top section - so
           the header brings padding and nothing else, and the rule under
           it is what separates it from the field. */}
-      {/* items-END, not items-center. The cup is 92px and the type block
-          is about 55, so centring the two left the title floating in the
-          middle of the logo with air above and below it. Sitting them on
-          a common baseline drops the title to where the cup's own
-          wordmark is and takes the slack out of the whole header. */}
-      <div className="flex items-end justify-center gap-3 px-3 pb-2.5 pt-3 text-center sm:gap-4 sm:px-4">
+      {/* The title is centred on the CARD, and the mark is taken out of
+          the centring and parked on the left. Centring the pair meant the
+          title sat off the card's axis by half the logo plus the gap -
+          about 54px - so it never lined up with the guess field directly
+          beneath it, which is the one thing on this screen it ought to
+          line up with. Absolute, so the logo's width cannot push it. */}
+      <div className="relative flex items-end justify-center px-3 pb-2.5 pt-3 sm:px-4">
         <img
           src="/press-logo.png"
           alt="Sideline Brew"
-          className="h-16 w-16 shrink-0 sm:h-[92px] sm:w-[92px]"
+          className="absolute bottom-2 left-2 h-14 w-14 sm:bottom-2.5 sm:left-4 sm:h-[92px] sm:w-[92px]"
           style={{ objectFit: "contain" }}
         />
-        {/* The block shrinks to the title's width, so "centred" and
-            "left" mean the same thing for NAMEPLATE itself - what this
-            decides is where the shorter line under it sits, and that is
-            set on the line rather than here. */}
-        <div className="min-w-0">
+        {/* text-center on the block rather than on each line: the title
+            and its subtitle share one axis, and it is the card's. */}
+        <div className="min-w-0 text-center">
           {/* The "DAILY GAME" eyebrow is gone: the line under the title
               already says what kind of thing this is, and the card on the
               home page is captioned DAILY GAME too, so it was the third
               time in two screens. */}
           <h1
-            className="text-[clamp(1.6rem,7vw,2.4rem)] leading-none tracking-wide"
+            className="text-[clamp(1.5rem,6vw,2.4rem)] leading-none tracking-wide"
             style={{ fontFamily: "var(--font-display)" }}
           >
             NAMEPLATE
           </h1>
-          {/* Centred under the title, not ranged left with it. The type
-              block is exactly as wide as NAMEPLATE, so this centres on
-              the title's own axis - which is what you want from a line
-              that is a subtitle to it rather than a second line of it. */}
-          <p className="mt-0.5 truncate text-center text-[11px] leading-tight text-white/45 sm:text-[13px]">
-            NFL Guessing Game
-          </p>
+          <p className="mt-0.5 truncate text-[11px] leading-tight text-white/45 sm:text-[13px]">NFL Guessing Game</p>
         </div>
       </div>
     </>

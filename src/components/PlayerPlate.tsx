@@ -24,16 +24,10 @@ export function PlayerPlate({
   espnId,
   name,
   team,
-  // The photo IS the plate's height now, so this is the row height too.
-  // 48 rather than the 40 it was: the picture fills the card instead of
-  // sitting inside a margin, which buys eight pixels of player for none
-  // of row.
-  size = 48,
 }: {
   espnId: string;
   name: string;
   team: TeamAbbr;
-  size?: number;
 }) {
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -54,17 +48,20 @@ export function PlayerPlate({
 
   return (
     <span
-      className="puzzle-plate relative flex w-full min-w-0 items-center overflow-hidden rounded-[10px]"
+      // h-full from md up, so the plate is exactly as tall as the chips
+      // beside it rather than a fixed 52 sitting inside a 62px row with
+      // five pixels of dead space above and below. The row's own height
+      // comes from the chips; this just fills it - and the photo, being
+      // a square of that height, gets bigger for free.
+      //
+      // No padding on the photo's side. The picture is flush with the
+      // left, the top AND the bottom, so a player stands on the edge of
+      // his own card rather than floating in a moat.
+      className="puzzle-plate relative flex h-[52px] w-full min-w-0 items-center overflow-hidden rounded-[10px] pr-3 md:h-full"
       style={{
         background: `linear-gradient(100deg, ${bg}, ${bg}cc)`,
         border: "2px solid #0a1120",
         boxShadow: "3px 4px 0 #05090f",
-        // No padding on the photo's side. The picture is flush with the
-        // left, the top AND the bottom, so a player stands on the edge of
-        // his own card rather than floating in a 4px moat - and the
-        // headshot gets the full height to fill instead of 40 of 48.
-        paddingRight: 12,
-        height: size + 4,
       }}
       title={name}
     >
@@ -77,28 +74,21 @@ export function PlayerPlate({
           alt=""
           aria-hidden
           loading="lazy"
-          className="pointer-events-none absolute max-w-none select-none object-contain"
-          style={{
-            // 1.7x the photo: big enough to run past its right edge and
-            // under the start of the name - which is the point - without
-            // losing so much of the crest off the top and bottom of the
-            // plate that it stops being recognisable. The plate clips it,
-            // the photo does not.
-            height: size * 1.5,
-            width: size * 1.5,
-            left: size * -0.16,
-            top: "50%",
-            transform: "translateY(-50%)",
-            opacity: 0.26,
-          }}
+          // 1.5x the plate's height, and square with it, so it grows when
+          // the row does. Big enough to run past the photo's right edge
+          // and under the start of the name - which is the point -
+          // without losing so much of the crest off the top and bottom
+          // that it stops being recognisable. The plate clips it, the
+          // photo does not.
+          className="pointer-events-none absolute left-[-8px] top-1/2 aspect-square h-[150%] max-w-none -translate-y-1/2 select-none object-contain opacity-[0.26]"
         />
       )}
 
       {/* Square, full-bleed, and the plate's own rounded corners do the
           clipping - so no radius here, or the corners double up. */}
       <span
-        className="relative grid h-full shrink-0 place-items-center overflow-hidden"
-        style={{ width: size, fontSize: Math.round(size * 0.34), fontWeight: 800, color: ink }}
+        className="relative grid aspect-square h-full shrink-0 place-items-center overflow-hidden text-base font-extrabold"
+        style={{ color: ink }}
       >
         {/* Only until the photo arrives. The headshots are cut out on
             transparency, so initials left underneath one show THROUGH
