@@ -29,13 +29,19 @@ const ours = (abbr) => ESPN_TO_OURS[abbr] ?? abbr;
 // Parsed strictly and checked afterwards: a regex that silently matches
 // nothing would make this script cheerfully report "0 games to post"
 // forever, which is the failure mode that looks exactly like success.
+//
+// kickoff comes along too, because the deadline reminder needs to know
+// when a week actually locks and there should not be a second regex
+// reading the same file to find out. It is captured optionally: a game
+// without one still parses rather than vanishing from the list, which
+// would turn a schedule typo into a silently short week.
 export function parseGames(source) {
   const games = [];
   const re =
-    /\{\s*id:\s*"([^"]+)",\s*week:\s*(\d+),\s*away:\s*"([A-Z]+)",\s*home:\s*"([A-Z]+)"/g;
+    /\{\s*id:\s*"([^"]+)",\s*week:\s*(\d+),\s*away:\s*"([A-Z]+)",\s*home:\s*"([A-Z]+)"(?:,\s*kickoff:\s*"([^"]+)")?/g;
   let m;
   while ((m = re.exec(source))) {
-    games.push({ id: m[1], week: Number(m[2]), away: m[3], home: m[4] });
+    games.push({ id: m[1], week: Number(m[2]), away: m[3], home: m[4], kickoff: m[5] ?? null });
   }
   return games;
 }

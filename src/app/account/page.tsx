@@ -7,6 +7,7 @@ import { useAuth, type Profile } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { fetchMyLeaderboardEntry, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
+import { EmailPrefsPanel } from "@/components/EmailPrefsPanel";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
 import { MyReferralsModal } from "@/components/MyReferralsModal";
 import { EditProfileModal } from "@/components/EditProfileModal";
@@ -190,6 +191,8 @@ function SignedInAccount({
           </RankPanel>
         </button>
       )}
+
+      <EmailPrefsPanel />
 
       {myRecord?.username && (
         <div className="text-center mt-6">

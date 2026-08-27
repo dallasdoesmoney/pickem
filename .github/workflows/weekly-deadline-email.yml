@@ -1,0 +1,53 @@
+# Reminds people with unfinished picks that the week is about to lock.
+#
+# Runs hourly and sends nothing on almost every run - the script asks the
+# schedule when the open week actually locks and only acts inside a
+# window before it. That is deliberate: encoding "Sunday at 11am" here
+# would send the wrong thing the first week that opens on a Thursday, and
+# a cron line is the worst place to keep a fact that changes.
+#
+# Sending at most once per person per week is enforced in the database,
+# not here, so an extra run, a retry or a manual dispatch cannot produce
+# a second email. See supabase/migrations/0052_email_reminders.sql.
+name: Weekly pick reminder
+
+on:
+  schedule:
+    # Hourly. The cheap runs are the point; the script exits in one API
+    # call when the deadline is not close.
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List who would be emailed without sending anything"
+        type: boolean
+        default: true
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # No install step: the script uses fetch and the standard library
+      # only, so there is nothing to pull and nothing to audit.
+      - name: Send
+        run: node scripts/send-weekly-deadline.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Good for two calls and nothing else - it is NOT the service
+          # role key, and must never be replaced with one.
+          EMAIL_SENDER_TOKEN: ${{ secrets.EMAIL_SENDER_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          # Required by CAN-SPAM in commercial mail. The script refuses
+          # to run without it rather than shipping a placeholder.
+          EMAIL_POSTAL_ADDRESS: ${{ secrets.EMAIL_POSTAL_ADDRESS }}
+          SITE_URL: https://sidelinebrew.com
+          # Manual runs default to a dry run, so the first thing anybody
+          # does by hand cannot be an accidental send.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '' }}
