@@ -6,6 +6,7 @@ import { fetchWeeks, WeekRow } from "@/lib/supabase/admin";
 import { fetchWeeklyPicks } from "@/lib/supabase/picks";
 import { fetchPredictorProgress } from "@/lib/supabase/achievements";
 import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
+import { fetchDailyPuzzle, readGuestGuesses, puzzleToday, PuzzleState, Verdict } from "@/lib/supabase/dailyPuzzle";
 import { CURRENT_WEEK, GAMES_BY_WEEK, Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
@@ -188,6 +189,69 @@ function MatchupGrid({ games }: { games: Game[] }) {
         <Matchup key={game.id} game={game} scale={scale} />
       ))}
     </div>
+  );
+}
+
+// ----------------------------------------------------------------- daily
+//
+// Same shape as the weekly hero and sitting above it: full width, art,
+// one name, one meta line, the whole card a link.
+//
+// The preview is the board's own signature - rows of green, gold and grey
+// - because that pattern is what somebody recognises from a screenshot
+// before they can read a word of it. Fixed, not random: this must draw
+// the same on the server and the client or it tears on hydration, and a
+// preview that reshuffles every render is noise.
+const DAILY_ART: Verdict[][] = [
+  ["miss", "close", "miss", "miss", "close", "miss", "miss"],
+  ["miss", "close", "hit", "close", "miss", "miss", "close"],
+  ["hit", "hit", "hit", "close", "hit", "close", "miss"],
+];
+const DAILY_TONE: Record<Verdict, string> = {
+  hit: "#3ecb78",
+  close: "#ffce3a",
+  miss: "#aab3c1",
+  unknown: "#8d96a5",
+};
+
+function DailyHero({ state }: { state: PuzzleState | null }) {
+  // A count is all a result is allowed to say out here. "SOLVED IN 4"
+  // gives away nothing about WHO, which is the one thing that would ruin
+  // somebody else's day - the same rule the share grid follows.
+  const meta = !state
+    ? "TODAY \u00b7 8 GUESSES"
+    : state.solved
+      ? `SOLVED IN ${state.guessesUsed}`
+      : state.finished
+        ? "OUT OF GUESSES TODAY"
+        : state.guessesUsed > 0
+          ? `${state.guessesUsed} OF ${state.maxGuesses} USED`
+          : `TODAY \u00b7 ${state.maxGuesses} GUESSES`;
+
+  return (
+    <Link href="/daily" className={CARD}>
+      <div className={ART}>
+        {/* Capped and centred rather than stretched. Left to fill a
+            992px card each chip came out about seven times wider than it
+            is tall, which reads as a stack of bars - the real board's
+            chips are nearer 2.7:1, and that proportion is half of what
+            makes the preview recognisable as the game. */}
+        <div className="mx-auto flex w-full max-w-[580px] flex-col gap-1.5 px-1 py-1.5 sm:gap-2">
+          {DAILY_ART.map((row, r) => (
+            <div key={r} className="flex gap-1.5 sm:gap-2">
+              {row.map((v, c) => (
+                <span
+                  key={c}
+                  className="h-6 flex-1 rounded-[4px] sm:h-8 sm:rounded-md"
+                  style={{ background: DAILY_TONE[v], border: "2px solid #0a1120", boxShadow: "2px 3px 0 #05090f" }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      <Caption name={"NAMEPLATE"} color="#fb923c" meta={meta} />
+    </Link>
   );
 }
 
@@ -381,6 +445,7 @@ export default function HomePage() {
   const [picks, setPicks] = useState<Record<string, TeamAbbr> | null>(null);
   const [progress, setProgress] = useState<Partial<Record<TeamAbbr, number>> | null>(null);
   const [board, setBoard] = useState<LeaderboardRow[]>([]);
+  const [daily, setDaily] = useState<PuzzleState | null>(null);
 
   useEffect(() => {
     fetchWeeks()
@@ -395,6 +460,38 @@ export default function HomePage() {
     const openWeeks = weeks.filter((w) => w.is_open).map((w) => w.week);
     return openWeeks.length > 0 ? Math.max(...openWeeks) : CURRENT_WEEK;
   }, [weeks]);
+
+  // Today's daily, for the card's meta line. Two sources, because a
+  // signed-out player's run lives in their browser and a signed-in one
+  // lives on the server - the card should say "3 OF 8 USED" either way
+  // rather than pretending a guest has not played.
+  useEffect(() => {
+    if (user) {
+      fetchDailyPuzzle()
+        .then(setDaily)
+        .catch(() => setDaily(null));
+      return;
+    }
+    const on = puzzleToday();
+    const held = readGuestGuesses(on);
+    // Only what the card needs. Building a whole board here would mean
+    // duplicating the game's own assembly for one line of text.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDaily(
+      held.length
+        ? {
+            puzzleOn: on,
+            maxGuesses: 8,
+            guessesUsed: held.length,
+            guesses: held,
+            solved: held.some((g) => g.correct),
+            finished: held.some((g) => g.correct) || held.length >= 8,
+            pointsAwarded: 0,
+            answer: null,
+          }
+        : null
+    );
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -420,14 +517,19 @@ export default function HomePage() {
             Pick'em is one of them, so titling the whole page after one
             of its own children read as though you had already arrived
             somewhere - the same reason the old Pick'em hub had to go.
-            These three name what you can actually do here, in the order
-            the cards run: pick this week, predict a season, rank the
-            league. The leaderboard underneath is where all three land,
-            which is why it isn't a fourth verb. */}
-        <h1 className="text-[clamp(2rem,8vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-          PICK. PREDICT. RANK.
+            These name what you can actually do here, in the order the
+            cards run: play today's game, pick this week, predict a
+            season, rank the league. The leaderboard underneath is where
+            they all land, which is why it isn't a fifth verb.
+            PLAY leads because the daily card does, and because it is the
+            only one of the four you can finish in a minute - which makes
+            it the cheapest reason for a stranger to come back tomorrow. */}
+        <h1 className="text-[clamp(1.7rem,7vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+          PLAY. PICK. PREDICT. RANK.
         </h1>
       </div>
+
+      <DailyHero state={daily} />
 
       <WeeklyHero week={activeWeek} games={games} picks={picks} signedIn={!!user} />
 
