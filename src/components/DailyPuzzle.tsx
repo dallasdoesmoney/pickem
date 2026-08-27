@@ -408,10 +408,14 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // Built at share time rather than held in state: it needs `window`,
   // which is not there when this renders on the server, and it is wanted
   // exactly once - at the moment somebody taps the button.
-  // Pulled out of shareText because the reveal card shows it too. Nobody
-  // should have to tap Share to find out what Share is going to post -
-  // the grid is the part people are actually deciding whether to send,
-  // and it gives away the board's shape without giving away the player.
+  // Pulled out of shareText because the reveal card shows it too - the
+  // GRID and nothing else.
+  //
+  // The full text was tried in the preview and it looked terrible: four
+  // lines of header the sharer already knows, and then a 60-character
+  // preview URL wrapped across the card. The squares are the only part
+  // anybody is deciding about; the header is boilerplate and the link is
+  // plumbing, and neither is worth the room.
   function shareGrid(s: PuzzleState): string {
     return s.guesses
       .map((g) =>
@@ -461,15 +465,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     // somebody who has never seen it - and this text is read almost
     // entirely by people who have never seen it.
     return `Sideline Brew\nNFL Nameplate\n${prettyDate(s.puzzleOn)}\n${score}\n\n${grid}`;
-  }
-
-  // Exactly what lands, link included. The preview used to show the grid
-  // alone, which left the one question people ask about a share - "what
-  // does it say about me, and does it give the answer away?" - answerable
-  // only by sending it to somebody.
-  function sharePreview(s: PuzzleState): string {
-    const link = typeof window === "undefined" ? "" : buildReferralLinkTo("/daily", profile?.username);
-    return link ? `${shareBody(s)}\n\n${link}` : shareBody(s);
   }
 
   async function share() {
@@ -540,7 +535,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           Re-measure if the header or the rail ever changes height. */}
       {state.finished && state.answer && !celebrating && (
         <div ref={revealRef} className="scroll-mt-[118px]">
-          <Reveal state={state} answer={answer} onShare={share} copied={copied} grid={sharePreview(state)} />
+          <Reveal state={state} answer={answer} onShare={share} copied={copied} grid={shareGrid(state)} />
         </div>
       )}
 
