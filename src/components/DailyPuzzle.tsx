@@ -401,8 +401,12 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // Built at share time rather than held in state: it needs `window`,
   // which is not there when this renders on the server, and it is wanted
   // exactly once - at the moment somebody taps the button.
-  function shareText(s: PuzzleState, dailyLink: string): string {
-    const grid = s.guesses
+  // Pulled out of shareText because the reveal card shows it too. Nobody
+  // should have to tap Share to find out what Share is going to post -
+  // the grid is the part people are actually deciding whether to send,
+  // and it gives away the board's shape without giving away the player.
+  function shareGrid(s: PuzzleState): string {
+    return s.guesses
       .map((g) =>
         visibleColumns
           .map((c) => {
@@ -412,6 +416,10 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           .join("")
       )
       .join("\n");
+  }
+
+  function shareText(s: PuzzleState, dailyLink: string): string {
+    const grid = shareGrid(s);
     // Words, not a fraction. "4/8" reads as four out of eight RIGHT - a
     // score on a test - which is the opposite of what it means: it took
     // four guesses out of the eight you were allowed, and fewer is
@@ -476,7 +484,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
 
       {state.finished && state.answer && !celebrating && (
         <div ref={revealRef}>
-          <Reveal state={state} answer={answer} onShare={share} copied={copied} />
+          <Reveal state={state} answer={answer} onShare={share} copied={copied} grid={shareGrid(state)} />
         </div>
       )}
 
@@ -491,11 +499,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         {/* The board goes as wide as the card allows; the input does not.
             A search field stretched to 1150px is a lot of runway for a
             name, and it drifts away from the list it drops down over. */}
+        {/* No rule above the field. The title and the thing you type in
+            are one gesture - read the name of the game, then type - and a
+            hairline between them made the header look like a separate
+            panel stacked on top. The board keeps its rule, because that
+            IS a different section. */}
         {!state.finished && (
-          <div
-            className="mx-auto flex w-full max-w-2xl flex-col px-4 py-4 lg:px-5 lg:py-5"
-            style={{ borderTop: CARD_EDGE }}
-          >
+          <div className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-4 pt-1 lg:px-5 lg:pb-5">
           {/* No title and no label. The field's own placeholder says
               "Guess the Player", so a heading above it saying the same
               three words was a line of height for nothing.
@@ -838,11 +848,15 @@ function Reveal({
   answer,
   onShare,
   copied,
+  grid,
 }: {
   state: PuzzleState;
   answer: PuzzlePlayer | undefined;
   onShare: () => void;
   copied: boolean;
+  // The emoji block the share button is about to put on the clipboard,
+  // shown so nobody has to send it to find out what it says.
+  grid: string;
 }) {
   const team = (answer?.team ?? state.answer?.team) as TeamAbbr | undefined;
   const brand = team ? TEAMS[team]?.color : undefined;
@@ -905,6 +919,26 @@ function Reveal({
             </span>
           )}
         </div>
+        {/* A preview, not a decoration. leading-none and a tight letter
+            spacing so the rows read as a block of squares rather than as
+            seven separate emoji per line - it should look like the thing
+            that lands in a message, which is how somebody decides whether
+            to send it. */}
+        <div
+          className="flex flex-col items-center gap-1 rounded-xl px-3 py-2.5"
+          style={{ background: FIELD, border: CARD_EDGE }}
+        >
+          <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: MUTED }}>
+            What you&rsquo;ll share
+          </span>
+          <pre
+            className="m-0 text-center font-sans text-[13px] leading-[1.35] tracking-[0.06em] sm:text-[15px]"
+            style={{ color: TEXT }}
+          >
+            {grid}
+          </pre>
+        </div>
+
         <p className="text-xs" style={{ color: MUTED }}>
           {state.solved ? "New player tomorrow at midnight ET." : "New player tomorrow — the streak survives."}
         </p>

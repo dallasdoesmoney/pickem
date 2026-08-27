@@ -52,16 +52,33 @@ export default function DailyPage() {
           about 54px - so it never lined up with the guess field directly
           beneath it, which is the one thing on this screen it ought to
           line up with. Absolute, so the logo's width cannot push it. */}
-      <div className="relative flex items-end justify-center px-3 pb-2.5 pt-3 sm:px-4">
-        <img
-          src="/press-logo.png"
-          alt="Sideline Brew"
-          className="absolute bottom-2 left-2 h-14 w-14 sm:bottom-2.5 sm:left-4 sm:h-[92px] sm:w-[92px]"
-          style={{ objectFit: "contain" }}
-        />
-        {/* text-center on the block rather than on each line: the title
-            and its subtitle share one axis, and it is the card's. */}
-        <div className="min-w-0 text-center">
+      <div className="relative flex justify-center px-3 pb-2.5 pt-3 sm:px-4">
+        {/* The block shrinks to the title, and the mark hangs off its left
+            edge - right-full, so it sits against the title wherever the
+            title happens to be rather than against the card. Pinned to
+            the card's left edge instead, it drifted a hundred pixels away
+            from the thing it belongs to and read as a stray nav item.
+            bottom-0 puts its feet on the same line as the subtitle.
+            Absolute, so it still takes no part in the centring: the title
+            stays on the card's axis, over the guess field. */}
+        {/* min-h and justify-end are what stop the mark hanging out of the
+            top of the card. Absolute means it no longer pushes the header
+            open the way it did in flow, so the block reserves its height
+            instead and sits its own content on the bottom edge - which is
+            also what puts the subtitle and the cup on one line. */}
+        <div className="relative flex min-h-14 min-w-0 flex-col justify-end text-center sm:min-h-[76px]">
+          <img
+            src="/press-logo.png"
+            alt="Sideline Brew"
+            // 76 rather than the 92 it was. The mark used to be in flow,
+            // so the header grew to hold it for free; now that it is
+            // absolute, every pixel of it is a pixel of header that has
+            // to be reserved - and this header has been cut twice
+            // already. 76 still reads as the big version next to a 48px
+            // title and costs six pixels of height rather than twenty-six.
+            className="absolute bottom-0 right-full mr-2 h-14 w-14 sm:mr-3 sm:h-[76px] sm:w-[76px]"
+            style={{ objectFit: "contain" }}
+          />
           {/* The "DAILY GAME" eyebrow is gone: the line under the title
               already says what kind of thing this is, and the card on the
               home page is captioned DAILY GAME too, so it was the third
