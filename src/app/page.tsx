@@ -282,7 +282,7 @@ function MiniPlate({ guess }: { guess: (typeof DAILY_GUESSES)[number] }) {
       )}
       <span
         className="relative grid aspect-square h-full shrink-0 place-items-center overflow-hidden font-extrabold"
-        style={{ color: ink, fontSize: "min(12px, 2.2cqw)" }}
+        style={{ color: ink, fontSize: "clamp(7px, 2.1cqw, 15px)" }}
       >
         {/* The headshots are cut out on transparency, so initials left
             underneath one show THROUGH him rather than behind him. */}
@@ -306,7 +306,7 @@ function MiniPlate({ guess }: { guess: (typeof DAILY_GUESSES)[number] }) {
           // plate that holds it. A fixed size plus a percentage column is
           // the combination that truncates on the narrowest phones: the
           // box gets smaller and the words do not.
-          fontSize: "min(13px, 2.5cqw)",
+          fontSize: "clamp(7px, 2.4cqw, 17px)",
           textShadow: ink === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.45)" : "none",
         }}
       >
@@ -336,16 +336,20 @@ function DailyHero({ state }: { state: PuzzleState | null }) {
 
   return (
     <Link href="/daily" className={CARD}>
-      {/* Capped and centred rather than stretched. Left to fill a
-          992px card each chip came out about seven times wider than it
-          is tall, which reads as a stack of bars - the real board's
-          chips are nearer 2.7:1, and that proportion is half of what
-          makes the preview recognisable as the game.
+      {/* Full width. It used to be capped at 580 and centred, because the
+          art was six featureless bars and letting them fill a 992px card
+          made each one seven times wider than it was tall - a stack of
+          ribbons. That cap bought nothing once the bars became chips with
+          words in them, and cost two hundred pixels of empty gutter on
+          either side of the biggest card on the page. What keeps the
+          proportion honest now is that the ROW HEIGHT and the type grow
+          with the card as well, so a chip stays a chip instead of
+          stretching on its own.
           aria-hidden because the caption already announces the card, and
           the board is decoration here: read out, it is thirty-two
           fragments of a game nobody has started. */}
       <div className={ART} aria-hidden>
-        <div className="mx-auto flex w-full max-w-[580px] flex-col gap-1.5 px-1 py-1.5 sm:gap-2">
+        <div className="flex w-full flex-col gap-1.5 px-1 py-1.5 sm:gap-2">
           {DAILY_GUESSES.map((guess) => (
             <div
               key={guess.espnId}
@@ -360,9 +364,14 @@ function DailyHero({ state }: { state: PuzzleState | null }) {
               // hero does not hand a 200px column to an eleven-letter
               // name, and at the bottom so the smallest phone still has
               // somewhere to put one. Between those it is one ratio at
-              // every width, which is why the type is sized in cqw too.
-              className="grid h-[30px] gap-1 sm:h-10 sm:gap-[7px]"
-              style={{ gridTemplateColumns: "clamp(88px, 34%, 176px) repeat(6, minmax(0, 1fr))" }}
+              // every width, which is why the height, the gap and the
+              // type are all sized in cqw too.
+              className="grid"
+              style={{
+                gridTemplateColumns: "clamp(88px, 30%, 230px) repeat(6, minmax(0, 1fr))",
+                height: "clamp(30px, 5.4cqw, 56px)",
+                gap: "clamp(4px, 0.75cqw, 9px)",
+              }}
             >
               <MiniPlate guess={guess} />
               {dailyRow(guess).map((cell, c) => (
@@ -370,7 +379,7 @@ function DailyHero({ state }: { state: PuzzleState | null }) {
                   key={c}
                   className="grid place-items-center rounded-[4px] px-0.5 text-center font-medium leading-[1.1] tabular-nums sm:rounded-md"
                   style={{
-                    fontSize: "min(12px, 2.15cqw)",
+                    fontSize: "clamp(6px, 2.1cqw, 15px)",
                     background: DAILY_TONE[cell.verdict],
                     color: "#0a1020",
                     border: "2px solid #0a1120",
