@@ -602,19 +602,40 @@ function Chip({
 }) {
   const { bg, ink } = cellStyle(column.key, cell);
   const text = formatCell(column.key, cell.value);
-  // "Northwestern" in a 76px chip needs the smaller size or it is three
-  // letters and an ellipsis. The threshold is 8 rather than 9 because
-  // "AFC North" is exactly nine characters and was the thing truncating.
-  const long = text.length > 8;
-  // Every value wraps on a phone now that seven chips share the width of
-  // one. Truncating instead would put an ellipsis where the answer is:
-  // "Mississippi State" and "AFC South" are both facts you are reading
-  // the board FOR, and half of either is worth nothing. The row grows to
-  // its tallest chip either way, so two lines cost nothing but height
-  // that was already going to be spent.
+  const arrow = cell.direction === "up" ? "↑" : cell.direction === "down" ? "↓" : null;
+
+  // ONE type size on every chip in the row. There used to be three - 15px
+  // for short values, 12px for anything over eight characters, 13px for
+  // college - each one a local fix for a value that would not fit, and
+  // together they made a row look like it had been set by three different
+  // people. "NFC South" next to "QB" in a size larger reads as emphasis
+  // that is not there.
   //
-  // From md up the chips are wide enough that only college needs it.
-  const wraps = column.key === "college";
+  // The size that fits the worst case is the size everything gets, and
+  // the long values buy their room by wrapping instead: "NFC" over
+  // "South", "Mississippi" over "State". A chip is two lines tall or one,
+  // and the row was already going to be as tall as its tallest chip.
+  // 12px is the size the long values were already using, so unifying on
+  // it is "everything comes down to the smallest", not "everything grows".
+  // A 79px chip has 67px of room once the border and padding are off it,
+  // and 67px is not enough for a word like "Massachusetts" at ANY size a
+  // person would want to read - 9px is the largest that clears it, which
+  // is not a real option. So the long single words break, as they already
+  // do today at 13px, and hyphens:auto is set to make that break a proper
+  // hyphenation where the browser can manage one.
+  // tracking-tight only on the phone, where a 45px chip leaves 33px of
+  // room and "Mississippi" wants 33.8 of it. Tightening buys the ~2px
+  // that keeps it whole; the alternative was another step down in size,
+  // which costs legibility on every chip to fix one.
+  const SIZE = "hyphens-auto text-[7px] tracking-tight md:text-[10px] md:tracking-normal lg:text-[12px]";
+
+  // DIV always breaks between its two words, even on a desktop chip wide
+  // enough to hold "NFC North" on one line. Left to wrap on its own it
+  // would be one line at lg and two at md, so a column that is the same
+  // fact everywhere would change shape as the window did. Every division
+  // is conference-then-region, so the space is always the right place to
+  // break it. Everything else wraps only when it has to.
+  const lines = column.key === "division" ? text.split(" ") : null;
 
   return (
     <div
@@ -631,27 +652,34 @@ function Chip({
         animationDelay: `${index * 45}ms`,
       }}
     >
-      <span className="text-[7px] font-semibold uppercase leading-none tracking-tight md:text-[8px] md:tracking-wider md:hidden" style={{ opacity: 0.6 }}>
+      {/* 6px, not 7. The value came down to 7 when every chip went to one
+          size, which left the label the same size as the thing it labels
+          and in a heavier weight - so TEAM read louder than MIN. */}
+      <span className="text-[6px] font-semibold uppercase leading-none tracking-tight md:text-[8px] md:tracking-wider md:hidden" style={{ opacity: 0.55 }}>
         {column.label}
       </span>
-      <span className="flex w-full items-center justify-center gap-0.5 px-0.5 md:px-1">
+      <span className="flex w-full items-center justify-center px-0.5 md:px-1">
+        {/* The VALUE is what gets centred, not the value-plus-arrow. When
+            the two shared a centred flex row, an arrow shoved the number
+            left by half its own width, so 6'4" with a hint sat on a
+            different axis to 6'4" without one and the column looked
+            ragged. The arrow hangs off the value's right edge instead -
+            out of the centring entirely. Only the numeric columns ever
+            get one and their values are four characters at most, so
+            there is always room for it to hang there. */}
         <span
-          // The long ones get a step smaller on a phone, or the break
-          // lands mid-word: "Mississippi" does not fit a 37px chip at
-          // 8.5px, and overflow-wrap will cut a word in half rather than
-          // overflow. "Mississip / pi State" is worse than small.
-          className={`min-w-0 break-words text-center font-medium leading-[1.12] tabular-nums md:leading-normal ${
-            long ? "text-[7px]" : "text-[8.5px]"
-          } ${
-            wraps
-              ? "md:break-words md:text-[11px] lg:text-[13px]"
-              : `md:truncate ${long ? "md:text-[11px] lg:text-[12px]" : "md:text-[13px] lg:text-[15px]"}`
-          }`}
+          className={`relative min-w-0 break-words text-center font-medium leading-[1.12] tabular-nums md:leading-tight ${SIZE}`}
         >
-          {text}
+          {lines ? lines.map((line) => <span key={line} className="block">{line}</span>) : text}
+          {arrow && (
+            <span
+              aria-label={cell.direction === "up" ? "higher" : "lower"}
+              className="absolute left-full top-1/2 ml-[3px] -translate-y-1/2 font-semibold"
+            >
+              {arrow}
+            </span>
+          )}
         </span>
-        {cell.direction === "up" && <span aria-label="higher">↑</span>}
-        {cell.direction === "down" && <span aria-label="lower">↓</span>}
       </span>
     </div>
   );
