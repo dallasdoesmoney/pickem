@@ -9,6 +9,8 @@ import { fetchLeaderboard, LeaderboardRow } from "@/lib/supabase/leaderboard";
 import { fetchDailyPuzzle, readGuestGuesses, puzzleToday, PuzzleState, Verdict } from "@/lib/supabase/dailyPuzzle";
 import { CURRENT_WEEK, GAMES_BY_WEEK, Game } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
+import { teamTile } from "@/lib/colorUtils";
+import { playerHeadshot } from "@/lib/espnHeadshot";
 import { PILL_WIDTH, TeamHalfPill } from "@/components/TeamHalfPill";
 import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
 import { getTierTemplate } from "@/data/tierTemplates";
@@ -197,16 +199,55 @@ function MatchupGrid({ games }: { games: Game[] }) {
 // Same shape as the weekly hero and sitting above it: full width, art,
 // one name, one meta line, the whole card a link.
 //
-// The preview is the board's own signature - rows of green, gold and grey
-// - because that pattern is what somebody recognises from a screenshot
-// before they can read a word of it. Fixed, not random: this must draw
-// the same on the server and the client or it tears on hydration, and a
-// preview that reshuffles every render is noise.
-const DAILY_ART: Verdict[][] = [
-  ["miss", "close", "miss", "miss", "close", "miss", "miss"],
-  ["miss", "close", "hit", "close", "miss", "miss", "close"],
-  ["hit", "hit", "hit", "close", "hit", "close", "miss"],
+// The preview is a real board: two wrong guesses and then the one that
+// lands, all six green. It used to be an abstract stripe of colour -
+// three rows of anonymous bars - which had the right palette and none of
+// the meaning. A stranger looking at bars sees a colour test; looking at
+// this they see football players, and the run of solid green along the
+// bottom says what winning looks like before they have read a word.
+//
+// Fixed, not random: this must draw the same on the server and the client
+// or it tears on hydration, and a preview that reshuffles every render is
+// noise. It is also not today's actual puzzle, and must never be - the
+// card would be spoiling the game it is advertising.
+//
+// The verdicts are DERIVED, not typed. Every value here is the player's
+// real row out of src/data/rosters/all.ts and every colour is what the
+// game itself would return for that guess, so the card cannot drift into
+// claiming a comparison the board would grade the other way.
+const DAILY_ANSWER = { team: "LAR", conf: "NFC", div: "NFC West", pos: "WR", age: 25, heightIn: 74, jersey: 12 };
+const DAILY_GUESSES = [
+  { espnId: "4239993", name: "Tee Higgins", team: "CIN" as TeamAbbr,
+    conf: "AFC", div: "AFC North", pos: "WR", age: 27, heightIn: 76, jersey: 5 },
+  { espnId: "4361370", name: "Chris Olave", team: "NO" as TeamAbbr,
+    conf: "NFC", div: "NFC South", pos: "WR", age: 26, heightIn: 72, jersey: 12 },
+  { espnId: "4426515", name: "Puka Nacua", team: "LAR" as TeamAbbr,
+    conf: "NFC", div: "NFC West", pos: "WR", age: 25, heightIn: 74, jersey: 12 },
 ];
+
+// The board's own thresholds, from CLOSE_MEANS in DailyPuzzle: a division
+// is close inside the same conference, and a number is close inside its
+// column's tolerance. Kept to one place so the card and the game cannot
+// disagree about what gold means.
+const near = (a: number, b: number, within: number): Verdict =>
+  a === b ? "hit" : Math.abs(a - b) <= within ? "close" : "miss";
+
+const feet = (inches: number) => `${Math.floor(inches / 12)}'${inches % 12}"`;
+
+type DailyCell = { text: string; verdict: Verdict };
+
+function dailyRow(g: (typeof DAILY_GUESSES)[number]): DailyCell[] {
+  const a = DAILY_ANSWER;
+  return [
+    { text: g.team, verdict: g.team === a.team ? "hit" : "miss" },
+    { text: g.div, verdict: g.div === a.div ? "hit" : g.conf === a.conf ? "close" : "miss" },
+    { text: g.pos, verdict: g.pos === a.pos ? "hit" : "miss" },
+    { text: String(g.age), verdict: near(g.age, a.age, 3) },
+    { text: feet(g.heightIn), verdict: near(g.heightIn, a.heightIn, 2) },
+    { text: String(g.jersey), verdict: near(g.jersey, a.jersey, 3) },
+  ];
+}
+
 const DAILY_TONE: Record<Verdict, string> = {
   hit: "#3ecb78",
   close: "#ffce3a",
@@ -214,43 +255,148 @@ const DAILY_TONE: Record<Verdict, string> = {
   unknown: "#8d96a5",
 };
 
+// The board's plate at preview size. Not PlayerPlate itself: that one is
+// built for a 62px guess row and hard-codes its type sizes to it, and
+// every number here is smaller than the smallest number there.
+function MiniPlate({ guess }: { guess: (typeof DAILY_GUESSES)[number] }) {
+  const [broken, setBroken] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const { bg, ink } = teamTile(TEAMS[guess.team]?.color ?? "#334155");
+  const logo = TEAMS[guess.team]?.logo;
+  const initials = guess.name.split(/\s+/).slice(0, 2).map((p) => p.charAt(0)).join("");
+
+  return (
+    <span
+      className="relative flex h-full w-full min-w-0 items-center overflow-hidden rounded-[4px] pr-1.5 sm:rounded-md sm:pr-2"
+      style={{ background: `linear-gradient(100deg, ${bg}, ${bg}cc)`, border: "2px solid #0a1120", boxShadow: "2px 3px 0 #05090f" }}
+    >
+      {logo && (
+        <img
+          src={logo}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          crossOrigin="anonymous"
+          className="pointer-events-none absolute left-[-6px] top-1/2 aspect-square h-[150%] max-w-none -translate-y-1/2 select-none object-contain opacity-[0.26]"
+        />
+      )}
+      <span
+        className="relative grid aspect-square h-full shrink-0 place-items-center overflow-hidden font-extrabold"
+        style={{ color: ink, fontSize: "min(12px, 2.2cqw)" }}
+      >
+        {/* The headshots are cut out on transparency, so initials left
+            underneath one show THROUGH him rather than behind him. */}
+        {!loaded && <span>{initials}</span>}
+        {!broken && (
+          <img
+            src={playerHeadshot(guess.espnId)}
+            alt=""
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+            onError={() => setBroken(true)}
+            className="absolute inset-0 h-full w-full select-none object-cover object-top"
+          />
+        )}
+      </span>
+      <span
+        className="relative ml-1.5 min-w-0 truncate font-semibold sm:ml-2"
+        style={{
+          color: ink,
+          // Container-relative, so the name shrinks in step with the
+          // plate that holds it. A fixed size plus a percentage column is
+          // the combination that truncates on the narrowest phones: the
+          // box gets smaller and the words do not.
+          fontSize: "min(13px, 2.5cqw)",
+          textShadow: ink === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.45)" : "none",
+        }}
+      >
+        {guess.name}
+      </span>
+    </span>
+  );
+}
+
 function DailyHero({ state }: { state: PuzzleState | null }) {
   // A count is all a result is allowed to say out here. "SOLVED IN 4"
   // gives away nothing about WHO, which is the one thing that would ruin
   // somebody else's day - the same rule the share grid follows.
+  //
+  // Every branch now names the game, because the card above it no longer
+  // does: "DAILY GAMES" is the category, and this is the line that says
+  // which one is behind it today.
   const meta = !state
-    ? "TODAY \u00b7 8 GUESSES"
+    ? "NAMEPLATE \u00b7 TODAY \u00b7 8 GUESSES"
     : state.solved
-      ? `SOLVED IN ${state.guessesUsed}`
+      ? `NAMEPLATE \u00b7 SOLVED IN ${state.guessesUsed}`
       : state.finished
-        ? "OUT OF GUESSES TODAY"
+        ? "NAMEPLATE \u00b7 OUT OF GUESSES TODAY"
         : state.guessesUsed > 0
-          ? `${state.guessesUsed} OF ${state.maxGuesses} USED`
-          : `TODAY \u00b7 ${state.maxGuesses} GUESSES`;
+          ? `NAMEPLATE \u00b7 ${state.guessesUsed} OF ${state.maxGuesses} USED`
+          : `NAMEPLATE \u00b7 TODAY \u00b7 ${state.maxGuesses} GUESSES`;
 
   return (
     <Link href="/daily" className={CARD}>
-      <div className={ART}>
-        {/* Capped and centred rather than stretched. Left to fill a
-            992px card each chip came out about seven times wider than it
-            is tall, which reads as a stack of bars - the real board's
-            chips are nearer 2.7:1, and that proportion is half of what
-            makes the preview recognisable as the game. */}
+      {/* Capped and centred rather than stretched. Left to fill a
+          992px card each chip came out about seven times wider than it
+          is tall, which reads as a stack of bars - the real board's
+          chips are nearer 2.7:1, and that proportion is half of what
+          makes the preview recognisable as the game.
+          aria-hidden because the caption already announces the card, and
+          the board is decoration here: read out, it is thirty-two
+          fragments of a game nobody has started. */}
+      <div className={ART} aria-hidden>
         <div className="mx-auto flex w-full max-w-[580px] flex-col gap-1.5 px-1 py-1.5 sm:gap-2">
-          {DAILY_ART.map((row, r) => (
-            <div key={r} className="flex gap-1.5 sm:gap-2">
-              {row.map((v, c) => (
+          {DAILY_GUESSES.map((guess) => (
+            <div
+              key={guess.espnId}
+              // The plate takes a share of the row and the six hints
+              // split what is left, exactly as the board does it.
+              //
+              // A SHARE, not a fixed 124px. Fixed, the plate keeps its
+              // width as the card narrows and takes it out of the chips
+              // instead - and "South" is the tightest word on the board,
+              // so it ran out of chip at 360px while the plate beside it
+              // sat there with room to spare. Clamped at the top so the
+              // hero does not hand a 200px column to an eleven-letter
+              // name, and at the bottom so the smallest phone still has
+              // somewhere to put one. Between those it is one ratio at
+              // every width, which is why the type is sized in cqw too.
+              className="grid h-[30px] gap-1 sm:h-10 sm:gap-[7px]"
+              style={{ gridTemplateColumns: "clamp(88px, 34%, 176px) repeat(6, minmax(0, 1fr))" }}
+            >
+              <MiniPlate guess={guess} />
+              {dailyRow(guess).map((cell, c) => (
                 <span
                   key={c}
-                  className="h-6 flex-1 rounded-[4px] sm:h-8 sm:rounded-md"
-                  style={{ background: DAILY_TONE[v], border: "2px solid #0a1120", boxShadow: "2px 3px 0 #05090f" }}
-                />
+                  className="grid place-items-center rounded-[4px] px-0.5 text-center font-medium leading-[1.1] tabular-nums sm:rounded-md"
+                  style={{
+                    fontSize: "min(12px, 2.15cqw)",
+                    background: DAILY_TONE[cell.verdict],
+                    color: "#0a1020",
+                    border: "2px solid #0a1120",
+                    boxShadow: "2px 3px 0 #05090f",
+                  }}
+                >
+                  {/* DIV is the one column whose value is two words, and
+                      at this size it cannot have them side by side - so
+                      it stacks, the same way the board's own DIV chip
+                      does. */}
+                  {cell.text.includes(" ") ? (
+                    cell.text.split(" ").map((word) => <span key={word} className="block">{word}</span>)
+                  ) : (
+                    cell.text
+                  )}
+                </span>
               ))}
             </div>
           ))}
         </div>
       </div>
-      <Caption name={"NAMEPLATE"} color="#fb923c" meta={meta} />
+      {/* DAILY GAMES, not NAMEPLATE. Nameplate is one of the daily games
+          rather than the name of the category - the meta line underneath
+          is where it says which one - so the card can hold tomorrow's
+          second game without being renamed. */}
+      <Caption name={"DAILY GAMES"} color="#fb923c" meta={meta} />
     </Link>
   );
 }
