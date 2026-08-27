@@ -39,6 +39,14 @@ alter table public.email_prefs enable row level security;
 -- You can read and change your own preference and nobody else's. The
 -- token is readable by its owner, which is harmless - it is their own
 -- unsubscribe link - and by nobody else.
+--
+-- Dropped first, the way 0005 and 0034 do it: `create policy` has no
+-- IF NOT EXISTS, and this file gets pasted into a SQL editor by hand.
+-- Without these a second run dies partway through, leaving the tables up
+-- and the functions absent - the worst possible half-state to debug.
+drop policy if exists "email_prefs_select_own" on public.email_prefs;
+drop policy if exists "email_prefs_insert_own" on public.email_prefs;
+drop policy if exists "email_prefs_update_own" on public.email_prefs;
 create policy "email_prefs_select_own" on public.email_prefs
   for select using (auth.uid() = user_id);
 create policy "email_prefs_insert_own" on public.email_prefs
@@ -64,6 +72,7 @@ grant update (weekly_deadline, updated_at) on table public.email_prefs to authen
 -- anon reaches this table through email_unsubscribe() and no other way.
 revoke select, insert, delete on table public.email_prefs from anon;
 
+drop trigger if exists email_prefs_set_updated_at on public.email_prefs;
 create trigger email_prefs_set_updated_at
   before update on public.email_prefs for each row execute function public.set_updated_at();
 
@@ -81,6 +90,16 @@ create table if not exists public.email_sends (
   user_id uuid not null references auth.users(id) on delete cascade,
   kind text not null,
   reference_id text not null,
+  -- Resend's own id for the message. Useless on its own; the reason it
+  -- is here from the start is that it is the ONLY join back to delivery
+  -- and engagement events, and it cannot be recovered after the fact -
+  -- a send recorded without one can never be tied to its bounce.
+  provider_message_id text,
+  -- How far through their card they were when we wrote to them. Stored
+  -- rather than derived, because it is the only version of that number
+  -- that can never be recovered later - by the time anybody asks whether
+  -- the reminder worked, the picks have moved.
+  picks_at_send integer,
   sent_at timestamptz not null default now(),
   unique (user_id, kind, reference_id)
 );
@@ -156,11 +175,21 @@ revoke all on function public.weekly_deadline_recipients(text, integer, integer)
 -- crash between the two costs a missing row and a possible second email,
 -- which is the right way round - recording first would silently drop the
 -- reminder somebody was owed.
+-- The uuid[] form this replaced is dropped explicitly: changing a
+-- function's argument types creates an overload rather than replacing
+-- it, so both would stay callable and which one ran would depend on how
+-- the caller happened to type its arguments.
+drop function if exists public.mark_emails_sent(text, text, text, uuid[]);
+
+-- Takes [{user_id, message_id}] rather than a bare array of ids, so the
+-- provider's message id is recorded in the same statement as the send.
+-- Two calls would mean a window where a send exists with no id, which is
+-- exactly the row you would later want to chase a bounce for.
 create or replace function public.mark_emails_sent(
   p_token text,
   p_kind text,
   p_reference_id text,
-  p_user_ids uuid[]
+  p_rows jsonb
 )
 returns integer
 language plpgsql
@@ -176,15 +205,17 @@ begin
     raise exception 'Not authorized';
   end if;
 
-  insert into public.email_sends (user_id, kind, reference_id)
-  select unnest(p_user_ids), p_kind, p_reference_id
+  insert into public.email_sends (user_id, kind, reference_id, provider_message_id, picks_at_send)
+  select (r ->> 'user_id')::uuid, p_kind, p_reference_id,
+         nullif(r ->> 'message_id', ''), (r ->> 'picks_at_send')::integer
+    from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) r
   on conflict (user_id, kind, reference_id) do nothing;
   get diagnostics v_n = row_count;
   return v_n;
 end;
 $$;
 
-revoke all on function public.mark_emails_sent(text, text, text, uuid[]) from public, anon, authenticated;
+revoke all on function public.mark_emails_sent(text, text, text, jsonb) from public, anon, authenticated;
 
 -- ----------------------------------------------------------- unsubscribe
 --

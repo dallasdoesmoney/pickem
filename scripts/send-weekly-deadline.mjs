@@ -224,8 +224,10 @@ async function main() {
       continue;
     }
     try {
-      await send(r.email, subject, { html: html(view), text: text(view) }, unsubUrl);
-      sent.push(r.user_id);
+      const messageId = await send(r.email, subject, { html: html(view), text: text(view) }, unsubUrl);
+      // Kept because it is the only join back to what happened next -
+      // delivered, bounced, complained. It cannot be recovered later.
+      sent.push({ user_id: r.user_id, message_id: messageId, picks_at_send: r.made });
     } catch (err) {
       // One bad address must not cost everybody else their reminder, and
       // it must not be recorded as sent - an unrecorded failure gets
@@ -244,7 +246,7 @@ async function main() {
       p_token: EMAIL_SENDER_TOKEN,
       p_kind: "weekly_deadline",
       p_reference_id: String(week),
-      p_user_ids: sent,
+      p_rows: sent,
     });
     console.log(`Sent ${sent.length}, recorded ${n}.`);
   }
