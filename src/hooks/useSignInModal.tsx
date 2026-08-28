@@ -9,6 +9,14 @@ import { errorMessage } from "@/lib/errorMessage";
 
 type ModalState = { resolve: (ok: boolean) => void } | null;
 
+// Fifteen seconds apart, for five minutes. Long enough to walk to another
+// device, find the mail and click the link; slow enough that the twenty
+// attempts stay well inside Supabase's rate limit on the auth endpoint,
+// which counts per IP and would start refusing the person's REAL sign-in
+// if this were greedy about it.
+const POLL_MS = 15_000;
+const WAIT_FOR_CONFIRM_MS = 5 * 60_000;
+
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className}>
@@ -84,10 +92,55 @@ export function useSignInModal() {
       .catch(() => setReferrer(null));
   }, [state]);
 
-  function close(ok: boolean) {
-    state?.resolve(ok);
-    setState(null);
-  }
+  const close = useCallback(
+    (ok: boolean) => {
+      state?.resolve(ok);
+      setState(null);
+    },
+    [state],
+  );
+
+  // THE OTHER DEVICE CANNOT TELL THIS ONE THAT THE LINK WAS CLICKED.
+  //
+  // Signing up on a laptop and confirming on a phone leaves the account
+  // signed in on the phone - which is the device that has none of the
+  // work. The board is on the laptop, in localStorage, and the laptop
+  // never finds out it is allowed in.
+  //
+  // So the laptop asks. The password was typed here seconds ago and is
+  // still in memory, and a sign-in that Supabase refuses with "email not
+  // confirmed" starts succeeding the moment it is confirmed, from
+  // wherever. Whoever clicks the link, THIS browser is the one that ends
+  // up signed in, with its own storage intact, and the migration then
+  // runs where the picks actually are.
+  //
+  // Nothing is stored to make this work and nothing new is exposed: it is
+  // the same sign-in the button does, asked again.
+  useEffect(() => {
+    if (!confirmSentTo || !password) return;
+    let stopped = false;
+    let timer = 0;
+    const deadline = Date.now() + WAIT_FOR_CONFIRM_MS;
+
+    const attempt = async () => {
+      if (stopped || Date.now() > deadline) return;
+      const { error } = await signInWithPassword(confirmSentTo, password);
+      if (stopped) return;
+      // Every failure here is expected - "email not confirmed" until it
+      // is - so nothing is shown. The person still has the button.
+      if (!error) {
+        close(true);
+        return;
+      }
+      timer = window.setTimeout(attempt, POLL_MS);
+    };
+
+    timer = window.setTimeout(attempt, POLL_MS);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+    };
+  }, [confirmSentTo, password, signInWithPassword, close]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -195,8 +248,8 @@ export function useSignInModal() {
                   gets split. break-all cut someone@example.com after
                   "example.co". */}
               We sent a confirmation link to{" "}
-              <span className="text-white font-medium [overflow-wrap:anywhere]">{confirmSentTo}</span>. Click it and
-              you&rsquo;ll come straight back here, signed in.
+              <span className="text-white font-medium [overflow-wrap:anywhere]">{confirmSentTo}</span>. Open it on any
+              device &mdash; this page signs you in the moment you do.
             </p>
             {/* Said plainly because a typo'd address is the single most
                 likely reason that link never arrives, and the fix is to
@@ -230,7 +283,7 @@ export function useSignInModal() {
                 saying, because "you are not signed in yet" reads like
                 "you just lost it". */}
             <p className="text-[11px] text-white/35 leading-relaxed text-center">
-              Nothing you&rsquo;ve done is lost. It&rsquo;s saved on this device and moves to your account when you confirm.
+              Nothing you&rsquo;ve done is lost. It&rsquo;s saved on this device and moves to your account the moment you&rsquo;re in.
             </p>
           </div>
         )}
