@@ -29,7 +29,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // How close to kickoff counts as "about to lock". Wide enough that an
 // hourly cron cannot step over it, narrow enough that the mail is
 // genuinely urgent when it lands.
-const WINDOW_HOURS = Number(process.env.WINDOW_HOURS ?? 3);
+// Guarded rather than `Number(env ?? 3)`, because GitHub sets an unset
+// workflow input to an EMPTY STRING, not to nothing - and Number("") is
+// 0, which would leave the scheduled job with a zero-hour window and
+// stop it ever sending, silently and forever. Anything absent, empty,
+// non-numeric or not positive falls back to the default.
+const WINDOW_HOURS = Number(process.env.WINDOW_HOURS) > 0 ? Number(process.env.WINDOW_HOURS) : 3;
 
 const DRY_RUN = process.env.DRY_RUN === "1";
 

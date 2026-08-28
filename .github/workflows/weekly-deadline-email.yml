@@ -22,6 +22,16 @@ on:
         description: "List who would be emailed without sending anything"
         type: boolean
         default: true
+      window_hours:
+        # Exists to make this testable before a real deadline is near.
+        # The scheduled run always uses the script's own 3 hours; only a
+        # manual run can widen it, and only far enough to reach a kickoff
+        # that is weeks away. Without this the first genuine end-to-end
+        # test would have to wait for a live game week, which is the
+        # worst possible time to discover the sender does not work.
+        description: "How many hours before kickoff still counts as close (default 3; try 400 to reach a distant week)"
+        type: string
+        default: ""
 
 jobs:
   remind:
@@ -57,3 +67,6 @@ jobs:
           # Manual runs default to a dry run, so the first thing anybody
           # does by hand cannot be an accidental send.
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '' }}
+          # Empty on a scheduled run, so the script falls back to its own
+          # default and the cron can never be widened by accident.
+          WINDOW_HOURS: ${{ github.event_name == 'workflow_dispatch' && inputs.window_hours || '' }}
