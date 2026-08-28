@@ -158,14 +158,17 @@ export function html({ playUrl, unsubUrl, addr, logo }) {
       <div style="margin:8px 0 0;color:#ffffff;font-family:${DISPLAY};font-weight:900;font-size:44px;line-height:1;letter-spacing:-.01em;">NAMEPLATE</div>
       <p style="margin:14px 0 0;color:#c3cfe2;font-size:16px;line-height:1.55;">
         A new daily game on Sideline Brew, live as of today. One mystery NFL
-        player, eight guesses, and the same player for everybody &mdash; so
-        you can argue about it afterwards.
+        player and eight guesses.
       </p>
     </td></tr>
     <tr><td style="height:4px;background:${B.green};font-size:0;line-height:0;">&nbsp;</td></tr>
 
     <tr><td style="padding:30px 30px 6px;">
       <div style="color:${B.deep};font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;">How it works</div>
+      <p style="margin:12px 0 0;color:${B.ink};font-size:16px;line-height:1.55;font-weight:600;">
+        If you have played Wordle, you already know the shape of it &mdash; guess,
+        find out how close you were, guess again. This one is NFL players.
+      </p>
     </td></tr>
     <tr><td style="padding:16px 30px 8px;">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${how}</table>
@@ -215,10 +218,12 @@ export function text({ playUrl, unsubUrl, addr }) {
     "NAMEPLATE - just launched",
     "",
     "A new daily game on Sideline Brew, live as of today. One mystery NFL",
-    "player, eight guesses, and the same player for everybody - so you can",
-    "argue about it afterwards.",
+    "player and eight guesses.",
     "",
     "HOW IT WORKS",
+    "",
+    "If you have played Wordle, you already know the shape of it - guess,",
+    "find out how close you were, guess again. This one is NFL players.",
     "",
     "1. Guess any NFL player. Anyone. The first guess is a shot in the",
     "   dark, and that is fine.",
