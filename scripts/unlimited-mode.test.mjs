@@ -169,6 +169,31 @@ check(
   `${practiceRows} rows, still round 1 ${stillRoundOne}`,
 );
 
+// --- 5b. The caret has to survive a guess ---
+//
+// It did not. The field was disabled while a guess graded, which blurs a
+// focused element, and the focus() meant to restore it ran while `busy`
+// was still true - a no-op on an element that cannot take focus. Every
+// guess ended with the caret nowhere and the next one needed a click. On
+// a phone it was worse: disabling dismisses the keyboard, and iOS will
+// not reopen it for a programmatic focus after an await.
+{
+  await field.click();
+  await field.fill("br");
+  await page.waitForTimeout(350);
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(700);
+  const focused = await page.evaluate(() => document.activeElement?.tagName === "INPUT");
+  check("the field keeps focus after Enter", focused, focused ? "" : "caret left the box");
+
+  // And the proof it is usable: type without touching anything.
+  await page.keyboard.type("ma");
+  await page.waitForTimeout(300);
+  const typed = await field.inputValue();
+  check("you can keep typing straight away", typed === "ma", `field holds "${typed}"`);
+  await field.fill("");
+}
+
 // --- 6. Play out the round and check PLAY AGAIN deals a new player ---
 for (let i = 0; i < 8 && !(await page.getByRole("button", { name: "PLAY AGAIN" }).count()); i++) {
   await guessSomething(String.fromCharCode(100 + i));

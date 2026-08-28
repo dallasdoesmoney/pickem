@@ -359,8 +359,16 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
 
   async function guess(player: PuzzlePlayer) {
     if (busy || guessedIds.has(player.espnId)) return;
+    const typed = query;
     setError(null);
     setBusy(true);
+    // CLEARED NOW, not after the round trip, and that ordering is the
+    // point. The field stays enabled while a guess is in flight (see the
+    // input), so anything typed during those couple of hundred
+    // milliseconds is real input - and clearing afterwards would eat it.
+    // Cleared up front, a fast second name lands in an empty field.
+    setQuery("");
+    setActive(0);
     try {
       let next: PuzzleState;
       if (mode === "unlimited") {
@@ -387,7 +395,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         next = guestBoard(state?.puzzleOn ?? puzzleToday(), held);
         setDailyState(next);
       }
-      setQuery("");
       // A solve that happened just now, on this guess - which is the only
       // kind that gets the celebration. Anybody who reduces motion goes
       // straight to the reveal.
@@ -402,11 +409,18 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         }
       }
       posthog.capture("daily_puzzle_guess", { used: next.guessesUsed, solved: next.solved, guest: !user, mode });
-      inputRef.current?.focus();
     } catch (err) {
       setError(errorMessage(err));
+      // A guess that never landed should not cost the name that was
+      // typed for it.
+      setQuery(typed);
     } finally {
       setBusy(false);
+      // For the path where the caret really did leave: tapping a
+      // suggestion moves focus to that button, so the field has to be
+      // given it back. On the Enter path this is a no-op, because the
+      // field never lost it.
+      inputRef.current?.focus();
     }
   }
 
@@ -696,10 +710,33 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               onKeyDown={onKeyDown}
               placeholder="Guess the Player"
               autoComplete="off"
-              disabled={busy}
+              // NOT disabled while a guess is grading, and that is the
+              // fix rather than an oversight.
+              //
+              // Disabling it blurred the field - a focused element that
+              // becomes disabled loses focus - and the focus() call that
+              // was meant to restore it ran while `busy` was still true,
+              // so it was a no-op on an element that could not take
+              // focus. By the time the field re-enabled, nothing asked
+              // for it back. Every guess therefore ended with the caret
+              // nowhere, and the next one needed a tap on the box.
+              //
+              // Worse on a phone, which is where it was reported:
+              // disabling dismisses the keyboard, and iOS will not
+              // reopen it for a programmatic focus() that happens after
+              // an await, outside the tap that started it. Re-focusing
+              // harder could not have fixed that. Never losing focus
+              // can, so the field simply stays live.
+              //
+              // Nothing is lost by it: the double-submit it was
+              // presumably there to stop is already stopped by the
+              // `busy` guard at the top of guess(), and the query is
+              // cleared on the way in rather than on the way out, so a
+              // second name typed mid-flight survives.
+              aria-busy={busy}
               aria-label="Guess a player"
               aria-autocomplete="list"
-              className="w-full px-4 py-3.5 text-base font-medium outline-none transition-shadow duration-150 focus:shadow-[0_0_0_3px_#2b3a56] disabled:opacity-60 lg:px-5 lg:py-4 lg:text-lg"
+              className={`w-full px-4 py-3.5 text-base font-medium outline-none transition-shadow duration-150 focus:shadow-[0_0_0_3px_#2b3a56] lg:px-5 lg:py-4 lg:text-lg ${busy ? "opacity-60" : ""}`}
               style={{
                 background: FIELD,
                 border: CARD_EDGE,
