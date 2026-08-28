@@ -73,13 +73,14 @@ export function EmailPrefsPanel() {
         aria-expanded={open}
         className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
       >
-        <div className="min-w-0 flex-1">
-          <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
-            EMAIL
-          </div>
-          {/* Says what is behind it, so opening it is a decision rather
-              than a discovery. */}
-          <div className="mt-0.5 text-[11px] text-white/50">Pick reminders &mdash; on by default</div>
+        {/* The label and nothing else, matching SOCIAL LINKS and the
+            other section rows on this page. It named the setting and its
+            default underneath - which put "reminders are on" in front of
+            everybody who ever opened their account page, which is the
+            advertisement for turning them off that collapsing this was
+            meant to avoid. What is inside belongs inside. */}
+        <div className="min-w-0 flex-1 text-sm" style={{ fontFamily: "var(--font-display)" }}>
+          EMAIL PREFERENCES
         </div>
         <svg
           viewBox="0 0 24 24"
