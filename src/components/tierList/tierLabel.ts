@@ -32,10 +32,17 @@ const NAME_SIZE = 15;
 // A letter is not a name. "S" and "CHAMPIONSHIP" are different KINDS of
 // label, so they get different sizes and that reads as deliberate; two
 // names at two sizes reads as a bug.
-const isLetter = (label: string) => {
+// Exported because the rail's WIDTH now asks the same question its type
+// size does. A board of letters is squared off; one carrying names keeps
+// the wider rail those names need. Two answers from one definition, so
+// they cannot drift into a board that is sized for a letter and set for a
+// name.
+export const isLetterLabel = (label: string) => {
   const t = label.trim();
   return t.length > 0 && t.length <= 2 && !/\s/.test(t);
 };
+
+const isLetter = isLetterLabel;
 
 // The pyramid's band is narrower than the board's rail - 111px against
 // 124 on a desktop, because it is a fraction of the triangle rather than

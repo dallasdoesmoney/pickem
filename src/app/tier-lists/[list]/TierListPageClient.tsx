@@ -77,6 +77,7 @@ import { readBoard, runCascade } from "@/components/tierList/cascade";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
+import { isLetterLabel } from "@/components/tierList/tierLabel";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 // Per list, keyed the same way the board's own state is (see
@@ -314,6 +315,15 @@ export default function TierListPageClient({
 
   // Solve chip size from real available width so two columns of logos
   // never overflow a 320px phone.
+  // Whether this board's rail is holding letters or words. Every default
+  // board is "S A B C D F", so the square is what almost everybody sees;
+  // renaming one tier to something with a word in it is what buys the
+  // wider rail back.
+  const lettersOnly = useMemo(
+    () => state.tiers.every((t, i) => isLetterLabel(tierLabelFor(t, i))),
+    [state.tiers],
+  );
+
   const { chipSize, railWidth } = useMemo(() => {
     // 1056 is the board's max width (max-w-[66rem] on the main below) and
     // is chosen, not rounded to: at an 80px chip and the rail below it
@@ -322,19 +332,6 @@ export default function TierListPageClient({
     // come out of the same width - so widening the mark without widening
     // this is what costs a column.
     const content = Math.min(viewportWidth, 1056) - 32;
-    // The rail carries names now, not just letters, so it's held wide
-    // enough for a phrase like "SUPER BOWL CONTENDER" to wrap across two
-    // or three readable lines. A phone still can't spare as much as a
-    // desktop can, so it gets a narrower one and wraps sooner.
-    //
-    // 104 rather than 86 on a phone, which is what buys the name size its
-    // floor: a twelve-letter word has to fit the rail on ONE line, and at
-    // 86 the only size that managed it was 8px. Measured cost at 390: the
-    // mark goes 46px to 42, and the same five still fit a line. At 320 it
-    // is already at its 34px floor, so nothing changes there but the
-    // track.
-    const base = viewportWidth < 768 ? 104 : 136;
-    const track = content - base - 16;
     // Ten across from 1024 up - any normal laptop - rather than only once
     // the board hits its own max width. Between the two the chip solves a
     // little under its cap to make room, which is the right trade at that
@@ -342,21 +339,46 @@ export default function TierListPageClient({
     // column would come out of the mark instead, so it waits.
     const perRow =
       viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : viewportWidth < 1024 ? 8 : 10;
-    const size = Math.floor((track - (perRow - 1) * 6) / perRow);
+    const gaps = (perRow - 1) * 6;
     // Desktop earns a bigger mark than the old 58px cap allowed - this
     // page IS the logos, so they should be what you actually look at.
-    // Don't raise this without re-measuring: the rail width below is
-    // derived from the chip, so a bigger chip widens the rail, which eats
-    // the very track the chips need and can cost a whole column. At 80 the
-    // rail formula still lands under its 136 floor, so the floor holds.
-    const chip = Math.max(34, Math.min(80, size));
-    // The chevron has to read as a landscape tab, not a square - a name
-    // like "SHOULD BE FIRED" needs horizontal room, and a rail narrower
-    // than the row is tall looks like a stub. Held wider than the row
-    // height whatever the chip size works out to be.
+    const clamp = (n: number) => Math.max(34, Math.min(80, n));
+
+    // A LETTER'S RAIL IS A SQUARE. A row is one mark tall - chip + 16 of
+    // padding - so a rail that wide is exactly square, and six of them
+    // down the side read as a colour column rather than as six slabs.
+    //
+    // It has to be SOLVED, not just assigned, because the rail and the
+    // mark come out of the same width: the rail is the chip plus 16, and
+    // the chip is what is left after the rail. Writing that down and
+    // rearranging it,
+    //
+    //   chip * perRow + gaps  <=  content - (chip + 16) - 16
+    //   chip                  <=  (content - 32 - gaps) / (perRow + 1)
+    //
+    // A fixed rail with the chip solved against it would have to guess,
+    // and guessing high wastes width while guessing low overflows the row.
+    //
+    // Narrowing the rail hands its width back to the marks, so a phone
+    // gets a BIGGER logo out of this, not a smaller one: 36px at 390
+    // against 34, and 38 at 320 where it used to sit on the floor.
+    if (lettersOnly) {
+      const chip = clamp(Math.floor((content - 32 - gaps) / (perRow + 1)));
+      return { chipSize: chip, railWidth: chip + 16 };
+    }
+
+    // A NAME'S RAIL IS NOT. "SUPER BOWL CONTENDER" needs horizontal room
+    // to wrap into two or three readable lines, and a square would set it
+    // four characters to a line. So a board with any real name on it
+    // keeps the wider rail, and the floor under it is what holds the name
+    // size up: a twelve-letter word has to fit on ONE line, and at 86 the
+    // only size that managed was 8px.
+    const base = viewportWidth < 768 ? 104 : 136;
+    const track = content - base - 16;
+    const chip = clamp(Math.floor((track - gaps) / perRow));
     const rail = Math.max(base, Math.round((chip + 16) * 1.28));
     return { chipSize: chip, railWidth: rail };
-  }, [viewportWidth]);
+  }, [viewportWidth, lettersOnly]);
 
   // ------------------------------------------------------- pyramid mode
   //
