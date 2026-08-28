@@ -269,4 +269,11 @@ export function text({ playUrl, unsubUrl, addr }) {
   ].join("\n");
 }
 
-export const SUBJECT = "New daily game: can you name the player in 8 guesses?";
+// Dallas's call, made with the trademark point already on the table.
+// "Wordle" is the New York Times' mark and this uses it as a label
+// rather than a comparison, which is the more exposed of the two - worth
+// knowing, and his decision to make.
+//
+// Short on purpose beyond that: 21 characters survives every mobile
+// inbox that truncates, and the preheader carries the explanation.
+export const SUBJECT = "New Game: NFL Wordle!";
