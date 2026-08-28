@@ -92,17 +92,48 @@ const { SUPABASE_URL, SUPABASE_ANON_KEY, EMAIL_SENDER_TOKEN, RESEND_API_KEY, EMA
   process.env;
 const SITE = (process.env.SITE_URL ?? "https://sidelinebrew.com").replace(/\/$/, "");
 
-// A FROM without a display name shows the raw address in the inbox -
-// "picks@sidelinebrew.com" where the sender's name should be. It still
-// sends, so this warns rather than refusing, but it is worth shouting
-// about: the name beside a subject line is most of what decides whether
-// somebody opens it, and the failure is invisible from anywhere except
-// an actual inbox.
-if (EMAIL_FROM && !/<[^>]+>\s*$/.test(EMAIL_FROM.trim())) {
+// WHAT EMAIL_FROM HAS TO CONTAIN, and why it cannot just be a name.
+//
+// `From` is a single header carrying an optional display name AND a
+// mandatory address - "Sideline Brew <picks@sidelinebrew.com>". The
+// address is what actually routes the mail and what the receiving server
+// checks against SPF and DKIM; the name is decoration on top of it.
+// There is no second field to put the address in, so a name on its own
+// is not a From line, it is half of one.
+//
+// Two failure modes, and they deserve different treatment:
+//
+//   No @ at all      BROKEN. Resend rejects it with a 422, but not until
+//                    the first send is attempted - so on a real run that
+//                    surfaces as every address failing in turn, which
+//                    reads like a delivery problem rather than a typo in
+//                    a secret. Caught here instead, before anything is
+//                    contacted.
+//
+//   Address, no name WORKS, looks worse. The inbox shows the raw address
+//                    where the sender's name belongs. Warned rather than
+//                    refused, because the mail is fine - but warned
+//                    loudly, since the name beside a subject line is most
+//                    of what decides whether anybody opens it, and the
+//                    value is masked in the workflow log so there is
+//                    nowhere to notice it except an actual inbox.
+const FROM = (EMAIL_FROM ?? "").trim();
+if (FROM && !FROM.includes("@")) {
+  console.error(
+    `EMAIL_FROM has no email address in it: "${FROM}"\n\n` +
+      "A From line needs the address as well as the name - the address is what\n" +
+      "routes the mail and what gets checked against your domain's DNS. Set the\n" +
+      "secret to both, in this shape:\n\n" +
+      `  ${FROM} <picks@sidelinebrew.com>\n\n` +
+      "using whichever address on sidelinebrew.com you verified in Resend.",
+  );
+  process.exit(1);
+}
+if (FROM && !/<[^>]+@[^>]+>$/.test(FROM)) {
   console.warn(
-    `\nWARNING: EMAIL_FROM is a bare address, so the inbox will show "${EMAIL_FROM}"\n` +
+    `\nWARNING: EMAIL_FROM is a bare address, so the inbox will show "${FROM}"\n` +
       "where the sender's name belongs. Set the secret to include one:\n" +
-      `  Sideline Brew <${EMAIL_FROM.trim()}>\n`,
+      `  Sideline Brew <${FROM}>\n`,
   );
 }
 
