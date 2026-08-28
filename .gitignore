@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Written by the local build-verification harness, never shipped.
 build-stamp.txt
+
+# Rendered email previews - scripts/preview-emails.mjs writes them here.
+.email-preview/

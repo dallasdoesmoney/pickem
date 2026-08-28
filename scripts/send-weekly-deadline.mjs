@@ -48,6 +48,19 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // non-numeric or not positive falls back to the default.
 const WINDOW_HOURS = Number(process.env.WINDOW_HOURS) > 0 ? Number(process.env.WINDOW_HOURS) : 24;
 
+// The last call, inside the final hour. Deliberately not configurable
+// from the workflow: widening the heads-up is a testing convenience,
+// widening this would turn a last call into a second heads-up and mail
+// people twice in an afternoon.
+//
+// A caveat worth knowing rather than discovering. The cron runs at the
+// top of each hour, so the notice this produces lands between 0 and 60
+// minutes before kickoff depending on the kickoff MINUTE - a 1:00 PM
+// Sunday start gets a clean hour, a 8:20 PM Wednesday start gets twenty
+// minutes. Running the cron every fifteen minutes is what would make
+// "an hour" mean an hour.
+const FINAL_HOURS = 1;
+
 const DRY_RUN = process.env.DRY_RUN === "1";
 
 // CAN-SPAM requires a real postal address in commercial mail. It is an
@@ -58,7 +71,11 @@ const REQUIRED = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "EMAIL_SENDER_TOKEN", "EM
 if (!DRY_RUN) REQUIRED.push("RESEND_API_KEY");
 
 const missing = REQUIRED.filter((k) => !process.env[k]);
-if (missing.length) {
+// Only when actually run. Imported - by the preview, or a test - the
+// templates are wanted without the environment a send needs, and
+// exiting the process on import would take the importer down with it.
+const RUNNING = Boolean(process.argv[1] && process.argv[1].endsWith("send-weekly-deadline.mjs"));
+if (RUNNING && missing.length) {
   // Named, not just listed. A secret whose name does not match what the
   // workflow asks for resolves to an empty string with no warning from
   // GitHub, and "Missing: SUPABASE_URL" alone sends you looking for a
@@ -139,11 +156,11 @@ const esc = (s) =>
 // the version people actually see stops being the version anyone looked
 // at. Tables and inline styles for the same reason - Outlook's renderer
 // is Word, and it ignores most of what a browser understands.
-function html({ name, made, total, week, locksAt, unsubUrl }) {
+function html({ name, made, total, week, locksAt, unsubUrl, final }) {
   const left = total - made;
   return `<!doctype html>
 <html><body style="margin:0;padding:0;background:#eef1f6;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Week ${week} locks ${esc(locksAt)} - ${left} ${left === 1 ? "pick" : "picks"} still open.</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${final ? "Last chance - " : ""}Week ${week} locks ${esc(locksAt)}, ${left} ${left === 1 ? "pick" : "picks"} still open.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f6;padding:24px 12px;">
 <tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
@@ -151,16 +168,18 @@ function html({ name, made, total, week, locksAt, unsubUrl }) {
       <div style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em;">Sideline Brew</div>
     </td></tr>
     <tr><td style="padding:28px 26px 8px;">
-      <div style="color:#0b1220;font-size:22px;font-weight:700;line-height:1.3;">Week ${week} locks ${esc(locksAt)}</div>
+      <div style="color:#0b1220;font-size:22px;font-weight:700;line-height:1.3;">${
+        final ? `Week ${week} locks within the hour` : `Week ${week} locks ${esc(locksAt)}`
+      }</div>
       <p style="color:#41506a;font-size:15px;line-height:1.6;margin:14px 0 0;">
         ${esc(name)}, you have <strong style="color:#0b1220;">${made} of ${total}</strong> picked${
           made === 0 ? " - the whole card is still open." : `, so ${left} ${left === 1 ? "game is" : "games are"} still open.`
-        }
+        }${final ? ` Anything unpicked at ${esc(locksAt)} stays unpicked.` : ""}
       </p>
     </td></tr>
     <tr><td style="padding:22px 26px 6px;">
       <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#3ecb78;border-radius:9px;">
-        <a href="${SITE}/weekly" style="display:inline-block;padding:13px 26px;color:#06210f;font-size:15px;font-weight:700;text-decoration:none;">Finish my picks</a>
+        <a href="${SITE}/weekly" style="display:inline-block;padding:13px 26px;color:#06210f;font-size:15px;font-weight:700;text-decoration:none;">${final ? "Pick them now" : "Finish my picks"}</a>
       </td></tr></table>
     </td></tr>
     <tr><td style="padding:20px 26px 26px;">
@@ -175,9 +194,9 @@ function html({ name, made, total, week, locksAt, unsubUrl }) {
 </body></html>`;
 }
 
-function text({ name, made, total, week, locksAt, unsubUrl }) {
+function text({ name, made, total, week, locksAt, unsubUrl, final }) {
   return [
-    `Week ${week} locks ${locksAt}.`,
+    final ? `Week ${week} locks within the hour - ${locksAt}.` : `Week ${week} locks ${locksAt}.`,
     "",
     `${name}, you have ${made} of ${total} picked.`,
     "",
@@ -235,14 +254,31 @@ async function main() {
   if (hoursOut > WINDOW_HOURS)
     return console.log(`Week ${week} locks in ${hoursOut.toFixed(1)}h, outside the ${WINDOW_HOURS}h window. Nothing to do.`);
 
+  // Which of the two this run is. Inside the final hour it is the last
+  // call; otherwise it is the day-out heads-up. Both are excluded
+  // independently by the ledger, so a run inside the final hour sends
+  // the last call to somebody who already had the heads-up, and sends
+  // nothing to somebody who has already had both.
+  //
+  // The heads-up is NOT re-sent inside the final hour: anybody still
+  // unpicked at that point already received it a day ago, so they are in
+  // the ledger for that kind and fall out of the query on their own.
+  const final = hoursOut <= FINAL_HOURS;
+  const kind = final ? "weekly_deadline_final" : "weekly_deadline";
+
   const locksAt = FMT.full.format(first);
   const locksDay = FMT.day.format(first);
-  console.log(`Week ${week} locks ${locksAt} - ${hoursOut.toFixed(1)}h out. ${total} games.`);
+  console.log(
+    `Week ${week} locks ${locksAt} - ${hoursOut.toFixed(1)}h out. ${total} games. Sending the ${
+      final ? "LAST CALL" : "day-out heads-up"
+    }.`,
+  );
 
   const recipients = await rpc("weekly_deadline_recipients", {
     p_token: EMAIL_SENDER_TOKEN,
     p_week: week,
     p_total_games: total,
+    p_kind: kind,
   });
   if (!recipients?.length) return console.log("Nobody to tell - everybody opted in has finished, or was told already.");
   console.log(`${recipients.length} to tell.`);
@@ -250,9 +286,11 @@ async function main() {
   const sent = [];
   for (const r of recipients) {
     const unsubUrl = `${SITE}/unsubscribe?t=${r.unsub_token}`;
-    const view = { name: r.display_name, made: r.made, total, week, locksAt, unsubUrl };
+    const view = { name: r.display_name, made: r.made, total, week, locksAt, unsubUrl, final };
     const left = total - r.made;
-    const subject = `Week ${week} locks ${locksDay} - ${left} ${left === 1 ? "pick" : "picks"} still open`;
+    const subject = final
+      ? `Last call - Week ${week} locks within the hour, ${left} ${left === 1 ? "pick" : "picks"} open`
+      : `Week ${week} locks ${locksDay} - ${left} ${left === 1 ? "pick" : "picks"} still open`;
 
     if (DRY_RUN) {
       console.log(`  [dry run] ${r.email} - "${subject}" (${r.made}/${total})`);
@@ -279,7 +317,7 @@ async function main() {
     // reminder somebody was owed.
     const n = await rpc("mark_emails_sent", {
       p_token: EMAIL_SENDER_TOKEN,
-      p_kind: "weekly_deadline",
+      p_kind: kind,
       p_reference_id: String(week),
       p_rows: sent,
     });
@@ -291,7 +329,14 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err.message);
-  process.exit(1);
-});
+// Importable without running, the way sync-results.mjs does it. The
+// preview script imports html() and text() from here so that what it
+// shows IS what goes out - and importing must not start a send.
+if (process.argv[1] && process.argv[1].endsWith("send-weekly-deadline.mjs")) {
+  main().catch((err) => {
+    console.error(err.message);
+    process.exit(1);
+  });
+}
+
+export { html, text };
