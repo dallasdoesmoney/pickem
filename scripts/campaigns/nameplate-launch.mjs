@@ -141,6 +141,26 @@ const how = HOW.map(
   </tr>`,
 ).join("");
 
+
+const WHY = [
+  ["🔥", "Keep a streak alive",
+   "Show up every day and the flame on your profile counts the run."],
+  ["🟩", "Share it without spoiling it",
+   "Your result posts as coloured squares only &mdash; no name, no team. Nobody reading it loses their turn."],
+  ["🏆", "Settle who is better",
+   "Same player for everyone, so the only question left is who needed fewer guesses."],
+];
+
+const why = WHY.map(
+  ([icon, title, body]) => `<tr>
+    <td width="30" valign="top" style="padding:0 12px 16px 0;font-size:18px;line-height:1.2;">${icon}</td>
+    <td valign="top" style="padding:0 0 16px;">
+      <div style="color:${B.ink};font-size:15px;font-weight:700;line-height:1.35;">${title}</div>
+      <div style="margin-top:3px;color:${B.body};font-size:14px;line-height:1.55;">${body}</div>
+    </td>
+  </tr>`,
+).join("");
+
 export function html({ playUrl, unsubUrl, addr, logo }) {
   return `<!doctype html>
 <html><body style="margin:0;padding:0;background:${B.wash};">
@@ -182,12 +202,11 @@ export function html({ playUrl, unsubUrl, addr, logo }) {
       ${board}
     </td></tr>
     <tr><td style="padding:14px 20px 0;" align="center">${key}</td></tr>
-    <tr><td style="padding:16px 30px 0;">
-      <p style="margin:0;color:${B.body};font-size:15px;line-height:1.6;text-align:center;">
-        Two wrong guesses and the answer is already cornered: NFC West, wide receiver,
-        25 years old, 6&#39;2&quot;, wears number 12. That is the game &mdash; the misses are
-        what get you there.
-      </p>
+    <tr><td style="padding:28px 30px 0;">
+      <div style="height:1px;background:${B.hair};font-size:0;line-height:0;">&nbsp;</div>
+    </td></tr>
+    <tr><td style="padding:24px 30px 8px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${why}</table>
     </td></tr>
 
     <tr><td align="center" style="padding:26px 30px 8px;">
@@ -197,8 +216,7 @@ export function html({ playUrl, unsubUrl, addr, logo }) {
     </td></tr>
     <tr><td style="padding:12px 30px 32px;">
       <p style="margin:0;color:${B.mute};font-size:13px;line-height:1.6;text-align:center;">
-        Free, no app, about a minute a day. A new player every night at midnight ET &mdash;
-        and you can share your result as a grid of squares without giving the answer away.
+        Free, no app, about a minute a day. A new player every night at midnight ET.
       </p>
     </td></tr>
 
@@ -231,15 +249,19 @@ export function text({ playUrl, unsubUrl, addr }) {
     "   and number, all graded against the mystery player.",
     "3. Green is exact, gold is close. Eight guesses to close the net.",
     "",
-    "Two wrong guesses in and the answer is already cornered: NFC West,",
-    "wide receiver, 25 years old, 6'2\", wears number 12. That is the game -",
-    "the misses are what get you there.",
+    "WHY IT IS WORTH COMING BACK",
+    "",
+    "- Keep a streak alive. Show up every day and the flame on your",
+    "  profile counts the run.",
+    "- Share it without spoiling it. Your result posts as coloured squares",
+    "  only - no name, no team - so nobody reading it loses their turn.",
+    "- Settle who is better. Same player for everyone, so the only",
+    "  question left is who needed fewer guesses.",
     "",
     `Play today's game: ${playUrl}`,
     "",
     "Free, no app, about a minute a day. A new player every night at",
-    "midnight ET - and you can share your result as a grid of squares",
-    "without giving the answer away.",
+    "midnight ET.",
     "",
     `Unsubscribe: ${unsubUrl}`,
     "",
