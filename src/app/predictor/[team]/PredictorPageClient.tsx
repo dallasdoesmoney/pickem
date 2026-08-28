@@ -17,6 +17,7 @@ import { useSeasonPicks } from "@/hooks/useSeasonPicks";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
+import { SavePicksPrompt } from "@/components/SavePicksPrompt";
 import { supabase } from "@/lib/supabase/client";
 import { saveSeasonPicks, syncOpponentSeasonPicks } from "@/lib/supabase/picks";
 import { syncPredictorAchievements } from "@/lib/supabase/achievements";
@@ -49,6 +50,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
   const winTotal = WIN_TOTALS[trackedTeam];
 
   // Column count, gap and scale are display settings now - see
@@ -140,6 +142,7 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loaded]);
 
+
   // Auto-save while signed in, same debounced/hydration-guard pattern as
   // the weekly picks page. skipNextAutoSaveRef resets whenever loaded goes
   // false, which useSeasonPicks already does at the start of every fetch
@@ -187,6 +190,40 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
   const losses = Object.values(picks).filter((winner) => winner !== trackedTeam).length;
   const gamesPicked = wins + losses;
   const diff = winTotal !== undefined && gamesPicked > 0 ? Math.round((wins - winTotal) * 2) / 2 : null;
+
+  // Nudge a signed-out visitor once they are clearly invested - halfway
+  // through the season - rather than only pitching it passively. The
+  // weekly board has had this for a while; the predictor had nothing, so
+  // somebody could fill in all eighteen weeks without ever being told
+  // the work lived in one browser.
+  //
+  // Keyed per TEAM in localStorage, not per visit: predicting the Ravens
+  // and then the Chiefs is two boards, and being asked once for each is
+  // reasonable where being asked on every page load is not.
+  useEffect(() => {
+    if (user || !loaded || view.streamerMode || schedule.length === 0) return;
+    if (gamesPicked / schedule.length < 0.5) return;
+    const key = `pickem:save-prompt-seen-${trackedTeam}`;
+    if (localStorage.getItem(key) === "1") return;
+    localStorage.setItem(key, "1");
+    // Deliberate, and the rule's usual advice does not apply: this is not
+    // derived state that could be computed during render. It is a
+    // one-time side effect keyed on a localStorage marker - "has this
+    // person been asked about this board before" - which render has no
+    // business reading.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowSavePrompt(true);
+  }, [user, loaded, gamesPicked, schedule.length, trackedTeam, view.streamerMode]);
+
+  // Close this before opening the sign-in modal, not after - both are
+  // fixed inset-0 overlays, and leaving one mounted under the other is
+  // the "have to exit out twice" bug the weekly page already hit.
+  function handleSavePromptSignUp() {
+    setShowSavePrompt(false);
+    if (view.streamerMode) return;
+    void handleSaveAndSubmit();
+  }
+
 
   // Picks that defy the power rankings - each one earns the side-eye dog
   // on its card, and the total gets its own KPI pill below.
@@ -638,6 +675,13 @@ export default function PredictorPageClient({ trackedTeam }: { trackedTeam: Team
       </main>
       {dialog}
       {signInModal}
+      {showSavePrompt && (
+        <SavePicksPrompt
+          context={`the ${team.name}\u2019 season`}
+          onSignUp={handleSavePromptSignUp}
+          onDismiss={() => setShowSavePrompt(false)}
+        />
+      )}
     </div>
   );
 }

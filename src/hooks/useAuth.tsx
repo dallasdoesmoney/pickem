@@ -52,11 +52,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  // Migration is keyed on the DB flag, not on which auth event fired - this
-  // ref just stops a duplicate run within the same tab load (e.g. the
-  // initial getSession() and an immediate onAuthStateChange both resolving
-  // to the same signed-in user) before the flag flip round-trips.
-  const migratingRef = useRef(false);
+  // Migration is keyed on the DB flag, not on which auth event fired. This
+  // ref holds the in-flight run so a duplicate within the same tab load -
+  // the initial getSession() and an immediate onAuthStateChange both
+  // resolving to the same signed-in user - AWAITS it rather than skipping
+  // past it, before the flag flip round-trips. See resolveSession for why
+  // skipping was the bug.
+  const migrationRef = useRef<{ userId: string; done: Promise<void> } | null>(null);
   const identifiedUserIdRef = useRef<string | null>(null);
   const claimingReferralRef = useRef(false);
   const [pendingReferrerSuggestion, setPendingReferrerSuggestion] = useState<PendingReferrerSuggestion | null>(null);
@@ -85,6 +87,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const nextProfile = await fetchProfile(nextUser.id);
     setProfile(nextProfile);
+
+    // MIGRATE BEFORE RELEASING `loading`, and this ordering is the whole
+    // point rather than a detail.
+    //
+    // usePicks and useSeasonPicks both start with `if (authLoading)
+    // return`, and both, once a user exists, treat the DATABASE as
+    // authoritative - they fetch it and write the result back over the
+    // local copy as a cache. So with loading released first, this raced,
+    // and the race had a winner:
+    //
+    //   1. setLoading(false)
+    //   2. useSeasonPicks sees a user, fetches an EMPTY season from the
+    //      database, and caches that empty result to localStorage
+    //   3. migrateLocalDataToAccount reads localStorage and finds {}
+    //
+    // Somebody who predicted a whole season signed out, then made an
+    // account to save it, watched the board empty itself - and the thing
+    // that erased their work was the cache write in step 2, a moment
+    // before the migration that existed to rescue it.
+    //
+    // Holding `loading` true keeps both hooks parked, so the migration
+    // reads the local storage it was written to read. The cost is that
+    // the first load after signing up waits for it, which happens once
+    // per account - profiles.migrated_local_picks makes sure of that.
+    // A PROMISE, not a "busy" flag, and that distinction is load-bearing.
+    // getSession() and onAuthStateChange both call this function, at the
+    // same time, with the same session. A flag makes the second caller
+    // SKIP the migration - correct, it must only run once - and then walk
+    // straight on to setLoading(false) while the first is still copying
+    // picks. Which put the empty fetch back in front of the migration and
+    // reproduced the whole bug through a second door.
+    //
+    // Holding the promise means the second caller waits for the same work
+    // instead of stepping over it. Keyed by user id so a different
+    // account signing in later on the same page still gets its own.
+    if (nextProfile && !nextProfile.migrated_local_picks) {
+      if (migrationRef.current?.userId !== nextUser.id) {
+        migrationRef.current = {
+          userId: nextUser.id,
+          done: (async () => {
+            try {
+              await migrateLocalDataToAccount(nextUser.id);
+              await supabase.from("profiles").update({ migrated_local_picks: true }).eq("id", nextUser.id);
+              setProfile((prev) => (prev ? { ...prev, migrated_local_picks: true } : prev));
+            } catch (err) {
+              // Swallowed, not rethrown. This sits in front of
+              // setLoading(false), so an exception escaping here would
+              // park the whole app on its loading state forever - losing
+              // the picks AND the site. The flag stays false in the
+              // database, so the next load tries again.
+              console.error("Failed to migrate this device's picks into the new account", err);
+            }
+          })(),
+        };
+      }
+      await migrationRef.current.done;
+    }
+
     setLoading(false);
 
     if (identifiedUserIdRef.current !== nextUser.id) {
@@ -97,17 +157,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         is_admin: nextProfile?.is_admin,
       });
       identifiedUserIdRef.current = nextUser.id;
-    }
-
-    if (nextProfile && !nextProfile.migrated_local_picks && !migratingRef.current) {
-      migratingRef.current = true;
-      try {
-        await migrateLocalDataToAccount(nextUser.id);
-        await supabase.from("profiles").update({ migrated_local_picks: true }).eq("id", nextUser.id);
-        setProfile((prev) => (prev ? { ...prev, migrated_local_picks: true } : prev));
-      } finally {
-        migratingRef.current = false;
-      }
     }
 
     if (nextProfile && !nextProfile.referred_by && !claimingReferralRef.current) {
