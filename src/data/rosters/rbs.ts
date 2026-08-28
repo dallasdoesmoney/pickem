@@ -45,7 +45,7 @@ export const RUNNING_BACKS: RunningBack[] = [
   { espnId: "4241985", name: "J.K. Dobbins", team: "DEN", heightIn: 70, weightLb: 212, age: 27, jersey: 27 },
   { espnId: "4575131", name: "Jacory Croskey-Merritt", team: "WAS", heightIn: 71, weightLb: 208, age: 25, jersey: 22 },
   { espnId: "4685512", name: "Jadarian Price", team: "SEA", heightIn: 71, weightLb: 209, age: 22, jersey: 8, college: "Notre Dame" },
-  { espnId: "4429795", name: "Jahmyr Gibbs", team: "DET", heightIn: 69, weightLb: 202, age: 24 },
+  { espnId: "4429795", name: "Jahmyr Gibbs", team: "DET", heightIn: 69, weightLb: 202, age: 24, jersey: 0 },
   { espnId: "4379399", name: "James Cook III", team: "BUF", heightIn: 71, weightLb: 190, age: 26, jersey: 4 },
   { espnId: "4361579", name: "Javonte Williams", team: "DAL", heightIn: 70, weightLb: 222, age: 26, jersey: 33 },
   { espnId: "4569987", name: "Jaylen Warren", team: "PIT", heightIn: 68, weightLb: 215, age: 27, jersey: 30 },
