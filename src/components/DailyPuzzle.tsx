@@ -430,10 +430,9 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     return `${MONTHS[m - 1]} ${d}, ${y}`;
   }
 
-  // The body WITHOUT the link on the end. The share sheet takes the link
-  // as its own field and appends it itself, so a copy pasted in here as
-  // well arrives twice - once as a line of text and once as the attached
-  // URL. The clipboard path, which has no url field, adds it back.
+  // Everything except the link. share() puts that on the end, for both
+  // the share sheet and the clipboard - see the note there for why it is
+  // no longer handed over as a separate `url` field.
   function shareBody(s: PuzzleState): string {
     const grid = shareGrid(s);
     // Words, not a fraction. "4/8" reads as four out of eight RIGHT - a
@@ -464,17 +463,29 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     // ?ref=username for anybody signed in. A signed-out player shares the
     // same link without the code, because there is no account to credit.
     const dailyLink = buildReferralLinkTo("/daily", profile?.username);
-    const body = shareBody(state);
+    // ONE STRING, with the link as its last line.
+    //
+    // This used to hand the sheet `url` as its own field, on the reasoning
+    // that a share sheet only unfurls something it has been told is a URL.
+    // The cost of that is losing control of WHERE it goes: the field is a
+    // hint, and each platform places it. iOS puts it under the message;
+    // macOS Messages puts it on top, so the first thing the recipient sees
+    // is a link, with the score and the squares below it - backwards, for
+    // a share whose whole point is the squares.
+    //
+    // Inside the text the order is ours on every platform, and nothing is
+    // really lost: Messages, Slack and the rest linkify a URL in a message
+    // body and unfurl it from there. It also collapses the two paths below
+    // into the same string, so the sheet and the clipboard can no longer
+    // disagree about what a shared result looks like - which is how the
+    // link came to be sent twice once already.
+    //
+    // No title either. Messages ignores it, and the targets that use it
+    // put it above a body that already opens with the same two words.
+    const message = `${shareBody(state)}\n\n${dailyLink}`;
     if (navigator.share) {
       try {
-        // No title. Messages ignores it, and the ones that do use it put
-        // it above a body that already opens with the same two words.
-        //
-        // url as its own field rather than pasted on the end of text: a
-        // share sheet will only unfurl something it has been TOLD is a
-        // URL, and it appends it to the message itself - so the body
-        // deliberately stops at the grid.
-        await navigator.share({ text: body, url: dailyLink });
+        await navigator.share({ text: message });
         posthog.capture("daily_puzzle_shared", { method: "native_share" });
         return;
       } catch {
@@ -482,8 +493,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         // rather than leaving the button looking broken.
       }
     }
-    // Nothing appends the link here, so it goes on the end by hand.
-    await navigator.clipboard.writeText(`${body}\n\n${dailyLink}`);
+    await navigator.clipboard.writeText(message);
     posthog.capture("daily_puzzle_shared", { method: "clipboard" });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

@@ -20,6 +20,7 @@
 // cron fire, a manual re-run - none of them can send the same person the
 // same reminder twice.
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { parseGames } from "./sync-results.mjs";
@@ -60,6 +61,53 @@ const WINDOW_HOURS = Number(process.env.WINDOW_HOURS) > 0 ? Number(process.env.W
 // minutes. Running the cron every fifteen minutes is what would make
 // "an hour" mean an hour.
 const FINAL_HOURS = 1;
+
+// THE HOLDOUT. Off by default, and deliberately so - it withholds a
+// reminder from real people, which is a product decision rather than a
+// measurement one.
+//
+// Why it is here at all: "did the reminders help?" cannot be answered by
+// looking at the people who got one. Plenty of them would have finished
+// their card anyway, and a report showing that 60% of emailed people
+// went on to pick is compatible with the email doing everything and with
+// it doing nothing. The only way to tell the two apart is to leave a
+// comparable group alone and see whether they behave differently.
+//
+// Set HOLDOUT_PERCENT to (say) 20 in the workflow to switch it on. Read
+// supabase/checks/email_impact.sql for what comes out, and read the
+// group sizes there before the percentages - on a small list this takes
+// several weeks to say anything, and two people out of three is not a
+// result.
+//
+// Guarded the same way as WINDOW_HOURS: GitHub sets an unset input to an
+// empty string, and Number("") is 0. Here 0 happens to be the safe
+// default rather than a broken one, but the guard also catches a typo
+// like "20%" or "twenty" that would otherwise become NaN and silently
+// hold nobody back.
+const HOLDOUT_PERCENT = (() => {
+  const n = Number(process.env.HOLDOUT_PERCENT);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  // Above 50 the experiment costs more picks than it can be worth, and
+  // 100 would be "stop sending reminders" written in a confusing way.
+  return Math.min(Math.floor(n), 50);
+})();
+
+// Which side of the experiment somebody is on, for a given week.
+//
+// Deterministic, so an hourly cron re-running inside the window puts the
+// same person on the same side every time - the ledger is not what keeps
+// them there. Salted with the week, so it is a different draw each week
+// and the same unlucky people are not silently the ones who never get
+// reminders all season.
+//
+// A hash rather than Math.random for the determinism, and rather than
+// something like the last hex digit of the uuid because that would tie
+// the split to how uuids happen to be generated.
+function inHoldout(userId, week) {
+  if (HOLDOUT_PERCENT <= 0) return false;
+  const digest = createHash("sha256").update(`${userId}:week${week}`).digest();
+  return digest.readUInt32BE(0) % 100 < HOLDOUT_PERCENT;
+}
 
 const DRY_RUN = process.env.DRY_RUN === "1";
 
@@ -143,12 +191,72 @@ const FMT = {
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+// The site's own colours, read off globals.css and the components rather
+// than invented here, so the email and the app cannot drift apart
+// quietly. If one of these changes on the site, change it here too.
+const C = {
+  ground: "#070e1c", // globals.css --background
+  green: "#4ade80", // the app's primary green
+  deep: "#22c55e", // its darker partner, for small text on white
+  red: "#ef4444", // wrong/urgent - the last call's eyebrow
+  ink: "#0b1220",
+  body: "#41506a",
+  faint: "#9aa8bd",
+  mute: "#7d8ca6",
+  wash: "#eef1f6",
+  hair: "#e6eaf1",
+};
+
+const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+// The horizontal logo - a WHITE wordmark, which is why it only ever
+// appears on the dark band. public/press-logo.png is the same mark with
+// a dark wordmark for light grounds; putting this one on white would
+// render it invisible.
+//
+// Served from the site rather than attached or inlined: Gmail strips
+// data: URIs on images, and a CID attachment means dealing with MIME by
+// hand. The file is public/email-logo.png - the header logo trimmed,
+// resized to 440px and quantised, 9.6KB against the original's 311KB,
+// which otherwise would have been most of the message's weight.
+const LOGO = `${SITE}/email-logo.png`;
+
+// Where the button goes. Two things ride along:
+//
+// from=reminder is read by the weekly page, which uses it to lead with
+// sign-in when the visitor is signed out - email gets read on phones,
+// and picks live in the database, so somebody arriving signed out would
+// otherwise see an EMPTY card seconds after being told they had 13 of 16
+// picked. See src/app/weekly/page.tsx.
+//
+// The utm_* trio is what PostHog reads, and it is the only reason we can
+// ever say how many people the reminder actually brought back. Campaign
+// carries the week so weeks can be compared; content separates the
+// heads-up from the last call, which is the comparison that decides
+// whether the second email earns its place.
+// Two forms on purpose. In an href every & has to be &amp; - a raw one
+// starts an entity reference, and a parameter that happens to spell one
+// (&copy, &reg, &not) is silently swallowed by the parser. Nothing here
+// spells one today, which is exactly the kind of thing that stays true
+// until somebody adds a parameter. The plain-text mail wants the raw
+// URL, because there is no parser there to undo the escaping.
+const ctaUrl = (week, final) =>
+  `${SITE}/weekly?from=reminder` +
+  `&utm_source=email&utm_medium=reminder` +
+  `&utm_campaign=week${week}` +
+  `&utm_content=${final ? "last_call" : "heads_up"}`;
+const ctaHref = (week, final) => ctaUrl(week, final).replaceAll("&", "&amp;");
+
 // The footer says "because you have an account", NOT "because you turned
 // this on". Reminders are on by default as of migration 0053, so the
 // second sentence would be false for almost everybody receiving it -
 // and a recipient who is told they opted in when they did not reaches
 // for the spam button rather than the unsubscribe link, which costs the
 // sending domain instead of costing the list one address.
+//
+// It is also two lines rather than a paragraph. CAN-SPAM wants a working
+// opt-out and a postal address; it does not want an essay, and an essay
+// about leaving is an advertisement for leaving.
 //
 // A dark band for the brand and a light body for everything else. Not a
 // style choice so much as a deliverability one: a fully dark email is
@@ -159,35 +267,40 @@ const esc = (s) =>
 function html({ name, made, total, week, locksAt, unsubUrl, final }) {
   const left = total - made;
   return `<!doctype html>
-<html><body style="margin:0;padding:0;background:#eef1f6;">
+<html><body style="margin:0;padding:0;background:${C.wash};">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${final ? "Last chance - " : ""}Week ${week} locks ${esc(locksAt)}, ${left} ${left === 1 ? "pick" : "picks"} still open.</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f6;padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.wash};padding:24px 12px;">
 <tr><td align="center">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-    <tr><td style="background:#070e1c;padding:20px 26px;">
-      <div style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em;">Sideline Brew</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;font-family:${SANS};">
+    <tr><td style="background:${C.ground};padding:22px 30px;">
+      <img src="${LOGO}" width="200" alt="Sideline Brew" style="display:block;border:0;width:200px;height:auto;">
     </td></tr>
-    <tr><td style="padding:28px 26px 8px;">
-      <div style="color:#0b1220;font-size:22px;font-weight:700;line-height:1.3;">${
-        final ? `Week ${week} locks within the hour` : `Week ${week} locks ${esc(locksAt)}`
+    <tr><td style="height:4px;background:${C.green};font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td style="padding:32px 30px 0;">
+      <div style="color:${final ? C.red : C.deep};font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;">${
+        final ? "Last call" : `Week ${week}`
       }</div>
-      <p style="color:#41506a;font-size:15px;line-height:1.6;margin:14px 0 0;">
-        ${esc(name)}, you have <strong style="color:#0b1220;">${made} of ${total}</strong> picked${
+      <h1 style="margin:10px 0 0;color:${C.ink};font-size:26px;line-height:1.25;font-weight:800;">${
+        final ? "Your picks lock within the hour" : `Your picks lock ${esc(locksAt)}`
+      }</h1>
+      <p style="color:${C.body};font-size:16px;line-height:1.6;margin:14px 0 0;">
+        ${esc(name)}, you have <strong style="color:${C.ink};">${made} of ${total}</strong> picked${
           made === 0 ? " - the whole card is still open." : `, so ${left} ${left === 1 ? "game is" : "games are"} still open.`
         }${final ? ` Anything unpicked at ${esc(locksAt)} stays unpicked.` : ""}
       </p>
     </td></tr>
-    <tr><td style="padding:22px 26px 6px;">
-      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#3ecb78;border-radius:9px;">
-        <a href="${SITE}/weekly" style="display:inline-block;padding:13px 26px;color:#06210f;font-size:15px;font-weight:700;text-decoration:none;">${final ? "Pick them now" : "Finish my picks"}</a>
+    <tr><td style="padding:26px 30px 34px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:${C.green};border-radius:10px;">
+        <a href="${ctaHref(week, final)}" style="display:inline-block;padding:15px 32px;color:#06210f;font-size:15px;font-weight:800;text-decoration:none;letter-spacing:.02em;">${
+          final ? "Pick them now" : "Finish my picks"
+        }</a>
       </td></tr></table>
     </td></tr>
-    <tr><td style="padding:20px 26px 26px;">
-      <p style="color:#7d8ca6;font-size:12px;line-height:1.6;margin:0;">
-        You are getting this because you have a Sideline Brew account.
-        <a href="${unsubUrl}" style="color:#41506a;">Unsubscribe</a> - it takes one click and nothing else changes.
+    <tr><td style="border-top:1px solid ${C.hair};padding:18px 30px 24px;">
+      <p style="margin:0;color:${C.faint};font-size:11px;line-height:1.7;">
+        ${esc(EMAIL_POSTAL_ADDRESS)}<br>
+        <a href="${unsubUrl}" style="color:${C.mute};text-decoration:underline;">Unsubscribe</a>
       </p>
-      <p style="color:#9aa8bd;font-size:11px;line-height:1.6;margin:12px 0 0;">${esc(EMAIL_POSTAL_ADDRESS)}</p>
     </td></tr>
   </table>
 </td></tr></table>
@@ -200,7 +313,7 @@ function text({ name, made, total, week, locksAt, unsubUrl, final }) {
     "",
     `${name}, you have ${made} of ${total} picked.`,
     "",
-    `Finish them: ${SITE}/weekly`,
+    `Finish them: ${ctaUrl(week, final)}`,
     "",
     `You are getting this because you have a Sideline Brew account.`,
     `Unsubscribe: ${unsubUrl}`,
@@ -281,10 +394,24 @@ async function main() {
     p_kind: kind,
   });
   if (!recipients?.length) return console.log("Nobody to tell - everybody opted in has finished, or was told already.");
-  console.log(`${recipients.length} to tell.`);
+
+  // Split off the holdout before anything is sent. See HOLDOUT_PERCENT
+  // above for why this exists; the short version is that "did the
+  // reminder help" cannot be answered by looking only at people who got
+  // one.
+  const holdout = recipients.filter((r) => inHoldout(r.user_id, week));
+  const audience = recipients.filter((r) => !inHoldout(r.user_id, week));
+  if (HOLDOUT_PERCENT > 0) {
+    console.log(
+      `${recipients.length} eligible - ${audience.length} to tell, ${holdout.length} held back ` +
+        `(${HOLDOUT_PERCENT}% holdout).`,
+    );
+  } else {
+    console.log(`${recipients.length} to tell.`);
+  }
 
   const sent = [];
-  for (const r of recipients) {
+  for (const r of audience) {
     const unsubUrl = `${SITE}/unsubscribe?t=${r.unsub_token}`;
     const view = { name: r.display_name, made: r.made, total, week, locksAt, unsubUrl, final };
     const left = total - r.made;
@@ -309,7 +436,30 @@ async function main() {
     }
   }
 
-  if (DRY_RUN) return console.log("\nDry run - nothing sent, nothing recorded.");
+  if (DRY_RUN) {
+    for (const r of holdout) console.log(`  [dry run] HELD BACK ${r.email} (${r.made}/${total})`);
+    return console.log("\nDry run - nothing sent, nothing recorded.");
+  }
+
+  // Record the holdout too, once per person per week. Without a row
+  // there is nothing to compare against later: "who did we deliberately
+  // not email in week 3" is not recoverable after the fact, because the
+  // percentage could change and the eligible set moves as people pick.
+  //
+  // Kind is weekly_deadline_holdout, which the recipient query does not
+  // filter on - so this row does not affect who gets mail. Holding
+  // somebody back is decided by inHoldout() on every run, which is
+  // deterministic, so they stay held back all week without needing the
+  // ledger to remember. The unique constraint makes this idempotent.
+  if (holdout.length) {
+    const n = await rpc("mark_emails_sent", {
+      p_token: EMAIL_SENDER_TOKEN,
+      p_kind: "weekly_deadline_holdout",
+      p_reference_id: String(week),
+      p_rows: holdout.map((r) => ({ user_id: r.user_id, message_id: null, picks_at_send: r.made })),
+    });
+    console.log(`Held back ${holdout.length}, newly recorded ${n}.`);
+  }
 
   if (sent.length) {
     // After Resend accepts, never before. A crash between the two costs a
@@ -323,8 +473,8 @@ async function main() {
     });
     console.log(`Sent ${sent.length}, recorded ${n}.`);
   }
-  if (sent.length !== recipients.length) {
-    console.error(`${recipients.length - sent.length} failed and will be retried on the next run.`);
+  if (sent.length !== audience.length) {
+    console.error(`${audience.length - sent.length} failed and will be retried on the next run.`);
     process.exitCode = 1;
   }
 }

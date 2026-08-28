@@ -24,6 +24,7 @@ import { buildReferralLink } from "@/lib/referralStorage";
 import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
 import { useBoardView } from "@/hooks/useBoardView";
 import { StreamerSettings } from "@/components/StreamerSettings";
+import { SavePicksPrompt } from "@/components/SavePicksPrompt";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -371,8 +372,57 @@ export default function Home() {
   // local storage.
   const { picks, setPick, resetPicks, loaded, lockedGameId, toggleLock } = usePicks(activeWeek, view.streamerMode);
   const { confirm, dialog } = useConfirmDialog();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
+
+  // Arrived from a pick reminder email. The link carries from=reminder
+  // (see scripts/send-weekly-deadline.mjs), and it exists because of one
+  // specific bad moment: email is read on phones, picks live in the
+  // database, and a signed-out arrival would otherwise land on an EMPTY
+  // card seconds after being told they had 13 of 16 picked. The board
+  // still works - nothing is gated - but the first thing on screen has
+  // to explain the gap instead of contradicting the email.
+  //
+  // Read once, from the real URL rather than useSearchParams, so this
+  // does not drag the page into a Suspense boundary for one boolean.
+  // Read straight from the URL rather than through useSearchParams,
+  // which would force this whole page's client tree to render on the
+  // client for one boolean, and in a lazy initialiser rather than an
+  // effect, which would mean setState on mount. The value cannot change
+  // without a navigation, so it is read once and never again.
+  //
+  // The window guard is for the server render, where this is false. That
+  // does NOT desync hydration: authLoading starts true on both sides, so
+  // the banner below renders nothing on the hydration pass whatever the
+  // URL says, and only appears once auth resolves.
+  const [fromReminder] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("from") === "reminder",
+  );
+  const [reminderDismissed, setReminderDismissed] = useState(false);
+
+  // The click itself, as our own event rather than only as a UTM tag.
+  // PostHog attributes the session from the utm_* parameters too, but
+  // those describe a visit; this says which email, which week, and
+  // whether they were already signed in - the difference between
+  // "somebody came" and "the reminder worked".
+  //
+  // Fired only after auth settles, and only once. Capturing on mount
+  // would report signed_in:false for every signed-in visitor, because
+  // the session has not resolved on the first render - a wrong number
+  // that would look exactly like a real one.
+  const reminderLogged = useRef(false);
+  useEffect(() => {
+    if (!fromReminder || authLoading || reminderLogged.current) return;
+    reminderLogged.current = true;
+    posthog.capture("reminder_clicked", {
+      week: activeWeek,
+      kind: new URLSearchParams(window.location.search).get("utm_content") ?? "unknown",
+      signed_in: Boolean(user),
+    });
+  }, [fromReminder, authLoading, user, activeWeek]);
+  // Only once auth has settled, or a signed-in visitor sees the
+  // signed-out banner flash before their session resolves.
+  const showReminderSignIn = fromReminder && !reminderDismissed && !authLoading && !user;
   // Season-wide record (across every published week), for the record
   // pill's first segment - same query the profile page and leaderboard
   // already use, just scoped to whoever's signed in here.
@@ -418,6 +468,12 @@ export default function Home() {
     const key = `pickem:save-prompt-seen-w${activeWeek}`;
     if (localStorage.getItem(key) === "1") return;
     localStorage.setItem(key, "1");
+    // Deliberate, and the rule's usual advice does not apply: this is not
+    // derived state that could be computed during render. It is a
+    // one-time side effect keyed on a localStorage marker - "has this
+    // person been asked about this board before" - which render has no
+    // business reading.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowSavePrompt(true);
   }, [user, loaded, pickedCount, games.length, activeWeek]);
 
@@ -773,6 +829,39 @@ export default function Home() {
         )}
         {pageTab === "picks" && loaded && (
           <>
+            {/* Straight after a reminder click, signed out. Says where the
+                picks went rather than letting an empty board imply they
+                were lost - the email that sent them here just quoted a
+                number, and this is the only screen that can explain why
+                the board disagrees with it. Dismissible, and it never
+                blocks the board: picking signed out still works, and
+                saving still prompts on its own. */}
+            {showReminderSignIn && (
+              <div className="mb-4 rounded-2xl border border-[#4ade80]/25 bg-[#4ade80]/[0.07] px-4 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
+                <div className="flex-1 min-w-[15rem]">
+                  <p className="text-white text-sm font-semibold">Sign in to see your picks</p>
+                  <p className="text-white/55 text-[13px] leading-snug mt-0.5">
+                    Your card is saved to your account, not this device &mdash; sign in and it comes back exactly as you left it.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => requestSignIn()}
+                    className="rounded-lg bg-[#4ade80] px-4 py-2 text-[13px] font-bold text-[#06210f] hover:bg-[#3ecb78] transition-colors"
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReminderDismissed(true)}
+                    className="rounded-lg px-2.5 py-2 text-[13px] text-white/45 hover:text-white/80 transition-colors"
+                  >
+                    Not now
+                  </button>
+                </div>
+              </div>
+            )}
             {view.showRecordPill ? (
             <WeeklyRecordPill
               seasonCorrect={myRecord?.correct ?? 0}
@@ -987,75 +1076,11 @@ export default function Home() {
       {dialog}
       {signInModal}
       {showSavePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowSavePrompt(false)} />
-          {/* Same chrome and "why sign up" tile grid as the sign-in modal's
-              own referral pitch (useSignInModal.tsx) - this is the same
-              sell, just triggered by picks progress instead of a referral
-              link. */}
-          <div className="relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1730] p-6 shadow-2xl shadow-black/50">
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={() => setShowSavePrompt(false)}
-              className="absolute top-4 right-4 h-7 w-7 rounded-full border border-white/15 text-white/50 hover:text-white flex items-center justify-center transition-colors"
-            >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 6l12 12" />
-                <path d="M18 6L6 18" />
-              </svg>
-            </button>
-
-            <h2 className="text-white text-lg" style={{ fontFamily: "var(--font-display)" }}>
-              WANT TO SAVE THESE PICKS?
-            </h2>
-            <p className="text-white/50 text-sm mt-1 mb-4">You&rsquo;re halfway through Week {activeWeek} &mdash; sign up free to lock them in.</p>
-
-            <div className="flex flex-col items-center gap-1.5 text-center mb-4">
-              <span
-                className="h-12 w-12 rounded-full flex items-center justify-center text-xl"
-                style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
-              >
-                🏈
-              </span>
-              <span className="text-xs text-white/70">Create a free profile to keep them</span>
-
-              <div className="grid grid-cols-3 gap-2 w-full mt-2.5">
-                <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
-                  <span className="text-base leading-none">💾</span>
-                  <span className="text-[10px] font-semibold mt-0.5">SAVE PICKS</span>
-                  <span className="text-[8.5px] text-white/40">Any device</span>
-                </div>
-                <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
-                  <span className="text-base leading-none">🏆</span>
-                  <span className="text-[10px] font-semibold mt-0.5">TRACK RECORD</span>
-                  <span className="text-[8.5px] text-white/40">Every week</span>
-                </div>
-                <div className="flex flex-col items-center gap-0.5 rounded-xl border border-white/15 bg-white/5 px-1.5 py-2.5">
-                  <span className="text-base leading-none">👥</span>
-                  <span className="text-[10px] font-semibold mt-0.5">COMPARE</span>
-                  <span className="text-[8.5px] text-white/40">With friends</span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSavePromptSignUp}
-              className="w-full rounded-full px-5 py-2.5 text-sm active:scale-95 transition-transform duration-150"
-              style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
-            >
-              SIGN UP FREE
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowSavePrompt(false)}
-              className="w-full text-center text-xs text-white/45 hover:text-white/70 mt-3 transition-colors"
-            >
-              Maybe later
-            </button>
-          </div>
-        </div>
+        <SavePicksPrompt
+          context={`Week ${activeWeek}`}
+          onSignUp={handleSavePromptSignUp}
+          onDismiss={() => setShowSavePrompt(false)}
+        />
       )}
     </div>
   );

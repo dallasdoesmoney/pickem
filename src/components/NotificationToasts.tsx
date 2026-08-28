@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreadNotifications, markNotificationRead, syncLevelUpNotifications, NotificationRow } from "@/lib/supabase/notifications";
@@ -164,44 +164,72 @@ export function NotificationToasts() {
   const [checkIn, setCheckIn] = useState<CheckInResult | null>(null);
   const [actors, setActors] = useState<Map<string, Actor>>(new Map());
   const [current, setCurrent] = useState<NotificationRow | null>(null);
+  const [checkInToast, setCheckInToast] = useState<NotificationRow | null>(null);
+
+  // THE CHECK-IN, ON ITS OWN, CLAIMED ONCE. It used to live in the effect
+  // below, which is keyed on profile?.referred_by - and useAuth delivers
+  // `user` on one render and `profile` on a later one (it sets the user,
+  // then awaits fetchProfile). So that effect ran TWICE on every load,
+  // and the two runs fought over a thing that can only happen once a day:
+  //
+  //   call #1  awarded:true   <- won it, then discarded, because the
+  //                              re-run had already set cancelled
+  //   call #2  awarded:false  <- the day was already claimed
+  //
+  // Nothing was shown. The points still landed and the streak still
+  // counted up, so the only broken part was the announcement - which is
+  // why it looked like the notification had never been built.
+  //
+  // Keyed on `user` alone, because that is all a check-in depends on. The
+  // ref holds the PROMISE rather than a done flag so a second run reuses
+  // the in-flight claim instead of making a second one, and every run
+  // subscribes to it - a re-render must not be able to drop a result the
+  // previous run started waiting for.
+  const checkInRef = useRef<{ userId: string; promise: Promise<CheckInResult | null> } | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    if (checkInRef.current?.userId !== user.id) {
+      checkInRef.current = {
+        userId: user.id,
+        promise: dailyCheckIn().catch((err) => {
+          console.error("Daily check-in failed", err);
+          return null;
+        }),
+      };
+    }
+    checkInRef.current.promise.then((result) => {
+      if (cancelled || !result?.awarded) return;
+      // Which surface depends on which day it is.
+      //
+      // A streak at 1 is a streak STARTING - someone's first ever, or the
+      // first day back after one broke. That is the day with something to
+      // announce that five seconds in the corner cannot carry: there is
+      // no number counting up yet, just the fact that they came back, and
+      // the day after a broken streak is exactly when somebody needs a
+      // reason to keep going. So it gets the pop-up.
+      //
+      // From day two the count IS the story, and the count fits in the
+      // bar - with the same flame on it, so it still reads as the same
+      // event. A full-screen interrupt every single day stops being a
+      // celebration and starts being a door to close.
+      if (result.streak <= 1) setCheckIn(result);
+      else setCheckInToast(checkInRow(result));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    // Held here rather than pushed straight into the queue, because the
-    // fetch below REPLACES the queue rather than appending to it - a
-    // setQueue from inside this .then() is overwritten a moment later by
-    // one that never knew about it. It goes in when the queue is built,
-    // at the front, so the day's check-in plays before the followers and
-    // level-ups that the same load turned up.
-    let checkInToast: NotificationRow | null = null;
-    // Check in first, then sync levels: the 50 points can be what tips
-    // someone over a level, and doing it the other way round would hold
-    // that notification back until the next load.
-    dailyCheckIn()
-      .then((result) => {
-        if (cancelled || !result.awarded) return;
-        // Which surface depends on which day it is.
-        //
-        // A streak at 1 is a streak STARTING - someone's first ever, or
-        // the first day back after one broke. That is the day with
-        // something to announce that five seconds in the corner cannot
-        // carry: there is no number counting up yet, just the fact that
-        // they came back, and the day after a broken streak is exactly
-        // when somebody needs a reason to keep going. So it gets the
-        // pop-up.
-        //
-        // From day two the count IS the story, and the count fits in the
-        // bar - with the same flame on it, so it still reads as the same
-        // event. A full-screen interrupt every single day stops being a
-        // celebration and starts being a door to close.
-        if (result.streak <= 1) {
-          setCheckIn(result);
-          return;
-        }
-        checkInToast = checkInRow(result);
-      })
-      .catch((err) => console.error("Daily check-in failed", err))
+    // Still after the check-in, which is why the effect above is declared
+    // first: the 50 points can be what tips someone over a level, and
+    // syncing levels before the check-in lands would hold that level-up
+    // notification back until the next load. Awaiting the same promise
+    // keeps that order without calling daily_check_in() a second time.
+    (checkInRef.current?.promise ?? Promise.resolve(null))
       .then(() => syncLevelUpNotifications())
       .catch((err) => console.error("Level-up sync failed", err))
       .finally(() => {
@@ -209,7 +237,7 @@ export function NotificationToasts() {
         Promise.all([fetchUnreadNotifications(user.id).catch(() => []), fetchMyReferrals().catch(() => [])]).then(([notifications, myReferrals]) => {
           if (cancelled) return;
           setReferrals(myReferrals);
-          setQueue(checkInToast ? [checkInToast, ...notifications] : notifications);
+          setQueue(notifications);
           const actorIds = notifications.filter((n) => n.type === "new_follower").map((n) => String(n.data.follower_id));
           if (actorIds.length > 0) {
             fetchProfilesByIds(actorIds)
@@ -224,11 +252,21 @@ export function NotificationToasts() {
   }, [user, profile?.referred_by]);
 
   useEffect(() => {
-    if (current || queue.length === 0) return;
+    if (current) return;
+    // The check-in goes first when it is there, and it is held in state
+    // rather than merged into the queue because the fetch above REPLACES
+    // the queue - the two arrive independently, and whichever lands
+    // second used to win.
+    if (checkInToast) {
+      setCurrent(checkInToast);
+      setCheckInToast(null);
+      return;
+    }
+    if (queue.length === 0) return;
     const [next, ...rest] = queue;
     setCurrent(next);
     setQueue(rest);
-  }, [queue, current]);
+  }, [queue, current, checkInToast]);
 
   useEffect(() => {
     if (!current) return;
