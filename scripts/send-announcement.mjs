@@ -92,6 +92,74 @@ const { SUPABASE_URL, SUPABASE_ANON_KEY, EMAIL_SENDER_TOKEN, RESEND_API_KEY, EMA
   process.env;
 const SITE = (process.env.SITE_URL ?? "https://sidelinebrew.com").replace(/\/$/, "");
 
+// WHAT EMAIL_FROM HAS TO CONTAIN, and why it cannot just be a name.
+//
+// `From` is a single header carrying an optional display name AND a
+// mandatory address - "Sideline Brew <picks@sidelinebrew.com>". The
+// address is what actually routes the mail and what the receiving server
+// checks against SPF and DKIM; the name is decoration on top of it.
+// There is no second field to put the address in, so a name on its own
+// is not a From line, it is half of one.
+//
+// Two failure modes, and they deserve different treatment:
+//
+//   No @ at all      BROKEN. Resend rejects it with a 422, but not until
+//                    the first send is attempted - so on a real run that
+//                    surfaces as every address failing in turn, which
+//                    reads like a delivery problem rather than a typo in
+//                    a secret. Caught here instead, before anything is
+//                    contacted.
+//
+//   Address, no name WORKS, looks worse. The inbox shows the raw address
+//                    where the sender's name belongs. Warned rather than
+//                    refused, because the mail is fine - but warned
+//                    loudly, since the name beside a subject line is most
+//                    of what decides whether anybody opens it, and the
+//                    value is masked in the workflow log so there is
+//                    nowhere to notice it except an actual inbox.
+const FROM = (EMAIL_FROM ?? "").trim();
+if (FROM && !FROM.includes("@")) {
+  console.error(
+    `EMAIL_FROM has no email address in it: "${FROM}"\n\n` +
+      "A From line needs the address as well as the name - the address is what\n" +
+      "routes the mail and what gets checked against your domain's DNS. Set the\n" +
+      "secret to both, in this shape:\n\n" +
+      `  ${FROM} <picks@sidelinebrew.com>\n\n` +
+      "using whichever address on sidelinebrew.com you verified in Resend.",
+  );
+  process.exit(1);
+}
+if (FROM && !/<[^>]+@[^>]+>$/.test(FROM)) {
+  console.warn(
+    `\nWARNING: EMAIL_FROM is a bare address, so the inbox will show "${FROM}"\n` +
+      "where the sender's name belongs. Set the secret to include one:\n" +
+      `  Sideline Brew <${FROM}>\n`,
+  );
+}
+
+// WHERE A REPLY GOES, and why this is worth a whole extra secret.
+//
+// Resend flags a noreply@ From address, and it is right: telling somebody
+// they cannot answer you is a way of telling them the only button that
+// does anything is "spam". Gmail also reads replies as a positive
+// engagement signal, so a sender nobody can answer is a sender nobody
+// vouches for.
+//
+// The catch is that a friendly From address is a WORSE no-reply if
+// nothing is listening on it - now the mail invites an answer and eats
+// it. This header is what fixes that without needing a mailbox on the
+// sending domain at all: From stays on sidelinebrew.com, because that is
+// what DKIM signs and SPF authorises, while replies land wherever this
+// points. Optional; unset, nothing is added and the From address has to
+// receive on its own.
+const REPLY_TO = (process.env.EMAIL_REPLY_TO ?? "").trim();
+if (REPLY_TO && !REPLY_TO.includes("@")) {
+  console.error(`EMAIL_REPLY_TO is not an email address: "${REPLY_TO}"`);
+  process.exit(1);
+}
+
+
+
 async function rpc(fn, body) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: "POST",
@@ -117,6 +185,9 @@ async function send(to, subject, body, unsubUrl) {
       subject,
       html: body.html,
       text: body.text,
+      // Only when set - Resend rejects an empty reply_to rather than
+      // ignoring it.
+      ...(REPLY_TO ? { reply_to: REPLY_TO } : {}),
       // The header form, so a mail client can offer its own unsubscribe
       // button instead of making somebody hunt the footer for the link.
       headers: { "List-Unsubscribe": `<${unsubUrl}>` },

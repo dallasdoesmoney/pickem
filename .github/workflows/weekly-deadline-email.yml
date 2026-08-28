@@ -78,6 +78,11 @@ jobs:
           EMAIL_SENDER_TOKEN: ${{ secrets.EMAIL_SENDER_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          # Optional, and the answer to Resend's "don't use no-reply".
+          # From has to stay on the verified sending domain because that
+          # is what DKIM signs; this is where the replies it invites
+          # actually go, so it can be a mailbox you already read.
+          EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
           # Required by CAN-SPAM in commercial mail. The script refuses
           # to run without it rather than shipping a placeholder.
           EMAIL_POSTAL_ADDRESS: ${{ secrets.EMAIL_POSTAL_ADDRESS }}
