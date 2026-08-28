@@ -210,16 +210,27 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // there is no celebration, because there was no guess.
   const CELEBRATE_MS = 2150;
   const [celebrating, setCelebrating] = useState(false);
-  // Whether the result dialog is up. Opened when a round ENDS and never
-  // on load: a finished board that pops a modal every time you come back
-  // to it is a modal you learn to dismiss without reading. The card keeps
-  // a way back in instead.
-  const [resultOpen, setResultOpen] = useState(false);
+  // WHICH dialog is up, not whether one is - a signed-out win has two
+  // things to say and they are not the same thing.
+  //
+  //   "reveal"  who it was, how many guesses, and the share.
+  //   "join"    keep this result. Follows the reveal for a guest, and
+  //             stands alone for one who ran out, because being told to
+  //             sign in IS their result.
+  //
+  // Opened when a round ENDS and never on load: a finished board that
+  // pops a modal every time you come back to it is a modal people learn
+  // to dismiss without reading. The card keeps a way back in instead.
+  const [stage, setStage] = useState<null | "reveal" | "join">(null);
+  // The ask follows the reveal ONCE. Offered again on every dismissal it
+  // would stop being an offer and start being a thing in the way -
+  // somebody reopening their result to screenshot it does not want to
+  // close two dialogs each time.
+  const [joinOffered, setJoinOffered] = useState(false);
   const celebrateTimer = useRef<number | null>(null);
   // A losing guest has no reveal to scroll to, so the sign-in card is
   // what the board scrolls up to instead. Without this the eighth guess
   // leaves them at the bottom of eight rows with the result off screen.
-  const guestFinishRef = useRef<HTMLDivElement>(null);
 
   // Starting a round is the same act whether it is the first one or the
   // ninth, so switching mode and pressing PLAY AGAIN both come here.
@@ -228,6 +239,8 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     setError(null);
     setQuery("");
     setCelebrating(false);
+    setStage(null);
+    setJoinOffered(false);
   }, []);
 
   function switchMode(next: "daily" | "unlimited") {
@@ -253,7 +266,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     // appeared above the board and the page scrolled up to it, which
     // meant the last thing the celebration did was move the thing you
     // were looking at. Now the flips finish and the result comes to you.
-    setResultOpen(true);
+    setStage("reveal");
   }, []);
 
   // Any tap or key cuts it short. Somebody on their fourth day does not
@@ -420,7 +433,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           setCelebrating(true);
           celebrateTimer.current = window.setTimeout(endCelebration, CELEBRATE_MS);
         } else {
-          setResultOpen(true);
+          setStage(next.answer ? "reveal" : "join");
         }
       }
       posthog.capture("daily_puzzle_guess", { used: next.guessesUsed, solved: next.solved, guest: !user, mode });
@@ -598,53 +611,56 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           the same word every day. Unfinished, the header leads as normal.
           The title lives in the page above this component, so the page
           hands it in and this decides where it sits. */}
-      {/* THE RESULT, whatever the result turns out to be.
-          For nearly everybody that is the reveal. For a signed-out player
-          who ran OUT on the daily there is no reveal to give - guestBoard
-          cannot fill in an answer it is deliberately not allowed to know
-          - so the honest result is "sign in and we will tell you", and
-          that card goes here rather than sitting above the board. It was
-          the last thing on the page still doing what this change exists
-          to stop. */}
-      {resultOpen && state.finished && !celebrating && (state.answer || guestLost) && (
-        <ResultDialog onClose={() => setResultOpen(false)}>
-          {state.answer ? (
-            <Reveal
-              state={state}
-              answer={answer}
-              onShare={share}
-              copied={copied}
-              grid={shareGrid(state)}
-              practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
-              onPlayAgain={() => {
-                setResultOpen(false);
-                startPracticeRound();
-              }}
-            />
-          ) : (
-            <GuestFinish solved={false} onJoin={() => void requestSignIn()} />
-          )}
+      {/* TWO DIALOGS, IN ORDER, because a signed-out win has two things
+          to say and they are not the same thing.
+
+          First the reveal: who it was, in how many, and the share. Then -
+          once that has been closed, so it is not competing with the thing
+          somebody just earned - the ask to keep it.
+
+          A guest who ran OUT skips straight to the ask, because for them
+          it IS the result: guestBoard cannot fill in an answer it is
+          deliberately not allowed to know, since telling a signed-out
+          player who it was needs an endpoint that hands today's player to
+          anybody who asks. */}
+      {stage === "reveal" && state.finished && state.answer && !celebrating && (
+        <ResultDialog
+          onClose={() => {
+            // The hand-off. Only for a guest who solved the DAILY - there
+            // is no result to keep in practice - and only the first time,
+            // so reopening a result to screenshot it does not mean
+            // closing two dialogs every time.
+            const ask = mode === "daily" && !user && state.solved && !joinOffered;
+            setStage(ask ? "join" : null);
+            if (ask) setJoinOffered(true);
+          }}
+        >
+          <Reveal
+            state={state}
+            answer={answer}
+            onShare={share}
+            copied={copied}
+            grid={shareGrid(state)}
+            practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
+            onPlayAgain={() => {
+              setStage(null);
+              startPracticeRound();
+            }}
+          />
         </ResultDialog>
       )}
 
-      {/* The ask, at the end and only at the end.
-          It used to arrive at the third guess, mid-play, interrupting the
-          one thing the person came to do - and it was suppressed once the
-          board finished, so the single moment somebody most wants an
-          account was the moment they were never asked.
-          ONLY ALONGSIDE A RESULT now. A guest who won has their reveal in
-          the dialog and this underneath it, offering to keep what they
-          just did - two different things, so two places is right. A guest
-          who LOST has this as their result, in the dialog, and printing
-          it inline as well would be the same card twice on one screen.
-          Daily only either way: this card is about keeping a RESULT - the
-          streak, the points, the board on another device - and a practice
-          round has none of those, so offering an account for one would be
-          asking on false pretences. */}
-      {mode === "daily" && state.finished && state.answer && !user && !celebrating && (
-        <div ref={guestFinishRef} className="scroll-mt-[118px]">
-          <GuestFinish solved={state.solved} onJoin={() => void requestSignIn()} />
-        </div>
+      {stage === "join" && state.finished && !user && mode === "daily" && !celebrating && (
+        <ResultDialog onClose={() => setStage(null)}>
+          <GuestFinish
+            solved={state.solved}
+            onJoin={async () => {
+              // Signed in, so the thing this was asking for has happened
+              // and the dialog has no reason to still be up.
+              if (await requestSignIn()) setStage(null);
+            }}
+          />
+        </ResultDialog>
       )}
       {signInModal}
 
@@ -743,7 +759,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             {(state.answer || guestLost) && (
               <button
                 type="button"
-                onClick={() => setResultOpen(true)}
+                onClick={() => setStage(state.answer ? "reveal" : "join")}
                 className="flex-1 rounded-xl px-4 py-2.5 text-[.8rem] transition-colors"
                 style={{
                   fontFamily: "var(--font-display)",

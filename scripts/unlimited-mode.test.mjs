@@ -281,6 +281,61 @@ if (finished) {
   check("it says what was solved", solvedLine > 0);
 }
 
+// --- 8. A SIGNED-OUT WIN ON THE DAILY IS TWO DIALOGS, IN ORDER.
+//        The reveal first, then - only once that has been closed, so it
+//        is not competing with what was just earned - the ask to keep it.
+{
+  const guest = await browser.newContext({ viewport: { width: 1280, height: 1100 } });
+  await guest.route("**://posthog.invalid/**", (r) => r.abort());
+  await guest.route("**://*.posthog.com/**", (r) => r.abort());
+  let n = 0;
+  await guest.route(`${SB}/**`, (route) => {
+    const u = route.request().url();
+    let post = {};
+    try { post = JSON.parse(route.request().postData() ?? "{}"); } catch {}
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    // Third guess wins. No session is seeded, so this is a guest.
+    if (u.includes("puzzle_guest_compare")) { n++; return j(grade(post.p_espn_id, n === 3 ? post.p_espn_id : "x")); }
+    if (u.includes("/rpc/")) return j({});
+    return j([]);
+  });
+  const gp = await guest.newPage();
+  await gp.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+  await gp.waitForSelector("main input", { timeout: 20000 });
+  await gp.waitForTimeout(900);
+  const gf = gp.locator("main input").first();
+  for (const q of ["ma", "jo", "ty"]) {
+    await gf.click(); await gf.fill(q); await gp.waitForTimeout(320);
+    await gp.keyboard.press("Enter"); await gp.waitForTimeout(600);
+  }
+  await gp.waitForTimeout(3000);
+
+  const solvedIn = await gp.locator("text=/Solved in/").count();
+  const keepEarly = await gp.locator("text=/KEEP THIS RESULT/").count();
+  check("a guest win shows the reveal first", solvedIn > 0 && keepEarly === 0, `reveal ${solvedIn > 0}, ask up ${keepEarly > 0}`);
+
+  await gp.getByRole("button", { name: "Close result" }).click();
+  await gp.waitForTimeout(600);
+  const keepAfter = await gp.locator("text=/KEEP THIS RESULT/").count();
+  const dialogUp = await gp.getByRole("dialog", { name: "Result" }).isVisible().catch(() => false);
+  check("closing it brings the ask, as a dialog", keepAfter > 0 && dialogUp, `ask ${keepAfter > 0}, in a dialog ${dialogUp}`);
+
+  await gp.getByRole("button", { name: "Close result" }).click();
+  await gp.waitForTimeout(600);
+  const anyDialog = await gp.getByRole("dialog", { name: "Result" }).isVisible().catch(() => false);
+  const askInline = await gp.locator("text=/KEEP THIS RESULT/").count();
+  check("closing that leaves a clean board", !anyDialog && askInline === 0, `dialog ${anyDialog}, inline ask ${askInline > 0}`);
+
+  // And it does not nag: reopening the reveal must not queue the ask again.
+  await gp.getByRole("button", { name: "SEE RESULT" }).click();
+  await gp.waitForTimeout(500);
+  await gp.getByRole("button", { name: "Close result" }).click();
+  await gp.waitForTimeout(600);
+  const nagged = await gp.locator("text=/KEEP THIS RESULT/").count();
+  check("and it only asks once", nagged === 0, nagged ? "asked again on reopen" : "");
+  await guest.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.pass).length;
 console.log(failed ? `\n${failed} FAILED` : "\nall checks pass");
