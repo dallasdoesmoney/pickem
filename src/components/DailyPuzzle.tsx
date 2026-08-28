@@ -210,8 +210,12 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // there is no celebration, because there was no guess.
   const CELEBRATE_MS = 2150;
   const [celebrating, setCelebrating] = useState(false);
+  // Whether the result dialog is up. Opened when a round ENDS and never
+  // on load: a finished board that pops a modal every time you come back
+  // to it is a modal you learn to dismiss without reading. The card keeps
+  // a way back in instead.
+  const [resultOpen, setResultOpen] = useState(false);
   const celebrateTimer = useRef<number | null>(null);
-  const revealRef = useRef<HTMLDivElement>(null);
   // A losing guest has no reveal to scroll to, so the sign-in card is
   // what the board scrolls up to instead. Without this the eighth guess
   // leaves them at the bottom of eight rows with the result off screen.
@@ -245,11 +249,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       celebrateTimer.current = null;
     }
     setCelebrating(false);
-    // The reveal only mounts once celebrating is false, so the scroll has
-    // to wait a frame for something to scroll to.
-    window.setTimeout(() => {
-      (revealRef.current ?? guestFinishRef.current)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 40);
+    // The animation IS the hand-off. The result used to be a card that
+    // appeared above the board and the page scrolled up to it, which
+    // meant the last thing the celebration did was move the thing you
+    // were looking at. Now the flips finish and the result comes to you.
+    setResultOpen(true);
   }, []);
 
   // Any tap or key cuts it short. Somebody on their fourth day does not
@@ -395,17 +399,28 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         next = guestBoard(state?.puzzleOn ?? puzzleToday(), held);
         setDailyState(next);
       }
-      // A solve that happened just now, on this guess - which is the only
-      // kind that gets the celebration. Anybody who reduces motion goes
-      // straight to the reveal.
-      if (next.solved && !state?.solved) {
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          window.setTimeout(() => {
-            revealRef.current?.scrollIntoView({ block: "start" });
-          }, 40);
-        } else {
+      // How the round ends, in three cases.
+      //
+      // A SOLVE gets the celebration first and the result after it: the
+      // chips roll over one at a time, the other rows dim, the winning
+      // row lifts - and only when that has played out does the dialog
+      // arrive, from endCelebration. Watching the board turn green is the
+      // payoff, and covering it with a result card would throw it away.
+      //
+      // Reduced motion skips the animation, so there is nothing to wait
+      // for and the result opens immediately.
+      //
+      // RUNNING OUT has no celebration - there is nothing to celebrate -
+      // so it opens immediately too. That is not an oversight: the round
+      // is over either way, and making a loss sit through a beat of
+      // nothing before being told would read as the page having hung.
+      if (next.finished) {
+        const fresh = next.solved && !state?.solved;
+        if (fresh && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
           setCelebrating(true);
           celebrateTimer.current = window.setTimeout(endCelebration, CELEBRATE_MS);
+        } else {
+          setResultOpen(true);
         }
       }
       posthog.capture("daily_puzzle_guess", { used: next.guessesUsed, solved: next.solved, guest: !user, mode });
@@ -586,8 +601,8 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           this is the fix rather than a magic number in the scroll call.
           118 = 106 + a little air.
           Re-measure if the header or the rail ever changes height. */}
-      {state.finished && state.answer && !celebrating && (
-        <div ref={revealRef} className="scroll-mt-[118px]">
+      {resultOpen && state.finished && state.answer && !celebrating && (
+        <ResultDialog onClose={() => setResultOpen(false)}>
           <Reveal
             state={state}
             answer={answer}
@@ -595,9 +610,12 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             copied={copied}
             grid={shareGrid(state)}
             practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
-            onPlayAgain={startPracticeRound}
+            onPlayAgain={() => {
+              setResultOpen(false);
+              startPracticeRound();
+            }}
           />
-        </div>
+        </ResultDialog>
       )}
 
       {/* The ask, at the end and only at the end.
@@ -687,6 +705,53 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             hairline between them made the header look like a separate
             panel stacked on top. The board keeps its rule, because that
             IS a different section. */}
+        {/* WHERE THE GUESS FIELD WAS. A finished round has nothing to type
+            into, and the result now lives in a dialog somebody can close -
+            so this is the way back to it, and in unlimited the way on to
+            the next round without reopening anything first.
+
+            It has to exist. A result that can only be reached by finishing
+            the round is a result you lose the moment you dismiss it, and
+            the daily's share button lives inside it. */}
+        {state.finished && !celebrating && (
+          <div className="mx-auto flex w-full max-w-2xl items-center justify-center gap-2 px-4 pb-4 pt-1 lg:px-5 lg:pb-5">
+            {mode === "unlimited" && (
+              <button
+                type="button"
+                onClick={startPracticeRound}
+                className="puzzle-press flex-1"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: ".8rem",
+                  background: "#3ecb78",
+                  color: INK,
+                  border: EDGE,
+                  borderRadius: 12,
+                  padding: 11,
+                  boxShadow: `3px 4px 0 ${INK}`,
+                }}
+              >
+                PLAY AGAIN
+              </button>
+            )}
+            {state.answer && (
+              <button
+                type="button"
+                onClick={() => setResultOpen(true)}
+                className="flex-1 rounded-xl px-4 py-2.5 text-[.8rem] transition-colors"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  background: FIELD,
+                  border: CARD_EDGE,
+                  color: TEXT,
+                }}
+              >
+                SEE RESULT
+              </button>
+            )}
+          </div>
+        )}
+
         {!state.finished && (
           <div className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-4 pt-1 lg:px-5 lg:pb-5">
           {/* No title and no label. The field's own placeholder says
@@ -1086,6 +1151,67 @@ function Swatch({ bg }: { bg: string }) {
 // The end of the round, which is the only part of this anyone photographs.
 // The card takes the team's colour, the crest sits behind the face, and the
 // name lands in the same display face as the rest of the site.
+// The result, as something that arrives rather than something the page
+// grew. It used to be a card above the board that the page scrolled up
+// to, which meant the celebration's last act was to move what you were
+// looking at - and on a phone the board you had just filled in went off
+// the bottom of the screen.
+//
+// Closable, and that is the point of it being a dialog: the board is
+// still there underneath, and somebody who wants to look at their own
+// eight rows should not have to scroll past their score to do it.
+//
+// Not portalled, unlike the sign-in modal. That one has to escape a
+// backdrop-filter on the header, which makes the header the containing
+// block for anything fixed inside it. This renders from the game's own
+// root, which has no filter above it, so `fixed` resolves to the
+// viewport as intended - verified in a browser rather than assumed.
+function ResultDialog({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    // The page behind must not scroll under the dialog - on a phone that
+    // reads as the result being stuck to a page that is running away.
+    const held = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = held;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto overscroll-contain px-4 py-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Result"
+    >
+      {/* Under the sign-in modal's z-[80], because signing in can be
+          asked for FROM here - a guest tapping the ask behind this needs
+          that dialog to land in front of this one, not behind it. */}
+      <div className="puzzle-dialog-veil absolute inset-0 bg-black/70 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="puzzle-dialog relative my-auto w-full max-w-md">
+        <button
+          type="button"
+          aria-label="Close result"
+          onClick={onClose}
+          className="absolute -top-3 -right-1 z-10 flex h-9 w-9 items-center justify-center rounded-full transition-colors sm:-right-3"
+          style={{ background: CARD, border: `2px solid ${RULE}`, color: TEXT }}
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
+            <path d="M6 6l12 12" />
+            <path d="M18 6L6 18" />
+          </svg>
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function Reveal({
   state,
   answer,

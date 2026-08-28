@@ -1121,3 +1121,51 @@ body {
   }
 }
 
+
+/* The result dialog's entrance. The board's celebration has just
+   finished, so this arrives INTO a settled screen rather than competing
+   with anything - which is why it can afford a slight overshoot on the
+   card while the veil merely fades. Two speeds, so the dimming reads as
+   the room going quiet and the card as the thing being handed over. */
+@keyframes puzzle-dialog-veil-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes puzzle-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.puzzle-dialog-veil {
+  animation: puzzle-dialog-veil-in 200ms ease-out both;
+}
+
+.puzzle-dialog {
+  animation: puzzle-dialog-in 320ms cubic-bezier(0.34, 1.36, 0.64, 1) both;
+}
+
+/* The card inside carries its own entrance from .puzzle-reveal, written
+   for when it appeared in the page flow. Two animations on nested
+   elements both moving is a wobble, so the outer one is the only one
+   that moves here. */
+.puzzle-dialog .puzzle-reveal {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .puzzle-dialog-veil,
+  .puzzle-dialog {
+    animation: none;
+  }
+}
