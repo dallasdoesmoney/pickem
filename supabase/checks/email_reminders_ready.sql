@@ -31,9 +31,17 @@ select * from (values
                       having count(*) = 2)
         then 'ok' else 'STALE COPY - re-run 0052' end),
 
-  ('recipient function',
-   case when to_regprocedure('public.weekly_deadline_recipients(text,integer,integer)') is not null
-        then 'ok' else 'MISSING - run 0052' end),
+  -- The FOUR-argument form. 0054 dropped the three-argument version and
+  -- replaced it with one that takes the reminder kind, so this check
+  -- looked for a signature that is supposed to be gone and reported
+  -- MISSING on a database that was entirely correct. A check that cries
+  -- wolf on a healthy database is worse than no check.
+  ('recipient function (kind-aware form)',
+   case when to_regprocedure('public.weekly_deadline_recipients(text,integer,integer,text)') is not null
+          then 'ok'
+        when to_regprocedure('public.weekly_deadline_recipients(text,integer,integer)') is not null
+          then 'OLD 3-ARG FORM - run 0054'
+        else 'MISSING - run 0052 then 0054' end),
 
   -- jsonb, not the uuid[] the first version took. An old signature here
   -- means the sender will record nothing.
@@ -78,6 +86,41 @@ select * from (values
    case when to_regclass('public.email_prefs') is null then '- run 0052 first'
         else (xpath('/row/c/text()', query_to_xml(
                 $q$select count(*) filter (where weekly_deadline) || ' of ' || count(*) || ' accounts' as c
-                     from public.email_prefs$q$, false, true, '')))[1]::text end)
+                     from public.email_prefs$q$, false, true, '')))[1]::text end),
+
+  -- CAN THE SENDER ACTUALLY CALL THEM. Added after the first real run
+  -- died on "permission denied for function weekly_deadline_recipients":
+  -- 0052 and 0054 revoked EXECUTE from anon and never granted it back,
+  -- so the functions existed, were correct, and were unreachable.
+  --
+  -- Every check above this one passed while that was true. Existing is
+  -- not the same as callable, and the sender arrives through PostgREST
+  -- as `anon`, so anon is the role that has to hold the privilege.
+  ('sender can call weekly_deadline_recipients',
+   case when to_regprocedure('public.weekly_deadline_recipients(text,integer,integer,text)') is null
+          then 'function missing - run 0054'
+        when has_function_privilege('anon',
+               'public.weekly_deadline_recipients(text,integer,integer,text)', 'execute')
+          then 'ok'
+        else 'PERMISSION DENIED for anon - run 0055' end),
+
+  ('sender can call mark_emails_sent',
+   case when to_regprocedure('public.mark_emails_sent(text,text,text,jsonb)') is null
+          then 'function missing - run 0052'
+        when has_function_privilege('anon',
+               'public.mark_emails_sent(text,text,text,jsonb)', 'execute')
+          then 'ok'
+        else 'PERMISSION DENIED for anon - run 0055' end),
+
+  -- The unsubscribe link is clicked by somebody reading their email, not
+  -- signed in, very likely on another device. If anon cannot execute
+  -- this, every unsubscribe in every email is a dead link - which is a
+  -- legal problem as well as a deliverability one.
+  ('unsubscribe link works signed out',
+   case when to_regprocedure('public.email_unsubscribe(uuid)') is null
+          then 'function missing - run 0052'
+        when has_function_privilege('anon', 'public.email_unsubscribe(uuid)', 'execute')
+          then 'ok'
+        else 'PERMISSION DENIED for anon - unsubscribe links are dead' end)
 
 ) as t(check_name, status);
