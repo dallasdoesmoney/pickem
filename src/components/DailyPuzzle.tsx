@@ -19,7 +19,9 @@ import {
   PuzzleGuess,
   Verdict,
   NumCell,
+  submitPracticeGuess,
 } from "@/lib/supabase/dailyPuzzle";
+import { pickPracticeAnswer, practiceBoard } from "@/lib/practicePuzzle";
 import { errorMessage } from "@/lib/errorMessage";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
@@ -179,7 +181,15 @@ function guestBoard(puzzleOn: string, guesses: PuzzleGuess[]): PuzzleState {
 export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const { user, profile } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
-  const [state, setState] = useState<PuzzleState | null>(null);
+  const [dailyState, setDailyState] = useState<PuzzleState | null>(null);
+  // TWO BOARDS, HELD SEPARATELY, and that is what makes the toggle a
+  // toggle rather than a reset. Switching to unlimited and back has to
+  // return the day's board exactly as it was left - refetching it would
+  // work for an account and would silently lose a guest's run, since the
+  // guest board only exists in this component.
+  const [mode, setMode] = useState<"daily" | "unlimited">("daily");
+  const [practice, setPractice] = useState<{ answer: PuzzlePlayer; guesses: PuzzleGuess[]; round: number } | null>(null);
+  const state = mode === "daily" ? dailyState : practice ? practiceBoard(practice.answer, practice.guesses) : null;
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -206,6 +216,28 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // what the board scrolls up to instead. Without this the eighth guess
   // leaves them at the bottom of eight rows with the result off screen.
   const guestFinishRef = useRef<HTMLDivElement>(null);
+
+  // Starting a round is the same act whether it is the first one or the
+  // ninth, so switching mode and pressing PLAY AGAIN both come here.
+  const startPracticeRound = useCallback(() => {
+    setPractice((prev) => ({ answer: pickPracticeAnswer(), guesses: [], round: (prev?.round ?? 0) + 1 }));
+    setError(null);
+    setQuery("");
+    setCelebrating(false);
+  }, []);
+
+  function switchMode(next: "daily" | "unlimited") {
+    if (next === mode) return;
+    setError(null);
+    setQuery("");
+    setCelebrating(false);
+    setMode(next);
+    // Only the FIRST switch deals a player. Coming back to a round left
+    // half-played should find it half-played, the same way the daily
+    // does - the whole reason both boards are held rather than refetched.
+    if (next === "unlimited" && !practice) startPracticeRound();
+    posthog.capture("daily_puzzle_mode", { mode: next });
+  }
 
   const endCelebration = useCallback(() => {
     if (celebrateTimer.current !== null) {
@@ -246,7 +278,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       fetchDailyPuzzle()
         .then((next) => {
           if (cancelled) return;
-          setState(next);
+          setDailyState(next);
           // Anything played as a guest today is handed over on the way
           // in, one guess at a time through the real function, so it
           // lands with the limit and the points applied properly rather
@@ -269,7 +301,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 break;
               }
             }
-            if (!cancelled) setState(board);
+            if (!cancelled) setDailyState(board);
           })();
         })
         .catch((err) => !cancelled && setError(errorMessage(err)));
@@ -286,7 +318,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     // which is a hydration mismatch. Same trade the tier list's saved
     // view makes, for the same reason.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState(guestBoard(on, readGuestGuesses(on)));
+    setDailyState(guestBoard(on, readGuestGuesses(on)));
     return () => {
       cancelled = true;
     };
@@ -331,8 +363,19 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     setBusy(true);
     try {
       let next: PuzzleState;
-      if (user) {
+      if (mode === "unlimited") {
+        // Nothing to record and no limit to defend, so the round lives
+        // entirely here - but the GRADING is still the server's, against
+        // the answer this browser picked. Same function the daily uses,
+        // so a yellow cannot come to mean two different things.
+        if (!practice) return;
+        const graded = await submitPracticeGuess(player.espnId, practice.answer.espnId);
+        const held = [...practice.guesses, graded];
+        setPractice({ ...practice, guesses: held });
+        next = practiceBoard(practice.answer, held);
+      } else if (user) {
         next = await submitDailyGuess(player.espnId);
+        setDailyState(next);
       } else {
         // Graded by the server, held by the browser. The limit is
         // enforced here rather than there, which is fine precisely
@@ -342,8 +385,8 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
         const held = [...(state?.guesses ?? []), graded];
         writeGuestGuesses(state?.puzzleOn ?? puzzleToday(), held);
         next = guestBoard(state?.puzzleOn ?? puzzleToday(), held);
+        setDailyState(next);
       }
-      setState(next);
       setQuery("");
       // A solve that happened just now, on this guess - which is the only
       // kind that gets the celebration. Anybody who reduces motion goes
@@ -358,7 +401,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           celebrateTimer.current = window.setTimeout(endCelebration, CELEBRATE_MS);
         }
       }
-      posthog.capture("daily_puzzle_guess", { used: next.guessesUsed, solved: next.solved, guest: !user });
+      posthog.capture("daily_puzzle_guess", { used: next.guessesUsed, solved: next.solved, guest: !user, mode });
       inputRef.current?.focus();
     } catch (err) {
       setError(errorMessage(err));
@@ -531,7 +574,15 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           Re-measure if the header or the rail ever changes height. */}
       {state.finished && state.answer && !celebrating && (
         <div ref={revealRef} className="scroll-mt-[118px]">
-          <Reveal state={state} answer={answer} onShare={share} copied={copied} grid={shareGrid(state)} />
+          <Reveal
+            state={state}
+            answer={answer}
+            onShare={share}
+            copied={copied}
+            grid={shareGrid(state)}
+            practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
+            onPlayAgain={startPracticeRound}
+          />
         </div>
       )}
 
@@ -548,7 +599,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           Inline rather than a modal: for the loser it IS the result, and
           covering a winner's reveal with a dialog would hide the thing
           they just earned and came to screenshot. */}
-      {state.finished && !user && !celebrating && (
+      {/* Daily only. This card is about keeping a RESULT - the streak, the
+          points, the board on another device - and a practice round has
+          none of those to keep, so offering an account for one would be
+          asking on false pretences. */}
+      {mode === "daily" && state.finished && !user && !celebrating && (
         <div ref={guestFinishRef} className="scroll-mt-[118px]">
           <GuestFinish solved={state.solved} onJoin={() => void requestSignIn()} />
         </div>
@@ -562,6 +617,53 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           rather than by air - the same rule the legend already used. */}
       <div style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }}>
         {header}
+
+        {/* The two modes, on the card and above the field, because the
+            first thing to settle is which game you are playing. Inside
+            the card rather than floating above it: it belongs to the
+            board, and a control on the page would read as navigation.
+
+            Both are always open. Locking unlimited behind the daily
+            protects the streak, but it does it by telling a first-time
+            visitor who wants to keep playing to come back tomorrow, and
+            the visitor who wants a second round is the one worth
+            keeping. */}
+        <div className="flex justify-center px-4 pb-3 pt-1">
+          <div className="flex gap-1 rounded-full p-1" style={{ background: FIELD, border: CARD_EDGE }}>
+            {(
+              [
+                { key: "daily", label: "TODAY" },
+                { key: "unlimited", label: "UNLIMITED" },
+              ] as const
+            ).map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => switchMode(m.key)}
+                aria-pressed={mode === m.key}
+                className="rounded-full px-4 py-1.5 text-[11px] transition-colors sm:text-xs"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  letterSpacing: "0.04em",
+                  background: mode === m.key ? "#3ecb78" : "transparent",
+                  color: mode === m.key ? INK : MUTED,
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* What round you are on, and the one line that says why this
+            board does not count. Said here rather than only at the end,
+            because somebody who lands mid-round should not have to solve
+            it to find out it was practice. */}
+        {mode === "unlimited" && practice && (
+          <p className="px-4 pb-2 text-center text-[11px]" style={{ color: MUTED }}>
+            Round {practice.round} &middot; no points, no streak &mdash; play as many as you like
+          </p>
+        )}
 
         {/* The board goes as wide as the card allows; the input does not.
             A search field stretched to 1150px is a lot of runway for a
@@ -953,6 +1055,8 @@ function Reveal({
   onShare,
   copied,
   grid,
+  practiceRound,
+  onPlayAgain,
 }: {
   state: PuzzleState;
   answer: PuzzlePlayer | undefined;
@@ -961,6 +1065,12 @@ function Reveal({
   // The emoji block the share button is about to put on the clipboard,
   // shown so nobody has to send it to find out what it says.
   grid: string;
+  // Which practice round this was, or null for the daily. What it gates
+  // is the SHARE: a daily grid is worth posting because everybody had the
+  // same player, and a practice grid is a picture of a puzzle nobody else
+  // was set. Posting it would say "3 guesses" about nothing.
+  practiceRound: number | null;
+  onPlayAgain: () => void;
 }) {
   const team = (answer?.team ?? state.answer?.team) as TeamAbbr | undefined;
   const brand = team ? TEAMS[team]?.color : undefined;
@@ -1005,6 +1115,12 @@ function Reveal({
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-semibold" style={{ color: TEXT }}>
             {state.solved ? `Solved in ${state.guessesUsed}` : "Out of guesses"}
+            {practiceRound !== null && (
+              <span className="font-normal" style={{ color: MUTED }}>
+                {" "}
+                &middot; round {practiceRound}
+              </span>
+            )}
           </span>
           {state.solved && state.pointsAwarded > 0 && (
             <span
@@ -1028,46 +1144,76 @@ function Reveal({
             seven separate emoji per line - it should look like the thing
             that lands in a message, which is how somebody decides whether
             to send it. */}
-        <div
-          className="flex flex-col items-center gap-1 rounded-xl px-3 py-2.5"
-          style={{ background: FIELD, border: CARD_EDGE }}
-        >
-          <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: MUTED }}>
-            What you&rsquo;ll share
-          </span>
-          <pre
-            className="m-0 text-center font-sans text-[13px] leading-[1.35] tracking-[0.06em] sm:text-[15px]"
-            style={{ color: TEXT }}
+        {/* The grid preview is a share preview, so it goes with the share
+            button. A practice round has neither. */}
+        {practiceRound === null && (
+          <div
+            className="flex flex-col items-center gap-1 rounded-xl px-3 py-2.5"
+            style={{ background: FIELD, border: CARD_EDGE }}
           >
-            {grid}
-          </pre>
-        </div>
+            <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: MUTED }}>
+              What you&rsquo;ll share
+            </span>
+            <pre
+              className="m-0 text-center font-sans text-[13px] leading-[1.35] tracking-[0.06em] sm:text-[15px]"
+              style={{ color: TEXT }}
+            >
+              {grid}
+            </pre>
+          </div>
+        )}
 
         <p className="text-xs" style={{ color: MUTED }}>
-          {state.solved ? "New player tomorrow at midnight ET." : "New player tomorrow — the streak survives."}
+          {practiceRound !== null
+            ? "Practice — nothing recorded. Today's board is under TODAY."
+            : state.solved
+              ? "New player tomorrow at midnight ET."
+              : "New player tomorrow — the streak survives."}
         </p>
         {/* Orange rather than yellow: yellow is a verdict on this board
             now, and a button wearing a verdict's colour reads as one. */}
-        <button
-          type="button"
-          onClick={onShare}
-          className="puzzle-press"
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: ".85rem",
-            background: "#ff7a45",
-            color: INK,
-            border: EDGE,
-            borderRadius: 12,
-            padding: 11,
-            boxShadow: `3px 4px 0 ${INK}`,
-          }}
-        >
-          {copied ? "COPIED" : "SHARE RESULT"}
-        </button>
-        <p className="text-center text-[10px]" style={{ color: MUTED }}>
-          Shares squares only — no name, no team.
-        </p>
+        {practiceRound !== null ? (
+          <button
+            type="button"
+            onClick={onPlayAgain}
+            className="puzzle-press"
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: ".85rem",
+              background: "#3ecb78",
+              color: INK,
+              border: EDGE,
+              borderRadius: 12,
+              padding: 11,
+              boxShadow: `3px 4px 0 ${INK}`,
+            }}
+          >
+            PLAY AGAIN
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onShare}
+              className="puzzle-press"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: ".85rem",
+                background: "#ff7a45",
+                color: INK,
+                border: EDGE,
+                borderRadius: 12,
+                padding: 11,
+                boxShadow: `3px 4px 0 ${INK}`,
+              }}
+            >
+              {copied ? "COPIED" : "SHARE RESULT"}
+            </button>
+            <p className="text-center text-[10px]" style={{ color: MUTED }}>
+              Shares squares only — no name, no team.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

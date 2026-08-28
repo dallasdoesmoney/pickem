@@ -70,6 +70,23 @@ export async function submitGuestGuess(espnId: string): Promise<PuzzleGuess> {
   return data as PuzzleGuess;
 }
 
+// ------------------------------------------------------------ unlimited
+//
+// One guess graded against an answer the CALLER supplies, which is the
+// whole difference. The daily withholds its answer because there is a
+// record and a payout riding on it; unlimited has neither, so the browser
+// can hold the answer and there is no round to store, expire or clean up.
+//
+// The grading is still the server's - this reaches the same
+// puzzle_compare submit_daily_guess uses - so a yellow means the same
+// thing in both modes and cannot drift when a band is retuned. See
+// supabase/migrations/0057_practice_mode.sql.
+export async function submitPracticeGuess(espnId: string, answerId: string): Promise<PuzzleGuess> {
+  const { data, error } = await supabase.rpc("puzzle_practice_compare", { p_guess: espnId, p_answer: answerId });
+  if (error) throw error;
+  return data as PuzzleGuess;
+}
+
 // Keyed by date so yesterday's board is not sitting there tomorrow, and
 // so the storage cannot silently grow one entry per day forever - reading
 // today's key is what clears every other one.
