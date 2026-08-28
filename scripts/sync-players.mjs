@@ -146,6 +146,24 @@ function attrsOf(a) {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
   };
+  // ZERO IS A REAL JERSEY NUMBER, and the guard above threw it away.
+  //
+  // For height, weight and age a zero is missing data - nobody is 0
+  // inches tall - so `n > 0` is the right reading of it there. A jersey
+  // is the one field where 0 is a value somebody actually wears: the NFL
+  // legalised it in 2023 and it went straight onto some of the most
+  // recognisable players in the league. Jahmyr Gibbs, Calvin Ridley,
+  // Keon Coleman and Matthew Golden were the four starters this dropped,
+  // and the board showed them a grey "?" in the # column - which reads
+  // as "we do not know", when in fact ESPN had told us.
+  //
+  // Bounded above as well, because 100 is not a jersey either and a
+  // range says what the field is more clearly than a floor alone.
+  const jerseyNum = (v) => {
+    if (v === null || v === undefined || v === "") return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 99 ? Math.round(n) : undefined;
+  };
   const out = {};
   // ESPN reports height in inches and weight in pounds.
   const put = (key, value) => {
@@ -154,7 +172,7 @@ function attrsOf(a) {
   put("heightIn", num(a.height));
   put("weightLb", num(a.weight));
   put("age", num(a.age));
-  put("jersey", num(a.jersey));
+  put("jersey", jerseyNum(a.jersey));
   // college is a $ref on the core API and an object on the roster
   // endpoint. Only the inline form is used - chasing the ref would be one
   // more request per player for one hint column.
@@ -327,7 +345,10 @@ export const ACTIVE_PLAYERS: ActivePlayer[] = [
       r.heightIn ? `, heightIn: ${r.heightIn}` : "",
       r.weightLb ? `, weightLb: ${r.weightLb}` : "",
       r.age ? `, age: ${r.age}` : "",
-      r.jersey ? `, jersey: ${r.jersey}` : "",
+      // Not `r.jersey ? ...`: 0 is falsy and is also a jersey somebody
+      // wears, so a truthiness test here would drop the number even
+      // after attrsOf has correctly kept it.
+      r.jersey === undefined || r.jersey === null ? "" : `, jersey: ${r.jersey}`,
       r.college ? `, college: ${JSON.stringify(r.college)}` : "",
       r.depthRank ? `, depthRank: ${r.depthRank}` : "",
     ].join("");
@@ -419,7 +440,10 @@ export const ${position.exportName}: ${position.typeName}[] = [
       r.heightIn ? `, heightIn: ${r.heightIn}` : "",
       r.weightLb ? `, weightLb: ${r.weightLb}` : "",
       r.age ? `, age: ${r.age}` : "",
-      r.jersey ? `, jersey: ${r.jersey}` : "",
+      // Not `r.jersey ? ...`: 0 is falsy and is also a jersey somebody
+      // wears, so a truthiness test here would drop the number even
+      // after attrsOf has correctly kept it.
+      r.jersey === undefined || r.jersey === null ? "" : `, jersey: ${r.jersey}`,
       r.college ? `, college: ${JSON.stringify(r.college)}` : "",
     ].join("");
   const body = rows
