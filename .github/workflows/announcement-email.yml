@@ -1,0 +1,83 @@
+# Sends a one-off announcement to everybody who wants game updates.
+#
+# NO SCHEDULE, on purpose. This is not a job that watches for a condition
+# - it is a button somebody presses when there is something to say. A
+# cron here would eventually fire on its own and mail people about a
+# launch that happened weeks ago.
+#
+# Sending once per person per campaign is enforced in the database, not
+# here, so a double click, a retry or a re-run cannot produce a second
+# email. See supabase/migrations/0056_email_product_news.sql.
+name: Announcement email
+
+on:
+  workflow_dispatch:
+    inputs:
+      campaign:
+        description: "Which file in scripts/campaigns/ (without .mjs)"
+        type: string
+        required: true
+        default: "nameplate-launch"
+      dry_run:
+        description: "List who would be emailed without sending anything"
+        type: boolean
+        default: true
+      test_send:
+        # A test goes to ONE address and records nothing, so it cannot
+        # consume the real campaign - announcement_recipients excludes
+        # anybody already in the ledger, permanently, so a "just to me"
+        # test down the normal path would mean never getting the real one.
+        description: "Send only to EMAIL_TEST_TO, record nothing (overrides everything below)"
+        type: boolean
+        default: false
+      test_to:
+        # PUT IT IN A SECRET INSTEAD unless you do not mind. This
+        # repository is public, and a workflow input is printed verbatim
+        # into the run log where it stays and is indexed. The secret
+        # EMAIL_TEST_TO is masked; this box is here for a throwaway
+        # address, and is left blank by default so the secret wins.
+        description: "Override the test address (WARNING: public repo — this appears in the run log)"
+        type: string
+        default: ""
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # No install step: the script uses fetch and the standard library
+      # only, so there is nothing to pull and nothing to audit.
+      - name: Send
+        run: node scripts/send-announcement.mjs
+        env:
+          CAMPAIGN: ${{ inputs.campaign }}
+          # Either name - the app's own vars are NEXT_PUBLIC_ prefixed
+          # because Next requires that for anything the browser reads, so
+          # a workflow asking for the bare name can silently get an empty
+          # string. Accepting both means it works whichever convention a
+          # secret was added under.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          # Good for two calls and nothing else - it is NOT the service
+          # role key, and must never be replaced with one.
+          EMAIL_SENDER_TOKEN: ${{ secrets.EMAIL_SENDER_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          # Required by CAN-SPAM in commercial mail. The script refuses
+          # to run without it rather than shipping a placeholder.
+          EMAIL_POSTAL_ADDRESS: ${{ secrets.EMAIL_POSTAL_ADDRESS }}
+          SITE_URL: https://sidelinebrew.com
+          # Defaults to a dry run, so the first thing anybody does by
+          # hand cannot be an accidental send to the whole list.
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          # Only when test_send is ticked, so a stray secret cannot
+          # silently turn every run into a test that reaches nobody.
+          TEST_TO: ${{ inputs.test_send && (inputs.test_to != '' && inputs.test_to || secrets.EMAIL_TEST_TO) || '' }}
+          # Passed separately so the script can tell "no test wanted"
+          # from "test wanted, address missing" - the second must fail
+          # loudly rather than quietly becoming a send to everybody.
+          TEST_SEND: ${{ inputs.test_send && '1' || '' }}

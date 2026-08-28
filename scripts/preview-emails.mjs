@@ -72,6 +72,28 @@ for (const c of CASES) {
   console.log(`    subject: ${subject}`);
 }
 
+
+// The announcement campaigns, rendered the same way and from the same
+// files the sender imports - so a launch blast can be looked at before
+// it goes to a few hundred people, which is the entire reason this
+// script exists.
+const { readdirSync } = await import("node:fs");
+const campaignDir = join(ROOT, "scripts", "campaigns");
+for (const file of readdirSync(campaignDir).filter((f) => f.endsWith(".mjs"))) {
+  const slug = file.replace(/\.mjs$/, "");
+  const c = await import(`./campaigns/${file}`);
+  const view = {
+    playUrl: `https://sidelinebrew.com/daily?from=announcement&utm_source=email&utm_medium=announcement&utm_campaign=${slug}`,
+    unsubUrl: UNSUB,
+    addr: process.env.EMAIL_POSTAL_ADDRESS,
+    logo: LOGO_DATA,
+  };
+  writeFileSync(join(OUT, `campaign-${slug}.html`), c.html(view));
+  writeFileSync(join(OUT, `campaign-${slug}.txt`), `Subject: ${c.SUBJECT}\n\n${c.text(view)}`);
+  console.log(`campaign-${slug}.html   announcement`);
+  console.log(`    subject: ${c.SUBJECT}`);
+}
+
 // One page that shows all four in the frame a mail client gives them, so
 // the whole set can be judged at once rather than four files at a time.
 writeFileSync(
