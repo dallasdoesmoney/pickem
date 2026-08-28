@@ -32,7 +32,10 @@ type AuthContextValue = {
   profile: Profile | null;
   loading: boolean;
   signInWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUpWithPassword: (email: string, password: string) => Promise<{ error: string | null }>;
+  // needsConfirmation: the account exists but there is no session yet,
+  // because the address has to be proved first. Callers must not treat
+  // this as signed in - see the comment on the implementation.
+  signUpWithPassword: (email: string, password: string) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -218,13 +221,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Supabase only honours a redirect that matches an allowed URL in the
   // project's auth settings, so an origin that has not been listed there
   // falls back to the Site URL - which is the old behaviour, not a break.
+  // needsConfirmation is read from the RESPONSE, not from a setting we
+  // keep in sync by hand. Supabase hands back a session immediately when
+  // the project auto-confirms and no session at all when it wants the
+  // address proved first, so the same code covers both and flipping
+  // "Confirm email" in the dashboard needs no deploy to match it.
+  //
+  // It is also true for a signup on an address that already has an
+  // account: Supabase answers with no session and no error, deliberately,
+  // so that this box cannot be used to find out who has signed up. "Check
+  // your email" is the honest thing to say in both cases and gives that
+  // away either way.
   const signUpWithPassword = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: window.location.href },
     });
-    return { error: error?.message ?? null };
+    return { error: error?.message ?? null, needsConfirmation: !error && !data.session };
   }, []);
 
   const signInWithGoogle = useCallback(async () => {

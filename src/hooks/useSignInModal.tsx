@@ -46,6 +46,9 @@ export function useSignInModal() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // Separate from sentTo, which is the forgot-password message. This one
+  // replaces the whole form: there is nothing left to type.
+  const [confirmSentTo, setConfirmSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [referrer, setReferrer] = useState<{ label: string; avatarUrl: string | null } | null>(null);
@@ -59,6 +62,7 @@ export function useSignInModal() {
     setPassword("");
     setConfirm("");
     setSentTo(null);
+    setConfirmSentTo(null);
     setError(null);
     return new Promise<boolean>((resolve) => {
       setState({ resolve });
@@ -115,10 +119,19 @@ export function useSignInModal() {
     }
 
     setSubmitting(true);
-    const { error } = mode === "signin" ? await signInWithPassword(email, password) : await signUpWithPassword(email, password);
+    const result = mode === "signin" ? await signInWithPassword(email, password) : await signUpWithPassword(email, password);
     setSubmitting(false);
-    if (error) {
-      setError(error);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    // Signed up, but there is no session until the link in the email is
+    // clicked. Closing here would look exactly like success and then
+    // silently not be - the caller would go to save and find nobody
+    // signed in - so the modal stays open and says what has to happen
+    // next instead.
+    if ("needsConfirmation" in result && result.needsConfirmation) {
+      setConfirmSentTo(email);
       return;
     }
     close(true);
@@ -128,6 +141,7 @@ export function useSignInModal() {
     setMode(next);
     setError(null);
     setSentTo(null);
+    setConfirmSentTo(null);
     setPassword("");
     setConfirm("");
   }
@@ -158,21 +172,74 @@ export function useSignInModal() {
         </button>
 
         <h2 className="text-white text-lg" style={{ fontFamily: "var(--font-display)" }}>
-          {mode === "signin" ? "SIGN IN" : mode === "signup" ? "CREATE ACCOUNT" : "FORGOT PASSWORD"}
+          {confirmSentTo ? "CHECK YOUR EMAIL" : mode === "signin" ? "SIGN IN" : mode === "signup" ? "CREATE ACCOUNT" : "FORGOT PASSWORD"}
         </h2>
         <p className="text-white/50 text-sm mt-1 mb-3">
-          {mode === "signin"
-            ? "Pick up where you left off."
-            : mode === "signup"
-              ? "Free, and it takes about ten seconds."
-              : "We'll email you a link to set a new one."}
+          {confirmSentTo
+            ? "One click and you're in."
+            : mode === "signin"
+              ? "Pick up where you left off."
+              : mode === "signup"
+                ? "Free, and it takes about ten seconds."
+                : "We'll email you a link to set a new one."}
         </p>
+
+        {/* Everything below is hidden while this is up, because there is
+            nothing left to type - the account exists and the only thing
+            that finishes it is in an inbox. */}
+        {confirmSentTo && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-white/70 leading-relaxed">
+              {/* anywhere, not break-all: a normal address wraps whole
+                  onto its own line, and only one long enough to need it
+                  gets split. break-all cut someone@example.com after
+                  "example.co". */}
+              We sent a confirmation link to{" "}
+              <span className="text-white font-medium [overflow-wrap:anywhere]">{confirmSentTo}</span>. Click it and
+              you&rsquo;ll come straight back here, signed in.
+            </p>
+            {/* Said plainly because a typo'd address is the single most
+                likely reason that link never arrives, and the fix is to
+                sign up again rather than to keep waiting. */}
+            <p className="text-xs text-white/40 leading-relaxed">
+              Check the spam folder too. Nothing there? The address may have a typo &mdash;{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmSentTo(null);
+                  setPassword("");
+                  setConfirm("");
+                }}
+                className="text-white/60 underline underline-offset-2 hover:text-white transition-colors"
+              >
+                try a different one
+              </button>
+              .
+            </p>
+            <button
+              type="button"
+              onClick={() => close(false)}
+              className="mt-1 rounded-full px-5 py-2.5 text-sm active:scale-95 transition-transform duration-150"
+              style={{ fontFamily: "var(--font-display)", background: "linear-gradient(135deg, #4ade80, #22c55e)", color: "#0e1b33" }}
+            >
+              GOT IT
+            </button>
+            {/* Their work is still on this device and still theirs - the
+                migration in useAuth runs whenever a session shows up, so
+                confirming in the same browser picks it all up. Worth
+                saying, because "you are not signed in yet" reads like
+                "you just lost it". */}
+            <p className="text-[11px] text-white/35 leading-relaxed text-center">
+              Nothing you&rsquo;ve done is lost. It&rsquo;s saved on this device and moves to your account when you confirm.
+            </p>
+          </div>
+        )}
 
         {/* What an account actually buys. This modal is the only place
             most people meet that pitch, and "sign in to save your picks"
             undersold it - saving tier lists, the leaderboard and the
             season predictor were all invisible from here. */}
-        {mode !== "forgot" && (
+        {mode !== "forgot" && !confirmSentTo && (
         <ul className="flex flex-col gap-2 mb-4">
           {[
             "Save tier lists and come back to them later",
@@ -190,7 +257,7 @@ export function useSignInModal() {
         </ul>
         )}
 
-        {referrer && mode === "signup" && (
+        {referrer && mode === "signup" && !confirmSentTo && (
           <div className="flex flex-col items-center gap-1.5 text-center mb-4">
             {referrer.avatarUrl ? (
               <img src={referrer.avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover border border-white/15" />
@@ -226,6 +293,7 @@ export function useSignInModal() {
           </div>
         )}
 
+        {!confirmSentTo && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input
             type="email"
@@ -300,12 +368,13 @@ export function useSignInModal() {
             </p>
           )}
         </form>
+        )}
 
         {/* The way back in when the password is gone. There was no way at
             all before this - an account whose password was forgotten was
             simply lost, and the only tell was people signing up again. */}
         <div className="mt-3 text-center">
-          {mode === "signin" ? (
+          {confirmSentTo ? null : mode === "signin" ? (
             <button
               type="button"
               onClick={() => switchTo("forgot")}
@@ -324,12 +393,15 @@ export function useSignInModal() {
           ) : null}
         </div>
 
+        {!confirmSentTo && (
         <div className="flex items-center gap-3 my-4">
           <div className="h-px flex-1 bg-white/10" />
           <span className="text-[11px] text-white/35">OR</span>
           <div className="h-px flex-1 bg-white/10" />
         </div>
+        )}
 
+        {!confirmSentTo && (
         <button
           type="button"
           onClick={handleGoogle}
@@ -339,7 +411,9 @@ export function useSignInModal() {
           <GoogleIcon className="h-4 w-4" />
           CONTINUE WITH GOOGLE
         </button>
+        )}
 
+        {!confirmSentTo && (
         <button
           type="button"
           onClick={() => {
@@ -350,6 +424,7 @@ export function useSignInModal() {
         >
           {mode === "signup" ? "Already have an account? Sign in" : "Need an account? Sign up"}
         </button>
+        )}
       </div>
     </div>
   );
