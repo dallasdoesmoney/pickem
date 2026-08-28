@@ -37,8 +37,14 @@ jobs:
       - name: Send
         run: node scripts/send-weekly-deadline.mjs
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Either name. The app's own env vars are NEXT_PUBLIC_ prefixed
+          # because Next requires that for anything the browser reads, and
+          # the repository secrets were created to match them - so a
+          # workflow asking for the bare name silently got an empty string
+          # and the script exited "Missing: SUPABASE_URL". Accepting both
+          # means it works whichever convention a secret was added under.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           # Good for two calls and nothing else - it is NOT the service
           # role key, and must never be replaced with one.
           EMAIL_SENDER_TOKEN: ${{ secrets.EMAIL_SENDER_TOKEN }}

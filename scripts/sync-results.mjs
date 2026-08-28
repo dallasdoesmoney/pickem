@@ -110,7 +110,15 @@ async function main() {
     (k) => !process.env[k],
   );
   if (missing.length) {
+    // See send-weekly-deadline.mjs for why this says more than the list:
+    // a secret under a slightly different name is invisible from here,
+    // and this job failed that way from the day it was written.
     console.error(`Missing: ${missing.join(", ")}`);
+    console.error(
+      "\nThese come from GitHub Actions secrets (the Supabase pair also accepts a\n" +
+        "NEXT_PUBLIC_ prefix). Empty means no secret exists under the name the\n" +
+        "workflow asks for - check Settings > Secrets and variables > Actions.",
+    );
     process.exit(1);
   }
 

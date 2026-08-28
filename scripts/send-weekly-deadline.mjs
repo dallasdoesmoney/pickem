@@ -42,7 +42,18 @@ if (!DRY_RUN) REQUIRED.push("RESEND_API_KEY");
 
 const missing = REQUIRED.filter((k) => !process.env[k]);
 if (missing.length) {
+  // Named, not just listed. A secret whose name does not match what the
+  // workflow asks for resolves to an empty string with no warning from
+  // GitHub, and "Missing: SUPABASE_URL" alone sends you looking for a
+  // secret that is sitting right there under a different name - which is
+  // exactly how the results sync failed unnoticed.
   console.error(`Missing: ${missing.join(", ")}`);
+  console.error(
+    "\nEach comes from a GitHub Actions secret of the same name (the two Supabase\n" +
+      "ones also accept a NEXT_PUBLIC_ prefix). An empty value here means the secret\n" +
+      "does not exist under the name the workflow asks for - check the exact spelling\n" +
+      "at Settings > Secrets and variables > Actions.",
+  );
   process.exit(1);
 }
 
