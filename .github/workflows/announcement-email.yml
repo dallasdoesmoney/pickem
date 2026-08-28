@@ -22,6 +22,23 @@ on:
         description: "List who would be emailed without sending anything"
         type: boolean
         default: true
+      test_send:
+        # A test goes to ONE address and records nothing, so it cannot
+        # consume the real campaign - announcement_recipients excludes
+        # anybody already in the ledger, permanently, so a "just to me"
+        # test down the normal path would mean never getting the real one.
+        description: "Send only to EMAIL_TEST_TO, record nothing (overrides everything below)"
+        type: boolean
+        default: false
+      test_to:
+        # PUT IT IN A SECRET INSTEAD unless you do not mind. This
+        # repository is public, and a workflow input is printed verbatim
+        # into the run log where it stays and is indexed. The secret
+        # EMAIL_TEST_TO is masked; this box is here for a throwaway
+        # address, and is left blank by default so the secret wins.
+        description: "Override the test address (WARNING: public repo — this appears in the run log)"
+        type: string
+        default: ""
 
 jobs:
   announce:
@@ -57,3 +74,10 @@ jobs:
           # Defaults to a dry run, so the first thing anybody does by
           # hand cannot be an accidental send to the whole list.
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          # Only when test_send is ticked, so a stray secret cannot
+          # silently turn every run into a test that reaches nobody.
+          TEST_TO: ${{ inputs.test_send && (inputs.test_to != '' && inputs.test_to || secrets.EMAIL_TEST_TO) || '' }}
+          # Passed separately so the script can tell "no test wanted"
+          # from "test wanted, address missing" - the second must fail
+          # loudly rather than quietly becoming a send to everybody.
+          TEST_SEND: ${{ inputs.test_send && '1' || '' }}

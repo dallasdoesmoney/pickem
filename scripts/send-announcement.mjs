@@ -45,6 +45,35 @@ if (!/^announcement:[a-z0-9-]{3,60}$/.test(KIND)) {
   process.exit(1);
 }
 
+// A test send: one email to one address, and NOTHING else happens.
+//
+// The database is not asked who the recipients are and the ledger is not
+// written, so a test cannot consume the real campaign - which matters
+// because announcement_recipients excludes anybody already in the ledger
+// for this kind, permanently. Testing by sending "just to me" through
+// the normal path would quietly mean the sender never mails you the real
+// one.
+const TEST_TO = (process.env.TEST_TO ?? "").trim();
+
+// Asking for a test and not getting one has to be an ERROR, never a
+// quiet fall-through to the real thing. Ticking "test send" in the
+// workflow without EMAIL_TEST_TO configured leaves TEST_TO empty, and
+// without this the script would shrug and mail the entire list - the
+// exact opposite of what was asked for, at the worst possible moment.
+if (process.env.TEST_SEND === "1" && !TEST_TO) {
+  console.error(
+    "Test send was requested but there is no address to send to.\n\n" +
+      "Add a repository secret EMAIL_TEST_TO with your email, or type one into\n" +
+      "the test_to box when you run the workflow. Refusing to fall back to the\n" +
+      "real send.",
+  );
+  process.exit(1);
+}
+if (TEST_TO && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(TEST_TO)) {
+  console.error(`TEST_TO does not look like an email address: "${TEST_TO}"`);
+  process.exit(1);
+}
+
 const REQUIRED = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "EMAIL_SENDER_TOKEN", "EMAIL_FROM", "EMAIL_POSTAL_ADDRESS"];
 if (!DRY_RUN) REQUIRED.push("RESEND_API_KEY");
 const missing = REQUIRED.filter((k) => !process.env[k]);
@@ -106,6 +135,26 @@ async function main() {
 
   console.log(`Campaign: ${KIND}`);
   console.log(`Subject:  ${SUBJECT}`);
+
+  if (TEST_TO) {
+    // The unsubscribe link carries an all-zero token on purpose. A real
+    // one would let a test email actually unsubscribe somebody, and the
+    // /unsubscribe page already handles an unknown token gracefully - it
+    // says the link did not match anything, which is true.
+    const view = {
+      playUrl: `${SITE}/daily?from=announcement&utm_source=email&utm_medium=announcement&utm_campaign=${CAMPAIGN}`,
+      unsubUrl: `${SITE}/unsubscribe?t=00000000-0000-0000-0000-000000000000`,
+      addr: EMAIL_POSTAL_ADDRESS,
+      logo: `${SITE}/email-logo.png`,
+    };
+    console.log(`\nTEST SEND to ${TEST_TO}`);
+    console.log("Nobody else is contacted, and NOTHING is recorded - the real send still");
+    console.log("reaches everyone, including this address.");
+    console.log("The unsubscribe link in a test carries a dummy token and will not work.");
+    if (DRY_RUN) return console.log("\nDry run - nothing sent.");
+    const messageId = await send(TEST_TO, SUBJECT, { html: html(view), text: text(view) }, view.unsubUrl);
+    return console.log(`\nSent. Resend message id: ${messageId ?? "(none returned)"}`);
+  }
 
   const recipients = await rpc("announcement_recipients", {
     p_token: EMAIL_SENDER_TOKEN,
