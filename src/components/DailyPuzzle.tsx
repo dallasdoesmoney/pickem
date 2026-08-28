@@ -582,6 +582,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     );
   }
 
+  // A signed-out player who ran out of guesses on the daily: finished,
+  // not solved, and no answer, because the only way to tell them would be
+  // an endpoint that hands today's player to anybody who asks.
+  const guestLost = mode === "daily" && !user && state.finished && !state.answer;
+
   const left = state.maxGuesses - state.guessesUsed;
   const answer = state.answer ? PUZZLE_PLAYERS_BY_ID.get(state.answer.espnId) : undefined;
 
@@ -593,28 +598,32 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           the same word every day. Unfinished, the header leads as normal.
           The title lives in the page above this component, so the page
           hands it in and this decides where it sits. */}
-      {/* scroll-mt, because /daily carries 106px of sticky chrome: the 72px
-          header and the 34px back rail pinned under it. block: "start"
-          puts an element's top at the top of the VIEWPORT, which is behind
-          both of them - so the reveal arrived with its top half covered.
-          scroll-margin-top is what scrollIntoView measures against, so
-          this is the fix rather than a magic number in the scroll call.
-          118 = 106 + a little air.
-          Re-measure if the header or the rail ever changes height. */}
-      {resultOpen && state.finished && state.answer && !celebrating && (
+      {/* THE RESULT, whatever the result turns out to be.
+          For nearly everybody that is the reveal. For a signed-out player
+          who ran OUT on the daily there is no reveal to give - guestBoard
+          cannot fill in an answer it is deliberately not allowed to know
+          - so the honest result is "sign in and we will tell you", and
+          that card goes here rather than sitting above the board. It was
+          the last thing on the page still doing what this change exists
+          to stop. */}
+      {resultOpen && state.finished && !celebrating && (state.answer || guestLost) && (
         <ResultDialog onClose={() => setResultOpen(false)}>
-          <Reveal
-            state={state}
-            answer={answer}
-            onShare={share}
-            copied={copied}
-            grid={shareGrid(state)}
-            practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
-            onPlayAgain={() => {
-              setResultOpen(false);
-              startPracticeRound();
-            }}
-          />
+          {state.answer ? (
+            <Reveal
+              state={state}
+              answer={answer}
+              onShare={share}
+              copied={copied}
+              grid={shareGrid(state)}
+              practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
+              onPlayAgain={() => {
+                setResultOpen(false);
+                startPracticeRound();
+              }}
+            />
+          ) : (
+            <GuestFinish solved={false} onJoin={() => void requestSignIn()} />
+          )}
         </ResultDialog>
       )}
 
@@ -623,19 +632,16 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           one thing the person came to do - and it was suppressed once the
           board finished, so the single moment somebody most wants an
           account was the moment they were never asked.
-          A guest who LOST has an empty results slot: guestBoard cannot
-          fill in an answer it is not allowed to know, so the reveal above
-          renders nothing and the page simply stopped. This is what goes
-          there. A guest who WON has their reveal already, and this sits
-          under it offering to keep the result rather than to explain it.
-          Inline rather than a modal: for the loser it IS the result, and
-          covering a winner's reveal with a dialog would hide the thing
-          they just earned and came to screenshot. */}
-      {/* Daily only. This card is about keeping a RESULT - the streak, the
-          points, the board on another device - and a practice round has
-          none of those to keep, so offering an account for one would be
+          ONLY ALONGSIDE A RESULT now. A guest who won has their reveal in
+          the dialog and this underneath it, offering to keep what they
+          just did - two different things, so two places is right. A guest
+          who LOST has this as their result, in the dialog, and printing
+          it inline as well would be the same card twice on one screen.
+          Daily only either way: this card is about keeping a RESULT - the
+          streak, the points, the board on another device - and a practice
+          round has none of those, so offering an account for one would be
           asking on false pretences. */}
-      {mode === "daily" && state.finished && !user && !celebrating && (
+      {mode === "daily" && state.finished && state.answer && !user && !celebrating && (
         <div ref={guestFinishRef} className="scroll-mt-[118px]">
           <GuestFinish solved={state.solved} onJoin={() => void requestSignIn()} />
         </div>
@@ -734,7 +740,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 PLAY AGAIN
               </button>
             )}
-            {state.answer && (
+            {(state.answer || guestLost) && (
               <button
                 type="button"
                 onClick={() => setResultOpen(true)}
