@@ -75,6 +75,9 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 1100 } }
 // Every practice answer the page asks to be graded against, in order.
 const practiceAnswers = [];
 let dailyGuesses = 0;
+// Flipped on for the win case: the next graded guess comes back correct
+// whoever it was, so a solve can be forced without knowing the answer.
+let forceCorrect = false;
 
 await ctx.route("**://posthog.invalid/**", (r) => r.abort());
 await ctx.route("**://*.posthog.com/**", (r) => r.abort());
@@ -92,7 +95,7 @@ await ctx.route(`${SB}/**`, async (route) => {
 
   if (url.includes("/rpc/puzzle_practice_compare")) {
     practiceAnswers.push(post.p_answer);
-    return json(grade(post.p_guess, post.p_answer));
+    return json(grade(post.p_guess, forceCorrect ? post.p_guess : post.p_answer));
   }
   if (url.includes("/rpc/puzzle_guest_compare")) {
     dailyGuesses++;
@@ -203,6 +206,29 @@ const finished = (await page.getByRole("button", { name: "PLAY AGAIN" }).count()
 check("a lost round ends and offers another", finished, `after ${practiceAnswers.length} guesses`);
 
 if (finished) {
+  // THE RESULT IS A DIALOG NOW. It has to be dismissible, the board has
+  // to still be there underneath, and there has to be a way back to it -
+  // a result you lose by closing it takes the daily's share button with
+  // it.
+  const dialog = page.getByRole("dialog", { name: "Result" });
+  check("the result arrives as a dialog", await dialog.isVisible().catch(() => false));
+  check("the board is still behind it", (await rows()) > 0, `${await rows()} rows`);
+
+  await page.getByRole("button", { name: "Close result" }).click();
+  await page.waitForTimeout(400);
+  check("it closes", !(await dialog.isVisible().catch(() => false)));
+
+  await page.getByRole("button", { name: "SEE RESULT" }).click();
+  await page.waitForTimeout(400);
+  check("and can be reopened", await dialog.isVisible().catch(() => false));
+
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  check("escape closes it too", !(await dialog.isVisible().catch(() => false)));
+
+  await page.getByRole("button", { name: "SEE RESULT" }).click();
+  await page.waitForTimeout(400);
+
   // The answer is revealed on a LOSS, which the daily deliberately never
   // does for a guest - here the browser already knows it and being told
   // is the point of practising.
@@ -212,8 +238,9 @@ if (finished) {
   const shareOffered = (await page.getByRole("button", { name: /SHARE RESULT/ }).count()) > 0;
   check("practice is not shareable", !shareOffered, "no SHARE RESULT button");
 
-  await page.getByRole("button", { name: "PLAY AGAIN" }).click();
+  await dialog.getByRole("button", { name: "PLAY AGAIN" }).click();
   await page.waitForTimeout(700);
+  check("PLAY AGAIN closes the dialog", !(await dialog.isVisible().catch(() => false)));
   const roundTwo = (await page.locator("text=/Round 2/").count()) > 0;
   const clean = (await rows()) === 0;
   check("PLAY AGAIN starts round 2 with a clean board", roundTwo && clean, `round 2 ${roundTwo}, ${await rows()} rows`);
@@ -221,6 +248,92 @@ if (finished) {
   await guessSomething("z");
   const secondAnswer = practiceAnswers[practiceAnswers.length - 1];
   check("and a different player", secondAnswer !== firstAnswer, `${firstAnswer} then ${secondAnswer}`);
+}
+
+// --- 7. THE WIN. The celebration has to play out in full and THEN hand
+//        over to the dialog - the flips are the payoff, and a result card
+//        landing on top of them throws it away.
+{
+  forceCorrect = true;
+  await guessSomething("ty");
+
+  // Straight after the guess: board celebrating, dialog not yet up.
+  const dialog = page.getByRole("dialog", { name: "Result" });
+  const celebratingNow = await page.locator('[data-celebrate="1"]').count();
+  const dialogEarly = await dialog.isVisible().catch(() => false);
+  check(
+    "a solve celebrates before it reports",
+    celebratingNow > 0 && !dialogEarly,
+    `celebrating ${celebratingNow > 0}, dialog up ${dialogEarly}`,
+  );
+
+  // CELEBRATE_MS is 2150; wait past it and the dialog should have arrived
+  // on its own, with nothing clicked.
+  await page.waitForTimeout(2800);
+  const dialogLate = await dialog.isVisible().catch(() => false);
+  const stillCelebrating = await page.locator('[data-celebrate="1"]').count();
+  check(
+    "and the result arrives when it finishes",
+    dialogLate && stillCelebrating === 0,
+    `dialog up ${dialogLate}, still celebrating ${stillCelebrating > 0}`,
+  );
+  const solvedLine = await page.locator("text=/Solved in/").count();
+  check("it says what was solved", solvedLine > 0);
+}
+
+// --- 8. A SIGNED-OUT WIN ON THE DAILY IS TWO DIALOGS, IN ORDER.
+//        The reveal first, then - only once that has been closed, so it
+//        is not competing with what was just earned - the ask to keep it.
+{
+  const guest = await browser.newContext({ viewport: { width: 1280, height: 1100 } });
+  await guest.route("**://posthog.invalid/**", (r) => r.abort());
+  await guest.route("**://*.posthog.com/**", (r) => r.abort());
+  let n = 0;
+  await guest.route(`${SB}/**`, (route) => {
+    const u = route.request().url();
+    let post = {};
+    try { post = JSON.parse(route.request().postData() ?? "{}"); } catch {}
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    // Third guess wins. No session is seeded, so this is a guest.
+    if (u.includes("puzzle_guest_compare")) { n++; return j(grade(post.p_espn_id, n === 3 ? post.p_espn_id : "x")); }
+    if (u.includes("/rpc/")) return j({});
+    return j([]);
+  });
+  const gp = await guest.newPage();
+  await gp.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+  await gp.waitForSelector("main input", { timeout: 20000 });
+  await gp.waitForTimeout(900);
+  const gf = gp.locator("main input").first();
+  for (const q of ["ma", "jo", "ty"]) {
+    await gf.click(); await gf.fill(q); await gp.waitForTimeout(320);
+    await gp.keyboard.press("Enter"); await gp.waitForTimeout(600);
+  }
+  await gp.waitForTimeout(3000);
+
+  const solvedIn = await gp.locator("text=/Solved in/").count();
+  const keepEarly = await gp.locator("text=/KEEP THIS RESULT/").count();
+  check("a guest win shows the reveal first", solvedIn > 0 && keepEarly === 0, `reveal ${solvedIn > 0}, ask up ${keepEarly > 0}`);
+
+  await gp.getByRole("button", { name: "Close result" }).click();
+  await gp.waitForTimeout(600);
+  const keepAfter = await gp.locator("text=/KEEP THIS RESULT/").count();
+  const dialogUp = await gp.getByRole("dialog", { name: "Result" }).isVisible().catch(() => false);
+  check("closing it brings the ask, as a dialog", keepAfter > 0 && dialogUp, `ask ${keepAfter > 0}, in a dialog ${dialogUp}`);
+
+  await gp.getByRole("button", { name: "Close result" }).click();
+  await gp.waitForTimeout(600);
+  const anyDialog = await gp.getByRole("dialog", { name: "Result" }).isVisible().catch(() => false);
+  const askInline = await gp.locator("text=/KEEP THIS RESULT/").count();
+  check("closing that leaves a clean board", !anyDialog && askInline === 0, `dialog ${anyDialog}, inline ask ${askInline > 0}`);
+
+  // And it does not nag: reopening the reveal must not queue the ask again.
+  await gp.getByRole("button", { name: "SEE RESULT" }).click();
+  await gp.waitForTimeout(500);
+  await gp.getByRole("button", { name: "Close result" }).click();
+  await gp.waitForTimeout(600);
+  const nagged = await gp.locator("text=/KEEP THIS RESULT/").count();
+  check("and it only asks once", nagged === 0, nagged ? "asked again on reopen" : "");
+  await guest.close();
 }
 
 await browser.close();
