@@ -5,6 +5,7 @@ import { UsernameGate } from "@/components/UsernameGate";
 import { AvatarPromptGate } from "@/components/AvatarPromptGate";
 import { FollowRecsGate } from "@/components/FollowRecsGate";
 import { ReferralPromptGate } from "@/components/ReferralPromptGate";
+import { ChunkReload } from "@/components/ChunkReload";
 import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
 
@@ -94,6 +95,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </pattern>
           <rect width="100%" height="100%" fill="url(#press-backdrop)" />
         </svg>
+        {/* Outside AuthProvider on purpose: a chunk failure can happen
+            before any provider has mounted, and this has to be listening
+            by then. It renders nothing. */}
+        <ChunkReload />
         <AuthProvider>
           <NavShell>{children}</NavShell>
           <UsernameGate />
