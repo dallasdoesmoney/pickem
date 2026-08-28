@@ -114,6 +114,13 @@ const FMT = {
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+// The footer says "because you have an account", NOT "because you turned
+// this on". Reminders are on by default as of migration 0053, so the
+// second sentence would be false for almost everybody receiving it -
+// and a recipient who is told they opted in when they did not reaches
+// for the spam button rather than the unsubscribe link, which costs the
+// sending domain instead of costing the list one address.
+//
 // A dark band for the brand and a light body for everything else. Not a
 // style choice so much as a deliverability one: a fully dark email is
 // re-coloured unpredictably by Gmail's and Outlook's own dark modes, and
@@ -146,7 +153,7 @@ function html({ name, made, total, week, locksAt, unsubUrl }) {
     </td></tr>
     <tr><td style="padding:20px 26px 26px;">
       <p style="color:#7d8ca6;font-size:12px;line-height:1.6;margin:0;">
-        You are getting this because you turned on pick reminders.
+        You are getting this because you have a Sideline Brew account.
         <a href="${unsubUrl}" style="color:#41506a;">Unsubscribe</a> - it takes one click and nothing else changes.
       </p>
       <p style="color:#9aa8bd;font-size:11px;line-height:1.6;margin:12px 0 0;">${esc(EMAIL_POSTAL_ADDRESS)}</p>
@@ -164,7 +171,7 @@ function text({ name, made, total, week, locksAt, unsubUrl }) {
     "",
     `Finish them: ${SITE}/weekly`,
     "",
-    `You are getting this because you turned on pick reminders.`,
+    `You are getting this because you have a Sideline Brew account.`,
     `Unsubscribe: ${unsubUrl}`,
     "",
     EMAIL_POSTAL_ADDRESS,

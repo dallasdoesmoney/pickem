@@ -287,6 +287,18 @@ export function useSignInModal() {
                   ? "SIGN UP"
                   : "EMAIL ME A LINK"}
           </button>
+
+          {/* Said at the point of signing up, because consent nobody is
+              told about is not much of a disclosure - and because the
+              first reminder landing unannounced is what turns an
+              unsubscribe into a spam report. Named the same thing the
+              account page calls it, so somebody hunting for the switch
+              is looking for the words they were shown here. */}
+          {mode === "signup" && (
+            <p className="mt-3 text-center text-[11px] leading-relaxed text-white/40">
+              You&rsquo;ll get pick reminders by email before each week locks. Turn them off any time in your profile.
+            </p>
+          )}
         </form>
 
         {/* The way back in when the password is gone. There was no way at

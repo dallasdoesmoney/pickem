@@ -9,13 +9,16 @@
 -- security-definer functions that each do exactly one thing, and good
 -- for nothing else. The sender never gets a general-purpose key.
 --
--- WHY OPT-IN AND NOT OPT-OUT. A deadline reminder is marketing mail, not
--- transactional - unlike the password reset Supabase already sends,
--- nobody asked for it by clicking something. So it defaults to OFF, it
--- carries an unsubscribe link that works without signing in, and turning
--- it off is one write that cannot fail. Getting this wrong does not
--- produce a bug report; it produces spam complaints, and a young sending
--- domain does not survive many.
+-- ON BY DEFAULT - but read 0053, which changed that and argues it. This
+-- file originally shipped the reminder off until somebody asked for it.
+--
+-- What has not changed is everything that makes default-on defensible: a
+-- deadline reminder is still marketing mail rather than transactional,
+-- so it carries an unsubscribe link that works without signing in, the
+-- toggle is in the account page, and turning it off is one write that
+-- cannot fail. Getting THAT wrong does not produce a bug report; it
+-- produces spam complaints, and a young sending domain does not survive
+-- many.
 
 -- ---------------------------------------------------------------- prefs
 --
@@ -26,8 +29,10 @@
 -- `select *` away from being public.
 create table if not exists public.email_prefs (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  -- OFF until somebody asks for it. See above.
-  weekly_deadline boolean not null default false,
+  -- ON by default - see 0053, which is where that decision is argued.
+  -- Left as the default here too so a database built from scratch does
+  -- not spend a migration disagreeing with itself.
+  weekly_deadline boolean not null default true,
   -- What the unsubscribe link carries. Random, per-user, and rotatable:
   -- if one ever leaks the worst case is that somebody else silences a
   -- reminder, and re-subscribing is a toggle in the account page.
