@@ -92,6 +92,21 @@ const { SUPABASE_URL, SUPABASE_ANON_KEY, EMAIL_SENDER_TOKEN, RESEND_API_KEY, EMA
   process.env;
 const SITE = (process.env.SITE_URL ?? "https://sidelinebrew.com").replace(/\/$/, "");
 
+// A FROM without a display name shows the raw address in the inbox -
+// "picks@sidelinebrew.com" where the sender's name should be. It still
+// sends, so this warns rather than refusing, but it is worth shouting
+// about: the name beside a subject line is most of what decides whether
+// somebody opens it, and the failure is invisible from anywhere except
+// an actual inbox.
+if (EMAIL_FROM && !/<[^>]+>\s*$/.test(EMAIL_FROM.trim())) {
+  console.warn(
+    `\nWARNING: EMAIL_FROM is a bare address, so the inbox will show "${EMAIL_FROM}"\n` +
+      "where the sender's name belongs. Set the secret to include one:\n" +
+      `  Sideline Brew <${EMAIL_FROM.trim()}>\n`,
+  );
+}
+
+
 async function rpc(fn, body) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: "POST",
