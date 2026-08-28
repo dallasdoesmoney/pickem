@@ -6,12 +6,18 @@
 // what "still going" means, and a lapsed player simply has no badge
 // rather than a stale one. See supabase/migrations/0045_leaderboard_streak.sql.
 //
-// Deliberately silent on day one. A "1" next to everybody who opened the
-// app today is not a streak, it is attendance, and it would put a flame
-// beside every name on the board on any given day - at which point the
-// badge stops distinguishing anyone. It starts at 2, where coming back is
-// the thing being shown.
-const MIN_VISIBLE = 2;
+// Shows from day one. This used to start at 2, on the argument that a "1"
+// beside everybody who opened the app today is attendance rather than a
+// streak. The call went the other way, and the reason is better: the
+// profile page has always shown a 1-day streak, so hiding it on the
+// leaderboard made the same account look like it had no streak in one
+// place and a streak in another. A badge that disagrees with the profile
+// behind it is worse than a badge that is common.
+//
+// Day one is also the day the flame is worth the most - it is the first
+// thing anybody has to lose, and nobody protects a streak they were never
+// shown.
+const MIN_VISIBLE = 1;
 
 // Sized against what sits beside it rather than against the text: on a
 // leaderboard row that is the 26px creator pill, and a flame smaller than
