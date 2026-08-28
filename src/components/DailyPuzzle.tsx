@@ -256,6 +256,37 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     posthog.capture("daily_puzzle_mode", { mode: next });
   }
 
+  // KEEPS THE LAST GUESSES ABOVE THE KEYBOARD.
+  //
+  // A phone with the keyboard up has roughly half a screen left, and the
+  // board grows by a row every guess - so by the fourth the row that just
+  // landed is underneath the keyboard and the only way to read your own
+  // guess is to dismiss it, look, and bring it back.
+  //
+  // visualViewport is the whole trick. window.innerHeight does NOT change
+  // when an iOS keyboard opens - the layout viewport is the same size and
+  // the page is simply covered - so any scroll computed from it puts the
+  // row exactly where it already was, under the keyboard. visualViewport
+  // is the part actually on screen, and it is the only thing that knows
+  // where the keyboard starts.
+  //
+  // scrollBy rather than scrollIntoView, because scrollIntoView aligns to
+  // the layout viewport and has no idea the bottom third is covered.
+  //
+  // Only ever scrolls DOWN. If the newest row is already visible there is
+  // nothing to do, and yanking the page around after a guess that did not
+  // need it is worse than leaving it alone.
+  const showNewestGuess = useCallback(() => {
+    const rows = document.querySelectorAll("[data-guess-row]");
+    const newest = rows[rows.length - 1];
+    if (!newest) return;
+    const vv = window.visualViewport;
+    const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    // 14px so the row clears the keyboard rather than touching it.
+    const delta = newest.getBoundingClientRect().bottom - (bottom - 14);
+    if (delta > 1) window.scrollBy({ top: delta, behavior: "smooth" });
+  }, []);
+
   const endCelebration = useCallback(() => {
     if (celebrateTimer.current !== null) {
       window.clearTimeout(celebrateTimer.current);
@@ -427,6 +458,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       // so it opens immediately too. That is not an oversight: the round
       // is over either way, and making a loss sit through a beat of
       // nothing before being told would read as the page having hung.
+      // Two frames: the first is the one React commits the new row on,
+      // the second is after layout has settled, which is when the row has
+      // a height worth measuring.
+      requestAnimationFrame(() => requestAnimationFrame(showNewestGuess));
+
       if (next.finished) {
         const fresh = next.solved && !state?.solved;
         if (fresh && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -774,8 +810,29 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           </div>
         )}
 
+        {/* STICKY ON A PHONE, and the whole run of guesses is why.
+            By the fifth guess the board is taller than the screen, so the
+            field you type into had scrolled off the top - every guess
+            meant scrolling up to type and back down to read. Pinned, the
+            loop is type, enter, read, type again, and the page does the
+            moving.
+
+            top-[106px] is the site chrome: a 72px header and the 34px
+            back rail pinned under it, both sticky, both measured rather
+            than guessed. Re-measure if either changes height.
+
+            Phone only. A desktop board fits on the screen whole, so
+            there is nothing to pin it against, and a field that detaches
+            from a board you can already see reads as a bug.
+
+            The background is not decoration: without it the guess rows
+            scroll THROUGH the field, which is the one thing a sticky
+            element must never let happen. */}
         {!state.finished && (
-          <div className="mx-auto flex w-full max-w-2xl flex-col px-4 pb-4 pt-1 lg:px-5 lg:pb-5">
+          <div
+            className="sticky top-[106px] z-30 mx-auto flex w-full max-w-2xl flex-col px-4 pb-4 pt-2 md:static md:pt-1 lg:px-5 lg:pb-5"
+            style={{ background: CARD }}
+          >
           {/* No title and no label. The field's own placeholder says
               "Guess the Player", so a heading above it saying the same
               three words was a line of height for nothing.
@@ -930,6 +987,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               <div
                 key={g.espnId}
                 className="puzzle-row flex flex-col gap-2 md:grid md:items-stretch md:gap-2"
+                data-guess-row
                 data-win={g.correct ? "1" : undefined}
                 style={{ gridTemplateColumns: columnTrack }}
               >
