@@ -41,16 +41,18 @@ function Unsubscribe() {
         {state === "done" ? "UNSUBSCRIBED" : state === "working" ? "ONE MOMENT" : "HMM"}
       </h1>
 
-      {state === "working" && <p className="mt-4 text-sm text-white/50">Turning off your pick reminders.</p>}
+      {state === "working" && <p className="mt-4 text-sm text-white/50">Turning off your emails.</p>}
 
       {state === "done" && (
         <>
           <p className="mt-4 text-[15px] leading-relaxed text-white/70">
-            You won&rsquo;t get pick reminders any more. Nothing else about your account has changed &mdash; your picks,
-            your streak and your points are all exactly where you left them.
+            You won&rsquo;t get any more emails from Sideline Brew &mdash; not pick reminders, not game updates.
+            Nothing else about your account has changed: your picks, your streak and your points are all exactly
+            where you left them.
           </p>
           <p className="mt-3 text-sm text-white/45">
-            Changed your mind? Turn them back on any time from your profile.
+            Wanted to keep one of them? Both switches live under Email preferences on your profile, and you can turn
+            either back on any time.
           </p>
         </>
       )}
@@ -67,8 +69,8 @@ function Unsubscribe() {
 
       {state === "error" && (
         <p className="mt-4 text-[15px] leading-relaxed text-white/70">
-          Something went wrong on our end, so nothing changed. Try the link again, or turn reminders off from your
-          profile.
+          Something went wrong on our end, so nothing changed. Try the link again, or turn emails off under Email
+          preferences on your profile.
         </p>
       )}
 
