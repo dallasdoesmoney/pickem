@@ -137,6 +137,28 @@ if (FROM && !/<[^>]+@[^>]+>$/.test(FROM)) {
   );
 }
 
+// WHERE A REPLY GOES, and why this is worth a whole extra secret.
+//
+// Resend flags a noreply@ From address, and it is right: telling somebody
+// they cannot answer you is a way of telling them the only button that
+// does anything is "spam". Gmail also reads replies as a positive
+// engagement signal, so a sender nobody can answer is a sender nobody
+// vouches for.
+//
+// The catch is that a friendly From address is a WORSE no-reply if
+// nothing is listening on it - now the mail invites an answer and eats
+// it. This header is what fixes that without needing a mailbox on the
+// sending domain at all: From stays on sidelinebrew.com, because that is
+// what DKIM signs and SPF authorises, while replies land wherever this
+// points. Optional; unset, nothing is added and the From address has to
+// receive on its own.
+const REPLY_TO = (process.env.EMAIL_REPLY_TO ?? "").trim();
+if (REPLY_TO && !REPLY_TO.includes("@")) {
+  console.error(`EMAIL_REPLY_TO is not an email address: "${REPLY_TO}"`);
+  process.exit(1);
+}
+
+
 
 async function rpc(fn, body) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
@@ -163,6 +185,9 @@ async function send(to, subject, body, unsubUrl) {
       subject,
       html: body.html,
       text: body.text,
+      // Only when set - Resend rejects an empty reply_to rather than
+      // ignoring it.
+      ...(REPLY_TO ? { reply_to: REPLY_TO } : {}),
       // The header form, so a mail client can offer its own unsubscribe
       // button instead of making somebody hunt the footer for the link.
       headers: { "List-Unsubscribe": `<${unsubUrl}>` },
