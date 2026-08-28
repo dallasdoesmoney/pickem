@@ -22,6 +22,7 @@ const ATHLETES = {
   4: "Receiver Four",
   5: "Receiver Five",
   6: "Attributed Six",
+  7: "Zero Seven",
 };
 
 // Attributes the daily puzzle grades on. Keyed by athlete id so a case
@@ -31,6 +32,12 @@ const ATHLETES = {
 // Athlete 6 and nobody else, so the bare-row cases above stay bare.
 const ATTRS = {
   6: { height: 74, weight: 225, age: 41, jersey: "8", college: { name: "California" } },
+  // Jersey 0, legal since 2023 and worn by Jahmyr Gibbs among others.
+  // ESPN sends it as the string "0", which is falsy-adjacent in every
+  // direction: Number("0") is 0, and 0 fails a `> 0` guard and a plain
+  // truthiness test alike. It was dropped by both, so the board showed
+  // one of the most recognisable players in the league a "?".
+  7: { height: 69, weight: 202, age: 24, jersey: "0", college: { name: "Alabama" } },
 };
 
 function stubFetch(payloads) {
@@ -223,6 +230,31 @@ assert.deepEqual(withAttrs[0], {
 // Athlete 2 has none of them, and carries none of the keys.
 assert.deepEqual(withAttrs[1], { espnId: "2", name: "Backup Two" });
 assert.equal("heightIn" in withAttrs[1], false);
+
+// 6b. JERSEY ZERO SURVIVES. The one number that is both a real value and
+//     falsy - so a `> 0` guard on the way in and a `r.jersey ? ...` on
+//     the way out each dropped it independently.
+stubFetch({
+  [CHART]: {
+    items: [{ positions: { QB: { position: { abbreviation: "QB" }, athletes: [
+      { rank: 1, athlete: { $ref: ref(7) } },
+    ] } } }],
+  },
+});
+const zero = await depthChartAt(2026, "T", QB.slots, 1);
+assert.deepEqual(zero[0], {
+  espnId: "7",
+  name: "Zero Seven",
+  heightIn: 69,
+  weightLb: 202,
+  age: 24,
+  jersey: 0,
+  college: "Alabama",
+});
+// And it has to be the NUMBER zero, not a string or a stray undefined -
+// the seed writes it straight into SQL.
+assert.equal(zero[0].jersey, 0);
+assert.equal("jersey" in zero[0], true);
 
 console.log("all depth chart cases pass");
 
