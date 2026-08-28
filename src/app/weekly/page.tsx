@@ -371,8 +371,57 @@ export default function Home() {
   // local storage.
   const { picks, setPick, resetPicks, loaded, lockedGameId, toggleLock } = usePicks(activeWeek, view.streamerMode);
   const { confirm, dialog } = useConfirmDialog();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
+
+  // Arrived from a pick reminder email. The link carries from=reminder
+  // (see scripts/send-weekly-deadline.mjs), and it exists because of one
+  // specific bad moment: email is read on phones, picks live in the
+  // database, and a signed-out arrival would otherwise land on an EMPTY
+  // card seconds after being told they had 13 of 16 picked. The board
+  // still works - nothing is gated - but the first thing on screen has
+  // to explain the gap instead of contradicting the email.
+  //
+  // Read once, from the real URL rather than useSearchParams, so this
+  // does not drag the page into a Suspense boundary for one boolean.
+  // Read straight from the URL rather than through useSearchParams,
+  // which would force this whole page's client tree to render on the
+  // client for one boolean, and in a lazy initialiser rather than an
+  // effect, which would mean setState on mount. The value cannot change
+  // without a navigation, so it is read once and never again.
+  //
+  // The window guard is for the server render, where this is false. That
+  // does NOT desync hydration: authLoading starts true on both sides, so
+  // the banner below renders nothing on the hydration pass whatever the
+  // URL says, and only appears once auth resolves.
+  const [fromReminder] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("from") === "reminder",
+  );
+  const [reminderDismissed, setReminderDismissed] = useState(false);
+
+  // The click itself, as our own event rather than only as a UTM tag.
+  // PostHog attributes the session from the utm_* parameters too, but
+  // those describe a visit; this says which email, which week, and
+  // whether they were already signed in - the difference between
+  // "somebody came" and "the reminder worked".
+  //
+  // Fired only after auth settles, and only once. Capturing on mount
+  // would report signed_in:false for every signed-in visitor, because
+  // the session has not resolved on the first render - a wrong number
+  // that would look exactly like a real one.
+  const reminderLogged = useRef(false);
+  useEffect(() => {
+    if (!fromReminder || authLoading || reminderLogged.current) return;
+    reminderLogged.current = true;
+    posthog.capture("reminder_clicked", {
+      week: activeWeek,
+      kind: new URLSearchParams(window.location.search).get("utm_content") ?? "unknown",
+      signed_in: Boolean(user),
+    });
+  }, [fromReminder, authLoading, user, activeWeek]);
+  // Only once auth has settled, or a signed-in visitor sees the
+  // signed-out banner flash before their session resolves.
+  const showReminderSignIn = fromReminder && !reminderDismissed && !authLoading && !user;
   // Season-wide record (across every published week), for the record
   // pill's first segment - same query the profile page and leaderboard
   // already use, just scoped to whoever's signed in here.
@@ -773,6 +822,39 @@ export default function Home() {
         )}
         {pageTab === "picks" && loaded && (
           <>
+            {/* Straight after a reminder click, signed out. Says where the
+                picks went rather than letting an empty board imply they
+                were lost - the email that sent them here just quoted a
+                number, and this is the only screen that can explain why
+                the board disagrees with it. Dismissible, and it never
+                blocks the board: picking signed out still works, and
+                saving still prompts on its own. */}
+            {showReminderSignIn && (
+              <div className="mb-4 rounded-2xl border border-[#4ade80]/25 bg-[#4ade80]/[0.07] px-4 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
+                <div className="flex-1 min-w-[15rem]">
+                  <p className="text-white text-sm font-semibold">Sign in to see your picks</p>
+                  <p className="text-white/55 text-[13px] leading-snug mt-0.5">
+                    Your card is saved to your account, not this device &mdash; sign in and it comes back exactly as you left it.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => requestSignIn()}
+                    className="rounded-lg bg-[#4ade80] px-4 py-2 text-[13px] font-bold text-[#06210f] hover:bg-[#3ecb78] transition-colors"
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReminderDismissed(true)}
+                    className="rounded-lg px-2.5 py-2 text-[13px] text-white/45 hover:text-white/80 transition-colors"
+                  >
+                    Not now
+                  </button>
+                </div>
+              </div>
+            )}
             {view.showRecordPill ? (
             <WeeklyRecordPill
               seasonCorrect={myRecord?.correct ?? 0}

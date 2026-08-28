@@ -10,7 +10,8 @@
     "sync:players": "node scripts/sync-players.mjs",
     "og": "node scripts/gen-og-cards.mjs",
     "email:preview": "node scripts/preview-emails.mjs",
-    "test:sync": "node scripts/sync-players.test.mjs"
+    "test:sync": "node scripts/sync-players.test.mjs",
+    "email:artifact": "node scripts/build-email-artifact.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -64,6 +64,17 @@ jobs:
           # to run without it rather than shipping a placeholder.
           EMAIL_POSTAL_ADDRESS: ${{ secrets.EMAIL_POSTAL_ADDRESS }}
           SITE_URL: https://sidelinebrew.com
+          # The holdout, off unless a repository VARIABLE says otherwise.
+          # A variable rather than a secret because it is not one, and
+          # because variables can be read back - a holdout percentage you
+          # cannot check is a holdout you will forget is running.
+          #
+          # Set it at Settings > Secrets and variables > Actions >
+          # Variables to (say) 20 to start measuring, and delete it to
+          # stop. Nothing else changes; see the HOLDOUT_PERCENT comment in
+          # the script and supabase/checks/email_impact.sql for what it
+          # buys you.
+          HOLDOUT_PERCENT: ${{ vars.HOLDOUT_PERCENT }}
           # Manual runs default to a dry run, so the first thing anybody
           # does by hand cannot be an accidental send.
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '' }}

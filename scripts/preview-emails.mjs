@@ -12,7 +12,7 @@
 // renders IS what goes out; a preview built from a second copy of the
 // template is a preview of the wrong thing the moment one of them
 // changes.
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -28,8 +28,18 @@ process.env.DRY_RUN = "1";
 
 const { html, text } = await import("./send-weekly-deadline.mjs");
 
-const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", ".email-preview");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const OUT = join(ROOT, ".email-preview");
 mkdirSync(OUT, { recursive: true });
+
+// The real email points its logo at https://sidelinebrew.com/email-logo.png,
+// which is right for a mail client and wrong for a preview: opened from
+// a file:// path before a deploy, that URL is either the OLD logo or a
+// 404, and a preview that quietly shows a stale image is worse than one
+// that shows none. So the preview swaps in the file on disk. Everything
+// else - every colour, every table, every word - is the sender's own.
+const LOGO_DATA = `data:image/png;base64,${readFileSync(join(ROOT, "public", "email-logo.png")).toString("base64")}`;
+const localLogo = (s) => s.replaceAll(`${process.env.SITE_URL ?? "https://sidelinebrew.com"}/email-logo.png`, LOGO_DATA);
 
 // The cases worth looking at, not just the happy one. Nothing picked
 // reads differently from one game left, and the last call says something
@@ -55,7 +65,7 @@ for (const c of CASES) {
     ? `Last call - Week ${view.week} locks within the hour, ${left} ${left === 1 ? "pick" : "picks"} open`
     : `Week ${view.week} locks Sunday - ${left} ${left === 1 ? "pick" : "picks"} still open`;
 
-  writeFileSync(join(OUT, `${c.file}.html`), html(view));
+  writeFileSync(join(OUT, `${c.file}.html`), localLogo(html(view)));
   writeFileSync(join(OUT, `${c.file}.txt`), `Subject: ${subject}\n\n${text(view)}`);
   index.push({ ...c, subject });
   console.log(`${c.file}.html   ${c.label}`);
