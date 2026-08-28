@@ -29,6 +29,32 @@ export const TIER_LABEL_LEADING = 1.18;
 const LETTER_SIZE = 20;
 const NAME_SIZE = 15;
 
+// THE BOARD'S RAIL SCALES; A FIXED SIZE CANNOT.
+//
+// The rail is a square that solves against the viewport, so it is 96px
+// on a desktop and 54 on a small phone - and 20px of type is a fifth of
+// the first and well over a third of the second. Flat sizes were fine
+// while the rail was a fixed 104/136 tab; against a square that moves,
+// the same number reads as a label on a laptop and a shout on a phone.
+//
+// So the two flat sizes become CAPS and the type scales with the rail
+// underneath them. The ratios are just the desktop numbers written as
+// fractions - 20 of 96, 15 of 96 - so a desktop board is unchanged to
+// the pixel and everything narrower comes down in proportion.
+const LETTER_RATIO = LETTER_SIZE / 96;
+const NAME_RATIO = NAME_SIZE / 96;
+// Floors, because proportion stops being the right answer once the type
+// is too small to read at all. Reached on a 320px phone and nowhere else.
+const LETTER_MIN = 12;
+const NAME_MIN = 10;
+
+export const tierRailLabelSize = (label: string, railWidth: number): number => {
+  const letter = isLetterLabel(label);
+  const cap = letter ? LETTER_SIZE : NAME_SIZE;
+  const min = letter ? LETTER_MIN : NAME_MIN;
+  return Math.max(min, Math.min(cap, Math.round(railWidth * (letter ? LETTER_RATIO : NAME_RATIO))));
+};
+
 // A letter is not a name. "S" and "CHAMPIONSHIP" are different KINDS of
 // label, so they get different sizes and that reads as deliberate; two
 // names at two sizes reads as a bug.

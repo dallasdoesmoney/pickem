@@ -6,7 +6,7 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { Tier, MAX_TIER_LABEL, tierLabelFor } from "@/lib/tierList";
 import { SortableTierItem } from "@/components/tierList/TierItemChip";
-import { TIER_LABEL_FONT, pickTierLabelSize } from "@/components/tierList/tierLabel";
+import { TIER_LABEL_FONT, tierRailLabelSize } from "@/components/tierList/tierLabel";
 
 // The label's own ink, reused for the marks that say it can be edited -
 // a dashed inset and a pencil in any other colour would read as a
@@ -198,10 +198,10 @@ export function TierRow({
             // be read, so what you are looking at while you type IS the
             // result. A textarea rather than an input because the rail
             // wraps: an input would scroll a long name sideways instead.
-            className="w-full min-w-0 resize-none overflow-hidden bg-transparent text-center leading-[1.18] uppercase outline-none [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
+            className="w-full min-w-0 resize-none overflow-hidden bg-transparent text-center leading-[1.18] uppercase outline-none [overflow-wrap:anywhere] [hyphens:none]"
             style={{
               ...TIER_LABEL_FONT,
-              fontSize: pickTierLabelSize(tier.label || tierLabelFor(tier, index)),
+              fontSize: tierRailLabelSize(tier.label || tierLabelFor(tier, index), railWidth),
               caretColor: TIER_LABEL_FONT.color,
             }}
           />
@@ -212,8 +212,8 @@ export function TierRow({
             // w-full/min-w-0 are what make wrapping actually bite: as a
             // bare flex item the span sizes to its content instead, so a
             // long name overflowed the rail.
-            className="w-full min-w-0 text-center leading-[1.18] uppercase [overflow-wrap:normal] [word-break:normal] [hyphens:none]"
-            style={{ ...TIER_LABEL_FONT, fontSize: pickTierLabelSize(tierLabelFor(tier, index)) }}
+            className="w-full min-w-0 text-center leading-[1.18] uppercase [overflow-wrap:anywhere] [hyphens:none]"
+            style={{ ...TIER_LABEL_FONT, fontSize: tierRailLabelSize(tierLabelFor(tier, index), railWidth) }}
           >
             {tierLabelFor(tier, index)}
           </span>

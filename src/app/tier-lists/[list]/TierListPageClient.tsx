@@ -77,7 +77,6 @@ import { readBoard, runCascade } from "@/components/tierList/cascade";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
-import { isLetterLabel } from "@/components/tierList/tierLabel";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 // Per list, keyed the same way the board's own state is (see
@@ -315,15 +314,6 @@ export default function TierListPageClient({
 
   // Solve chip size from real available width so two columns of logos
   // never overflow a 320px phone.
-  // Whether this board's rail is holding letters or words. Every default
-  // board is "S A B C D F", so the square is what almost everybody sees;
-  // renaming one tier to something with a word in it is what buys the
-  // wider rail back.
-  const lettersOnly = useMemo(
-    () => state.tiers.every((t, i) => isLetterLabel(tierLabelFor(t, i))),
-    [state.tiers],
-  );
-
   const { chipSize, railWidth } = useMemo(() => {
     // 1056 is the board's max width (max-w-[66rem] on the main below) and
     // is chosen, not rounded to: at an 80px chip and the rail below it
@@ -337,14 +327,21 @@ export default function TierListPageClient({
     // little under its cap to make room, which is the right trade at that
     // size: ten marks at 78px beats nine at 80. Below 1024 the tenth
     // column would come out of the mark instead, so it waits.
+    //
+    // 500, not 400, and that number moved for a reason. Once the rail is
+    // derived from the mark, adding a column shrinks BOTH - so at the old
+    // boundary a 402px phone dropped from five marks at 50px to seven at
+    // 37, a smaller board than a 390px phone got. Backwards. Phones run
+    // 320 to 430; holding all of them at five columns keeps the mark
+    // growing with the screen the way it should.
     const perRow =
-      viewportWidth < 400 ? 5 : viewportWidth < 768 ? 7 : viewportWidth < 1024 ? 8 : 10;
+      viewportWidth < 500 ? 5 : viewportWidth < 768 ? 7 : viewportWidth < 1024 ? 8 : 10;
     const gaps = (perRow - 1) * 6;
     // Desktop earns a bigger mark than the old 58px cap allowed - this
     // page IS the logos, so they should be what you actually look at.
     const clamp = (n: number) => Math.max(34, Math.min(80, n));
 
-    // A LETTER'S RAIL IS A SQUARE. A row is one mark tall - chip + 16 of
+    // THE RAIL IS A SQUARE. A row is one mark tall - chip + 16 of
     // padding - so a rail that wide is exactly square, and six of them
     // down the side read as a colour column rather than as six slabs.
     //
@@ -360,25 +357,20 @@ export default function TierListPageClient({
     // and guessing high wastes width while guessing low overflows the row.
     //
     // Narrowing the rail hands its width back to the marks, so a phone
-    // gets a BIGGER logo out of this, not a smaller one: 36px at 390
-    // against 34, and 38 at 320 where it used to sit on the floor.
-    if (lettersOnly) {
-      const chip = clamp(Math.floor((content - 32 - gaps) / (perRow + 1)));
-      return { chipSize: chip, railWidth: chip + 16 };
-    }
-
-    // A NAME'S RAIL IS NOT. "SUPER BOWL CONTENDER" needs horizontal room
-    // to wrap into two or three readable lines, and a square would set it
-    // four characters to a line. So a board with any real name on it
-    // keeps the wider rail, and the floor under it is what holds the name
-    // size up: a twelve-letter word has to fit on ONE line, and at 86 the
-    // only size that managed was 8px.
-    const base = viewportWidth < 768 ? 104 : 136;
-    const track = content - base - 16;
-    const chip = clamp(Math.floor((track - gaps) / perRow));
-    const rail = Math.max(base, Math.round((chip + 16) * 1.28));
-    return { chipSize: chip, railWidth: rail };
-  }, [viewportWidth, lettersOnly]);
+    // gets a BIGGER logo out of this, not a smaller one: 50px at 390
+    // against 42, and 38 at 320 where it used to sit on the floor.
+    //
+    // EVERY board, not only one whose tiers are single letters. That
+    // exception existed to keep a rail wide enough for "SUPER BOWL
+    // CONTENDER", and it is gone because it answered the wrong question:
+    // it made a board's SHAPE depend on its contents, so the same page
+    // was square for one person and a 1.42:1 tab for the next, with
+    // nothing on screen explaining why. A name is a type problem, and it
+    // is solved in the type - tierRailLabelSize scales with this width
+    // and the rail breaks a word rather than clipping it.
+    const chip = clamp(Math.floor((content - 32 - gaps) / (perRow + 1)));
+    return { chipSize: chip, railWidth: chip + 16 };
+  }, [viewportWidth]);
 
   // ------------------------------------------------------- pyramid mode
   //
