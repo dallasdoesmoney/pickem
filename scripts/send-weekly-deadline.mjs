@@ -1,4 +1,4 @@
-// Emails people whose picks are unfinished, shortly before the week locks.
+// Emails people whose picks are unfinished, a day before the week locks.
 //
 //   DRY_RUN=1 node scripts/send-weekly-deadline.mjs
 //
@@ -26,15 +26,27 @@ import { parseGames } from "./sync-results.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-// How close to kickoff counts as "about to lock". Wide enough that an
-// hourly cron cannot step over it, narrow enough that the mail is
-// genuinely urgent when it lands.
-// Guarded rather than `Number(env ?? 3)`, because GitHub sets an unset
+// How close to kickoff counts as "about to lock".
+//
+// A DAY, not a few hours. The cron runs hourly, the ledger allows one
+// email per person per week, so the send happens on the first run where
+// kickoff is within this many hours - which at 24 puts it roughly a day
+// out, with time to actually go and make the picks.
+//
+// The consequence to keep in mind: this is a heads-up, not a last call.
+// Somebody who reads it a day early and still has not picked an hour
+// before kickoff gets nothing further, because they are already in the
+// ledger for that week. Adding a genuine last call later means a second
+// kind - the ledger is keyed on (user, kind, week), so a second row with
+// a different kind coexists with this one rather than being swallowed by
+// it.
+//
+// Guarded rather than `Number(env ?? 24)`, because GitHub sets an unset
 // workflow input to an EMPTY STRING, not to nothing - and Number("") is
 // 0, which would leave the scheduled job with a zero-hour window and
 // stop it ever sending, silently and forever. Anything absent, empty,
 // non-numeric or not positive falls back to the default.
-const WINDOW_HOURS = Number(process.env.WINDOW_HOURS) > 0 ? Number(process.env.WINDOW_HOURS) : 3;
+const WINDOW_HOURS = Number(process.env.WINDOW_HOURS) > 0 ? Number(process.env.WINDOW_HOURS) : 24;
 
 const DRY_RUN = process.env.DRY_RUN === "1";
 

@@ -24,12 +24,12 @@ on:
         default: true
       window_hours:
         # Exists to make this testable before a real deadline is near.
-        # The scheduled run always uses the script's own 3 hours; only a
+        # The scheduled run always uses the script's own 24 hours; only a
         # manual run can widen it, and only far enough to reach a kickoff
         # that is weeks away. Without this the first genuine end-to-end
         # test would have to wait for a live game week, which is the
         # worst possible time to discover the sender does not work.
-        description: "How many hours before kickoff still counts as close (default 3; try 400 to reach a distant week)"
+        description: "How many hours before kickoff still counts as close (default 24; try 400 to reach a distant week)"
         type: string
         default: ""
 
