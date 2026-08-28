@@ -175,26 +175,82 @@ async function rpc(fn, body) {
   return text ? JSON.parse(text) : null;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// PACE. Resend rate-limits the send endpoint, and this loop is the only
+// thing here that runs hundreds of times: with no gap it fires as fast
+// as the round trips complete, which is several a second and over the
+// limit. The failures that produces are not lost mail - a 429 is thrown,
+// logged, and NOT recorded, so the next run retries it - but a launch
+// that half-arrives and needs a second run is a bad first impression
+// from a domain with no sending history.
+//
+// 550ms is under two a second with room for jitter. 116 people is about
+// a minute; the workflow does not care.
+const SEND_GAP_MS = 550;
+
+// Where the send endpoint lives. Overridable ONLY to a loopback address,
+// which is the whole point of the restriction: it makes the pacing and
+// the 429 retry testable against a fake Resend without opening a way to
+// point real sends at somebody else's server. An override to any other
+// host is refused rather than ignored, so a mistake here cannot quietly
+// become an exfiltration route.
+const RESEND_URL = (() => {
+  const override = (process.env.RESEND_BASE ?? "").trim();
+  if (!override) return "https://api.resend.com/emails";
+  const host = (() => {
+    try {
+      return new URL(override).hostname;
+    } catch {
+      return "";
+    }
+  })();
+  if (host !== "127.0.0.1" && host !== "localhost" && host !== "::1") {
+    console.error(`RESEND_BASE may only point at localhost, got: "${override}"`);
+    process.exit(1);
+  }
+  return `${override.replace(/\/$/, "")}/emails`;
+})();
+
+// How many times to wait out a 429 before giving up on one address.
+// Backs off rather than hammering: a rate limiter answered by an
+// immediate retry is a rate limiter answered by more rate limiting.
+const RATE_LIMIT_RETRIES = 4;
+
 async function send(to, subject, body, unsubUrl) {
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: EMAIL_FROM,
-      to: [to],
-      subject,
-      html: body.html,
-      text: body.text,
-      // Only when set - Resend rejects an empty reply_to rather than
-      // ignoring it.
-      ...(REPLY_TO ? { reply_to: REPLY_TO } : {}),
-      // The header form, so a mail client can offer its own unsubscribe
-      // button instead of making somebody hunt the footer for the link.
-      headers: { "List-Unsubscribe": `<${unsubUrl}>` },
-    }),
+  const payload = JSON.stringify({
+    from: EMAIL_FROM,
+    to: [to],
+    subject,
+    html: body.html,
+    text: body.text,
+    // Only when set - Resend rejects an empty reply_to rather than
+    // ignoring it.
+    ...(REPLY_TO ? { reply_to: REPLY_TO } : {}),
+    // The header form, so a mail client can offer its own unsubscribe
+    // button instead of making somebody hunt the footer for the link.
+    headers: { "List-Unsubscribe": `<${unsubUrl}>` },
   });
-  if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
-  return (await res.json())?.id ?? null;
+
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(RESEND_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+      body: payload,
+    });
+    if (res.ok) return (await res.json())?.id ?? null;
+
+    const body429 = (await res.text()).slice(0, 200);
+    // Only 429 is worth retrying. A 422 is a malformed message and a 403
+    // is a key problem - both would fail identically every time, and
+    // retrying them just delays the error by four backoffs.
+    if (res.status !== 429 || attempt >= RATE_LIMIT_RETRIES) {
+      throw new Error(`${res.status} ${body429}`);
+    }
+    const wait = SEND_GAP_MS * 2 ** (attempt + 1);
+    console.warn(`  rate limited, waiting ${wait}ms then retrying ${to}`);
+    await sleep(wait);
+  }
 }
 
 async function main() {
@@ -237,6 +293,7 @@ async function main() {
   console.log(`${recipients.length} to tell.`);
 
   const sent = [];
+  let failures = 0;
   for (const r of recipients) {
     const unsubUrl = `${SITE}/unsubscribe?t=${r.unsub_token}`;
     // The link carries the same tags as the reminder, so PostHog can
@@ -251,6 +308,10 @@ async function main() {
       console.log(`  [dry run] ${r.email}`);
       continue;
     }
+    // Pace between sends, not after the last one. Placed before the
+    // attempt rather than after it so a failure does not skip the gap
+    // and speed the loop up exactly when it is already in trouble.
+    if (sent.length > 0 || failures > 0) await sleep(SEND_GAP_MS);
     try {
       const messageId = await send(r.email, SUBJECT, { html: html(view), text: text(view) }, unsubUrl);
       sent.push({ user_id: r.user_id, message_id: messageId, picks_at_send: null });
@@ -258,6 +319,7 @@ async function main() {
       // One bad address must not cost everybody else the announcement,
       // and it must not be recorded as sent - an unrecorded failure gets
       // retried on the next run, which is the right way round.
+      failures++;
       console.error(`  FAILED ${r.email}: ${err.message}`);
     }
   }
