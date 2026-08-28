@@ -106,6 +106,18 @@ const CASES = [
     wantOpen: true,
     wantSignedIn: false,
   },
+  {
+    // The case this was all for: the link is opened somewhere else
+    // entirely, and THIS browser - the one holding the picks - has to
+    // notice and let itself in. Nothing tells it; it asks, so the test
+    // has to wait a poll interval to see it happen.
+    name: "confirmed on another device",
+    body: () => ({ ...user(EMAIL), identities: [{ id: USER }] }),
+    confirmed: true,
+    waitMs: 25_000,
+    wantOpen: false,
+    wantSignedIn: true,
+  },
 ];
 
 const browser = await chromium.launch(
@@ -115,6 +127,7 @@ let failures = 0;
 
 for (const testCase of CASES) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  let tokenCalls = 0;
 
   await ctx.route(`${SB}/**`, (route) => {
     const url = route.request().url();
@@ -122,6 +135,16 @@ for (const testCase of CASES) {
       route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
     if (url.includes("/auth/v1/signup")) return json(testCase.body());
+    // Sign-in, which is what the wait on the confirmation screen retries.
+    // Refused exactly the way Supabase refuses it until the address is
+    // proved - so a case that never confirms also proves the retry does
+    // not talk itself into a false success.
+    if (url.includes("/auth/v1/token")) {
+      tokenCalls++;
+      return testCase.confirmed
+        ? json({ ...session(EMAIL), user: user(EMAIL) })
+        : json({ error: "invalid_grant", error_description: "Email not confirmed" }, 400);
+    }
     if (url.includes("/auth/v1/user")) return json(user(EMAIL));
     if (url.includes("/profiles")) {
       const me = {
@@ -153,8 +176,9 @@ for (const testCase of CASES) {
   await page.getByRole("button", { name: "SIGN UP" }).click();
 
   // Long enough for the modal to close on the success path, and for a
-  // session that did arrive to reach the rest of the app.
-  await page.waitForTimeout(2500);
+  // session that did arrive to reach the rest of the app. A case that is
+  // waiting on the confirmation retry needs a poll interval instead.
+  await page.waitForTimeout(testCase.waitMs ?? 2500);
 
   // Narrowed to THIS dialog by its own heading, not just "a dialog is
   // open" - signing in successfully hands straight over to the add-a-
@@ -175,6 +199,10 @@ for (const testCase of CASES) {
     open === testCase.wantOpen &&
     signedIn === testCase.wantSignedIn &&
     (testCase.wantOpen ? says : true) &&
+    // A case that got in by waiting must actually have asked. Landing
+    // here without a single retry would mean it passed for some other
+    // reason and the wait is not being tested at all.
+    (testCase.confirmed ? tokenCalls > 0 : true) &&
     // The duplicate case must not volunteer anything the fresh one does not.
     (testCase.name.includes("already") ? !/already|exists|taken/i.test(text) : true);
 
@@ -183,6 +211,7 @@ for (const testCase of CASES) {
     `${ok ? "ok  " : "FAIL"} ${testCase.name.padEnd(30)} ` +
       `modal:${(open ? "open" : "closed").padEnd(6)} want:${(testCase.wantOpen ? "open" : "closed").padEnd(6)} ` +
       `signedIn:${String(signedIn).padEnd(5)} want:${String(testCase.wantSignedIn).padEnd(5)} ` +
+      `retries:${String(tokenCalls).padEnd(3)} ` +
       `${text.slice(0, 60)}`,
   );
   await ctx.close();

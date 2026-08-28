@@ -45,6 +45,25 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// How long a new account keeps looking for a device with work on it.
+//
+// There has to be an end, because the keys the migration reads are also
+// the keys usePicks writes as a signed-in cache. On a shared computer
+// that means one person's cache is sitting there when the next person
+// makes an account, and the migration cannot tell the two apart. Bounded
+// to the first week, that window is the same one the code always had; left
+// open forever it would slowly become a way to inherit a stranger's picks.
+//
+// A week is well past when somebody signs up on their phone and gets back
+// to the laptop, which is the case this exists for.
+const MIGRATION_GRACE_DAYS = 7;
+
+function olderThanGrace(createdAt: string | null): boolean {
+  if (!createdAt) return true;
+  const age = Date.now() - new Date(createdAt).getTime();
+  return !Number.isFinite(age) || age > MIGRATION_GRACE_DAYS * 24 * 60 * 60 * 1000;
+}
+
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
   if (error) return null;
@@ -131,9 +150,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userId: nextUser.id,
           done: (async () => {
             try {
-              await migrateLocalDataToAccount(nextUser.id);
-              await supabase.from("profiles").update({ migrated_local_picks: true }).eq("id", nextUser.id);
-              setProfile((prev) => (prev ? { ...prev, migrated_local_picks: true } : prev));
+              // Only settled once something was actually brought across,
+              // or once the account is too old for a first device to
+              // still be turning up with work on it.
+              //
+              // The flag used to be set unconditionally, and that is
+              // what cost people their boards: sign up on a phone,
+              // confirm on the phone, and the phone's run finds an empty
+              // localStorage, brings nothing across and marks the
+              // account done - so the laptop holding the actual season
+              // predictor can never hand it over. Nothing looked wrong;
+              // the work was just gone.
+              //
+              // Leaving it false is now cheap and safe. Cheap because a
+              // browser with no guest keys makes no network calls at
+              // all and returns immediately; safe because the migration
+              // is additive and skips any week the account already has.
+              const migrated = await migrateLocalDataToAccount(nextUser.id);
+              const settled = migrated || olderThanGrace(nextProfile.created_at);
+              if (settled) {
+                await supabase.from("profiles").update({ migrated_local_picks: true }).eq("id", nextUser.id);
+                setProfile((prev) => (prev ? { ...prev, migrated_local_picks: true } : prev));
+              }
             } catch (err) {
               // Swallowed, not rethrown. This sits in front of
               // setLoading(false), so an exception escaping here would
