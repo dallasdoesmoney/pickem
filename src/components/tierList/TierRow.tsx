@@ -6,7 +6,7 @@ import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { TierItem, TierTemplate, resolveItem } from "@/data/tierTemplates";
 import { Tier, MAX_TIER_LABEL, tierLabelFor } from "@/lib/tierList";
 import { SortableTierItem } from "@/components/tierList/TierItemChip";
-import { TIER_LABEL_FONT, tierRailLabelSize } from "@/components/tierList/tierLabel";
+import { TIER_LABEL_FONT, isLetterLabel, tierRailLetterSize } from "@/components/tierList/tierLabel";
 
 // The label's own ink, reused for the marks that say it can be edited -
 // a dashed inset and a pencil in any other colour would read as a
@@ -20,6 +20,7 @@ export function TierRow({
   template,
   chipSize,
   railWidth,
+  nameSize,
   first,
   cascading,
   sweeping,
@@ -47,6 +48,10 @@ export function TierRow({
   template: TierTemplate;
   chipSize: number;
   railWidth: number;
+  // Solved by the board from the longest word across every tier, so all
+  // the named rails on one board share a size. mustBreak is set only when
+  // even the floor could not fit that word. See tierRailNameSize.
+  nameSize: { size: number; mustBreak: boolean };
   // Only the separator differs; the first row has the board's edge above it.
   first: boolean;
   // Set for a beat when the board fills, so the rows can light in sequence.
@@ -106,6 +111,14 @@ export function TierRow({
     fit(el);
     if (active) el.focus();
   }, [active, editing]);
+  // A letter is one glyph in a square and takes a share of it; a name has
+  // to fit a word, and that answer was solved for the whole board.
+  const railTypeSize = (label: string) => (isLetterLabel(label) ? tierRailLetterSize(railWidth) : nameSize.size);
+  // Wraps between words and never inside one - that is the whole point of
+  // solving the size against the longest word. `anywhere` is the escape
+  // hatch for the word no readable size can fit, and only then.
+  const railWrap = nameSize.mustBreak ? "[overflow-wrap:anywhere]" : "[overflow-wrap:normal] [word-break:normal]";
+
   const items = itemIds.map((id) => resolveItem(template, id));
   // `armed` is every row while an item is selected for tap-to-place -
   // giving all six a full glow at once would just be noise.
@@ -198,10 +211,10 @@ export function TierRow({
             // be read, so what you are looking at while you type IS the
             // result. A textarea rather than an input because the rail
             // wraps: an input would scroll a long name sideways instead.
-            className="w-full min-w-0 resize-none overflow-hidden bg-transparent text-center leading-[1.18] uppercase outline-none [overflow-wrap:anywhere] [hyphens:none]"
+            className={`w-full min-w-0 resize-none overflow-hidden bg-transparent text-center leading-[1.18] uppercase outline-none [hyphens:none] ${railWrap}`}
             style={{
               ...TIER_LABEL_FONT,
-              fontSize: tierRailLabelSize(tier.label || tierLabelFor(tier, index), railWidth),
+              fontSize: railTypeSize(tier.label || tierLabelFor(tier, index)),
               caretColor: TIER_LABEL_FONT.color,
             }}
           />
@@ -212,8 +225,8 @@ export function TierRow({
             // w-full/min-w-0 are what make wrapping actually bite: as a
             // bare flex item the span sizes to its content instead, so a
             // long name overflowed the rail.
-            className="w-full min-w-0 text-center leading-[1.18] uppercase [overflow-wrap:anywhere] [hyphens:none]"
-            style={{ ...TIER_LABEL_FONT, fontSize: tierRailLabelSize(tierLabelFor(tier, index), railWidth) }}
+            className={`w-full min-w-0 text-center leading-[1.18] uppercase [hyphens:none] ${railWrap}`}
+            style={{ ...TIER_LABEL_FONT, fontSize: railTypeSize(tierLabelFor(tier, index)) }}
           >
             {tierLabelFor(tier, index)}
           </span>

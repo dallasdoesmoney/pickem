@@ -36,10 +36,10 @@ const ROW_GAP = 0;
 // in a feed, where a single device pixel disappears.
 const ROW_LINE = 2;
 
-// The rail's face. The board sets its tier names in the body face at 600
+// The rail's face. The board sets its tier names in the body face at 500
 // - the display face is a poster face and at this size it turned a name
 // into a slab you read letter by letter - so the card does the same.
-const railFont = (px: number) => `600 ${px}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
+const railFont = (px: number) => `500 ${px}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`;
 const ROW_PAD = 10;
 const CHIP_GAP = 6;
 const ROW_RADIUS = 18;
@@ -488,7 +488,7 @@ function drawRow(
   });
 }
 
-// The rail's type, matching the board: the body face at 600 rather than
+// The rail's type, matching the board: the body face at 500 rather than
 // the display face, a few points smaller, and wrapping rather than
 // ellipsising. A name is the whole point of renaming a tier, and on one
 // line "SUPER BOWL CONTENDER" came out as "SUPER BO…" - the card showed

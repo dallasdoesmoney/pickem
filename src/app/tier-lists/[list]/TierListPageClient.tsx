@@ -77,6 +77,7 @@ import { readBoard, runCascade } from "@/components/tierList/cascade";
 import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
+import { tierRailNameSize } from "@/components/tierList/tierLabel";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 // Per list, keyed the same way the board's own state is (see
@@ -371,6 +372,16 @@ export default function TierListPageClient({
     const chip = clamp(Math.floor((content - 32 - gaps) / (perRow + 1)));
     return { chipSize: chip, railWidth: chip + 16 };
   }, [viewportWidth]);
+
+  // One size for every named rail on the board, solved from the longest
+  // word any of them contains. Here rather than in the row because a row
+  // can only see its own name, and a board where each rail sized itself
+  // would set three names at three sizes.
+  const railNameSize = useMemo(
+    () => tierRailNameSize(state.tiers.map((t, i) => tierLabelFor(t, i)), railWidth),
+    [state.tiers, railWidth],
+  );
+
 
   // ------------------------------------------------------- pyramid mode
   //
@@ -1197,6 +1208,7 @@ export default function TierListPageClient({
               template={template}
               chipSize={chipSize}
               railWidth={railWidth}
+              nameSize={railNameSize}
               first={i === 0}
               cascading={cascading}
               sweeping={sweeping}
