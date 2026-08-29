@@ -1074,19 +1074,27 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               </div>
             </div>
 
-            {header}
+            {/* The two modes, directly under the strip and above the title.
+                The strip says WHICH board this is, so the control that
+                changes which board this is belongs against it - and the
+                pair now reads as one thing: a state, and the switch for
+                it. Below the title it was separated from the strip by the
+                wordmark, which is the one element on the card that never
+                changes.
 
-            {/* The two modes, on the card and above the field, because the
-                first thing to settle is which game you are playing. Inside
-                the card rather than floating above it: it belongs to the
-                board, and a control on the page would read as navigation.
+                Inside the card rather than floating above it: it belongs
+                to the board, and a control on the page would read as
+                navigation.
 
                 Both are always open. Locking unlimited behind the daily
                 protects the streak, but it does it by telling a first-time
                 visitor who wants to keep playing to come back tomorrow, and
                 the visitor who wants a second round is the one worth
                 keeping. */}
-            <div className="flex justify-center px-4 pb-3 pt-1">
+            {/* No bottom padding: the header brings its own pt-3, so the
+                gap under the toggle matches the one above it rather than
+                doubling. */}
+            <div className="flex justify-center px-4 pt-3">
               <div className="flex gap-1 rounded-full p-1" style={{ background: FIELD, border: CARD_EDGE }}>
                 {(
                   [
@@ -1114,6 +1122,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               </div>
             </div>
 
+            {header}
           </div>
         </div>
 
