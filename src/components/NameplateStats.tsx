@@ -85,18 +85,22 @@ export function NameplateStatsPanel({
           value={pct(stats.winRate)}
           sub={nothingYet ? undefined : `${stats.won} of ${stats.played}`}
         />
+        {/* BOARDS, not days. A streak counts games you played and
+            solved, so missing a Tuesday does not cost you one - see
+            0060_puzzle_epoch.sql. Saying "days" here would be a promise
+            the number does not keep. */}
         <Tile
           label="Streak"
           value={String(stats.currentStreak)}
-          // Only once it is running. "0 days" is a sentence about
+          // Only once it is running. "0 in a row" is a sentence about
           // nothing, and it is the tile somebody with a broken streak is
           // already looking at.
-          sub={stats.currentStreak > 0 ? (stats.currentStreak === 1 ? "day" : "days") : undefined}
+          sub={stats.currentStreak > 0 ? "in a row" : undefined}
         />
         <Tile
           label="Best streak"
           value={String(stats.maxStreak)}
-          sub={stats.maxStreak > 0 ? (stats.maxStreak === 1 ? "day" : "days") : undefined}
+          sub={stats.maxStreak > 0 ? "in a row" : undefined}
         />
         <Tile label="Avg guesses" value={avg(stats.avgGuesses)} sub={nothingYet ? undefined : "when solved"} />
       </div>
