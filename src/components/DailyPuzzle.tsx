@@ -278,7 +278,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // The 80px floor separates a keyboard from browser chrome sliding away
   // on scroll, which shrinks the visual viewport too and is not
   // something to react to.
-  const [kb, setKb] = useState({ inset: 0, top: 0 });
+  const [kb, setKb] = useState({ inset: 0, top: 0, visible: 0 });
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
     const vv = window.visualViewport;
@@ -297,7 +297,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     }
     const measure = () => {
       const covered = window.innerHeight - vv.height - vv.offsetTop;
-      setKb(covered > 80 ? { inset: Math.round(covered), top: Math.round(vv.offsetTop) } : { inset: 0, top: 0 });
+      setKb(
+        covered > 80
+          ? { inset: Math.round(covered), top: Math.round(vv.offsetTop), visible: Math.round(vv.height) }
+          : { inset: 0, top: 0, visible: 0 },
+      );
     };
     vv.addEventListener("resize", measure);
     vv.addEventListener("scroll", measure);
@@ -313,19 +317,24 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // floating on the visible strip, for exactly as long as the keyboard
   // is up on a phone. Anchored to the strip rather than to the document,
   // it cannot scroll away however far down the board you are.
-  const floatingBar = narrow && kb.inset > 0 && !state?.finished;
-  // Measured rather than guessed, because the spacer that replaces the
-  // bar in the flow has to be exactly its height or the board shifts as
-  // the keyboard opens.
+  // THE PLAY SHELL. A phone, keyboard up, round in progress - and for
+  // exactly that, the card stops being part of the page and becomes a
+  // panel the size of what you can actually see.
+  //
+  // This replaces three attempts at scrolling the DOCUMENT to the right
+  // place, each of which iOS defeated in a different way: sticky pinned
+  // to a layout viewport that had slid off screen, the page clamping
+  // before the newest row arrived, and rows landing under Safari's own
+  // bottom chrome, which visualViewport does not account for.
+  //
+  // None of that can happen to a box whose height I set. The bar is the
+  // top of it, the guesses scroll INSIDE it, and "show the newest" stops
+  // being viewport arithmetic and becomes scrollTop = scrollHeight,
+  // which cannot be wrong.
+  const playShell = narrow && kb.inset > 0 && !state?.finished;
   const barRef = useRef<HTMLDivElement>(null);
-  const [barHeight, setBarHeight] = useState(0);
-  useEffect(() => {
-    const el = barRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setBarHeight(el.offsetHeight));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [floatingBar]);
+  // The box the guesses scroll inside once the shell is up.
+  const boardScrollRef = useRef<HTMLDivElement>(null);
 
   // KEEPS THE LAST GUESSES ABOVE THE KEYBOARD.
   //
@@ -348,6 +357,28 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // nothing to do, and yanking the page around after a guess that did not
   // need it is worse than leaving it alone.
   const showNewestGuess = useCallback(() => {
+    // INSIDE THE BOX when the shell is up. The newest row is the last
+    // child, so the bottom of the scroll IS the newest guess - no
+    // viewport arithmetic, nothing iOS can report differently, and it
+    // cannot run out of page because the page is not what is moving.
+    const box = boardScrollRef.current;
+    if (box && box.scrollHeight > box.clientHeight) {
+      // Aligned to the SECOND-newest row, not to the bottom. Scrolling
+      // to the bottom shows the newest row and clips the top off the one
+      // before it - and the pair is what you read to pick the next
+      // guess. Putting the older of the two at the top of the box puts
+      // both of them entirely on screen.
+      //
+      // Clamped by the browser, so when only one row fits this lands at
+      // the bottom anyway, which is the right answer then.
+      const inBox = box.querySelectorAll("[data-guess-row]");
+      const anchor = inBox[inBox.length - 2] ?? inBox[inBox.length - 1];
+      const top = anchor
+        ? anchor.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 6
+        : box.scrollHeight;
+      box.scrollTo({ top, behavior: "smooth" });
+      return;
+    }
     const rows = document.querySelectorAll("[data-guess-row]");
     const newest = rows[rows.length - 1];
     if (!newest) return;
@@ -804,8 +835,36 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           which made a single activity look like three unrelated widgets
           stacked up. Inside, the sections are divided by a hairline
           rather than by air - the same rule the legend already used. */}
-      <div style={{ background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }}>
-        {header}
+      <div
+        data-play-shell={playShell ? "1" : undefined}
+        style={
+          playShell
+            ? {
+                // Sized and placed by the visible strip, so nothing can
+                // end up under the keyboard OR under Safari's own bottom
+                // chrome - both of which live outside this box by
+                // construction rather than by arithmetic.
+                position: "fixed",
+                top: kb.top,
+                left: 0,
+                right: 0,
+                height: `${kb.visible}px`,
+                display: "flex",
+                flexDirection: "column",
+                background: CARD,
+                // Above the site header (50); below the result dialog
+                // (70) and the sign-in modal (80), which interrupt play.
+                zIndex: 55,
+              }
+            : { background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }
+        }
+      >
+        {/* Hidden while the shell is up. The title, the mode toggle and
+            the round line were taking a third of the visible strip and
+            pushing the guesses off the bottom - and none of them is
+            something you read while typing a name. They come back the
+            moment the keyboard does down. */}
+        {!playShell && header}
 
         {/* The two modes, on the card and above the field, because the
             first thing to settle is which game you are playing. Inside
@@ -817,6 +876,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             visitor who wants to keep playing to come back tomorrow, and
             the visitor who wants a second round is the one worth
             keeping. */}
+        {!playShell && (
         <div className="flex justify-center px-4 pb-3 pt-1">
           <div className="flex gap-1 rounded-full p-1" style={{ background: FIELD, border: CARD_EDGE }}>
             {(
@@ -843,12 +903,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             ))}
           </div>
         </div>
+        )}
 
         {/* What round you are on, and the one line that says why this
             board does not count. Said here rather than only at the end,
             because somebody who lands mid-round should not have to solve
             it to find out it was practice. */}
-        {mode === "unlimited" && practice && (
+        {mode === "unlimited" && practice && !playShell && (
           <p className="px-4 pb-2 text-center text-[11px]" style={{ color: MUTED }}>
             Round {practice.round} &middot; no points, no streak &mdash; play as many as you like
           </p>
@@ -927,48 +988,15 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             The background is not decoration: without it the guess rows
             scroll THROUGH the field, which is the one thing a sticky
             element must never let happen. */}
-        {/* A spacer, only while the bar is floating. Taking the field out
-            of the flow would collapse the card by its height and jump the
-            whole board up under it. */}
-        {floatingBar && !state.finished && <div style={{ height: barHeight }} />}
-
         {!state.finished && (
           <div
             ref={barRef}
             className={
-              floatingBar
-                ? "mx-auto flex w-full max-w-2xl flex-col px-4 pb-3 pt-3"
+              playShell
+                ? "mx-auto flex w-full max-w-2xl shrink-0 flex-col px-4 pb-3 pt-3"
                 : "sticky top-[106px] z-30 mx-auto flex w-full max-w-2xl flex-col px-4 pb-4 pt-2 md:static md:pt-1 lg:px-5 lg:pb-5"
             }
-            style={
-              floatingBar
-                ? {
-                    // FIXED, not sticky, and offset by where the visible
-                    // strip starts. Sticky pins to the layout viewport,
-                    // which iOS slides out from under the screen when the
-                    // keyboard opens - this pins to what you can actually
-                    // see. Full width, because for as long as the
-                    // keyboard is up this IS the header: the site chrome
-                    // above it has gone the same way sticky would.
-                    position: "fixed",
-                    top: kb.top,
-                    left: 0,
-                    right: 0,
-                    // ABOVE the site header, which is z-50. For as long
-                    // as the keyboard is up this bar IS the header - the
-                    // real one is sticky, so it is pinned to a layout
-                    // viewport iOS has slid out from under the screen,
-                    // and leaving this underneath it meant the site logo
-                    // swallowed taps meant for the suggestion list.
-                    // Still under the result dialog (70) and the sign-in
-                    // modal (80), both of which interrupt play.
-                    zIndex: 55,
-                    background: CARD,
-                    borderBottom: CARD_EDGE,
-                    boxShadow: "0 10px 24px -14px #000",
-                  }
-                : { background: CARD }
-            }
+            style={{ background: CARD, borderBottom: playShell ? CARD_EDGE : undefined }}
           >
           {/* No title and no label. The field's own placeholder says
               "Guess the Player", so a heading above it saying the same
@@ -1117,9 +1145,10 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
 
       {state.guesses.length > 0 && (
         <div
-          className="puzzle-board px-2 py-3 md:p-[18px] lg:p-6"
+          ref={boardScrollRef}
+          className={`puzzle-board px-2 py-3 md:p-[18px] lg:p-6 ${playShell ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : ""}`}
           data-celebrate={celebrating ? "1" : undefined}
-          style={{ borderTop: CARD_EDGE }}
+          style={{ borderTop: playShell ? undefined : CARD_EDGE }}
         >
           {/* One header row on desktop, where the columns line up under it.
               On a phone the board stacks into a card per guess and every

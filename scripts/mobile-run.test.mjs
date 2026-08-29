@@ -171,6 +171,17 @@ for (let i = 0; i < seeds.length; i++) {
     const box = (el) => (el ? el.getBoundingClientRect() : null);
     const bar = input ? input.closest("div[class*='flex-col']") : null;
     const barBox = box(bar);
+    // The shell, when it is up: everything must be inside THIS, not
+    // merely inside the window. Safari's own bottom chrome lives outside
+    // the visual viewport too, which is why "in the window" was passing
+    // on a phone where the row was plainly hidden.
+    const shell = document.querySelector("[data-play-shell]");
+    const shellBox = box(shell);
+    // The scrolling box the rows live in once the shell is up. A row
+    // clipped by this is a row you cannot read, however "in the window"
+    // it technically is.
+    const scrollBox = document.querySelector(".puzzle-board");
+    const boxBox = box(scrollBox);
     const ir = box(input);
     const nr = box(newest);
     const pr = box(prev);
@@ -180,8 +191,10 @@ for (let i = 0; i < seeds.length; i++) {
       // "On screen" means inside the visual viewport, not merely in the DOM.
       inputVisible: !!ir && ir.top >= 0 && ir.bottom <= vh,
       inputTop: ir ? Math.round(ir.top) : null,
-      newestVisible: !!nr && nr.top >= 0 && nr.bottom <= vh,
-      prevVisible: !!pr && pr.bottom <= vh && pr.bottom > 0,
+      shellUp: !!shell,
+      shellHeight: shellBox ? Math.round(shellBox.height) : null,
+      newestVisible: !!nr && (shellBox ? nr.top >= shellBox.top - 1 && nr.bottom <= shellBox.bottom + 1 : nr.top >= 0 && nr.bottom <= vh),
+      prevVisible: !!pr && (shellBox ? pr.bottom <= shellBox.bottom + 1 && pr.top >= shellBox.top - 1 : pr.bottom <= vh && pr.bottom > 0),
       vh: Math.round(vh),
       blurs: window.__blurs ?? 0,
       // How far below the pinned field the newest row ends up. Big means
@@ -191,7 +204,7 @@ for (let i = 0; i < seeds.length; i++) {
       belowTarget: nr ? Math.round(nr.bottom - (vh - 16)) : 0,
       // Is the older of the two visible rows tucked up behind the bar?
       // Reported from a phone, and the reason the scroll is capped.
-      prevBehindBar: pr && barBox ? Math.round(barBox.bottom - pr.top) : 0,
+      prevBehindBar: pr ? Math.round((boxBox ? boxBox.top : barBox ? barBox.bottom : 0) - pr.top) : 0,
     };
   });
   report.push(m);
@@ -225,6 +238,11 @@ check(
   report.slice(1).every((m) => m.prevVisible),
   `${report.slice(1).filter((m) => m.prevVisible).length}/${report.length - 1}`,
 );
+check(
+  "the play shell matches the visible strip",
+  report.every((m) => m.shellUp && m.shellHeight === VISIBLE_WITH_KEYBOARD),
+  `heights: ${[...new Set(report.map((m) => m.shellHeight))].join(", ")} (strip is ${VISIBLE_WITH_KEYBOARD})`,
+);
 check("six guesses landed", report[report.length - 1].rows === 6, `${report[report.length - 1].rows} rows`);
 
 // THE ONE THAT WAS FAILING ON A REAL PHONE. Scrolling correctly is no
@@ -242,7 +260,7 @@ check("six guesses landed", report[report.length - 1].rows === 6, `${report[repo
 // guesses, which are the ones with the least page left beneath them.
 const shortfall = report.map((m) => m.belowTarget);
 check(
-  "the older of the two is not hidden behind the bar",
+  "the older of the two is not clipped at the top",
   report.slice(1).every((m) => m.prevBehindBar <= 8),
   `overlap px: ${report.slice(1).map((m) => m.prevBehindBar).join(", ")}`,
 );
