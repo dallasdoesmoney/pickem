@@ -169,6 +169,8 @@ for (let i = 0; i < seeds.length; i++) {
     const newest = rowEls[rowEls.length - 1];
     const prev = rowEls[rowEls.length - 2];
     const box = (el) => (el ? el.getBoundingClientRect() : null);
+    const bar = input ? input.closest("div[class*='flex-col']") : null;
+    const barBox = box(bar);
     const ir = box(input);
     const nr = box(newest);
     const pr = box(prev);
@@ -187,6 +189,9 @@ for (let i = 0; i < seeds.length; i++) {
       // How far the newest row sits BELOW where the scroll aimed it.
       // Zero means it landed; a big number means the page ran out.
       belowTarget: nr ? Math.round(nr.bottom - (vh - 16)) : 0,
+      // Is the older of the two visible rows tucked up behind the bar?
+      // Reported from a phone, and the reason the scroll is capped.
+      prevBehindBar: pr && barBox ? Math.round(barBox.bottom - pr.top) : 0,
     };
   });
   report.push(m);
@@ -236,6 +241,11 @@ check("six guesses landed", report[report.length - 1].rows === 6, `${report[repo
 // that line is the thing to check, and it has to hold on the LAST
 // guesses, which are the ones with the least page left beneath them.
 const shortfall = report.map((m) => m.belowTarget);
+check(
+  "the older of the two is not hidden behind the bar",
+  report.slice(1).every((m) => m.prevBehindBar <= 8),
+  `overlap px: ${report.slice(1).map((m) => m.prevBehindBar).join(", ")}`,
+);
 check(
   "the scroll reaches its target, not the end of the page",
   report.every((m) => m.belowTarget <= 24),

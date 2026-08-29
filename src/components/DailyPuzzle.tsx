@@ -256,38 +256,76 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     posthog.capture("daily_puzzle_mode", { mode: next });
   }
 
-  // HOW MUCH OF THE WINDOW THE KEYBOARD IS COVERING, live.
+  // WHERE THE VISIBLE STRIP ACTUALLY IS, live.
   //
-  // Needed because the page has to be able to SCROLL far enough. The
-  // scroll below wants to put the newest row just under the pinned
-  // field, and near the end of a board there is simply no document left
-  // underneath to scroll against - the browser scrolls as far as it can
-  // and stops short, which reads exactly like the scroll being too
-  // small. It was not too small; it ran out of page.
+  // Two numbers, and everything mobile here depends on both.
   //
-  // So the document grows by exactly what the keyboard took, and the
-  // room the keyboard removed from the bottom of the screen is given
-  // back to the bottom of the page. Zero when no keyboard is up, so a
-  // desktop and a phone at rest are untouched.
+  //   inset   how much of the window the keyboard covers. The page is
+  //           padded by it so there is always enough document left to
+  //           scroll against - without that the browser clamps the
+  //           scroll near the end of a board and the newest row stops
+  //           short, behind the keyboard.
   //
-  // The 80px floor is what separates a keyboard from browser chrome
-  // sliding away on scroll, which also shrinks the visual viewport and
-  // is not something to pad for.
-  const [keyboardInset, setKeyboardInset] = useState(0);
+  //   top     where the visible strip STARTS relative to the page. This
+  //           is the one that makes a sticky header vanish on iOS.
+  //           position: sticky pins to the LAYOUT viewport, and iOS
+  //           slides the visual viewport down over the layout viewport
+  //           when the keyboard opens - so a bar stuck 106px from the
+  //           top of the layout viewport ends up above the screen
+  //           entirely. It is not failing to stick; it is sticking
+  //           somewhere you cannot see.
+  //
+  // The 80px floor separates a keyboard from browser chrome sliding away
+  // on scroll, which shrinks the visual viewport too and is not
+  // something to react to.
+  const [kb, setKb] = useState({ inset: 0, top: 0 });
+  const [narrow, setNarrow] = useState(false);
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const onNarrow = () => setNarrow(mq.matches);
+    mq.addEventListener("change", onNarrow);
+    // Out of the effect body, so this is not a synchronous setState in
+    // an effect - it is the first tick of the subscription.
+    const first = requestAnimationFrame(onNarrow);
+
+    if (!vv) {
+      return () => {
+        mq.removeEventListener("change", onNarrow);
+        cancelAnimationFrame(first);
+      };
+    }
     const measure = () => {
       const covered = window.innerHeight - vv.height - vv.offsetTop;
-      setKeyboardInset(covered > 80 ? Math.round(covered) : 0);
+      setKb(covered > 80 ? { inset: Math.round(covered), top: Math.round(vv.offsetTop) } : { inset: 0, top: 0 });
     };
     vv.addEventListener("resize", measure);
     vv.addEventListener("scroll", measure);
     return () => {
+      mq.removeEventListener("change", onNarrow);
+      cancelAnimationFrame(first);
       vv.removeEventListener("resize", measure);
       vv.removeEventListener("scroll", measure);
     };
   }, []);
+
+  // The guess field stops being part of the page and becomes a bar
+  // floating on the visible strip, for exactly as long as the keyboard
+  // is up on a phone. Anchored to the strip rather than to the document,
+  // it cannot scroll away however far down the board you are.
+  const floatingBar = narrow && kb.inset > 0 && !state?.finished;
+  // Measured rather than guessed, because the spacer that replaces the
+  // bar in the flow has to be exactly its height or the board shifts as
+  // the keyboard opens.
+  const barRef = useRef<HTMLDivElement>(null);
+  const [barHeight, setBarHeight] = useState(0);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBarHeight(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [floatingBar]);
 
   // KEEPS THE LAST GUESSES ABOVE THE KEYBOARD.
   //
@@ -313,10 +351,32 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     const rows = document.querySelectorAll("[data-guess-row]");
     const newest = rows[rows.length - 1];
     if (!newest) return;
+    // The LAST TWO, not just the newest. Aiming only at the newest row
+    // put it against the keyboard and left the one before it tucked up
+    // behind the bar - and the pair is what you read to decide the next
+    // guess. So the target is the top of the previous row, clearing the
+    // bar, and the newest follows it down.
+    const prev = rows.length > 1 ? rows[rows.length - 2] : null;
     const vv = window.visualViewport;
+    // The bottom of what is ON SCREEN, in page coordinates - offsetTop is
+    // where the strip starts, and getBoundingClientRect is measured from
+    // the same origin.
     const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
     // 16px so the row clears the keyboard rather than touching it.
-    const delta = newest.getBoundingClientRect().bottom - (bottom - 16);
+    let delta = newest.getBoundingClientRect().bottom - (bottom - 16);
+
+    // But never so far that the previous row goes up behind the bar. The
+    // bar's own bottom edge is the ceiling, whether it is floating on the
+    // strip or stuck in the page - barRef is the same element either way.
+    if (prev && barRef.current) {
+      const ceiling = barRef.current.getBoundingClientRect().bottom + 8;
+      const room = prev.getBoundingClientRect().top - ceiling;
+      // room is how far the pair CAN move up before the older of the two
+      // is lost. Scroll the smaller of what is wanted and what is
+      // affordable, and never a negative.
+      delta = Math.max(0, Math.min(delta, room));
+    }
+
     if (delta > 1) window.scrollBy({ top: delta, behavior: "smooth" });
   }, []);
 
@@ -678,7 +738,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       // The scroll room the keyboard took. See keyboardInset above: this
       // is what lets the last guesses reach the top of the screen instead
       // of the page running out underneath them.
-      style={{ fontFamily: "var(--font-game)", paddingBottom: keyboardInset || undefined }}
+      style={{ fontFamily: "var(--font-game)", paddingBottom: kb.inset || undefined }}
     >
       {/* Finished: the result comes FIRST, above the title as well as the
           board. It is the thing somebody came back for and the only part
@@ -867,10 +927,48 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             The background is not decoration: without it the guess rows
             scroll THROUGH the field, which is the one thing a sticky
             element must never let happen. */}
+        {/* A spacer, only while the bar is floating. Taking the field out
+            of the flow would collapse the card by its height and jump the
+            whole board up under it. */}
+        {floatingBar && !state.finished && <div style={{ height: barHeight }} />}
+
         {!state.finished && (
           <div
-            className="sticky top-[106px] z-30 mx-auto flex w-full max-w-2xl flex-col px-4 pb-4 pt-2 md:static md:pt-1 lg:px-5 lg:pb-5"
-            style={{ background: CARD }}
+            ref={barRef}
+            className={
+              floatingBar
+                ? "mx-auto flex w-full max-w-2xl flex-col px-4 pb-3 pt-3"
+                : "sticky top-[106px] z-30 mx-auto flex w-full max-w-2xl flex-col px-4 pb-4 pt-2 md:static md:pt-1 lg:px-5 lg:pb-5"
+            }
+            style={
+              floatingBar
+                ? {
+                    // FIXED, not sticky, and offset by where the visible
+                    // strip starts. Sticky pins to the layout viewport,
+                    // which iOS slides out from under the screen when the
+                    // keyboard opens - this pins to what you can actually
+                    // see. Full width, because for as long as the
+                    // keyboard is up this IS the header: the site chrome
+                    // above it has gone the same way sticky would.
+                    position: "fixed",
+                    top: kb.top,
+                    left: 0,
+                    right: 0,
+                    // ABOVE the site header, which is z-50. For as long
+                    // as the keyboard is up this bar IS the header - the
+                    // real one is sticky, so it is pinned to a layout
+                    // viewport iOS has slid out from under the screen,
+                    // and leaving this underneath it meant the site logo
+                    // swallowed taps meant for the suggestion list.
+                    // Still under the result dialog (70) and the sign-in
+                    // modal (80), both of which interrupt play.
+                    zIndex: 55,
+                    background: CARD,
+                    borderBottom: CARD_EDGE,
+                    boxShadow: "0 10px 24px -14px #000",
+                  }
+                : { background: CARD }
+            }
           >
           {/* No title and no label. The field's own placeholder says
               "Guess the Player", so a heading above it saying the same
