@@ -83,8 +83,8 @@ const browser = await chromium.launch(
 // A FRESH CONTEXT PER RUN, not a fresh tab. A guest's guesses live in
 // localStorage, so a second tab in the same context opens onto a board
 // that is already six deep and finished - every name greyed out.
-const freshContext = async () => {
-  const ctx = await browser.newContext({ viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const freshContext = async (viewport = PHONE) => {
+  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await ctx.route("**://posthog.invalid/**", (r) => r.abort());
   await ctx.route("**://*.posthog.com/**", (r) => r.abort());
   await ctx.route(`${SB}/**`, (route) => {
@@ -322,8 +322,17 @@ await page.screenshot({ path: "/tmp/claude-0/-home-user-pickem/c8c47499-bc03-5b0
 // is where the page had scrolled to at the instant the panel appeared:
 // if it is still sitting at the pre-scroll position, the switch is what
 // moved the bar, and that is the jump.
+// AND ON A BIG PHONE, because the second half of the jump only happens
+// there. Going fixed takes the card out of the document; the document
+// gets shorter by the card's height; and if the page has scrolled past
+// what is left, the browser clamps it back. Whether it has depends on
+// how much page there is under the card, which is set by the LAYOUT
+// viewport - so the small phone above has room to spare and never
+// clamps, while the 440x956 in the recording gets yanked.
+const BIG_PHONE = { width: 440, height: 956 };
+const BIG_VISIBLE = 560;
 const LAZY_MS = 120;
-const jumpCtx = await freshContext();
+const jumpCtx = await freshContext(BIG_PHONE);
 const jump = await jumpCtx.newPage();
 await jump.addInitScript((visible) => {
   Object.defineProperty(window.visualViewport, "height", { get: () => visible, configurable: true });
@@ -331,53 +340,77 @@ await jump.addInitScript((visible) => {
   window.addEventListener("load", () => {
     setTimeout(() => window.visualViewport.dispatchEvent(new Event("resize")), 60);
   });
-}, VISIBLE_WITH_KEYBOARD);
+}, BIG_VISIBLE);
 await jump.addInitScript((lazy) => {
   const real = window.scrollBy.bind(window);
   window.scrollBy = (opts) => {
     if (opts && opts.behavior === "smooth") setTimeout(() => real(opts), lazy);
     else real(opts);
   };
+  // Latched the moment the panel appears, and again a beat later. Both
+  // halves of the jump are visible in these three readings: the scroll
+  // not having happened yet, and the document losing the card's height
+  // out from under a scroll position that then has nowhere to be.
+  const snap = () => ({
+    y: Math.round(window.scrollY),
+    doc: document.documentElement.scrollHeight,
+    max: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
+  });
+  // Sampled every frame, not on the mutation. "Before" has to be the
+  // frame immediately preceding the switch - read it any earlier and it
+  // describes a page that had not been scrolled or guessed into yet.
+  window.__handoff = null;
+  window.addEventListener("DOMContentLoaded", () => {
+    let before = snap();
+    let up = false;
+    const tick = () => {
+      const now = !!document.querySelector("[data-play-shell]");
+      if (!up && now) {
+        const at = snap();
+        setTimeout(() => {
+          // preGuess is where the page stood when the name was tapped -
+          // the hand-off scroll has not started yet there. before is the
+          // frame immediately preceding the switch, when it has
+          // finished. One check needs each.
+          window.__handoff = { preGuess: window.__preGuessY ?? 0, before, at, after: snap() };
+        }, 700);
+        up = true;
+        return;
+      }
+      if (!now) before = snap();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
 }, LAZY_MS);
 await jump.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
 await jump.waitForSelector("main input", { timeout: 20000 });
 await jump.waitForTimeout(900);
 await jump.locator("main input").first().click();
-// Guess until the panel is one guess away, then watch that guess.
-for (let i = 0; i < firstShell; i++) {
-  await jump.keyboard.type(seeds[i]);
+// Guess until the panel takes over. Where that happens depends on the
+// screen, so it is found rather than assumed.
+for (const seed of seeds) {
+  if (await jump.evaluate(() => !!window.__handoff)) break;
+  await jump.keyboard.type(seed);
   await jump.waitForTimeout(340);
+  await jump.evaluate(() => {
+    window.__preGuessY = Math.round(window.scrollY);
+  });
   await jump.locator('[role="option"]').first().click();
-  await jump.waitForTimeout(1100);
+  await jump.waitForTimeout(1300);
 }
-await jump.keyboard.type(seeds[firstShell]);
-await jump.waitForTimeout(340);
-const handoff = jump.evaluate(
-  () =>
-    new Promise((done) => {
-      const before = Math.round(window.scrollY);
-      let at = null;
-      const obs = new MutationObserver(() => {
-        if (at === null && document.querySelector("[data-play-shell]")) {
-          at = Math.round(window.scrollY);
-          obs.disconnect();
-        }
-      });
-      obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ["data-play-shell"] });
-      setTimeout(() => {
-        obs.disconnect();
-        done({ before, at, after: Math.round(window.scrollY) });
-      }, 2600);
-    }),
-);
-await jump.locator('[role="option"]').first().click();
-const h = await handoff;
+const h = await jump.evaluate(() => window.__handoff);
 check(
   "the panel waits for the scroll, not just for frames",
-  h.at !== null && h.after - h.before > 1 && Math.abs(h.at - h.after) <= 2,
-  h.at === null
+  !!h && h.at.y - h.preGuess > 1 && Math.abs(h.at.y - h.after.y) <= 2,
+  !h ? "panel never engaged" : `scrollY ${h.preGuess} -> ${h.at.y} at hand-off -> ${h.after.y} settled`,
+);
+check(
+  "the card leaves a hole, so the page is not yanked back",
+  !!h && Math.abs(h.at.doc - h.before.doc) <= 2 && h.at.max >= h.at.y,
+  !h
     ? "panel never engaged"
-    : `scrollY ${h.before} -> ${h.at} at hand-off -> ${h.after} settled`,
+    : `document ${h.before.doc} -> ${h.at.doc}, max scroll ${h.before.max} -> ${h.at.max}, at ${h.at.y}`,
 );
 
 await browser.close();

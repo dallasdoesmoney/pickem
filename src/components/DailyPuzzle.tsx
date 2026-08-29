@@ -365,6 +365,23 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const handingOffRef = useRef(false);
   // The box the guesses scroll inside once the shell is up.
   const boardScrollRef = useRef<HTMLDivElement>(null);
+  // The card itself, and the hole it leaves behind.
+  //
+  // THIS IS THE JUMP. Going fixed takes the card out of the document, so
+  // the page gets shorter by the card's whole height - and a page that
+  // has just scrolled down near its end is then sitting at an offset
+  // that no longer exists. The browser clamps it back, and on a phone
+  // that clamp is a lurch: measured at 440x956, the document fell from
+  // 1927 to 1150 and the scroll was yanked from 272 to 194 in one frame.
+  // On the recording it went far enough to put the site header back on
+  // screen for two frames.
+  //
+  // So the card's height stays in the flow after the card leaves it. The
+  // page keeps the same length, the scroll offset stays legal, and there
+  // is nothing to clamp. Measured before the switch, because afterwards
+  // the element is the panel and its height is the strip.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [shellHole, setShellHole] = useState(0);
 
 
   // KEEPS THE LAST GUESSES ABOVE THE KEYBOARD.
@@ -693,6 +710,10 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               // same view rather than starting from the top.
               const settleAndSwitch = () => {
                 boardFromRef.current = boardScrollRef.current?.getBoundingClientRect().top ?? null;
+                // How much page the card is about to stop occupying. See
+                // cardRef: this is what keeps the scroll offset legal
+                // through the switch.
+                setShellHole(cardRef.current?.offsetHeight ?? 0);
                 setOutgrown(true);
               };
               // WAIT FOR THE SCROLL TO ACTUALLY STOP, by watching it.
@@ -1020,7 +1041,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           which made a single activity look like three unrelated widgets
           stacked up. Inside, the sections are divided by a hairline
           rather than by air - the same rule the legend already used. */}
+      {/* The card's place in the page, held open while the card itself is
+          floating above it. Nothing is drawn here - it exists so the
+          document does not get shorter at the exact moment the page is
+          scrolled near its end. See cardRef. */}
+      <div style={playShell ? { height: shellHole } : undefined}>
       <div
+        ref={cardRef}
         data-play-shell={playShell ? "1" : undefined}
         style={
           playShell
@@ -1424,6 +1451,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           <Legend columns={visibleColumns} />
         </div>
       )}
+      </div>
       </div>
     </div>
   );
