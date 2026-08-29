@@ -695,18 +695,40 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 boardFromRef.current = boardScrollRef.current?.getBoundingClientRect().top ?? null;
                 setOutgrown(true);
               };
-              // scrollend where it exists, and a timer either way: Safari
-              // only gained scrollend in 17, and a hand-off that never
-              // happens is far worse than one that happens a beat late.
-              let switched = false;
-              const once = () => {
-                if (switched) return;
-                switched = true;
-                window.removeEventListener("scrollend", once);
+              // WAIT FOR THE SCROLL TO ACTUALLY STOP, by watching it.
+              //
+              // Not scrollend: Safari only gained it in 17, and where it
+              // exists it can fire for a scroll that has not finished -
+              // which hands over mid-travel and produces exactly the
+              // snap this is trying to remove. Not a fixed timer either,
+              // because how long a smooth scroll takes is the browser's
+              // business and varies with distance.
+              //
+              // So the position is sampled every frame and the hand-off
+              // waits for it to stop changing. That is true wherever the
+              // scroll ends up and whatever engine is running it -
+              // including a scroll that gets clamped short, which
+              // settles just the same.
+              if (lift <= 1) {
                 settleAndSwitch();
-              };
-              window.addEventListener("scrollend", once, { once: true });
-              window.setTimeout(once, lift > 1 ? 520 : 0);
+              } else {
+                let last = window.scrollY;
+                let still = 0;
+                const deadline = performance.now() + 1200;
+                const watch = () => {
+                  const now = window.scrollY;
+                  // Three still frames, so a momentary pause partway is
+                  // not mistaken for the end.
+                  still = Math.abs(now - last) < 0.5 ? still + 1 : 0;
+                  last = now;
+                  if (still >= 3 || performance.now() > deadline) {
+                    settleAndSwitch();
+                    return;
+                  }
+                  requestAnimationFrame(watch);
+                };
+                requestAnimationFrame(watch);
+              }
             }
           }
           if (!handingOffRef.current) showNewestGuess();
