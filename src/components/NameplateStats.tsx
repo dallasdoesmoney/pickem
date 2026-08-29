@@ -33,17 +33,21 @@ function avg(a: number | null): string {
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div
-      className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-2 py-3"
+      className="flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2.5 sm:px-2 sm:py-3"
       style={{ background: FIELD, border: CARD_EDGE }}
     >
+      {/* Tracking comes off on the narrow screen. Four tiles across a
+          phone leaves about 90px each, and 0.13em on eleven letters is
+          most of a word's worth of air - it was what pushed BEST STREAK
+          onto a second line and made the row taller than the tiles. */}
       <span
-        className="text-[9px] font-semibold uppercase leading-none tracking-[0.13em]"
+        className="whitespace-nowrap text-[8px] font-semibold uppercase leading-none tracking-[0.04em] sm:text-[9px] sm:tracking-[0.13em]"
         style={{ color: MUTED }}
       >
         {label}
       </span>
       <span
-        className="text-[22px] leading-none sm:text-[26px]"
+        className="text-[19px] leading-none sm:text-[26px]"
         style={{ fontFamily: "var(--font-display)", color: TEXT, fontVariantNumeric: "tabular-nums" }}
       >
         {value}
@@ -51,8 +55,8 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
       {/* Reserved whether or not there is a sub-line, so four tiles in a
           row keep one baseline instead of stepping. */}
       <span
-        className="text-[10px] leading-none"
-        style={{ color: MUTED, fontVariantNumeric: "tabular-nums", minHeight: 10 }}
+        className="whitespace-nowrap text-[9px] leading-none sm:text-[10px]"
+        style={{ color: MUTED, fontVariantNumeric: "tabular-nums", minHeight: 9 }}
       >
         {sub ?? ""}
       </span>
@@ -72,14 +76,34 @@ export function NameplateStatsPanel({
   highlight?: number | null;
   className?: string;
 }) {
-  const buckets = Array.from({ length: stats.maxGuesses }, (_, i) => i + 1);
-  const counts = buckets.map((n) => stats.distribution[String(n)] ?? 0);
+  const all = Array.from({ length: stats.maxGuesses }, (_, i) => i + 1);
+  const countOf = (n: number) => stats.distribution[String(n)] ?? 0;
+
+  // TRAILING EMPTY ROWS COME OFF. A bucket above your worst solve says
+  // nothing - you have never taken seven guesses, and eight rows of that
+  // was 90px of nothing between the record and the share button, which
+  // is the thing somebody who just finished a board is reaching for. On
+  // a phone with Safari's chrome that was the difference between the
+  // button being on screen and under it.
+  //
+  // Only the trailing ones. A zero in the MIDDLE is a real fact about
+  // how you play - never in three, often in four - and dropping it would
+  // squash the shape into a lie.
+  //
+  // Four rows minimum, so an early board does not render as one lonely
+  // bar, and never above the bucket being highlighted.
+  const highest = all.reduce((max, n) => (countOf(n) > 0 ? n : max), 0);
+  const buckets = all.slice(0, Math.max(4, highest, highlight ?? 0));
+  const counts = buckets.map(countOf);
   const most = Math.max(1, ...counts);
   const nothingYet = stats.played === 0;
 
   return (
     <div className={className}>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {/* FOUR ACROSS ON A PHONE TOO. Two rows of two pushed the share
+          button off the bottom of the result dialog, and the button is
+          the thing somebody finishing a board is reaching for. */}
+      <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
         <Tile
           label="Win rate"
           value={pct(stats.winRate)}
