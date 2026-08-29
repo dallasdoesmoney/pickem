@@ -243,6 +243,26 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  // PLAY AGAIN SHOULD LEAVE YOU TYPING, and on a phone that is harder
+  // than it sounds.
+  //
+  // The field does not exist when PLAY AGAIN is pressed - a finished
+  // round replaces it with the result buttons - so it cannot simply be
+  // focused in the click handler. It only mounts on the render the tap
+  // causes, and by then iOS considers the gesture over: it will not open
+  // a keyboard for a focus() it did not see a finger behind.
+  //
+  // So the gesture is kept alive through the gap. The tap focuses this
+  // one-pixel field FIRST, synchronously, which opens the keyboard while
+  // the tap is still the tap; the layout effect below then moves focus
+  // to the real field the moment it mounts, and moving between two text
+  // inputs never closes a keyboard that is already up.
+  //
+  // Not readOnly, not display:none, not visibility:hidden - iOS opens a
+  // keyboard for none of those. Zero opacity at one pixel, fixed at the
+  // top of the viewport so focusing it cannot scroll the page.
+  const keepAliveRef = useRef<HTMLInputElement>(null);
+  const wantFocusRef = useRef(false);
 
   // THE WIN IS HELD. Solving used to swap the reveal card in on the same
   // tick the guess landed, so the board turned green and vanished in the
@@ -291,6 +311,29 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     setJoinOffered(false);
     setOutgrown(false);
   }, []);
+
+  // PLAY AGAIN, as opposed to arriving in unlimited for the first time.
+  // Switching mode deals a round too, but tapping UNLIMITED is a
+  // decision about what to look at; pressing PLAY AGAIN is a decision to
+  // keep playing, and only the second one should raise a keyboard.
+  const playAgain = useCallback(() => {
+    // Before the state change, so it happens inside the tap. See
+    // keepAliveRef.
+    keepAliveRef.current?.focus({ preventScroll: true });
+    wantFocusRef.current = true;
+    startPracticeRound();
+  }, [startPracticeRound]);
+
+  // Hands the caret over as soon as there is something to hand it to.
+  // No dependency array on purpose: the field can appear on any commit,
+  // and the ref is what makes this run once rather than every time.
+  useIsoLayoutEffect(() => {
+    if (!wantFocusRef.current) return;
+    const el = inputRef.current;
+    if (!el) return;
+    wantFocusRef.current = false;
+    el.focus();
+  });
 
   function switchMode(next: "daily" | "unlimited") {
     if (next === mode) return;
@@ -950,10 +993,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             copied={copied}
             grid={shareGrid(state)}
             practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
-            onPlayAgain={() => {
-              setStage(null);
-              startPracticeRound();
-            }}
+            onPlayAgain={playAgain}
           />
         </ResultDialog>
       )}
@@ -1147,7 +1187,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             {mode === "unlimited" && (
               <button
                 type="button"
-                onClick={startPracticeRound}
+                onClick={playAgain}
                 className="puzzle-press flex-1"
                 style={{
                   fontFamily: "var(--font-display)",
@@ -1438,6 +1478,35 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       )}
       </div>
       </div>
+
+      {/* THE GESTURE'S FOOT IN THE DOOR. See keepAliveRef: PLAY AGAIN
+          focuses this for the few milliseconds between the tap and the
+          real field mounting, so the keyboard opens while iOS still
+          counts the tap as a tap.
+
+          A pixel, transparent, fixed at the top of the viewport so
+          focusing it cannot scroll anything, and untabbable so it is
+          never reached by accident. It is a real, writable text input,
+          because iOS opens a keyboard for nothing less - readOnly,
+          display:none and visibility:hidden all fail silently.
+
+          LAST in the tree, not first. There are two inputs on this card
+          now, and anything reaching for "the input" by document order
+          should find the one somebody types into. Being fixed, it takes
+          no part in the column's layout wherever it sits. */}
+      <input
+        ref={keepAliveRef}
+        type="text"
+        tabIndex={-1}
+        aria-hidden="true"
+        // Named, so it is obvious in the inspector what this is doing
+        // there rather than looking like a stray field.
+        data-keyboard-keepalive
+        autoComplete="off"
+        className="pointer-events-none fixed left-0 top-0 h-px w-px border-0 p-0 opacity-0"
+        onChange={() => {}}
+        value=""
+      />
     </div>
   );
 }

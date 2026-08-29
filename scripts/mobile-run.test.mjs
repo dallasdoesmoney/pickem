@@ -105,7 +105,13 @@ const ctx = await freshContext();
 
 const page = await ctx.newPage();
 await page.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
-await page.waitForSelector("main input", { timeout: 20000 });
+// THE GUESS FIELD, not just any input in main. There is a second one
+// now - a one-pixel keep-alive that PLAY AGAIN focuses to hold the tap
+// gesture open while the real field mounts. It sits earlier in the DOM,
+// so a bare "main input:not([data-keyboard-keepalive])" selector picks it instead: invisible, one pixel
+// wide and pointer-events:none, which reads as the click being blocked
+// by whatever is painted over it.
+await page.waitForSelector("main input:not([data-keyboard-keepalive])", { timeout: 20000 });
 await page.waitForTimeout(1000);
 
 const results = [];
@@ -140,10 +146,10 @@ await page.addInitScript(() => {
   );
 });
 await page.reload({ waitUntil: "domcontentloaded" });
-await page.waitForSelector("main input", { timeout: 20000 });
+await page.waitForSelector("main input:not([data-keyboard-keepalive])", { timeout: 20000 });
 await page.waitForTimeout(900);
 
-const field = page.locator("main input").first();
+const field = page.locator("main input:not([data-keyboard-keepalive])").first();
 await field.click();
 
 // HOW A GUESS IS MADE ON A PHONE. Not the Return key - a tap on the
@@ -180,7 +186,7 @@ for (let i = 0; i < seeds.length; i++) {
   const m = await page.evaluate(() => {
     // The visible strip, NOT the window. This is the whole distinction.
     const vh = window.visualViewport.height;
-    const input = document.querySelector("main input");
+    const input = document.querySelector("main input:not([data-keyboard-keepalive])");
     // Both selectors, deliberately. data-guess-row is new; .puzzle-row
     // is what the board has always carried. Measuring only the new one
     // would make this test pass on the old code for the wrong reason -
@@ -430,9 +436,9 @@ await big.addInitScript(() => {
   });
 });
 await big.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
-await big.waitForSelector("main input", { timeout: 20000 });
+await big.waitForSelector("main input:not([data-keyboard-keepalive])", { timeout: 20000 });
 await big.waitForTimeout(900);
-await big.locator("main input").first().click();
+await big.locator("main input:not([data-keyboard-keepalive])").first().click();
 // A BOARD, AND THEN A SCROLL, AND ONLY THEN THE KEYBOARD. An empty
 // board fits on the screen, so there is nothing to scroll and the
 // switch has no offset it could lose - which is the one arrangement
@@ -448,7 +454,7 @@ for (const seed of seeds) {
 await big.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
 await big.waitForTimeout(400);
 const dropped = await big.evaluate(() => Math.round(window.scrollY));
-await big.locator("main input").first().click();
+await big.locator("main input:not([data-keyboard-keepalive])").first().click();
 await big.evaluate(() => window.__openKeyboard());
 await big.waitForTimeout(1400);
 const e = await big.evaluate(() => window.__engage);
