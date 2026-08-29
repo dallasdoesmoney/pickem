@@ -80,21 +80,28 @@ const grade = (id) => ({
 const browser = await chromium.launch(
   process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {},
 );
-const ctx = await browser.newContext({ viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-await ctx.route("**://posthog.invalid/**", (r) => r.abort());
-await ctx.route("**://*.posthog.com/**", (r) => r.abort());
-await ctx.route(`${SB}/**`, (route) => {
-  const u = route.request().url();
-  let post = {};
-  try {
-    post = JSON.parse(route.request().postData() ?? "{}");
-  } catch {}
-  const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
-  if (u.includes("puzzle_practice_compare")) return j(grade(post.p_guess));
-  if (u.includes("puzzle_guest_compare")) return j(grade(post.p_espn_id));
-  if (u.includes("/rpc/")) return j({});
-  return j([]);
-});
+// A FRESH CONTEXT PER RUN, not a fresh tab. A guest's guesses live in
+// localStorage, so a second tab in the same context opens onto a board
+// that is already six deep and finished - every name greyed out.
+const freshContext = async () => {
+  const ctx = await browser.newContext({ viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await ctx.route("**://posthog.invalid/**", (r) => r.abort());
+  await ctx.route("**://*.posthog.com/**", (r) => r.abort());
+  await ctx.route(`${SB}/**`, (route) => {
+    const u = route.request().url();
+    let post = {};
+    try {
+      post = JSON.parse(route.request().postData() ?? "{}");
+    } catch {}
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("puzzle_practice_compare")) return j(grade(post.p_guess));
+    if (u.includes("puzzle_guest_compare")) return j(grade(post.p_espn_id));
+    if (u.includes("/rpc/")) return j({});
+    return j([]);
+  });
+  return ctx;
+};
+const ctx = await freshContext();
 
 const page = await ctx.newPage();
 await page.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
@@ -297,6 +304,82 @@ check(
 );
 
 await page.screenshot({ path: "/tmp/claude-0/-home-user-pickem/c8c47499-bc03-5b0f-a459-d3a18c357eda/scratchpad/mobile-run.png" });
+
+// THE JUMP, ON A SECOND PAGE WITH A DELIBERATELY LAZY SCROLL.
+//
+// The hand-off scrolls the page until the bar reaches the top of the
+// strip and only then lets the panel take over, so that switching moves
+// nothing. If it switches early the bar teleports - and that flash is
+// what was visible on a real phone and invisible here.
+//
+// Invisible here because Chromium starts a smooth scroll almost
+// immediately, so even a watcher that only looked for stillness happened
+// to be right. iOS does not: the first frames of a smooth scroll sit
+// still, which satisfied "three still frames" before the scroll began.
+//
+// So the shim below delays the scroll's FIRST MOVEMENT by 120ms, which
+// is the whole difference between the two engines. Then the observable
+// is where the page had scrolled to at the instant the panel appeared:
+// if it is still sitting at the pre-scroll position, the switch is what
+// moved the bar, and that is the jump.
+const LAZY_MS = 120;
+const jumpCtx = await freshContext();
+const jump = await jumpCtx.newPage();
+await jump.addInitScript((visible) => {
+  Object.defineProperty(window.visualViewport, "height", { get: () => visible, configurable: true });
+  Object.defineProperty(window.visualViewport, "offsetTop", { get: () => 0, configurable: true });
+  window.addEventListener("load", () => {
+    setTimeout(() => window.visualViewport.dispatchEvent(new Event("resize")), 60);
+  });
+}, VISIBLE_WITH_KEYBOARD);
+await jump.addInitScript((lazy) => {
+  const real = window.scrollBy.bind(window);
+  window.scrollBy = (opts) => {
+    if (opts && opts.behavior === "smooth") setTimeout(() => real(opts), lazy);
+    else real(opts);
+  };
+}, LAZY_MS);
+await jump.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+await jump.waitForSelector("main input", { timeout: 20000 });
+await jump.waitForTimeout(900);
+await jump.locator("main input").first().click();
+// Guess until the panel is one guess away, then watch that guess.
+for (let i = 0; i < firstShell; i++) {
+  await jump.keyboard.type(seeds[i]);
+  await jump.waitForTimeout(340);
+  await jump.locator('[role="option"]').first().click();
+  await jump.waitForTimeout(1100);
+}
+await jump.keyboard.type(seeds[firstShell]);
+await jump.waitForTimeout(340);
+const handoff = jump.evaluate(
+  () =>
+    new Promise((done) => {
+      const before = Math.round(window.scrollY);
+      let at = null;
+      const obs = new MutationObserver(() => {
+        if (at === null && document.querySelector("[data-play-shell]")) {
+          at = Math.round(window.scrollY);
+          obs.disconnect();
+        }
+      });
+      obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ["data-play-shell"] });
+      setTimeout(() => {
+        obs.disconnect();
+        done({ before, at, after: Math.round(window.scrollY) });
+      }, 2600);
+    }),
+);
+await jump.locator('[role="option"]').first().click();
+const h = await handoff;
+check(
+  "the panel waits for the scroll, not just for frames",
+  h.at !== null && h.after - h.before > 1 && Math.abs(h.at - h.after) <= 2,
+  h.at === null
+    ? "panel never engaged"
+    : `scrollY ${h.before} -> ${h.at} at hand-off -> ${h.after} settled`,
+);
+
 await browser.close();
 const failed = results.filter((r) => !r.pass).length;
 console.log(failed ? `\n${failed} FAILED` : "\nall checks pass");

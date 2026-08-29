@@ -1170,35 +1170,10 @@ body {
   }
 }
 
-/* The play panel arriving. The bar animates itself - see the FLIP in
-   DailyPuzzle - so this is only the ground it lands on: the panel's
-   background comes up under it rather than appearing fully formed, which
-   is what stops the title and mode toggle from looking like they were
-   snatched away. Short, because it happens mid-guess and anything longer
-   would be in the way. */
-@keyframes puzzle-shell-in {
-  from {
-    opacity: 0.35;
-  }
-  to {
-    opacity: 1;
-  }
-}
+/* No entrance on the play panel, deliberately.
+   It used to fade in from 35% opacity, and on a real phone that read as
+   a flash: caught frame by frame, the whole board ghosted for two frames
+   in the middle of the hand-off. The panel now arrives where the scroll
+   has already put things, so there is nothing for a fade to cover -
+   and a fade over a move that is already correct is just a flicker. */
 
-.puzzle-shell-in {
-  animation: puzzle-shell-in 260ms ease-out both;
-}
-
-/* The rows settling into the panel. They are in a scrolling box now
-   rather than the page, so their entrance animation would otherwise
-   replay from a standing start. */
-.puzzle-shell-in .puzzle-board {
-  animation: puzzle-shell-in 320ms 60ms ease-out both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .puzzle-shell-in,
-  .puzzle-shell-in .puzzle-board {
-    animation: none;
-  }
-}

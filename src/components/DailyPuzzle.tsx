@@ -712,16 +712,39 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               if (lift <= 1) {
                 settleAndSwitch();
               } else {
-                let last = window.scrollY;
+                // WAIT FOR IT TO START, THEN FOR IT TO STOP.
+                //
+                // Watching only for stillness was wrong in the way that
+                // matters: a smooth scroll does not move on its first
+                // frames, so three still frames were satisfied before it
+                // had begun. The watcher concluded the scroll was over,
+                // handed off immediately, and the bar teleported - which
+                // is the jump, seen frame by frame on a real phone.
+                //
+                // So movement has to be observed first. Until then the
+                // stillness counter cannot start.
+                const startedAt = window.scrollY;
+                let moved = false;
+                let last = startedAt;
                 let still = 0;
-                const deadline = performance.now() + 1200;
+                const deadline = performance.now() + 1400;
                 const watch = () => {
                   const now = window.scrollY;
-                  // Three still frames, so a momentary pause partway is
-                  // not mistaken for the end.
-                  still = Math.abs(now - last) < 0.5 ? still + 1 : 0;
+                  if (!moved) {
+                    if (Math.abs(now - startedAt) > 0.5) moved = true;
+                    // If it has not budged in a quarter of a second it
+                    // is not going to - the page is already as far up as
+                    // it goes - and waiting longer just delays the
+                    // hand-off for nothing.
+                    else if (performance.now() > deadline - 1150) {
+                      settleAndSwitch();
+                      return;
+                    }
+                  } else {
+                    still = Math.abs(now - last) < 0.5 ? still + 1 : 0;
+                  }
                   last = now;
-                  if (still >= 3 || performance.now() > deadline) {
+                  if ((moved && still >= 3) || performance.now() > deadline) {
                     settleAndSwitch();
                     return;
                   }
@@ -999,7 +1022,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           rather than by air - the same rule the legend already used. */}
       <div
         data-play-shell={playShell ? "1" : undefined}
-        className={playShell ? "puzzle-shell-in" : undefined}
         style={
           playShell
             ? {
