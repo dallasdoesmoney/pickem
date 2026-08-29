@@ -24,6 +24,7 @@ import {
 import { pickPracticeAnswer, practiceBoard } from "@/lib/practicePuzzle";
 import { errorMessage } from "@/lib/errorMessage";
 import { fetchNameplateStats, type NameplateStats } from "@/lib/supabase/nameplateStats";
+import { fetchPuzzleNumber } from "@/lib/supabase/dailyPuzzle";
 import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
@@ -52,27 +53,11 @@ import {
   DROP,
 } from "@/lib/nameplateTheme";
 
-// THE DAILY'S SERIAL. Day one is the day Nameplate went live.
-//
-// Arithmetic, not a count of rows. daily_puzzles only gets a row for a
-// day somebody actually played it - see the insert in 0046 - so counting
-// them would skip the quiet days AND renumber every past board the first
-// time one of them was played late. A date subtraction cannot do either.
-//
-// FIXED FOREVER. The moment somebody screenshots a board, that number is
-// what that day is called, so this constant is not a thing to tidy up
-// later.
-const PUZZLE_EPOCH = "2026-08-27";
-
-// Noon UTC at both ends. Parsing a bare date gives midnight, and midnight
-// is the one instant a daylight-saving shift can push across a day
-// boundary - which would make the number jump by one for half the year.
-const atNoonUTC = (iso: string) => Date.parse(`${iso}T12:00:00Z`);
-
-function puzzleNumber(iso: string): number {
-  const days = Math.round((atNoonUTC(iso) - atNoonUTC(PUZZLE_EPOCH)) / 86_400_000);
-  return days + 1;
-}
+// Day one is not a constant. It used to be - the date the game merged
+// to main - and it was wrong by three days, because the game had been
+// played on preview builds against the same database before that. The
+// strip said #3 while the stats, derived from the guesses, counted six.
+// The number comes from the database now; see 0059_puzzle_number.sql.
 
 const WEEKDAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 const MONTHS_LONG = [
@@ -289,6 +274,25 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // somebody reopening their result to screenshot it does not want to
   // close two dialogs each time.
   const [joinOffered, setJoinOffered] = useState(false);
+
+  // A guest's board is built in the browser, so it has no number in it -
+  // that is the one fact about the day only the database holds. Asked
+  // for once, and only when signed out; a signed-in board arrives with
+  // it. Failure leaves it null and the strip falls back to the date,
+  // which is the thing the number was there to say anyway.
+  const [guestNumber, setGuestNumber] = useState<number | null>(null);
+  useEffect(() => {
+    if (user) return;
+    let cancelled = false;
+    fetchPuzzleNumber(puzzleToday())
+      .then((n) => {
+        if (!cancelled) setGuestNumber(n);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // YOUR RECORD, fetched when a daily board settles.
   //
@@ -962,6 +966,9 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // an endpoint that hands today's player to anybody who asks.
   const guestLost = mode === "daily" && !user && state.finished && !state.answer;
 
+  // Whichever source has it: the board itself when signed in, the one
+  // extra call when not. Never both, so they cannot disagree.
+  const boardNumber = state.puzzleNumber ?? guestNumber;
   const left = state.maxGuesses - state.guessesUsed;
   const answer = state.answer ? PUZZLE_PLAYERS_BY_ID.get(state.answer.espnId) : undefined;
 
@@ -1127,14 +1134,16 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 className="text-[17px] leading-none tracking-[0.03em] md:text-[19px]"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
-                {mode === "daily" ? `#${puzzleNumber(state.puzzleOn)}` : "UNLIMITED"}
+                {mode === "daily" ? (boardNumber === null ? longPuzzleDate(state.puzzleOn) : `#${boardNumber}`) : "UNLIMITED"}
               </div>
               {/* 0.7 opacity rather than a second colour: on a fill this
                   saturated any grey goes muddy, and black at 70% stays
                   black. */}
               <div className="mt-1.5 text-[11px] leading-none tracking-[0.14em] opacity-70 md:text-[12px]">
                 {mode === "daily"
-                  ? longPuzzleDate(state.puzzleOn)
+                  ? boardNumber === null
+                    ? "NFL NAMEPLATE"
+                    : longPuzzleDate(state.puzzleOn)
                   : `ROUND ${practice?.round ?? 1} · NO STREAK`}
               </div>
             </div>
