@@ -58,6 +58,46 @@ const EDGE = `2px solid #0a1120`;
 const CARD_EDGE = `1px solid ${RULE}`;
 const DROP = `0 24px 60px -22px #000000`;
 
+// THE DAILY'S SERIAL. Day one is the day Nameplate went live.
+//
+// Arithmetic, not a count of rows. daily_puzzles only gets a row for a
+// day somebody actually played it - see the insert in 0046 - so counting
+// them would skip the quiet days AND renumber every past board the first
+// time one of them was played late. A date subtraction cannot do either.
+//
+// FIXED FOREVER. The moment somebody screenshots a board, that number is
+// what that day is called, so this constant is not a thing to tidy up
+// later.
+const PUZZLE_EPOCH = "2026-08-27";
+
+// Noon UTC at both ends. Parsing a bare date gives midnight, and midnight
+// is the one instant a daylight-saving shift can push across a day
+// boundary - which would make the number jump by one for half the year.
+const atNoonUTC = (iso: string) => Date.parse(`${iso}T12:00:00Z`);
+
+function puzzleNumber(iso: string): number {
+  const days = Math.round((atNoonUTC(iso) - atNoonUTC(PUZZLE_EPOCH)) / 86_400_000);
+  return days + 1;
+}
+
+const WEEKDAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+const MONTHS_LONG = [
+  "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+  "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
+];
+
+// Spelled out, because this is the line that says what day it is and an
+// abbreviation makes you do the expanding. Built from the ISO parts
+// rather than from Intl, so it reads the same in every locale - the
+// puzzle rolls on New York's clock for everybody, so its date should not
+// be phrased by the reader's.
+function longPuzzleDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const dow = new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+  return `${WEEKDAYS[dow]}, ${MONTHS_LONG[m - 1]} ${d}`;
+}
+
 // Columns, in board order. `base` marks the three that come from the team
 // a player is on, so they are known for everybody. The rest depend on
 // roster fields ESPN does not publish for everyone; a column nothing knows
@@ -991,6 +1031,49 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           aria-hidden={playShell && outgrown ? true : undefined}
         >
           <div className={playShell ? "puzzle-chrome-inner" : undefined}>
+            {/* THE LID. Which board this is, before anything else on the
+                card - a filled band is the only thing on this screen that
+                announces itself without being read, and "is this today's?"
+                is the question somebody arrives with.
+
+                Centred rather than split left-and-right, so it sits on the
+                same axis as the wordmark, the toggle and the field
+                underneath it and the top of the card reads as one stack.
+
+                Its own top radius rather than overflow:hidden on the card,
+                because the card is also what the suggestion list drops
+                down inside - clipping to the card would cut the list off
+                at the bottom edge every time it was longer than the board.
+
+                Gold for unlimited, green for today. Gold already means
+                CLOSE on the chips, which is a meaning being spent here;
+                the alternative was a muted band, and a practice round
+                deserves a header rather than an apology. */}
+            <div
+              className="px-4 py-3 text-center"
+              style={{
+                background: mode === "daily" ? "#3ecb78" : "#ffce3a",
+                color: INK,
+                fontFamily: "var(--font-display)",
+                borderRadius: playShell ? 0 : "17px 17px 0 0",
+              }}
+            >
+              <div
+                className="text-[17px] leading-none tracking-[0.03em] md:text-[19px]"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {mode === "daily" ? `#${puzzleNumber(state.puzzleOn)}` : "UNLIMITED"}
+              </div>
+              {/* 0.7 opacity rather than a second colour: on a fill this
+                  saturated any grey goes muddy, and black at 70% stays
+                  black. */}
+              <div className="mt-1.5 text-[11px] leading-none tracking-[0.14em] opacity-70 md:text-[12px]">
+                {mode === "daily"
+                  ? longPuzzleDate(state.puzzleOn)
+                  : `ROUND ${practice?.round ?? 1} · NO STREAK`}
+              </div>
+            </div>
+
             {header}
 
             {/* The two modes, on the card and above the field, because the
@@ -1031,15 +1114,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               </div>
             </div>
 
-            {/* What round you are on, and the one line that says why this
-                board does not count. Said here rather than only at the end,
-                because somebody who lands mid-round should not have to solve
-                it to find out it was practice. */}
-            {mode === "unlimited" && practice && (
-              <p className="px-4 pb-2 text-center text-[11px]" style={{ color: MUTED }}>
-                Round {practice.round} &middot; no points, no streak &mdash; play as many as you like
-              </p>
-            )}
           </div>
         </div>
 

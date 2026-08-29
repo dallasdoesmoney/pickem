@@ -139,7 +139,14 @@ check("the daily takes guesses", dailyRowsBefore >= 2, `${dailyRowsBefore} rows,
 await page.getByRole("button", { name: "UNLIMITED" }).click();
 await page.waitForTimeout(700);
 const emptied = await rows();
-const roundLine = (await page.locator("text=/Round 1/").count()) > 0;
+// WHICH ROUND, wherever it is written. It used to be a caption under
+// the toggle reading "Round 1 · no points, no streak"; it is the strip
+// across the top of the card now, reading "ROUND 1 · NO STREAK". The
+// same fact in the same place on the screen, so the test asks for the
+// fact and not for the sentence - case-insensitively, since the strip
+// is set in caps.
+const roundIs = async (n) => (await page.locator(`text=/round ${n}/i`).count()) > 0;
+const roundLine = await roundIs(1);
 check("unlimited starts a fresh board", emptied === 0 && roundLine, `${emptied} rows, round line ${roundLine}`);
 
 // --- 3. A practice guess must not touch the daily ---
@@ -165,7 +172,7 @@ check(
 await page.getByRole("button", { name: "UNLIMITED" }).click();
 await page.waitForTimeout(700);
 const practiceRows = await rows();
-const stillRoundOne = (await page.locator("text=/Round 1/").count()) > 0;
+const stillRoundOne = await roundIs(1);
 check(
   "the practice round survives it too",
   practiceRows === 1 && stillRoundOne,
@@ -241,7 +248,7 @@ if (finished) {
   await dialog.getByRole("button", { name: "PLAY AGAIN" }).click();
   await page.waitForTimeout(700);
   check("PLAY AGAIN closes the dialog", !(await dialog.isVisible().catch(() => false)));
-  const roundTwo = (await page.locator("text=/Round 2/").count()) > 0;
+  const roundTwo = await roundIs(2);
   const clean = (await rows()) === 0;
   check("PLAY AGAIN starts round 2 with a clean board", roundTwo && clean, `round 2 ${roundTwo}, ${await rows()} rows`);
 
