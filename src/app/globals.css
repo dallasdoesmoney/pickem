@@ -1169,3 +1169,55 @@ body {
     animation: none;
   }
 }
+
+/* No entrance on the play panel, deliberately.
+   It used to fade in from 35% opacity, and on a real phone that read as
+   a flash: caught frame by frame, the whole board ghosted for two frames
+   in the middle of the hand-off. The panel arrives with the keyboard
+   now, on a frame where iOS is animating a keyboard over the whole
+   screen anyway, so there is nothing for a fade to cover - and a fade
+   over a move that is already correct is just a flicker. */
+
+/* THE TITLE, THE MODE TOGGLE AND THE ROUND LINE GETTING OUT OF THE WAY.
+   This is what the hand-off became once the panel stopped switching its
+   positioning mid-guess: one element's height going to zero inside a
+   panel that is already the size of the screen. The board underneath is
+   flex-1, so it grows into the space at exactly the rate this shrinks,
+   and its rows ride up with it - the same movement as the scroll after
+   every other guess.
+
+   grid-template-rows 1fr -> 0fr rather than max-height, because a
+   max-height has to be guessed: too small clips the title, too large
+   spends the first part of the animation going through empty space, and
+   neither is a real height. A grid row IS the content's height, so this
+   travels the right distance without measuring anything.
+
+   The slide is longer than the fade so the movement is what you read,
+   and the text is gone before it would be caught mid-collapse. */
+.puzzle-chrome {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 420ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 220ms ease-out;
+}
+
+.puzzle-chrome[data-collapsed] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+/* min-height:0 is what lets a grid row actually reach zero - the default
+   min-content floor would stop it at the height of the title. */
+.puzzle-chrome-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .puzzle-chrome {
+    transition: none;
+  }
+}
+

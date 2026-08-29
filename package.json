@@ -15,7 +15,8 @@
     "test:streak": "node scripts/streak-toast.test.mjs",
     "test:signup": "node scripts/signup-confirm.test.mjs",
     "test:migration": "node scripts/local-migration.test.mjs",
-    "test:unlimited": "node scripts/unlimited-mode.test.mjs"
+    "test:unlimited": "node scripts/unlimited-mode.test.mjs",
+    "test:mobile": "node scripts/mobile-run.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
