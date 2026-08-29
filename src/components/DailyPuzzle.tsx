@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
 import { PUZZLE_PLAYERS, PUZZLE_PLAYERS_BY_ID, PuzzlePlayer } from "@/data/puzzlePlayers";
 import { TEAMS, TeamAbbr } from "@/data/teams";
@@ -26,6 +26,12 @@ import { errorMessage } from "@/lib/errorMessage";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
+
+// A layout effect on the client, a no-op on the server. The FLIP below
+// has to measure and set a transform BEFORE the browser paints, or the
+// bar is seen in its new position for one frame and the animation looks
+// like a bounce rather than a move.
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // The sticker language, in one place - moved down the scale. Same four
 // rules as the cream board it replaces (solid ground, hard outline, hard
@@ -351,8 +357,56 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // the same trap one level down.
   const playShell = narrow && kb.inset > 0 && outgrown && !state?.finished;
   const barRef = useRef<HTMLDivElement>(null);
+  // Where the bar was standing the moment before the panel took over.
+  const barFromRef = useRef<number | null>(null);
   // The box the guesses scroll inside once the shell is up.
   const boardScrollRef = useRef<HTMLDivElement>(null);
+
+  // THE BAR GLIDES TO THE TOP rather than teleporting there.
+  //
+  // Nothing can transition `position`, and this switch is exactly that -
+  // the bar goes from sitting in the page to being the top of a fixed
+  // panel, which is a jump of a couple of hundred pixels in one frame.
+  //
+  // So it is a FLIP. The bar's old top was captured just before the
+  // switch; now that React has put it in its new place, the difference
+  // is applied as a transform - which puts it visually back where it
+  // was, with no paint in between - and then released on the next frame
+  // so it travels to where it now belongs. What moves is a transform,
+  // which is cheap and does not touch layout.
+  useIsoLayoutEffect(() => {
+    const el = barRef.current;
+    const from = barFromRef.current;
+    barFromRef.current = null;
+    if (!playShell || !el || from === null) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const delta = from - el.getBoundingClientRect().top;
+    // Under a couple of pixels there is nothing to watch, and animating
+    // it would only risk a flicker.
+    if (Math.abs(delta) < 2) return;
+
+    el.style.transition = "none";
+    el.style.transform = `translateY(${delta}px)`;
+    const raf = requestAnimationFrame(() => {
+      el.style.transition = "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)";
+      el.style.transform = "translateY(0)";
+    });
+    // Cleared afterwards, always. A transform left on the bar would
+    // offset it for the rest of the round.
+    const clear = () => {
+      el.style.transition = "";
+      el.style.transform = "";
+    };
+    el.addEventListener("transitionend", clear, { once: true });
+    const failsafe = window.setTimeout(clear, 700);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(failsafe);
+      el.removeEventListener("transitionend", clear);
+      clear();
+    };
+  }, [playShell]);
 
   // KEEPS THE LAST GUESSES ABOVE THE KEYBOARD.
   //
@@ -613,7 +667,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             const boardH = boardScrollRef.current?.scrollHeight ?? 0;
             // 24px of slack, so it flips when a row is genuinely
             // crowding the edge rather than the moment it touches it.
-            if (barH + boardH > kb.visible - 24) setOutgrown(true);
+            if (barH + boardH > kb.visible - 24) {
+              // Where the bar is NOW, captured before the switch that
+              // moves it. Half of a FLIP: the other half runs in the
+              // layout effect once React has put it in its new place.
+              barFromRef.current = barRef.current?.getBoundingClientRect().top ?? null;
+              setOutgrown(true);
+            }
           }
           showNewestGuess();
         }),
@@ -869,6 +929,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           rather than by air - the same rule the legend already used. */}
       <div
         data-play-shell={playShell ? "1" : undefined}
+        className={playShell ? "puzzle-shell-in" : undefined}
         style={
           playShell
             ? {

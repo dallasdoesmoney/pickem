@@ -197,6 +197,10 @@ for (let i = 0; i < seeds.length; i++) {
       prevVisible: !!pr && (shellBox ? pr.bottom <= shellBox.bottom + 1 && pr.top >= shellBox.top - 1 : pr.bottom <= vh && pr.bottom > 0),
       vh: Math.round(vh),
       blurs: window.__blurs ?? 0,
+      // A transform left behind by the hand-off animation would offset
+      // the bar for the rest of the round - so by the time each guess
+      // has settled, there must be none.
+      barTransform: bar ? getComputedStyle(bar).transform : "none",
       // How far below the pinned field the newest row ends up. Big means
       // the scroll could not finish.
       // How far the newest row sits BELOW where the scroll aimed it.
@@ -255,6 +259,11 @@ check(
 );
 // It must not flicker back off - engaging frees the space that made it
 // necessary, so a naive "does it fit now" would oscillate.
+check(
+  "the hand-off animation leaves nothing behind",
+  report.every((m) => m.barTransform === "none" || m.barTransform === "matrix(1, 0, 0, 1, 0, 0)"),
+  `transforms: ${[...new Set(report.map((m) => m.barTransform))].join(" | ")}`,
+);
 check(
   "and never flickers back off",
   report.slice(firstShell).every((m) => m.shellUp),
