@@ -911,6 +911,24 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                       data-active={i === active && !already}
                       disabled={already}
                       onMouseEnter={() => setActive(i)}
+                      // THE TAP MUST NOT TAKE THE FOCUS.
+                      //
+                      // On a phone nobody presses Return - they tap the
+                      // name in this list. A button takes focus when it
+                      // is tapped, so the field blurs and iOS closes the
+                      // keyboard on the spot, before any of the code
+                      // below runs. Handing focus back afterwards cannot
+                      // fix it: that happens after an await, outside the
+                      // tap, and iOS will not reopen a keyboard for a
+                      // programmatic focus it did not ask for.
+                      //
+                      // preventDefault on mousedown is what stops the
+                      // focus moving at all - the browser focuses on
+                      // mousedown's default action, and Safari honours
+                      // this for a tap. So the field never blurs, the
+                      // keyboard never closes, and there is nothing to
+                      // restore.
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => guess(p)}
                       className={`puzzle-option flex w-full items-center gap-2.5 py-2 pr-3 text-left ${
                         already ? "opacity-40" : ""

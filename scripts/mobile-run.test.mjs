@@ -97,16 +97,43 @@ const check = (name, pass, detail = "") => {
   console.log(`${pass ? "ok  " : "FAIL"} ${name.padEnd(44)} ${detail}`);
 };
 
+// COUNTS BLURS, not focus-at-the-end, and the difference is the entire
+// point. Chromium hands focus back after the await and looks fine;
+// iOS closes the keyboard the instant the field blurs and will not
+// reopen it for a programmatic focus outside the tap. So "is it focused
+// now" passes on broken code. "Did it ever blur" does not.
+await page.addInitScript(() => {
+  window.__blurs = 0;
+  document.addEventListener(
+    "blur",
+    (e) => {
+      if (e.target instanceof HTMLInputElement) window.__blurs++;
+    },
+    true,
+  );
+});
+await page.reload({ waitUntil: "domcontentloaded" });
+await page.waitForSelector("main input", { timeout: 20000 });
+await page.waitForTimeout(900);
+
 const field = page.locator("main input").first();
 await field.click();
 
-// One tap, at the start, and never again - which is the point.
+// HOW A GUESS IS MADE ON A PHONE. Not the Return key - a tap on the
+// name in the dropdown. That distinction is the whole bug this test
+// exists for: a button takes focus when tapped, which blurs the field
+// and closes the keyboard, and no amount of focusing it again
+// afterwards brings the keyboard back on iOS.
+//
+// So the run below TAPS, the way a phone does, rather than pressing
+// Enter the way a keyboard does.
 const seeds = ["ma", "jo", "ty", "br", "al", "ke"];
 const report = [];
 for (let i = 0; i < seeds.length; i++) {
   await page.keyboard.type(seeds[i]);
-  await page.waitForTimeout(320);
-  await page.keyboard.press("Enter");
+  await page.waitForTimeout(340);
+  // Tap the first suggestion, which is what a thumb does.
+  await page.locator('[role="option"]').first().click();
   // Long enough for the smooth scroll to land.
   await page.waitForTimeout(1100);
 
@@ -133,13 +160,18 @@ for (let i = 0; i < seeds.length; i++) {
       newestVisible: !!nr && nr.top >= 0 && nr.bottom <= vh,
       prevVisible: !!pr && pr.bottom <= vh && pr.bottom > 0,
       vh: Math.round(vh),
+      blurs: window.__blurs ?? 0,
     };
   });
   report.push(m);
 }
 
 const every = (fn) => report.every(fn);
-check("the field never loses focus", every((m) => m.focused), `${report.filter((m) => m.focused).length}/${report.length} guesses`);
+check(
+  "tapping a name never takes the focus",
+  report[report.length - 1].blurs === 0 && every((m) => m.focused),
+  `${report[report.length - 1].blurs} blur events over ${report.length} guesses`,
+);
 check(
   "the field stays on screen the whole run",
   every((m) => m.inputVisible),
