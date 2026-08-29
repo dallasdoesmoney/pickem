@@ -29,6 +29,10 @@ export type PuzzleGuess = {
 
 export type PuzzleState = {
   puzzleOn: string;
+  // Which board this is, counted from the first day anybody ever played
+  // - see 0059_puzzle_number.sql. Optional because a guest board is
+  // built in the browser and fills it in from its own call.
+  puzzleNumber?: number;
   maxGuesses: number;
   guessesUsed: number;
   guesses: PuzzleGuess[];
@@ -63,6 +67,16 @@ export async function submitDailyGuess(espnId: string): Promise<PuzzleState> {
 // 0051_guest_play.sql), and the browser keeps the running board until
 // either the day rolls over or an account turns up to hand it to.
 const GUEST_KEY = "pickem:daily-guest";
+
+// A guest's board is assembled in the browser, so the number has to be
+// asked for separately - it is the one fact about the day that only the
+// database knows. One small call on load, and only when signed out.
+export async function fetchPuzzleNumber(puzzleOn: string): Promise<number | null> {
+  const { data, error } = await supabase.rpc("puzzle_number", { p_on: puzzleOn });
+  if (error) throw error;
+  const n = Number(data);
+  return Number.isFinite(n) ? n : null;
+}
 
 export async function submitGuestGuess(espnId: string): Promise<PuzzleGuess> {
   const { data, error } = await supabase.rpc("puzzle_guest_compare", { p_espn_id: espnId });
