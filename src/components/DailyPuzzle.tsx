@@ -23,6 +23,8 @@ import {
 } from "@/lib/supabase/dailyPuzzle";
 import { pickPracticeAnswer, practiceBoard } from "@/lib/practicePuzzle";
 import { errorMessage } from "@/lib/errorMessage";
+import { fetchNameplateStats, type NameplateStats } from "@/lib/supabase/nameplateStats";
+import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
@@ -33,30 +35,22 @@ import { useSignInModal } from "@/hooks/useSignInModal";
 // like a bounce rather than a move.
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-// The sticker language, in one place - moved down the scale. Same four
-// rules as the cream board it replaces (solid ground, hard outline, hard
-// offset shadow, no transparency), with one thing kept deliberately: the
-// CARD IS LIGHTER THAN THE PAGE. That is what makes an offset shadow read
-// as depth on a dark ground instead of as a smudge, and it is the whole
-// trick behind this palette.
-//
-// The chips stay light, so black type on them survives the change - the
-// board is dark, the stickers on it are not.
-const CARD = "#141d31";
-const FIELD = "#0e1626";
-const RULE = "#2b3a56";
-const TEXT = "#eef3fb";
-const MUTED = "#7d8ca6";
-const ALARM = "#ff6f61";
-// Ink is the colour of type ON A CHIP, and only that. Everything written
-// on the card itself uses TEXT.
-const INK = "#0a1020";
-const EDGE = `2px solid #0a1120`;
-// The card sits on the page, so it gets an ambient shadow; the chips sit
-// on the card, so they keep the hard offset. Two different jobs that were
-// one constant when everything was cream.
-const CARD_EDGE = `1px solid ${RULE}`;
-const DROP = `0 24px 60px -22px #000000`;
+// The palette moved to its own module when the stats started drawing on
+// it too - see src/lib/nameplateTheme.ts.
+import {
+  CARD,
+  FIELD,
+  RULE,
+  TEXT,
+  MUTED,
+  ALARM,
+  INK,
+  GREEN,
+  GOLD,
+  EDGE,
+  CARD_EDGE,
+  DROP,
+} from "@/lib/nameplateTheme";
 
 // THE DAILY'S SERIAL. Day one is the day Nameplate went live.
 //
@@ -157,8 +151,8 @@ function formatCell(key: ColumnKey, value: string | number | null): string {
 // `unknown` is a step quieter again: "nobody has this value" is less
 // than a miss, not more.
 const TONE: Record<Verdict, { bg: string; ink: string }> = {
-  hit: { bg: "#3ecb78", ink: INK },
-  close: { bg: "#ffce3a", ink: INK },
+  hit: { bg: GREEN, ink: INK },
+  close: { bg: GOLD, ink: INK },
   miss: { bg: "#aab3c1", ink: INK },
   unknown: { bg: "#8d96a5", ink: INK },
 };
@@ -295,6 +289,36 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // somebody reopening their result to screenshot it does not want to
   // close two dialogs each time.
   const [joinOffered, setJoinOffered] = useState(false);
+
+  // YOUR RECORD, fetched when a daily board settles.
+  //
+  // Only then, and only for the daily: it is derived from the guesses
+  // (see 0058), so asking before the last guess has landed would return
+  // a number that is about to be wrong, and a practice round is not in
+  // it at all - nothing a practice round does is written down.
+  //
+  // A failure is swallowed. The stats are the nicest part of finishing a
+  // board and none of the point of it; an error toast over somebody's
+  // result would trade the whole moment for a number.
+  const [stats, setStats] = useState<NameplateStats | null>(null);
+  const dailyFinished = mode === "daily" && dailyState?.finished === true;
+  useEffect(() => {
+    if (!user || !dailyFinished) return;
+    let cancelled = false;
+    fetchNameplateStats()
+      .then((s) => {
+        if (!cancelled) setStats(s);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, dailyFinished]);
+  // Whether they are SHOWN is decided here rather than by clearing the
+  // state above. Clearing meant a setState in the effect body on every
+  // render that was not a finished daily - a cascading render for the
+  // sake of a value nothing was reading yet.
+  const shownStats = user && dailyFinished ? stats : null;
   const celebrateTimer = useRef<number | null>(null);
   // A losing guest has no reveal to scroll to, so the sign-in card is
   // what the board scrolls up to instead. Without this the eighth guess
@@ -993,6 +1017,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             copied={copied}
             grid={shareGrid(state)}
             practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
+            stats={shownStats}
             onPlayAgain={playAgain}
           />
         </ResultDialog>
@@ -1092,7 +1117,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             <div
               className="px-4 py-3 text-center"
               style={{
-                background: mode === "daily" ? "#3ecb78" : "#ffce3a",
+                background: mode === "daily" ? GREEN : GOLD,
                 color: INK,
                 fontFamily: "var(--font-display)",
                 borderRadius: playShell ? 0 : "17px 17px 0 0",
@@ -1152,7 +1177,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                     style={{
                       fontFamily: "var(--font-display)",
                       letterSpacing: "0.04em",
-                      background: mode === m.key ? "#3ecb78" : "transparent",
+                      background: mode === m.key ? GREEN : "transparent",
                       color: mode === m.key ? INK : MUTED,
                     }}
                   >
@@ -1192,7 +1217,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 style={{
                   fontFamily: "var(--font-display)",
                   fontSize: ".8rem",
-                  background: "#3ecb78",
+                  background: GREEN,
                   color: INK,
                   border: EDGE,
                   borderRadius: 12,
@@ -1768,6 +1793,7 @@ function Reveal({
   grid,
   practiceRound,
   onPlayAgain,
+  stats,
 }: {
   state: PuzzleState;
   answer: PuzzlePlayer | undefined;
@@ -1782,6 +1808,9 @@ function Reveal({
   // was set. Posting it would say "3 guesses" about nothing.
   practiceRound: number | null;
   onPlayAgain: () => void;
+  // Null for a guest, for a practice round, and for the moment before
+  // the fetch lands - the panel simply is not drawn in any of them.
+  stats: NameplateStats | null;
 }) {
   const team = (answer?.team ?? state.answer?.team) as TeamAbbr | undefined;
   const brand = team ? TEAMS[team]?.color : undefined;
@@ -1874,6 +1903,32 @@ function Reveal({
           </div>
         )}
 
+        {/* YOUR RECORD, under the result rather than over it. The board
+            you just played is the thing you came for; the run it belongs
+            to is the reason to come back tomorrow, and that is an
+            afterthought in the right order.
+
+            The daily only. A practice round is not in these numbers, so
+            showing them beside one would invite the reading that it was.
+
+            The bar for the guess you just solved on is lit - see
+            highlight - so the number at the top of this card has a place
+            in the shape underneath it. */}
+        {practiceRound === null && stats !== null && (
+          <div className="w-full" style={{ borderTop: CARD_EDGE, paddingTop: 14 }}>
+            <p
+              className="mb-2 text-center text-[9px] font-semibold uppercase tracking-[0.14em]"
+              style={{ color: MUTED }}
+            >
+              Your record
+            </p>
+            <NameplateStatsPanel
+              stats={stats}
+              highlight={state.solved ? state.guessesUsed : null}
+            />
+          </div>
+        )}
+
         <p className="text-xs" style={{ color: MUTED }}>
           {practiceRound !== null
             ? "Practice — nothing recorded. Today's board is under TODAY."
@@ -1891,7 +1946,7 @@ function Reveal({
             style={{
               fontFamily: "var(--font-display)",
               fontSize: ".85rem",
-              background: "#3ecb78",
+              background: GREEN,
               color: INK,
               border: EDGE,
               borderRadius: 12,
