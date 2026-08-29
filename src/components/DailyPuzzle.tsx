@@ -357,53 +357,99 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // the same trap one level down.
   const playShell = narrow && kb.inset > 0 && outgrown && !state?.finished;
   const barRef = useRef<HTMLDivElement>(null);
-  // Where the bar was standing the moment before the panel took over.
+  // Where each piece was standing the moment before the panel took over.
   const barFromRef = useRef<number | null>(null);
+  const boardFromRef = useRef<number | null>(null);
+  // Set for the one guess that triggers the hand-off, so the usual
+  // smooth scroll stands aside and lets the animation own that frame.
+  const handingOffRef = useRef(false);
   // The box the guesses scroll inside once the shell is up.
   const boardScrollRef = useRef<HTMLDivElement>(null);
 
-  // THE BAR GLIDES TO THE TOP rather than teleporting there.
+  // THE WHOLE PANEL SLIDES UP rather than teleporting there.
   //
   // Nothing can transition `position`, and this switch is exactly that -
-  // the bar goes from sitting in the page to being the top of a fixed
-  // panel, which is a jump of a couple of hundred pixels in one frame.
+  // the card goes from sitting in the page to being a fixed panel, which
+  // moves the bar and the board a couple of hundred pixels in one frame,
+  // mid-guess.
   //
-  // So it is a FLIP. The bar's old top was captured just before the
-  // switch; now that React has put it in its new place, the difference
-  // is applied as a transform - which puts it visually back where it
-  // was, with no paint in between - and then released on the next frame
-  // so it travels to where it now belongs. What moves is a transform,
-  // which is cheap and does not touch layout.
+  // So it is a FLIP, on both pieces. Their old tops were captured just
+  // before the switch; now that React has put them in their new places,
+  // each difference is applied as a transform - which puts them visually
+  // back where they were, with no paint in between - and released on the
+  // next frame so they travel together. What moves is a transform, which
+  // is cheap and never touches layout.
+  //
+  // Animating only the bar was the first attempt, and it read worse than
+  // no animation at all: one thing gliding while everything under it
+  // jumped.
   useIsoLayoutEffect(() => {
-    const el = barRef.current;
-    const from = barFromRef.current;
+    const bar = barRef.current;
+    const board = boardScrollRef.current;
+    const barFrom = barFromRef.current;
+    const boardFrom = boardFromRef.current;
     barFromRef.current = null;
-    if (!playShell || !el || from === null) return;
+    boardFromRef.current = null;
+    handingOffRef.current = false;
+    if (!playShell || barFrom === null) return;
+
+    // The box is only now scrollable, so it is put where it belongs
+    // INSTANTLY, before anything is painted. Scrolling it smoothly while
+    // it is also sliding is two motions fighting over one element.
+    if (board) {
+      const inBox = board.querySelectorAll("[data-guess-row]");
+      const anchor = inBox[inBox.length - 2] ?? inBox[inBox.length - 1];
+      if (anchor) {
+        board.scrollTop =
+          anchor.getBoundingClientRect().top - board.getBoundingClientRect().top + board.scrollTop - 6;
+      }
+    }
+
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    const delta = from - el.getBoundingClientRect().top;
-    // Under a couple of pixels there is nothing to watch, and animating
-    // it would only risk a flicker.
-    if (Math.abs(delta) < 2) return;
+    const pieces: { el: HTMLElement; delta: number }[] = [];
+    const push = (el: HTMLElement | null, from: number | null) => {
+      if (!el || from === null) return;
+      const delta = from - el.getBoundingClientRect().top;
+      if (Math.abs(delta) >= 2) pieces.push({ el, delta });
+    };
+    push(bar, barFrom);
+    push(board, boardFrom);
+    if (pieces.length === 0) return;
 
-    el.style.transition = "none";
-    el.style.transform = `translateY(${delta}px)`;
+    for (const { el, delta } of pieces) {
+      el.style.transition = "none";
+      el.style.transform = `translateY(${delta}px)`;
+    }
     const raf = requestAnimationFrame(() => {
-      el.style.transition = "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)";
-      el.style.transform = "translateY(0)";
+      for (const { el } of pieces) {
+        // SYMMETRIC, not an ease-out, and that is the difference
+        // between watching it move and seeing it skip. A hard ease-out
+        // spends 60% of the distance in the first 140ms and then crawls
+        // - measured - so the eye reads the fast part as a jump and the
+        // slow part as the thing having already arrived. easeInOutCubic
+        // accelerates and decelerates, which is what makes the travel
+        // legible.
+        //
+        // 620ms, because this happens once a round rather than once a
+        // guess, so it can afford the time - and being legible is the
+        // entire point of it.
+        el.style.transition = "transform 620ms cubic-bezier(0.65, 0, 0.35, 1)";
+        el.style.transform = "translateY(0)";
+      }
     });
-    // Cleared afterwards, always. A transform left on the bar would
+    // Cleared afterwards, always. A transform left on either piece would
     // offset it for the rest of the round.
     const clear = () => {
-      el.style.transition = "";
-      el.style.transform = "";
+      for (const { el } of pieces) {
+        el.style.transition = "";
+        el.style.transform = "";
+      }
     };
-    el.addEventListener("transitionend", clear, { once: true });
-    const failsafe = window.setTimeout(clear, 700);
+    const failsafe = window.setTimeout(clear, 900);
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(failsafe);
-      el.removeEventListener("transitionend", clear);
       clear();
     };
   }, [playShell]);
@@ -660,9 +706,17 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
           // Has the board outgrown the screen yet? Asked here, where a
-          // row has just been added and laid out, and only while the
-          // answer is still no - see `outgrown`.
-          if (narrow && kb.visible > 0) {
+          // row has just been added and laid out, and ONLY WHILE THE
+          // ANSWER IS STILL NO.
+          //
+          // That guard is not an optimisation. Without it the check
+          // fires again on every later guess and re-arms handingOff -
+          // but setOutgrown(true) on an already-true value is not a
+          // state change, so React never re-renders, the layout effect
+          // that clears the flag never runs, and every subsequent guess
+          // skips its scroll. The board silently stopped following the
+          // newest row from the third guess on.
+          if (!outgrown && narrow && kb.visible > 0) {
             const barH = barRef.current?.offsetHeight ?? 0;
             const boardH = boardScrollRef.current?.scrollHeight ?? 0;
             // 24px of slack, so it flips when a row is genuinely
@@ -671,11 +725,18 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               // Where the bar is NOW, captured before the switch that
               // moves it. Half of a FLIP: the other half runs in the
               // layout effect once React has put it in its new place.
+              // Where BOTH pieces are standing, captured before the
+              // switch that moves them. The bar alone was not enough -
+              // animating it while the board teleported underneath is
+              // exactly the "skip, then everything is suddenly higher"
+              // that made the hand-off feel broken.
               barFromRef.current = barRef.current?.getBoundingClientRect().top ?? null;
+              boardFromRef.current = boardScrollRef.current?.getBoundingClientRect().top ?? null;
+              handingOffRef.current = true;
               setOutgrown(true);
             }
           }
-          showNewestGuess();
+          if (!handingOffRef.current) showNewestGuess();
         }),
       );
 
