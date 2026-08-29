@@ -221,6 +221,8 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // Opened when a round ENDS and never on load: a finished board that
   // pops a modal every time you come back to it is a modal people learn
   // to dismiss without reading. The card keeps a way back in instead.
+  const [kb, setKb] = useState({ inset: 0, top: 0, visible: 0 });
+  const [outgrown, setOutgrown] = useState(false);
   const [stage, setStage] = useState<null | "reveal" | "join">(null);
   // The ask follows the reveal ONCE. Offered again on every dismissal it
   // would stop being an offer and start being a thing in the way -
@@ -241,6 +243,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     setCelebrating(false);
     setStage(null);
     setJoinOffered(false);
+    setOutgrown(false);
   }, []);
 
   function switchMode(next: "daily" | "unlimited") {
@@ -278,7 +281,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // The 80px floor separates a keyboard from browser chrome sliding away
   // on scroll, which shrinks the visual viewport too and is not
   // something to react to.
-  const [kb, setKb] = useState({ inset: 0, top: 0, visible: 0 });
+
   const [narrow, setNarrow] = useState(false);
   useEffect(() => {
     const vv = window.visualViewport;
@@ -302,6 +305,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           ? { inset: Math.round(covered), top: Math.round(vv.offsetTop), visible: Math.round(vv.height) }
           : { inset: 0, top: 0, visible: 0 },
       );
+      if (covered <= 80) setOutgrown(false);
     };
     vv.addEventListener("resize", measure);
     vv.addEventListener("scroll", measure);
@@ -331,7 +335,21 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // top of it, the guesses scroll INSIDE it, and "show the newest" stops
   // being viewport arithmetic and becomes scrollTop = scrollHeight,
   // which cannot be wrong.
-  const playShell = narrow && kb.inset > 0 && !state?.finished;
+  // ...but only once the board has actually outgrown the screen. Taking
+  // the page over on the first guess, while everything still fits, is
+  // just hiding the title and the mode toggle for nothing.
+  //
+  // LATCHED, not re-evaluated. The obvious version - "does it fit right
+  // now" - oscillates, because engaging the shell hides the title and
+  // the toggle, which frees the very space that made it necessary; it
+  // would fit again, disengage, stop fitting, and flicker. So the
+  // question is asked only while the answer is still no, and once it is
+  // yes it stays yes until the keyboard goes down or a new round starts.
+  //
+  // Measured against the bar and the ROWS, both of which are the same
+  // height either way - deciding on anything the shell itself changes is
+  // the same trap one level down.
+  const playShell = narrow && kb.inset > 0 && outgrown && !state?.finished;
   const barRef = useRef<HTMLDivElement>(null);
   // The box the guesses scroll inside once the shell is up.
   const boardScrollRef = useRef<HTMLDivElement>(null);
@@ -585,7 +603,21 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       // Two frames: the first is the one React commits the new row on,
       // the second is after layout has settled, which is when the row has
       // a height worth measuring.
-      requestAnimationFrame(() => requestAnimationFrame(showNewestGuess));
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          // Has the board outgrown the screen yet? Asked here, where a
+          // row has just been added and laid out, and only while the
+          // answer is still no - see `outgrown`.
+          if (narrow && kb.visible > 0) {
+            const barH = barRef.current?.offsetHeight ?? 0;
+            const boardH = boardScrollRef.current?.scrollHeight ?? 0;
+            // 24px of slack, so it flips when a row is genuinely
+            // crowding the edge rather than the moment it touches it.
+            if (barH + boardH > kb.visible - 24) setOutgrown(true);
+          }
+          showNewestGuess();
+        }),
+      );
 
       if (next.finished) {
         const fresh = next.solved && !state?.solved;

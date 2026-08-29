@@ -238,10 +238,27 @@ check(
   report.slice(1).every((m) => m.prevVisible),
   `${report.slice(1).filter((m) => m.prevVisible).length}/${report.length - 1}`,
 );
+// THE PANEL WAITS UNTIL IT IS NEEDED. Taking the page over on the first
+// guess, while the board still fits, hides the title and the mode toggle
+// for nothing. So the early guesses stay on the normal page and the
+// panel arrives when the board outgrows the strip.
+const firstShell = report.findIndex((m) => m.shellUp);
 check(
-  "the play shell matches the visible strip",
-  report.every((m) => m.shellUp && m.shellHeight === VISIBLE_WITH_KEYBOARD),
-  `heights: ${[...new Set(report.map((m) => m.shellHeight))].join(", ")} (strip is ${VISIBLE_WITH_KEYBOARD})`,
+  "the panel waits until the board outgrows the screen",
+  firstShell > 0,
+  firstShell < 0 ? "never engaged" : `normal page for ${firstShell} guess(es), panel from ${firstShell + 1}`,
+);
+check(
+  "and once up it matches the visible strip",
+  report.slice(firstShell).every((m) => m.shellUp && m.shellHeight === VISIBLE_WITH_KEYBOARD),
+  `heights: ${[...new Set(report.slice(firstShell).map((m) => m.shellHeight))].join(", ")} (strip is ${VISIBLE_WITH_KEYBOARD})`,
+);
+// It must not flicker back off - engaging frees the space that made it
+// necessary, so a naive "does it fit now" would oscillate.
+check(
+  "and never flickers back off",
+  report.slice(firstShell).every((m) => m.shellUp),
+  `shell per guess: ${report.map((m) => (m.shellUp ? "on" : "off")).join(" ")}`,
 );
 check("six guesses landed", report[report.length - 1].rows === 6, `${report[report.length - 1].rows} rows`);
 
