@@ -23,6 +23,8 @@ import {
 } from "@/lib/supabase/dailyPuzzle";
 import { pickPracticeAnswer, practiceBoard } from "@/lib/practicePuzzle";
 import { errorMessage } from "@/lib/errorMessage";
+import { fetchNameplateStats, type NameplateStats } from "@/lib/supabase/nameplateStats";
+import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
@@ -33,30 +35,22 @@ import { useSignInModal } from "@/hooks/useSignInModal";
 // like a bounce rather than a move.
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-// The sticker language, in one place - moved down the scale. Same four
-// rules as the cream board it replaces (solid ground, hard outline, hard
-// offset shadow, no transparency), with one thing kept deliberately: the
-// CARD IS LIGHTER THAN THE PAGE. That is what makes an offset shadow read
-// as depth on a dark ground instead of as a smudge, and it is the whole
-// trick behind this palette.
-//
-// The chips stay light, so black type on them survives the change - the
-// board is dark, the stickers on it are not.
-const CARD = "#141d31";
-const FIELD = "#0e1626";
-const RULE = "#2b3a56";
-const TEXT = "#eef3fb";
-const MUTED = "#7d8ca6";
-const ALARM = "#ff6f61";
-// Ink is the colour of type ON A CHIP, and only that. Everything written
-// on the card itself uses TEXT.
-const INK = "#0a1020";
-const EDGE = `2px solid #0a1120`;
-// The card sits on the page, so it gets an ambient shadow; the chips sit
-// on the card, so they keep the hard offset. Two different jobs that were
-// one constant when everything was cream.
-const CARD_EDGE = `1px solid ${RULE}`;
-const DROP = `0 24px 60px -22px #000000`;
+// The palette moved to its own module when the stats started drawing on
+// it too - see src/lib/nameplateTheme.ts.
+import {
+  CARD,
+  FIELD,
+  RULE,
+  TEXT,
+  MUTED,
+  ALARM,
+  INK,
+  GREEN,
+  GOLD,
+  EDGE,
+  CARD_EDGE,
+  DROP,
+} from "@/lib/nameplateTheme";
 
 // THE DAILY'S SERIAL. Day one is the day Nameplate went live.
 //
@@ -157,8 +151,8 @@ function formatCell(key: ColumnKey, value: string | number | null): string {
 // `unknown` is a step quieter again: "nobody has this value" is less
 // than a miss, not more.
 const TONE: Record<Verdict, { bg: string; ink: string }> = {
-  hit: { bg: "#3ecb78", ink: INK },
-  close: { bg: "#ffce3a", ink: INK },
+  hit: { bg: GREEN, ink: INK },
+  close: { bg: GOLD, ink: INK },
   miss: { bg: "#aab3c1", ink: INK },
   unknown: { bg: "#8d96a5", ink: INK },
 };
@@ -243,6 +237,26 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  // PLAY AGAIN SHOULD LEAVE YOU TYPING, and on a phone that is harder
+  // than it sounds.
+  //
+  // The field does not exist when PLAY AGAIN is pressed - a finished
+  // round replaces it with the result buttons - so it cannot simply be
+  // focused in the click handler. It only mounts on the render the tap
+  // causes, and by then iOS considers the gesture over: it will not open
+  // a keyboard for a focus() it did not see a finger behind.
+  //
+  // So the gesture is kept alive through the gap. The tap focuses this
+  // one-pixel field FIRST, synchronously, which opens the keyboard while
+  // the tap is still the tap; the layout effect below then moves focus
+  // to the real field the moment it mounts, and moving between two text
+  // inputs never closes a keyboard that is already up.
+  //
+  // Not readOnly, not display:none, not visibility:hidden - iOS opens a
+  // keyboard for none of those. Zero opacity at one pixel, fixed at the
+  // top of the viewport so focusing it cannot scroll the page.
+  const keepAliveRef = useRef<HTMLInputElement>(null);
+  const wantFocusRef = useRef(false);
 
   // THE WIN IS HELD. Solving used to swap the reveal card in on the same
   // tick the guess landed, so the board turned green and vanished in the
@@ -275,6 +289,36 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // somebody reopening their result to screenshot it does not want to
   // close two dialogs each time.
   const [joinOffered, setJoinOffered] = useState(false);
+
+  // YOUR RECORD, fetched when a daily board settles.
+  //
+  // Only then, and only for the daily: it is derived from the guesses
+  // (see 0058), so asking before the last guess has landed would return
+  // a number that is about to be wrong, and a practice round is not in
+  // it at all - nothing a practice round does is written down.
+  //
+  // A failure is swallowed. The stats are the nicest part of finishing a
+  // board and none of the point of it; an error toast over somebody's
+  // result would trade the whole moment for a number.
+  const [stats, setStats] = useState<NameplateStats | null>(null);
+  const dailyFinished = mode === "daily" && dailyState?.finished === true;
+  useEffect(() => {
+    if (!user || !dailyFinished) return;
+    let cancelled = false;
+    fetchNameplateStats()
+      .then((s) => {
+        if (!cancelled) setStats(s);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, dailyFinished]);
+  // Whether they are SHOWN is decided here rather than by clearing the
+  // state above. Clearing meant a setState in the effect body on every
+  // render that was not a finished daily - a cascading render for the
+  // sake of a value nothing was reading yet.
+  const shownStats = user && dailyFinished ? stats : null;
   const celebrateTimer = useRef<number | null>(null);
   // A losing guest has no reveal to scroll to, so the sign-in card is
   // what the board scrolls up to instead. Without this the eighth guess
@@ -291,6 +335,29 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     setJoinOffered(false);
     setOutgrown(false);
   }, []);
+
+  // PLAY AGAIN, as opposed to arriving in unlimited for the first time.
+  // Switching mode deals a round too, but tapping UNLIMITED is a
+  // decision about what to look at; pressing PLAY AGAIN is a decision to
+  // keep playing, and only the second one should raise a keyboard.
+  const playAgain = useCallback(() => {
+    // Before the state change, so it happens inside the tap. See
+    // keepAliveRef.
+    keepAliveRef.current?.focus({ preventScroll: true });
+    wantFocusRef.current = true;
+    startPracticeRound();
+  }, [startPracticeRound]);
+
+  // Hands the caret over as soon as there is something to hand it to.
+  // No dependency array on purpose: the field can appear on any commit,
+  // and the ref is what makes this run once rather than every time.
+  useIsoLayoutEffect(() => {
+    if (!wantFocusRef.current) return;
+    const el = inputRef.current;
+    if (!el) return;
+    wantFocusRef.current = false;
+    el.focus();
+  });
 
   function switchMode(next: "daily" | "unlimited") {
     if (next === mode) return;
@@ -950,10 +1017,8 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             copied={copied}
             grid={shareGrid(state)}
             practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
-            onPlayAgain={() => {
-              setStage(null);
-              startPracticeRound();
-            }}
+            stats={shownStats}
+            onPlayAgain={playAgain}
           />
         </ResultDialog>
       )}
@@ -1052,7 +1117,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             <div
               className="px-4 py-3 text-center"
               style={{
-                background: mode === "daily" ? "#3ecb78" : "#ffce3a",
+                background: mode === "daily" ? GREEN : GOLD,
                 color: INK,
                 fontFamily: "var(--font-display)",
                 borderRadius: playShell ? 0 : "17px 17px 0 0",
@@ -1074,19 +1139,27 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               </div>
             </div>
 
-            {header}
+            {/* The two modes, directly under the strip and above the title.
+                The strip says WHICH board this is, so the control that
+                changes which board this is belongs against it - and the
+                pair now reads as one thing: a state, and the switch for
+                it. Below the title it was separated from the strip by the
+                wordmark, which is the one element on the card that never
+                changes.
 
-            {/* The two modes, on the card and above the field, because the
-                first thing to settle is which game you are playing. Inside
-                the card rather than floating above it: it belongs to the
-                board, and a control on the page would read as navigation.
+                Inside the card rather than floating above it: it belongs
+                to the board, and a control on the page would read as
+                navigation.
 
                 Both are always open. Locking unlimited behind the daily
                 protects the streak, but it does it by telling a first-time
                 visitor who wants to keep playing to come back tomorrow, and
                 the visitor who wants a second round is the one worth
                 keeping. */}
-            <div className="flex justify-center px-4 pb-3 pt-1">
+            {/* No bottom padding: the header brings its own pt-3, so the
+                gap under the toggle matches the one above it rather than
+                doubling. */}
+            <div className="flex justify-center px-4 pt-3">
               <div className="flex gap-1 rounded-full p-1" style={{ background: FIELD, border: CARD_EDGE }}>
                 {(
                   [
@@ -1104,7 +1177,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                     style={{
                       fontFamily: "var(--font-display)",
                       letterSpacing: "0.04em",
-                      background: mode === m.key ? "#3ecb78" : "transparent",
+                      background: mode === m.key ? GREEN : "transparent",
                       color: mode === m.key ? INK : MUTED,
                     }}
                   >
@@ -1114,6 +1187,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               </div>
             </div>
 
+            {header}
           </div>
         </div>
 
@@ -1138,12 +1212,12 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             {mode === "unlimited" && (
               <button
                 type="button"
-                onClick={startPracticeRound}
+                onClick={playAgain}
                 className="puzzle-press flex-1"
                 style={{
                   fontFamily: "var(--font-display)",
                   fontSize: ".8rem",
-                  background: "#3ecb78",
+                  background: GREEN,
                   color: INK,
                   border: EDGE,
                   borderRadius: 12,
@@ -1429,6 +1503,35 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       )}
       </div>
       </div>
+
+      {/* THE GESTURE'S FOOT IN THE DOOR. See keepAliveRef: PLAY AGAIN
+          focuses this for the few milliseconds between the tap and the
+          real field mounting, so the keyboard opens while iOS still
+          counts the tap as a tap.
+
+          A pixel, transparent, fixed at the top of the viewport so
+          focusing it cannot scroll anything, and untabbable so it is
+          never reached by accident. It is a real, writable text input,
+          because iOS opens a keyboard for nothing less - readOnly,
+          display:none and visibility:hidden all fail silently.
+
+          LAST in the tree, not first. There are two inputs on this card
+          now, and anything reaching for "the input" by document order
+          should find the one somebody types into. Being fixed, it takes
+          no part in the column's layout wherever it sits. */}
+      <input
+        ref={keepAliveRef}
+        type="text"
+        tabIndex={-1}
+        aria-hidden="true"
+        // Named, so it is obvious in the inspector what this is doing
+        // there rather than looking like a stray field.
+        data-keyboard-keepalive
+        autoComplete="off"
+        className="pointer-events-none fixed left-0 top-0 h-px w-px border-0 p-0 opacity-0"
+        onChange={() => {}}
+        value=""
+      />
     </div>
   );
 }
@@ -1690,6 +1793,7 @@ function Reveal({
   grid,
   practiceRound,
   onPlayAgain,
+  stats,
 }: {
   state: PuzzleState;
   answer: PuzzlePlayer | undefined;
@@ -1704,6 +1808,9 @@ function Reveal({
   // was set. Posting it would say "3 guesses" about nothing.
   practiceRound: number | null;
   onPlayAgain: () => void;
+  // Null for a guest, for a practice round, and for the moment before
+  // the fetch lands - the panel simply is not drawn in any of them.
+  stats: NameplateStats | null;
 }) {
   const team = (answer?.team ?? state.answer?.team) as TeamAbbr | undefined;
   const brand = team ? TEAMS[team]?.color : undefined;
@@ -1796,6 +1903,32 @@ function Reveal({
           </div>
         )}
 
+        {/* YOUR RECORD, under the result rather than over it. The board
+            you just played is the thing you came for; the run it belongs
+            to is the reason to come back tomorrow, and that is an
+            afterthought in the right order.
+
+            The daily only. A practice round is not in these numbers, so
+            showing them beside one would invite the reading that it was.
+
+            The bar for the guess you just solved on is lit - see
+            highlight - so the number at the top of this card has a place
+            in the shape underneath it. */}
+        {practiceRound === null && stats !== null && (
+          <div className="w-full" style={{ borderTop: CARD_EDGE, paddingTop: 14 }}>
+            <p
+              className="mb-2 text-center text-[9px] font-semibold uppercase tracking-[0.14em]"
+              style={{ color: MUTED }}
+            >
+              Your record
+            </p>
+            <NameplateStatsPanel
+              stats={stats}
+              highlight={state.solved ? state.guessesUsed : null}
+            />
+          </div>
+        )}
+
         <p className="text-xs" style={{ color: MUTED }}>
           {practiceRound !== null
             ? "Practice — nothing recorded. Today's board is under TODAY."
@@ -1813,7 +1946,7 @@ function Reveal({
             style={{
               fontFamily: "var(--font-display)",
               fontSize: ".85rem",
-              background: "#3ecb78",
+              background: GREEN,
               color: INK,
               border: EDGE,
               borderRadius: 12,

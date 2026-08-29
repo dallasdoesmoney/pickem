@@ -308,9 +308,15 @@ if (finished) {
   });
   const gp = await guest.newPage();
   await gp.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
-  await gp.waitForSelector("main input", { timeout: 20000 });
+  // THE GUESS FIELD, not just any input in main. There is a second one
+  // now - a one-pixel keep-alive that PLAY AGAIN focuses to hold the tap
+  // gesture open while the real field mounts. It sits earlier in the DOM,
+  // so a bare "main input:not([data-keyboard-keepalive])" selector picks it instead: invisible, one pixel
+  // wide and pointer-events:none, which reads as the click being blocked
+  // by whatever is painted over it.
+  await gp.waitForSelector("main input:not([data-keyboard-keepalive])", { timeout: 20000 });
   await gp.waitForTimeout(900);
-  const gf = gp.locator("main input").first();
+  const gf = gp.locator("main input:not([data-keyboard-keepalive])").first();
   for (const q of ["ma", "jo", "ty"]) {
     await gf.click(); await gf.fill(q); await gp.waitForTimeout(320);
     await gp.keyboard.press("Enter"); await gp.waitForTimeout(600);

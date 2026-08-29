@@ -15,6 +15,8 @@ import { CreatorRequestModal } from "@/components/CreatorRequestModal";
 import { SocialLinksModal } from "@/components/SocialLinksModal";
 import { usePlayerStats } from "@/hooks/usePlayerStats";
 import { fetchUserBadges } from "@/lib/supabase/badges";
+import { fetchNameplateStats, type NameplateStats } from "@/lib/supabase/nameplateStats";
+import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 import { RankPanel } from "@/components/RankPanel";
 import { ProfileCard } from "@/components/ProfileCard";
@@ -68,6 +70,26 @@ function SignedInAccount({
   const [socialLinksOpen, setSocialLinksOpen] = useState(false);
   const [isCreator, setIsCreator] = useState<boolean | null>(null);
   const stats = usePlayerStats(userId);
+
+  // NAMEPLATE'S RECORD. Derived on every call from the guesses
+  // themselves, so this is a read and there is nothing to keep in sync -
+  // see 0058_nameplate_stats.sql.
+  //
+  // Own stats only: the RPC takes no user id and reads auth.uid(), so
+  // this cannot be pointed at somebody else even by accident. It is the
+  // reason the panel lives here and not on the public profile card.
+  const [nameplate, setNameplate] = useState<NameplateStats | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchNameplateStats()
+      .then((s) => {
+        if (!cancelled) setNameplate(s);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     fetchUserBadges(userId)
@@ -140,6 +162,33 @@ function SignedInAccount({
         </div>
       )}
 
+
+      {/* NAMEPLATE, above the creator prompt because it is about
+          something they have already done rather than something they
+          might. Only once a board has settled: four dashes and an empty
+          chart is a worse first impression of the game than no card at
+          all, and the game is one tap away for anybody who wants to
+          change that. */}
+      {nameplate && nameplate.played > 0 && (
+        <div className="mt-6">
+          <RankPanel
+            rankColor={rankColor}
+            tone="hero"
+            className="rounded-2xl border border-white/12 bg-[#101d38]"
+            innerClassName="p-4"
+          >
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
+                NAMEPLATE
+              </div>
+              <Link href="/daily" className="text-[11px] text-white/50 transition-colors hover:text-white/80">
+                {nameplate.solvedToday ? "Today\u2019s board \u2192" : "Play today\u2019s \u2192"}
+              </Link>
+            </div>
+            <NameplateStatsPanel stats={nameplate} />
+          </RankPanel>
+        </div>
+      )}
 
       {isCreator === false && (
         <button
