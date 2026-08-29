@@ -17,17 +17,27 @@
 //   2. The field stays on screen - it is sticky under the site chrome.
 //   3. The newest row is visible, above where the keyboard would be.
 //
-// THE KEYBOARD IS SIMULATED BY A SHORT VIEWPORT, and that is a real
-// limitation worth naming: a headless browser has no software keyboard,
-// so visualViewport equals the layout viewport here. 390x430 is about
-// what an iPhone leaves above the keyboard, so the geometry this asserts
-// is the right geometry - what it cannot prove is that iOS reports it
-// the way every other browser does.
+// THE KEYBOARD IS SIMULATED BY SHRINKING visualViewport, not by using a
+// short window - and that distinction is why this test missed a real bug
+// once already.
+//
+// A short window makes innerHeight and visualViewport.height the same
+// number, which is the one thing a keyboard never does. A keyboard
+// leaves the LAYOUT viewport alone and covers part of it, so
+// innerHeight stays tall while visualViewport.height shrinks. Everything
+// hard about this lives in that gap: how far the page can scroll is set
+// by the tall number, and what is visible is set by the short one.
+//
+// So the window is a full 390x800 phone and visualViewport.height is
+// overridden to 430 - the real shape of the problem. What this still
+// cannot prove is that iOS populates those properties the way every
+// other browser does.
 const APP = process.env.APP_URL ?? "http://localhost:3000";
 const SB = "https://placeholder.supabase.co";
 
-// Roughly what an iPhone leaves visible with the keyboard up.
-const KEYBOARD_OPEN = { width: 390, height: 430 };
+// A whole phone, and then the part of it a keyboard leaves.
+const PHONE = { width: 390, height: 800 };
+const VISIBLE_WITH_KEYBOARD = 430;
 
 let chromium;
 try {
@@ -70,7 +80,7 @@ const grade = (id) => ({
 const browser = await chromium.launch(
   process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {},
 );
-const ctx = await browser.newContext({ viewport: KEYBOARD_OPEN, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const ctx = await browser.newContext({ viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 await ctx.route("**://posthog.invalid/**", (r) => r.abort());
 await ctx.route("**://*.posthog.com/**", (r) => r.abort());
 await ctx.route(`${SB}/**`, (route) => {
@@ -102,6 +112,16 @@ const check = (name, pass, detail = "") => {
 // iOS closes the keyboard the instant the field blurs and will not
 // reopen it for a programmatic focus outside the tap. So "is it focused
 // now" passes on broken code. "Did it ever blur" does not.
+// The keyboard, as the page sees one: visualViewport shrinks, the window
+// does not, and a resize fires so the app can react.
+await page.addInitScript((visible) => {
+  Object.defineProperty(window.visualViewport, "height", { get: () => visible, configurable: true });
+  Object.defineProperty(window.visualViewport, "offsetTop", { get: () => 0, configurable: true });
+  window.addEventListener("load", () => {
+    setTimeout(() => window.visualViewport.dispatchEvent(new Event("resize")), 60);
+  });
+}, VISIBLE_WITH_KEYBOARD);
+
 await page.addInitScript(() => {
   window.__blurs = 0;
   document.addEventListener(
@@ -138,7 +158,8 @@ for (let i = 0; i < seeds.length; i++) {
   await page.waitForTimeout(1100);
 
   const m = await page.evaluate(() => {
-    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    // The visible strip, NOT the window. This is the whole distinction.
+    const vh = window.visualViewport.height;
     const input = document.querySelector("main input");
     // Both selectors, deliberately. data-guess-row is new; .puzzle-row
     // is what the board has always carried. Measuring only the new one
@@ -161,6 +182,11 @@ for (let i = 0; i < seeds.length; i++) {
       prevVisible: !!pr && pr.bottom <= vh && pr.bottom > 0,
       vh: Math.round(vh),
       blurs: window.__blurs ?? 0,
+      // How far below the pinned field the newest row ends up. Big means
+      // the scroll could not finish.
+      // How far the newest row sits BELOW where the scroll aimed it.
+      // Zero means it landed; a big number means the page ran out.
+      belowTarget: nr ? Math.round(nr.bottom - (vh - 16)) : 0,
     };
   });
   report.push(m);
@@ -195,6 +221,26 @@ check(
   `${report.slice(1).filter((m) => m.prevVisible).length}/${report.length - 1}`,
 );
 check("six guesses landed", report[report.length - 1].rows === 6, `${report[report.length - 1].rows} rows`);
+
+// THE ONE THAT WAS FAILING ON A REAL PHONE. Scrolling correctly is no
+// use if the page runs out of document underneath and the browser
+// clamps the scroll - the newest row then stops short, halfway under
+// the keyboard, which looks exactly like the scroll being too small.
+//
+// So: by the last guess the newest row must be sitting hard against the
+// pinned field, not floating below where it could not reach.
+// The measure is whether the scroll REACHED ITS TARGET. It aims to put
+// the newest row's bottom 16px above the keyboard; if the document runs
+// out underneath, the browser clamps and the row stops lower down -
+// short of the line, partly behind the keyboard. So the distance from
+// that line is the thing to check, and it has to hold on the LAST
+// guesses, which are the ones with the least page left beneath them.
+const shortfall = report.map((m) => m.belowTarget);
+check(
+  "the scroll reaches its target, not the end of the page",
+  report.every((m) => m.belowTarget <= 24),
+  `px short of the line, per guess: ${shortfall.join(", ")}`,
+);
 
 await page.screenshot({ path: "/tmp/claude-0/-home-user-pickem/c8c47499-bc03-5b0f-a459-d3a18c357eda/scratchpad/mobile-run.png" });
 await browser.close();

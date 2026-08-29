@@ -256,6 +256,39 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     posthog.capture("daily_puzzle_mode", { mode: next });
   }
 
+  // HOW MUCH OF THE WINDOW THE KEYBOARD IS COVERING, live.
+  //
+  // Needed because the page has to be able to SCROLL far enough. The
+  // scroll below wants to put the newest row just under the pinned
+  // field, and near the end of a board there is simply no document left
+  // underneath to scroll against - the browser scrolls as far as it can
+  // and stops short, which reads exactly like the scroll being too
+  // small. It was not too small; it ran out of page.
+  //
+  // So the document grows by exactly what the keyboard took, and the
+  // room the keyboard removed from the bottom of the screen is given
+  // back to the bottom of the page. Zero when no keyboard is up, so a
+  // desktop and a phone at rest are untouched.
+  //
+  // The 80px floor is what separates a keyboard from browser chrome
+  // sliding away on scroll, which also shrinks the visual viewport and
+  // is not something to pad for.
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const measure = () => {
+      const covered = window.innerHeight - vv.height - vv.offsetTop;
+      setKeyboardInset(covered > 80 ? Math.round(covered) : 0);
+    };
+    vv.addEventListener("resize", measure);
+    vv.addEventListener("scroll", measure);
+    return () => {
+      vv.removeEventListener("resize", measure);
+      vv.removeEventListener("scroll", measure);
+    };
+  }, []);
+
   // KEEPS THE LAST GUESSES ABOVE THE KEYBOARD.
   //
   // A phone with the keyboard up has roughly half a screen left, and the
@@ -282,8 +315,8 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     if (!newest) return;
     const vv = window.visualViewport;
     const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
-    // 14px so the row clears the keyboard rather than touching it.
-    const delta = newest.getBoundingClientRect().bottom - (bottom - 14);
+    // 16px so the row clears the keyboard rather than touching it.
+    const delta = newest.getBoundingClientRect().bottom - (bottom - 16);
     if (delta > 1) window.scrollBy({ top: delta, behavior: "smooth" });
   }, []);
 
@@ -640,7 +673,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const answer = state.answer ? PUZZLE_PLAYERS_BY_ID.get(state.answer.espnId) : undefined;
 
   return (
-    <div className="flex flex-col gap-5" style={{ fontFamily: "var(--font-game)" }}>
+    <div
+      className="flex flex-col gap-5"
+      // The scroll room the keyboard took. See keyboardInset above: this
+      // is what lets the last guesses reach the top of the screen instead
+      // of the page running out underneath them.
+      style={{ fontFamily: "var(--font-game)", paddingBottom: keyboardInset || undefined }}
+    >
       {/* Finished: the result comes FIRST, above the title as well as the
           board. It is the thing somebody came back for and the only part
           anyone screenshots, and it was sitting under a header that says
