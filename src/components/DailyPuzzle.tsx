@@ -366,93 +366,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // The box the guesses scroll inside once the shell is up.
   const boardScrollRef = useRef<HTMLDivElement>(null);
 
-  // THE WHOLE PANEL SLIDES UP rather than teleporting there.
-  //
-  // Nothing can transition `position`, and this switch is exactly that -
-  // the card goes from sitting in the page to being a fixed panel, which
-  // moves the bar and the board a couple of hundred pixels in one frame,
-  // mid-guess.
-  //
-  // So it is a FLIP, on both pieces. Their old tops were captured just
-  // before the switch; now that React has put them in their new places,
-  // each difference is applied as a transform - which puts them visually
-  // back where they were, with no paint in between - and released on the
-  // next frame so they travel together. What moves is a transform, which
-  // is cheap and never touches layout.
-  //
-  // Animating only the bar was the first attempt, and it read worse than
-  // no animation at all: one thing gliding while everything under it
-  // jumped.
-  useIsoLayoutEffect(() => {
-    const bar = barRef.current;
-    const board = boardScrollRef.current;
-    const barFrom = barFromRef.current;
-    const boardFrom = boardFromRef.current;
-    barFromRef.current = null;
-    boardFromRef.current = null;
-    handingOffRef.current = false;
-    if (!playShell || barFrom === null) return;
-
-    // The box is only now scrollable, so it is put where it belongs
-    // INSTANTLY, before anything is painted. Scrolling it smoothly while
-    // it is also sliding is two motions fighting over one element.
-    if (board) {
-      const inBox = board.querySelectorAll("[data-guess-row]");
-      const anchor = inBox[inBox.length - 2] ?? inBox[inBox.length - 1];
-      if (anchor) {
-        board.scrollTop =
-          anchor.getBoundingClientRect().top - board.getBoundingClientRect().top + board.scrollTop - 6;
-      }
-    }
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const pieces: { el: HTMLElement; delta: number }[] = [];
-    const push = (el: HTMLElement | null, from: number | null) => {
-      if (!el || from === null) return;
-      const delta = from - el.getBoundingClientRect().top;
-      if (Math.abs(delta) >= 2) pieces.push({ el, delta });
-    };
-    push(bar, barFrom);
-    push(board, boardFrom);
-    if (pieces.length === 0) return;
-
-    for (const { el, delta } of pieces) {
-      el.style.transition = "none";
-      el.style.transform = `translateY(${delta}px)`;
-    }
-    const raf = requestAnimationFrame(() => {
-      for (const { el } of pieces) {
-        // SYMMETRIC, not an ease-out, and that is the difference
-        // between watching it move and seeing it skip. A hard ease-out
-        // spends 60% of the distance in the first 140ms and then crawls
-        // - measured - so the eye reads the fast part as a jump and the
-        // slow part as the thing having already arrived. easeInOutCubic
-        // accelerates and decelerates, which is what makes the travel
-        // legible.
-        //
-        // 620ms, because this happens once a round rather than once a
-        // guess, so it can afford the time - and being legible is the
-        // entire point of it.
-        el.style.transition = "transform 620ms cubic-bezier(0.65, 0, 0.35, 1)";
-        el.style.transform = "translateY(0)";
-      }
-    });
-    // Cleared afterwards, always. A transform left on either piece would
-    // offset it for the rest of the round.
-    const clear = () => {
-      for (const { el } of pieces) {
-        el.style.transition = "";
-        el.style.transform = "";
-      }
-    };
-    const failsafe = window.setTimeout(clear, 900);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.clearTimeout(failsafe);
-      clear();
-    };
-  }, [playShell]);
 
   // KEEPS THE LAST GUESSES ABOVE THE KEYBOARD.
   //
@@ -528,6 +441,45 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
 
     if (delta > 1) window.scrollBy({ top: delta, behavior: "smooth" });
   }, []);
+
+  // THE SWITCH ITSELF MOVES NOTHING.
+  //
+  // Two attempts at animating the hand-off - the bar alone, then bar and
+  // board together as a FLIP - both read as a glitch, and for the same
+  // reason: a transform makes things LOOK like they travelled while the
+  // panel underneath appeared fully formed in one frame. What was asked
+  // for is simpler and better. It should scroll, exactly the way it
+  // scrolls after every other guess.
+  //
+  // So it does. The guess that triggers the hand-off scrolls the page
+  // the ordinary way until the bar reaches the top of the visible strip,
+  // and only then does the panel take over - by which point the bar is
+  // already where the panel would put it, so switching moves nothing at
+  // all. Then the box carries on scrolling to the newest rows. Two
+  // ordinary scrolls with an invisible join, rather than a jump dressed
+  // up as motion.
+  useIsoLayoutEffect(() => {
+    const board = boardScrollRef.current;
+    const boardFrom = boardFromRef.current;
+    boardFromRef.current = null;
+    barFromRef.current = null;
+    handingOffRef.current = false;
+    if (!playShell || !board) return;
+
+    // Keep whatever was on screen exactly where it was. If the scroll
+    // above landed properly this is 0 and nothing shifts; it is here so
+    // that a scroll which came up short degrades into a small offset
+    // rather than a jump to the top of the board.
+    if (boardFrom !== null) {
+      const settle = board.getBoundingClientRect().top - boardFrom;
+      board.scrollTop = Math.max(0, settle);
+    }
+
+    // And now the ordinary scroll, inside the box, to the same place
+    // every other guess goes.
+    const raf = requestAnimationFrame(() => showNewestGuess());
+    return () => cancelAnimationFrame(raf);
+  }, [playShell, showNewestGuess]);
 
   const endCelebration = useCallback(() => {
     if (celebrateTimer.current !== null) {
@@ -730,10 +682,31 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               // animating it while the board teleported underneath is
               // exactly the "skip, then everything is suddenly higher"
               // that made the hand-off feel broken.
-              barFromRef.current = barRef.current?.getBoundingClientRect().top ?? null;
-              boardFromRef.current = boardScrollRef.current?.getBoundingClientRect().top ?? null;
               handingOffRef.current = true;
-              setOutgrown(true);
+              // Scroll the bar up to the top of the strip, the ordinary
+              // way. The panel takes over when this lands.
+              const bar = barRef.current;
+              const lift = bar ? bar.getBoundingClientRect().top - kb.top : 0;
+              if (lift > 1) window.scrollBy({ top: lift, behavior: "smooth" });
+
+              // Where the board finished, so the box can be handed the
+              // same view rather than starting from the top.
+              const settleAndSwitch = () => {
+                boardFromRef.current = boardScrollRef.current?.getBoundingClientRect().top ?? null;
+                setOutgrown(true);
+              };
+              // scrollend where it exists, and a timer either way: Safari
+              // only gained scrollend in 17, and a hand-off that never
+              // happens is far worse than one that happens a beat late.
+              let switched = false;
+              const once = () => {
+                if (switched) return;
+                switched = true;
+                window.removeEventListener("scrollend", once);
+                settleAndSwitch();
+              };
+              window.addEventListener("scrollend", once, { once: true });
+              window.setTimeout(once, lift > 1 ? 520 : 0);
             }
           }
           if (!handingOffRef.current) showNewestGuess();
@@ -922,7 +895,21 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       // The scroll room the keyboard took. See keyboardInset above: this
       // is what lets the last guesses reach the top of the screen instead
       // of the page running out underneath them.
-      style={{ fontFamily: "var(--font-game)", paddingBottom: kb.inset || undefined }}
+      // Room for the keyboard AND for the hand-off scroll on top of it.
+      // The hand-off lifts the bar to the very top of the strip, which
+      // means everything above it - title, mode toggle, round line - has
+      // to be able to scroll away; without the extra, the page runs out
+      // partway and the switch snaps the bar the rest of the distance,
+      // which is the jump this was all trying to remove. Measured: the
+      // bar stalled at 106px and then teleported to 0.
+      //
+      // A strip's worth is comfortably more than the chrome above it,
+      // and it costs nothing: once the panel is up the document behind
+      // it is not visible at all.
+      style={{
+        fontFamily: "var(--font-game)",
+        paddingBottom: kb.inset ? kb.inset + kb.visible : undefined,
+      }}
     >
       {/* Finished: the result comes FIRST, above the title as well as the
           board. It is the thing somebody came back for and the only part
@@ -1150,7 +1137,24 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 ? "mx-auto flex w-full max-w-2xl shrink-0 flex-col px-4 pb-3 pt-3"
                 : "sticky top-[106px] z-30 mx-auto flex w-full max-w-2xl flex-col px-4 pb-4 pt-2 md:static md:pt-1 lg:px-5 lg:pb-5"
             }
-            style={{ background: CARD, borderBottom: playShell ? CARD_EDGE : undefined }}
+            style={{
+              background: CARD,
+              borderBottom: playShell ? CARD_EDGE : undefined,
+              // THE STICKY CEILING COMES OFF while the keyboard is up.
+              //
+              // 106px is the site header plus the back rail, which is
+              // the right ceiling normally - but it is also the reason
+              // the hand-off jumped. The bar would ride up, pin at 106,
+              // and then the panel would close that last 106px in a
+              // single frame. Measured: it stalled at 106 and teleported
+              // to 0.
+              //
+              // With a keyboard up, the chrome it was clearing has gone
+              // the way of everything else sticky, so there is nothing
+              // to clear. Letting the bar reach the top of the strip is
+              // what makes the switch move nothing at all.
+              top: !playShell && narrow && kb.inset > 0 ? kb.top : undefined,
+            }}
           >
           {/* No title and no label. The field's own placeholder says
               "Guess the Player", so a heading above it saying the same
