@@ -155,6 +155,19 @@ await field.click();
 // So the run below TAPS, the way a phone does, rather than pressing
 // Enter the way a keyboard does.
 const seeds = ["ma", "jo", "ty", "br", "al", "ke"];
+// With the keyboard up but nothing guessed yet. The panel is already
+// the size of the strip here - that is the point of engaging it with
+// the keyboard rather than part-way through - so what this records is
+// that engaging early did NOT cost the title and the mode toggle.
+await page.waitForTimeout(500);
+const atRest = await page.evaluate(() => ({
+  pageY: Math.round(window.scrollY),
+  shellUp: !!document.querySelector("[data-play-shell]"),
+  chrome: (() => {
+    const el = document.querySelector(".puzzle-chrome");
+    return el ? Math.round(el.getBoundingClientRect().height) : null;
+  })(),
+}));
 const report = [];
 for (let i = 0; i < seeds.length; i++) {
   await page.keyboard.type(seeds[i]);
@@ -204,9 +217,22 @@ for (let i = 0; i < seeds.length; i++) {
       prevVisible: !!pr && (shellBox ? pr.bottom <= shellBox.bottom + 1 && pr.top >= shellBox.top - 1 : pr.bottom <= vh && pr.bottom > 0),
       vh: Math.round(vh),
       blurs: window.__blurs ?? 0,
-      // A transform left behind by the hand-off animation would offset
-      // the bar for the rest of the round - so by the time each guess
-      // has settled, there must be none.
+      // Where the PAGE is. With the panel up nothing should move it -
+      // the guesses scroll inside the box, not by dragging the document
+      // around underneath a fixed element.
+      pageY: Math.round(window.scrollY),
+      // The title, the mode toggle and the round line: open, or
+      // collapsed to nothing. Measured by height rather than by the
+      // attribute, so a collapse that is only declared and not actually
+      // happening reads as still open.
+      chrome: (() => {
+        const el = document.querySelector(".puzzle-chrome");
+        if (!el) return null;
+        return Math.round(el.getBoundingClientRect().height);
+      })(),
+      // Nothing animates the bar by transform any more, and a stray one
+      // would offset it for the rest of the round. Kept as the guard
+      // against that coming back.
       barTransform: bar ? getComputedStyle(bar).transform : "none",
       // How far below the pinned field the newest row ends up. Big means
       // the scroll could not finish.
@@ -249,31 +275,68 @@ check(
   report.slice(1).every((m) => m.prevVisible),
   `${report.slice(1).filter((m) => m.prevVisible).length}/${report.length - 1}`,
 );
-// THE PANEL WAITS UNTIL IT IS NEEDED. Taking the page over on the first
-// guess, while the board still fits, hides the title and the mode toggle
-// for nothing. So the early guesses stay on the normal page and the
-// panel arrives when the board outgrows the strip.
-const firstShell = report.findIndex((m) => m.shellUp);
+// THE PANEL COMES UP WITH THE KEYBOARD, AND THE CHROME WAITS.
+//
+// It used to be the other way round: everything stayed in the page and
+// the panel took over on the guess where the board outgrew the screen.
+// That put a change of positioning scheme in the middle of play, and
+// three rounds of fixes could not make that frame clean on a phone.
+//
+// So the panel engages when the keyboard opens - at the top of the
+// page, nothing scrolling, no guess made - and what waits instead is
+// the CHROME: the title, the mode toggle and the round line stay until
+// the board is crowding its box, then collapse inside a panel that does
+// not move. Same thing to look at, no switch to get wrong.
 check(
-  "the panel waits until the board outgrows the screen",
-  firstShell > 0,
-  firstShell < 0 ? "never engaged" : `normal page for ${firstShell} guess(es), panel from ${firstShell + 1}`,
+  "the panel is up as soon as the keyboard is",
+  atRest.shellUp,
+  atRest.shellUp ? "engaged before the first guess" : "not engaged",
+);
+check(
+  "and the title and toggle are still there",
+  atRest.chrome !== null && atRest.chrome > 40,
+  `chrome ${atRest.chrome}px tall with the keyboard up`,
+);
+const collapsed = report.findIndex((m) => m.chrome !== null && m.chrome < 4);
+check(
+  "the chrome collapses once the board crowds it",
+  collapsed >= 0,
+  collapsed < 0
+    ? `never collapsed: ${report.map((m) => m.chrome).join(", ")}`
+    : `open through guess ${collapsed}, collapsed from ${collapsed + 1}`,
+);
+check(
+  "and stays collapsed",
+  report.slice(collapsed).every((m) => m.chrome !== null && m.chrome < 4),
+  `chrome px per guess: ${report.map((m) => m.chrome).join(", ")}`,
+);
+// THE PAGE DOES NOT MOVE DURING PLAY, AND THIS IS THE JUMP.
+//
+// Every version of the jump was the document being scrolled or
+// re-laid-out under a panel that was supposed to be still: the page
+// clamping when the card left the flow, the panel taking over before
+// its scroll had run. None of that can happen if the page simply never
+// moves once the panel is up - the guesses scroll inside the box.
+check(
+  "the page never moves once the panel is up",
+  new Set([atRest.pageY, ...report.map((m) => m.pageY)]).size === 1,
+  `scrollY: ${[atRest.pageY, ...report.map((m) => m.pageY)].join(", ")}`,
 );
 check(
   "and once up it matches the visible strip",
-  report.slice(firstShell).every((m) => m.shellUp && m.shellHeight === VISIBLE_WITH_KEYBOARD),
-  `heights: ${[...new Set(report.slice(firstShell).map((m) => m.shellHeight))].join(", ")} (strip is ${VISIBLE_WITH_KEYBOARD})`,
+  report.every((m) => m.shellUp && m.shellHeight === VISIBLE_WITH_KEYBOARD),
+  `heights: ${[...new Set(report.map((m) => m.shellHeight))].join(", ")} (strip is ${VISIBLE_WITH_KEYBOARD})`,
 );
 // It must not flicker back off - engaging frees the space that made it
 // necessary, so a naive "does it fit now" would oscillate.
 check(
-  "the hand-off animation leaves nothing behind",
+  "no stray transform is left on the bar",
   report.every((m) => m.barTransform === "none" || m.barTransform === "matrix(1, 0, 0, 1, 0, 0)"),
   `transforms: ${[...new Set(report.map((m) => m.barTransform))].join(" | ")}`,
 );
 check(
   "and never flickers back off",
-  report.slice(firstShell).every((m) => m.shellUp),
+  report.every((m) => m.shellUp),
   `shell per guess: ${report.map((m) => (m.shellUp ? "on" : "off")).join(" ")}`,
 );
 check("six guesses landed", report[report.length - 1].rows === 6, `${report[report.length - 1].rows} rows`);
@@ -305,61 +368,48 @@ check(
 
 await page.screenshot({ path: "/tmp/claude-0/-home-user-pickem/c8c47499-bc03-5b0f-a459-d3a18c357eda/scratchpad/mobile-run.png" });
 
-// THE JUMP, ON A SECOND PAGE WITH A DELIBERATELY LAZY SCROLL.
+// AND THE SAME RUN ON A BIG PHONE, because whether the page can be
+// yanked at all depends on how much of it is left under the card - and
+// that is set by the LAYOUT viewport. The 390x800 above has room to
+// spare and never clamps; the 440x956 in the recording did.
 //
-// The hand-off scrolls the page until the bar reaches the top of the
-// strip and only then lets the panel take over, so that switching moves
-// nothing. If it switches early the bar teleports - and that flash is
-// what was visible on a real phone and invisible here.
-//
-// Invisible here because Chromium starts a smooth scroll almost
-// immediately, so even a watcher that only looked for stillness happened
-// to be right. iOS does not: the first frames of a smooth scroll sit
-// still, which satisfied "three still frames" before the scroll began.
-//
-// So the shim below delays the scroll's FIRST MOVEMENT by 120ms, which
-// is the whole difference between the two engines. Then the observable
-// is where the page had scrolled to at the instant the panel appeared:
-// if it is still sitting at the pre-scroll position, the switch is what
-// moved the bar, and that is the jump.
-// AND ON A BIG PHONE, because the second half of the jump only happens
-// there. Going fixed takes the card out of the document; the document
-// gets shorter by the card's height; and if the page has scrolled past
-// what is left, the browser clamps it back. Whether it has depends on
-// how much page there is under the card, which is set by the LAYOUT
-// viewport - so the small phone above has room to spare and never
-// clamps, while the 440x956 in the recording gets yanked.
+// Going fixed takes the card out of the document, so the document loses
+// the card's whole height. The panel now engages at the top of the
+// page, where there is no offset to lose, and the card leaves a hole
+// the same height behind it - so the document does not shrink either.
+// Both of those have to hold, and this is where they are checked.
 const BIG_PHONE = { width: 440, height: 956 };
 const BIG_VISIBLE = 560;
-const LAZY_MS = 120;
-const jumpCtx = await freshContext(BIG_PHONE);
-const jump = await jumpCtx.newPage();
-await jump.addInitScript((visible) => {
-  Object.defineProperty(window.visualViewport, "height", { get: () => visible, configurable: true });
-  Object.defineProperty(window.visualViewport, "offsetTop", { get: () => 0, configurable: true });
-  window.addEventListener("load", () => {
-    setTimeout(() => window.visualViewport.dispatchEvent(new Event("resize")), 60);
+const bigCtx = await freshContext(BIG_PHONE);
+const big = await bigCtx.newPage();
+// A KEYBOARD THAT OPENS WHEN THE FIELD IS TAPPED, rather than one that
+// was always there. The run above holds the strip short from the first
+// frame, which means the panel engages on load with the page at the top
+// - and at the top there is no scroll offset to lose, so the hole it
+// leaves behind is never load-bearing. The case that needs it is the
+// ordinary one: read some of the page, then tap the field.
+await big.addInitScript((visible) => {
+  let open = false;
+  Object.defineProperty(window.visualViewport, "height", {
+    get: () => (open ? visible : window.innerHeight),
+    configurable: true,
   });
-}, BIG_VISIBLE);
-await jump.addInitScript((lazy) => {
-  const real = window.scrollBy.bind(window);
-  window.scrollBy = (opts) => {
-    if (opts && opts.behavior === "smooth") setTimeout(() => real(opts), lazy);
-    else real(opts);
+  Object.defineProperty(window.visualViewport, "offsetTop", { get: () => 0, configurable: true });
+  window.__openKeyboard = () => {
+    open = true;
+    window.visualViewport.dispatchEvent(new Event("resize"));
   };
-  // Latched the moment the panel appears, and again a beat later. Both
-  // halves of the jump are visible in these three readings: the scroll
-  // not having happened yet, and the document losing the card's height
-  // out from under a scroll position that then has nowhere to be.
+}, BIG_VISIBLE);
+await big.addInitScript(() => {
+  // Sampled every frame across the engage, because the clamp lands in
+  // one frame and is gone by the next - reading before and after only
+  // would miss it entirely.
   const snap = () => ({
     y: Math.round(window.scrollY),
     doc: document.documentElement.scrollHeight,
     max: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
   });
-  // Sampled every frame, not on the mutation. "Before" has to be the
-  // frame immediately preceding the switch - read it any earlier and it
-  // describes a page that had not been scrolled or guessed into yet.
-  window.__handoff = null;
+  window.__engage = null;
   window.addEventListener("DOMContentLoaded", () => {
     let before = snap();
     let up = false;
@@ -367,14 +417,10 @@ await jump.addInitScript((lazy) => {
       const now = !!document.querySelector("[data-play-shell]");
       if (!up && now) {
         const at = snap();
-        setTimeout(() => {
-          // preGuess is where the page stood when the name was tapped -
-          // the hand-off scroll has not started yet there. before is the
-          // frame immediately preceding the switch, when it has
-          // finished. One check needs each.
-          window.__handoff = { preGuess: window.__preGuessY ?? 0, before, at, after: snap() };
-        }, 700);
         up = true;
+        setTimeout(() => {
+          window.__engage = { before, at, after: snap() };
+        }, 700);
         return;
       }
       if (!now) before = snap();
@@ -382,35 +428,52 @@ await jump.addInitScript((lazy) => {
     };
     requestAnimationFrame(tick);
   });
-}, LAZY_MS);
-await jump.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
-await jump.waitForSelector("main input", { timeout: 20000 });
-await jump.waitForTimeout(900);
-await jump.locator("main input").first().click();
-// Guess until the panel takes over. Where that happens depends on the
-// screen, so it is found rather than assumed.
+});
+await big.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+await big.waitForSelector("main input", { timeout: 20000 });
+await big.waitForTimeout(900);
+await big.locator("main input").first().click();
+// A BOARD, AND THEN A SCROLL, AND ONLY THEN THE KEYBOARD. An empty
+// board fits on the screen, so there is nothing to scroll and the
+// switch has no offset it could lose - which is the one arrangement
+// where the hole does not matter. Four guesses and a scroll to the
+// bottom give it something to lose. That is the ordinary case anyway:
+// come back to a round in progress, read down it, tap the field.
 for (const seed of seeds) {
-  if (await jump.evaluate(() => !!window.__handoff)) break;
-  await jump.keyboard.type(seed);
-  await jump.waitForTimeout(340);
-  await jump.evaluate(() => {
-    window.__preGuessY = Math.round(window.scrollY);
-  });
-  await jump.locator('[role="option"]').first().click();
-  await jump.waitForTimeout(1300);
+  await big.keyboard.type(seed);
+  await big.waitForTimeout(340);
+  await big.locator('[role="option"]').first().click();
+  await big.waitForTimeout(700);
 }
-const h = await jump.evaluate(() => window.__handoff);
+await big.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+await big.waitForTimeout(400);
+const dropped = await big.evaluate(() => Math.round(window.scrollY));
+await big.locator("main input").first().click();
+await big.evaluate(() => window.__openKeyboard());
+await big.waitForTimeout(1400);
+const e = await big.evaluate(() => window.__engage);
+const bigRun = await big.evaluate(() => ({
+  pageY: Math.round(window.scrollY),
+  chrome: (() => {
+    const el = document.querySelector(".puzzle-chrome");
+    return el ? Math.round(el.getBoundingClientRect().height) : null;
+  })(),
+  rows: document.querySelectorAll("[data-guess-row]").length,
+}));
 check(
-  "the panel waits for the scroll, not just for frames",
-  !!h && h.at.y - h.preGuess > 1 && Math.abs(h.at.y - h.after.y) <= 2,
-  !h ? "panel never engaged" : `scrollY ${h.preGuess} -> ${h.at.y} at hand-off -> ${h.after.y} settled`,
+  "the card leaves a hole, so the document does not shrink",
+  !!e && e.at.doc >= e.before.doc - 2,
+  !e ? "panel never engaged" : `document ${e.before.doc} -> ${e.at.doc} across the switch`,
 );
 check(
-  "the card leaves a hole, so the page is not yanked back",
-  !!h && Math.abs(h.at.doc - h.before.doc) <= 2 && h.at.max >= h.at.y,
-  !h
-    ? "panel never engaged"
-    : `document ${h.before.doc} -> ${h.at.doc}, max scroll ${h.before.max} -> ${h.at.max}, at ${h.at.y}`,
+  "and the scroll offset stays legal through it",
+  !!e && e.at.max >= e.at.y && e.at.y === e.before.y && e.after.y === e.at.y,
+  !e ? "panel never engaged" : `scrollY ${e.before.y} -> ${e.at.y} -> ${e.after.y}, max ${e.at.max}`,
+);
+check(
+  "a board already too tall gets the chrome out of the way at once",
+  !!e && bigRun.rows === 6 && bigRun.chrome !== null && bigRun.chrome < 4,
+  `${bigRun.rows} rows, chrome ${bigRun.chrome}px, page scrolled to ${dropped} before the keyboard`,
 );
 
 await browser.close();

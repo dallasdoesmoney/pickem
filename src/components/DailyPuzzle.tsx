@@ -341,45 +341,40 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // top of it, the guesses scroll INSIDE it, and "show the newest" stops
   // being viewport arithmetic and becomes scrollTop = scrollHeight,
   // which cannot be wrong.
-  // ...but only once the board has actually outgrown the screen. Taking
-  // the page over on the first guess, while everything still fits, is
-  // just hiding the title and the mode toggle for nothing.
   //
-  // LATCHED, not re-evaluated. The obvious version - "does it fit right
-  // now" - oscillates, because engaging the shell hides the title and
-  // the toggle, which frees the very space that made it necessary; it
-  // would fit again, disengage, stop fitting, and flicker. So the
-  // question is asked only while the answer is still no, and once it is
-  // yes it stays yes until the keyboard goes down or a new round starts.
+  // AND IT HAPPENS WHEN THE KEYBOARD OPENS, NOT PART-WAY THROUGH.
   //
-  // Measured against the bar and the ROWS, both of which are the same
-  // height either way - deciding on anything the shell itself changes is
-  // the same trap one level down.
-  const playShell = narrow && kb.inset > 0 && outgrown && !state?.finished;
+  // It used to engage on the guess where the board outgrew the screen,
+  // which put a change of positioning scheme in the middle of play - and
+  // three rounds of fixes could not make that frame clean. Each one
+  // removed a real defect and the jump survived, because the defects
+  // were incidental and the switch itself was the problem: going fixed
+  // mid-scroll re-lays out the document, moves the scroll anchor, and
+  // asks iOS to repaint a brand-new fixed element on a frame where the
+  // page is already moving. There is no ordering of those that is free.
+  //
+  // So nothing switches during play. The panel is up for as long as the
+  // keyboard is, and it engages on the same frame the keyboard opens -
+  // when the page is at the top, nothing is scrolling, no guess has been
+  // made, and iOS is animating a keyboard over the whole screen anyway.
+  //
+  // What used to be the hand-off is now a change of CONTENTS inside a
+  // panel that is already in place: the title, the mode toggle and the
+  // round line collapse to nothing and the board grows into the space.
+  // That is one height transition on one element. It cannot move the
+  // page, because the page is not involved.
+  const playShell = narrow && kb.inset > 0 && !state?.finished;
   const barRef = useRef<HTMLDivElement>(null);
-  // Where each piece was standing the moment before the panel took over.
-  const barFromRef = useRef<number | null>(null);
-  const boardFromRef = useRef<number | null>(null);
-  // Set for the one guess that triggers the hand-off, so the usual
-  // smooth scroll stands aside and lets the animation own that frame.
-  const handingOffRef = useRef(false);
   // The box the guesses scroll inside once the shell is up.
   const boardScrollRef = useRef<HTMLDivElement>(null);
-  // The card itself, and the hole it leaves behind.
+  // The card, and the hole it leaves behind.
   //
-  // THIS IS THE JUMP. Going fixed takes the card out of the document, so
-  // the page gets shorter by the card's whole height - and a page that
-  // has just scrolled down near its end is then sitting at an offset
-  // that no longer exists. The browser clamps it back, and on a phone
-  // that clamp is a lurch: measured at 440x956, the document fell from
-  // 1927 to 1150 and the scroll was yanked from 272 to 194 in one frame.
-  // On the recording it went far enough to put the site header back on
-  // screen for two frames.
-  //
-  // So the card's height stays in the flow after the card leaves it. The
-  // page keeps the same length, the scroll offset stays legal, and there
-  // is nothing to clamp. Measured before the switch, because afterwards
-  // the element is the panel and its height is the strip.
+  // Going fixed takes the card out of the document, so the page gets
+  // shorter by the card's whole height. That is only harmless while the
+  // page is at the top - which is exactly why the panel now engages
+  // there. The hole makes it harmless anyway: measured at 440x956, the
+  // document fell from 1927 to 1150 without it, and any scroll offset
+  // past the new end gets clamped back in a single frame.
   const cardRef = useRef<HTMLDivElement>(null);
   const [shellHole, setShellHole] = useState(0);
 
@@ -427,6 +422,12 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       box.scrollTo({ top, behavior: "smooth" });
       return;
     }
+    // AND ONLY THE BOX. With the panel up the page behind it is not
+    // visible, so scrolling it moves nothing anybody can see and risks
+    // moving something they can. The page path below is for a board
+    // still living in the page - desktop, or a phone with the keyboard
+    // down.
+    if (playShell) return;
     const rows = document.querySelectorAll("[data-guess-row]");
     const newest = rows[rows.length - 1];
     if (!newest) return;
@@ -457,43 +458,28 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     }
 
     if (delta > 1) window.scrollBy({ top: delta, behavior: "smooth" });
-  }, []);
+  }, [playShell]);
 
-  // THE SWITCH ITSELF MOVES NOTHING.
+  // THE PANEL ARRIVES WITH THE KEYBOARD.
   //
-  // Two attempts at animating the hand-off - the bar alone, then bar and
-  // board together as a FLIP - both read as a glitch, and for the same
-  // reason: a transform makes things LOOK like they travelled while the
-  // panel underneath appeared fully formed in one frame. What was asked
-  // for is simpler and better. It should scroll, exactly the way it
-  // scrolls after every other guess.
-  //
-  // So it does. The guess that triggers the hand-off scrolls the page
-  // the ordinary way until the bar reaches the top of the visible strip,
-  // and only then does the panel take over - by which point the bar is
-  // already where the panel would put it, so switching moves nothing at
-  // all. Then the box carries on scrolling to the newest rows. Two
-  // ordinary scrolls with an invisible join, rather than a jump dressed
-  // up as motion.
+  // Measured first, so the hole it leaves is the height it actually had,
+  // and set in a layout effect so the hole is in place on the same frame
+  // the card leaves the flow rather than one frame later.
   useIsoLayoutEffect(() => {
-    const board = boardScrollRef.current;
-    const boardFrom = boardFromRef.current;
-    boardFromRef.current = null;
-    barFromRef.current = null;
-    handingOffRef.current = false;
-    if (!playShell || !board) return;
+    if (playShell || !cardRef.current) return;
+    setShellHole(cardRef.current.offsetHeight);
+  }, [playShell, state?.guesses.length]);
 
-    // Keep whatever was on screen exactly where it was. If the scroll
-    // above landed properly this is 0 and nothing shifts; it is here so
-    // that a scroll which came up short degrades into a small offset
-    // rather than a jump to the top of the board.
-    if (boardFrom !== null) {
-      const settle = board.getBoundingClientRect().top - boardFrom;
-      board.scrollTop = Math.max(0, settle);
-    }
-
-    // And now the ordinary scroll, inside the box, to the same place
-    // every other guess goes.
+  // Whatever is in the box stays where it was when the panel engages,
+  // then the ordinary scroll runs. Nothing here touches the page.
+  useIsoLayoutEffect(() => {
+    const box = boardScrollRef.current;
+    if (!playShell || !box) return;
+    // Somebody can arrive here with a board already too tall for the
+    // panel - a reload mid-round, or a tap back into the field after
+    // reading. Asking only after a guess would leave the chrome sitting
+    // on top of a board that has no room for it until the next one.
+    if (box.scrollHeight > box.clientHeight - 24) setOutgrown(true);
     const raf = requestAnimationFrame(() => showNewestGuess());
     return () => cancelAnimationFrame(raf);
   }, [playShell, showNewestGuess]);
@@ -674,108 +660,25 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       // a height worth measuring.
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          // Has the board outgrown the screen yet? Asked here, where a
-          // row has just been added and laid out, and ONLY WHILE THE
-          // ANSWER IS STILL NO.
+          // Is the board crowding the box it scrolls in? If it is,
+          // the title, the mode toggle and the round line collapse and
+          // the board takes their room.
           //
-          // That guard is not an optimisation. Without it the check
-          // fires again on every later guess and re-arms handingOff -
-          // but setOutgrown(true) on an already-true value is not a
-          // state change, so React never re-renders, the layout effect
-          // that clears the flag never runs, and every subsequent guess
-          // skips its scroll. The board silently stopped following the
-          // newest row from the third guess on.
-          if (!outgrown && narrow && kb.visible > 0) {
-            const barH = barRef.current?.offsetHeight ?? 0;
-            const boardH = boardScrollRef.current?.scrollHeight ?? 0;
-            // 24px of slack, so it flips when a row is genuinely
+          // ONLY WHILE THE ANSWER IS STILL NO. Without that guard the
+          // check fires again every later guess; setOutgrown(true) on
+          // an already-true value is not a state change, so React never
+          // re-renders and the effects keyed on it never run.
+          //
+          // Nothing about the page moves here - the panel is already
+          // the size of the screen and stays exactly where it is. This
+          // is one element's height going to zero inside it.
+          if (!outgrown && playShell) {
+            const box = boardScrollRef.current;
+            // 24px of slack, so it collapses when a row is genuinely
             // crowding the edge rather than the moment it touches it.
-            if (barH + boardH > kb.visible - 24) {
-              // Where the bar is NOW, captured before the switch that
-              // moves it. Half of a FLIP: the other half runs in the
-              // layout effect once React has put it in its new place.
-              // Where BOTH pieces are standing, captured before the
-              // switch that moves them. The bar alone was not enough -
-              // animating it while the board teleported underneath is
-              // exactly the "skip, then everything is suddenly higher"
-              // that made the hand-off feel broken.
-              handingOffRef.current = true;
-              // Scroll the bar up to the top of the strip, the ordinary
-              // way. The panel takes over when this lands.
-              const bar = barRef.current;
-              const lift = bar ? bar.getBoundingClientRect().top - kb.top : 0;
-              if (lift > 1) window.scrollBy({ top: lift, behavior: "smooth" });
-
-              // Where the board finished, so the box can be handed the
-              // same view rather than starting from the top.
-              const settleAndSwitch = () => {
-                boardFromRef.current = boardScrollRef.current?.getBoundingClientRect().top ?? null;
-                // How much page the card is about to stop occupying. See
-                // cardRef: this is what keeps the scroll offset legal
-                // through the switch.
-                setShellHole(cardRef.current?.offsetHeight ?? 0);
-                setOutgrown(true);
-              };
-              // WAIT FOR THE SCROLL TO ACTUALLY STOP, by watching it.
-              //
-              // Not scrollend: Safari only gained it in 17, and where it
-              // exists it can fire for a scroll that has not finished -
-              // which hands over mid-travel and produces exactly the
-              // snap this is trying to remove. Not a fixed timer either,
-              // because how long a smooth scroll takes is the browser's
-              // business and varies with distance.
-              //
-              // So the position is sampled every frame and the hand-off
-              // waits for it to stop changing. That is true wherever the
-              // scroll ends up and whatever engine is running it -
-              // including a scroll that gets clamped short, which
-              // settles just the same.
-              if (lift <= 1) {
-                settleAndSwitch();
-              } else {
-                // WAIT FOR IT TO START, THEN FOR IT TO STOP.
-                //
-                // Watching only for stillness was wrong in the way that
-                // matters: a smooth scroll does not move on its first
-                // frames, so three still frames were satisfied before it
-                // had begun. The watcher concluded the scroll was over,
-                // handed off immediately, and the bar teleported - which
-                // is the jump, seen frame by frame on a real phone.
-                //
-                // So movement has to be observed first. Until then the
-                // stillness counter cannot start.
-                const startedAt = window.scrollY;
-                let moved = false;
-                let last = startedAt;
-                let still = 0;
-                const deadline = performance.now() + 1400;
-                const watch = () => {
-                  const now = window.scrollY;
-                  if (!moved) {
-                    if (Math.abs(now - startedAt) > 0.5) moved = true;
-                    // If it has not budged in a quarter of a second it
-                    // is not going to - the page is already as far up as
-                    // it goes - and waiting longer just delays the
-                    // hand-off for nothing.
-                    else if (performance.now() > deadline - 1150) {
-                      settleAndSwitch();
-                      return;
-                    }
-                  } else {
-                    still = Math.abs(now - last) < 0.5 ? still + 1 : 0;
-                  }
-                  last = now;
-                  if ((moved && still >= 3) || performance.now() > deadline) {
-                    settleAndSwitch();
-                    return;
-                  }
-                  requestAnimationFrame(watch);
-                };
-                requestAnimationFrame(watch);
-              }
-            }
+            if (box && box.scrollHeight > box.clientHeight - 24) setOutgrown(true);
           }
-          if (!handingOffRef.current) showNewestGuess();
+          showNewestGuess();
         }),
       );
 
@@ -958,20 +861,13 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   return (
     <div
       className="flex flex-col gap-5"
-      // The scroll room the keyboard took. See keyboardInset above: this
-      // is what lets the last guesses reach the top of the screen instead
-      // of the page running out underneath them.
-      // Room for the keyboard AND for the hand-off scroll on top of it.
-      // The hand-off lifts the bar to the very top of the strip, which
-      // means everything above it - title, mode toggle, round line - has
-      // to be able to scroll away; without the extra, the page runs out
-      // partway and the switch snaps the bar the rest of the distance,
-      // which is the jump this was all trying to remove. Measured: the
-      // bar stalled at 106px and then teleported to 0.
+      // The room the keyboard took, given back to the page.
       //
-      // A strip's worth is comfortably more than the chrome above it,
-      // and it costs nothing: once the panel is up the document behind
-      // it is not visible at all.
+      // The panel does not scroll the page any more, so this is no
+      // longer about reaching anything - it is about the page keeping a
+      // legal length while the card is floating above it rather than
+      // sitting in it. It costs nothing, because once the panel is up
+      // the document behind it is not visible at all.
       style={{
         fontFamily: "var(--font-game)",
         paddingBottom: kb.inset ? kb.inset + kb.visible : undefined,
@@ -1071,61 +967,81 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             : { background: CARD, border: CARD_EDGE, borderRadius: 18, boxShadow: DROP }
         }
       >
-        {/* Hidden while the shell is up. The title, the mode toggle and
-            the round line were taking a third of the visible strip and
-            pushing the guesses off the bottom - and none of them is
-            something you read while typing a name. They come back the
-            moment the keyboard does down. */}
-        {!playShell && header}
+        {/* THE CHROME, AND THE ONLY THING THAT MOVES DURING PLAY.
+            The title, the mode toggle and the round line take about a
+            third of the visible strip and none of them is something you
+            read while typing a name, so once the board starts crowding
+            its box they collapse and the board takes the room.
 
-        {/* The two modes, on the card and above the field, because the
-            first thing to settle is which game you are playing. Inside
-            the card rather than floating above it: it belongs to the
-            board, and a control on the page would read as navigation.
+            One wrapper around all three, collapsed by grid-template-rows
+            going 1fr to 0fr, because that is a height animation that
+            does not need the height measured. The board below grows as
+            this shrinks and its rows ride up with it - the same movement
+            as the scroll after every other guess, which is what was
+            asked for.
 
-            Both are always open. Locking unlimited behind the daily
-            protects the streak, but it does it by telling a first-time
-            visitor who wants to keep playing to come back tomorrow, and
-            the visitor who wants a second round is the one worth
-            keeping. */}
-        {!playShell && (
-        <div className="flex justify-center px-4 pb-3 pt-1">
-          <div className="flex gap-1 rounded-full p-1" style={{ background: FIELD, border: CARD_EDGE }}>
-            {(
-              [
-                { key: "daily", label: "TODAY" },
-                { key: "unlimited", label: "UNLIMITED" },
-              ] as const
-            ).map((m) => (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => switchMode(m.key)}
-                aria-pressed={mode === m.key}
-                className="rounded-full px-4 py-1.5 text-[11px] transition-colors sm:text-xs"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  letterSpacing: "0.04em",
-                  background: mode === m.key ? "#3ecb78" : "transparent",
-                  color: mode === m.key ? INK : MUTED,
-                }}
-              >
-                {m.label}
-              </button>
-            ))}
+            Nothing outside this element is involved. The panel is
+            already the size of the screen and does not move; the page
+            behind it is not touched. That is the whole reason this
+            replaced a hand-off that switched the card's positioning
+            mid-guess. */}
+        <div
+          className={playShell ? "puzzle-chrome" : undefined}
+          data-collapsed={playShell && outgrown ? "1" : undefined}
+          aria-hidden={playShell && outgrown ? true : undefined}
+        >
+          <div className={playShell ? "puzzle-chrome-inner" : undefined}>
+            {header}
+
+            {/* The two modes, on the card and above the field, because the
+                first thing to settle is which game you are playing. Inside
+                the card rather than floating above it: it belongs to the
+                board, and a control on the page would read as navigation.
+
+                Both are always open. Locking unlimited behind the daily
+                protects the streak, but it does it by telling a first-time
+                visitor who wants to keep playing to come back tomorrow, and
+                the visitor who wants a second round is the one worth
+                keeping. */}
+            <div className="flex justify-center px-4 pb-3 pt-1">
+              <div className="flex gap-1 rounded-full p-1" style={{ background: FIELD, border: CARD_EDGE }}>
+                {(
+                  [
+                    { key: "daily", label: "TODAY" },
+                    { key: "unlimited", label: "UNLIMITED" },
+                  ] as const
+                ).map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => switchMode(m.key)}
+                    aria-pressed={mode === m.key}
+                    tabIndex={playShell && outgrown ? -1 : undefined}
+                    className="rounded-full px-4 py-1.5 text-[11px] transition-colors sm:text-xs"
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      letterSpacing: "0.04em",
+                      background: mode === m.key ? "#3ecb78" : "transparent",
+                      color: mode === m.key ? INK : MUTED,
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* What round you are on, and the one line that says why this
+                board does not count. Said here rather than only at the end,
+                because somebody who lands mid-round should not have to solve
+                it to find out it was practice. */}
+            {mode === "unlimited" && practice && (
+              <p className="px-4 pb-2 text-center text-[11px]" style={{ color: MUTED }}>
+                Round {practice.round} &middot; no points, no streak &mdash; play as many as you like
+              </p>
+            )}
           </div>
         </div>
-        )}
-
-        {/* What round you are on, and the one line that says why this
-            board does not count. Said here rather than only at the end,
-            because somebody who lands mid-round should not have to solve
-            it to find out it was practice. */}
-        {mode === "unlimited" && practice && !playShell && (
-          <p className="px-4 pb-2 text-center text-[11px]" style={{ color: MUTED }}>
-            Round {practice.round} &middot; no points, no streak &mdash; play as many as you like
-          </p>
-        )}
 
         {/* The board goes as wide as the card allows; the input does not.
             A search field stretched to 1150px is a lot of runway for a
@@ -1211,20 +1127,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             style={{
               background: CARD,
               borderBottom: playShell ? CARD_EDGE : undefined,
-              // THE STICKY CEILING COMES OFF while the keyboard is up.
-              //
-              // 106px is the site header plus the back rail, which is
-              // the right ceiling normally - but it is also the reason
-              // the hand-off jumped. The bar would ride up, pin at 106,
-              // and then the panel would close that last 106px in a
-              // single frame. Measured: it stalled at 106 and teleported
-              // to 0.
-              //
-              // With a keyboard up, the chrome it was clearing has gone
-              // the way of everything else sticky, so there is nothing
-              // to clear. Letting the bar reach the top of the strip is
-              // what makes the switch move nothing at all.
-              top: !playShell && narrow && kb.inset > 0 ? kb.top : undefined,
             }}
           >
           {/* No title and no label. The field's own placeholder says
