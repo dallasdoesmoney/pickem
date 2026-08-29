@@ -1062,7 +1062,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
                 className="text-[17px] leading-none tracking-[0.03em] md:text-[19px]"
                 style={{ fontVariantNumeric: "tabular-nums" }}
               >
-                {mode === "daily" ? `NO. ${puzzleNumber(state.puzzleOn)}` : "UNLIMITED"}
+                {mode === "daily" ? `#${puzzleNumber(state.puzzleOn)}` : "UNLIMITED"}
               </div>
               {/* 0.7 opacity rather than a second colour: on a fill this
                   saturated any grey goes muddy, and black at 70% stays
