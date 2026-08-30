@@ -193,7 +193,14 @@ try {
     await cleanup();
     process.exit(1);
   }
-  const browser = await playwright.chromium.launch({ executablePath: process.env.CHROME_PATH });
+  // The same conditional every other suite uses: CHROME_PATH when a machine
+  // has a browser already, and nothing at all on a runner, where Playwright
+  // finds the one it installed for itself. Passing `executablePath: undefined`
+  // happens to work, but "the same as the other seven" is worth more here than
+  // saving a ternary.
+  const browser = await playwright.chromium.launch(
+    process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}
+  );
   const noJs = await browser.newContext({ javaScriptEnabled: false });
   const p1 = await noJs.newPage();
   await p1.goto(`${base}/leaderboard/${PLAYER.username}`, { waitUntil: "domcontentloaded" });
