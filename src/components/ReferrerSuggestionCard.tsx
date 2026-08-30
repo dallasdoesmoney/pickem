@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchFollowStatus, followUser } from "@/lib/supabase/follows";
+import { reportError } from "@/lib/sentry";
 
 // The post-signup counterpart to ReferralBanner - same card shape, but
 // this one needs an action button (Follow) rather than just an
@@ -37,7 +38,7 @@ export function ReferrerSuggestionCard() {
       .then((status) => {
         if (!cancelled && status.iFollow) clearPendingReferrerSuggestion();
       })
-      .catch(() => {});
+      .catch((err) => reportError("referrerSuggestion.followStatus", err));
     return () => {
       cancelled = true;
     };

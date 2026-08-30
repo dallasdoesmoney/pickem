@@ -17,6 +17,7 @@ import { getTierTemplate } from "@/data/tierTemplates";
 import { BoardZoom, previewFor } from "@/components/tierList/BoardThumb";
 import { widestWordEm } from "@/components/tierList/bungee";
 import { useAuth } from "@/hooks/useAuth";
+import { reportError } from "@/lib/sentry";
 
 // Every card fronts a destination with a live picture of what is behind
 // it - the week's actual matchups, your actual predictor progress, the
@@ -597,18 +598,30 @@ function LeaderboardCard({ rows }: { rows: LeaderboardRow[] }) {
 export default function HomePage() {
   const { user } = useAuth();
   const [weeks, setWeeks] = useState<WeekRow[]>([]);
-  const [picks, setPicks] = useState<Record<string, TeamAbbr> | null>(null);
-  const [progress, setProgress] = useState<Partial<Record<TeamAbbr, number>> | null>(null);
+  // Both are held WITH the account and week they were fetched for, and
+  // read back only when that still matches. The effect below used to
+  // clear them on sign-out instead, which is a render too late: for the
+  // one commit between a switch and the clear, the cards showed the
+  // previous player's picks.
+  const [fetchedPicks, setFetchedPicks] = useState<{
+    userId: string;
+    week: number;
+    picks: Record<string, TeamAbbr> | null;
+  } | null>(null);
+  const [fetchedProgress, setFetchedProgress] = useState<{
+    userId: string;
+    progress: Partial<Record<TeamAbbr, number>> | null;
+  } | null>(null);
   const [board, setBoard] = useState<LeaderboardRow[]>([]);
   const [daily, setDaily] = useState<PuzzleState | null>(null);
 
   useEffect(() => {
     fetchWeeks()
       .then(setWeeks)
-      .catch(() => {});
+      .catch((err) => reportError("home.weeks", err));
     fetchLeaderboard()
       .then(setBoard)
-      .catch(() => {});
+      .catch((err) => reportError("home.leaderboard", err));
   }, []);
 
   const activeWeek = useMemo(() => {
@@ -624,7 +637,10 @@ export default function HomePage() {
     if (user) {
       fetchDailyPuzzle()
         .then(setDaily)
-        .catch(() => setDaily(null));
+        .catch((err) => {
+          reportError("home.dailyBoard", err);
+          setDaily(null);
+        });
       return;
     }
     const on = puzzleToday();
@@ -649,18 +665,28 @@ export default function HomePage() {
   }, [user]);
 
   useEffect(() => {
-    if (!user) {
-      setPicks(null);
-      setProgress(null);
-      return;
-    }
-    fetchWeeklyPicks(user.id, activeWeek)
-      .then((result) => setPicks(result.picks))
-      .catch(() => setPicks(null));
-    fetchPredictorProgress(user.id)
-      .then(setProgress)
-      .catch(() => setProgress(null));
+    if (!user) return;
+    const userId = user.id;
+    const week = activeWeek;
+    fetchWeeklyPicks(userId, week)
+      .then((result) => setFetchedPicks({ userId, week, picks: result.picks }))
+      .catch((err) => {
+        reportError("home.weeklyPicks", err);
+        setFetchedPicks({ userId, week, picks: null });
+      });
+    fetchPredictorProgress(userId)
+      .then((progress) => setFetchedProgress({ userId, progress }))
+      .catch((err) => {
+        reportError("home.predictorProgress", err);
+        setFetchedProgress({ userId, progress: null });
+      });
   }, [user, activeWeek]);
+
+  const picks =
+    user && fetchedPicks?.userId === user.id && fetchedPicks.week === activeWeek
+      ? fetchedPicks.picks
+      : null;
+  const progress = user && fetchedProgress?.userId === user.id ? fetchedProgress.progress : null;
 
   const games = GAMES_BY_WEEK[activeWeek] ?? [];
 

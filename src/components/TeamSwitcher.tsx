@@ -44,10 +44,13 @@ export function TeamSwitcher({
   const [query, setQuery] = useState("");
 
   // Reset between openings - a stale filter from last time would look
-  // like most of the league had gone missing.
-  useEffect(() => {
+  // like most of the league had gone missing. Done during render, so the
+  // panel never commits a frame showing last time's filter.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) setQuery("");
-  }, [open]);
+  }
 
   // A callback ref rather than an effect on `open`: the panel doesn't
   // mount until useAnchoredMenu has measured the trigger, so on the

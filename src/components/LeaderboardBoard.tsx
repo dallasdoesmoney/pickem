@@ -12,6 +12,7 @@ import { LevelBadge } from "@/components/LevelBadge";
 import { CreatorBadgeIcon } from "@/components/CreatorBadgeIcon";
 import { StreakBadge } from "@/components/StreakBadge";
 import { getLevelInfo } from "@/lib/levels";
+import { reportError } from "@/lib/sentry";
 
 type BoardView = "global" | "friends";
 
@@ -73,7 +74,7 @@ export function LeaderboardBoard() {
         setRows(fetched);
         fetchCreatorUserIds(fetched.map((r) => r.user_id))
           .then(setCreatorIds)
-          .catch(() => {});
+          .catch((err) => reportError("leaderboard.creatorIds", err));
       })
       .catch((err) => setError(errorMessage(err)));
   }, []);
@@ -85,12 +86,13 @@ export function LeaderboardBoard() {
       .catch((err) => setError(errorMessage(err)));
   }, [user]);
 
+  // Signed out has no friends list and cannot be on the friends tab -
+  // both are facts about the current user rather than things to go and
+  // set. Deriving them means a sign-out never renders the friends tab
+  // with somebody else's list still in it, which the effect version did
+  // for exactly one frame.
   useEffect(() => {
-    if (!user) {
-      setFriendIds(null);
-      if (view === "friends") setView("global");
-      return;
-    }
+    if (!user) return;
     reloadFriends();
   }, [user, reloadFriends]);
 

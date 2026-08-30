@@ -29,15 +29,15 @@ export type PlayerStats = {
 // the Teams Predicted mosaic. Returns null until every fetch has
 // resolved.
 export function usePlayerStats(userId: string | undefined): PlayerStats | null {
-  const [stats, setStats] = useState<PlayerStats | null>(null);
+  // Keyed by the user, so nothing has to be cleared when the user
+  // changes: what is held belongs to an id, and it only counts if that id
+  // is the one being asked about. Two setStates in the effect body came
+  // off with it - the early return's and the pre-fetch reset's.
+  const [held, setHeld] = useState<{ id: string; stats: PlayerStats } | null>(null);
 
   useEffect(() => {
-    if (!userId) {
-      setStats(null);
-      return;
-    }
+    if (!userId) return;
     let cancelled = false;
-    setStats(null);
     Promise.all([
       fetchPublicReferralCount(userId).catch(() => 0),
       fetchPublicFollowerCount(userId).catch(() => 0),
@@ -51,12 +51,18 @@ export function usePlayerStats(userId: string | undefined): PlayerStats | null {
         (t) => (predictorProgress[t.abbr] ?? 0) >= (REQUIRED_PREDICTOR_WEEKS[t.abbr] ?? Infinity)
       ).map((t) => t.abbr);
       const completedWeekCount = ALL_WEEKS.filter((w) => (weeklyProgress[w] ?? 0) >= GAMES_BY_WEEK[w].length).length;
-      setStats({ referralCount, followerCount, friendCount, completedTeamCount: completedTeamAbbrs.length, completedTeamAbbrs, completedWeekCount, lockBonusCount });
+      setHeld({
+        id: userId,
+        stats: { referralCount, followerCount, friendCount, completedTeamCount: completedTeamAbbrs.length, completedTeamAbbrs, completedWeekCount, lockBonusCount },
+      });
     });
     return () => {
       cancelled = true;
     };
   }, [userId]);
 
-  return stats;
+  // Null until this user's own numbers have landed. Holding somebody
+  // else's while a new fetch is in flight is the thing the old clear was
+  // preventing, and this prevents it without a render to do it.
+  return held && held.id === userId ? held.stats : null;
 }

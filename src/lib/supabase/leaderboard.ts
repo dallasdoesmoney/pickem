@@ -15,7 +15,12 @@ export type LeaderboardRow = {
   streak: number;
 };
 
-const COLUMNS = "user_id, username, display_name, avatar_url, correct, graded, total_points, streak";
+// Exported because the server-rendered profile page reads the same row
+// through its own request-scoped client (see server.ts) and the two must
+// not be able to disagree about which columns a LeaderboardRow has.
+export const LEADERBOARD_COLUMNS = "user_id, username, display_name, avatar_url, correct, graded, total_points, streak";
+
+const COLUMNS = LEADERBOARD_COLUMNS;
 
 export async function fetchLeaderboard(): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase

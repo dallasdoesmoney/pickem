@@ -29,6 +29,7 @@ import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
+import { reportError } from "@/lib/sentry";
 
 // A layout effect on the client, a no-op on the server. The FLIP below
 // has to measure and set a transform BEFORE the browser paints, or the
@@ -288,7 +289,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       .then((n) => {
         if (!cancelled) setGuestNumber(n);
       })
-      .catch(() => {});
+      .catch((err) => reportError("daily.guestBoardNumber", err));
     return () => {
       cancelled = true;
     };
@@ -313,7 +314,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       .then((s) => {
         if (!cancelled) setStats(s);
       })
-      .catch(() => {});
+      .catch((err) => reportError("daily.nameplateStats", err));
     return () => {
       cancelled = true;
     };
@@ -650,10 +651,18 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               if (board.finished) break;
               try {
                 board = await submitDailyGuess(g.espnId);
-              } catch {
+              } catch (err) {
                 // A guess the server refuses (already used, day over)
                 // stops the handover rather than failing the page - the
                 // board it has is still the true one.
+                //
+                // Reported, because the two cases look identical from
+                // here and only one of them is fine: a refusal is
+                // expected, and a network failure means somebody just
+                // signed in and quietly lost the guesses they made as a
+                // guest, which is the worst moment on the site to lose
+                // anything.
+                reportError("daily.guestHandover", err);
                 break;
               }
             }
@@ -1022,7 +1031,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             answer={answer}
             onShare={share}
             copied={copied}
-            grid={shareGrid(state)}
             practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
             stats={shownStats}
             onPlayAgain={playAgain}
@@ -1799,7 +1807,6 @@ function Reveal({
   answer,
   onShare,
   copied,
-  grid,
   practiceRound,
   onPlayAgain,
   stats,
@@ -1808,9 +1815,6 @@ function Reveal({
   answer: PuzzlePlayer | undefined;
   onShare: () => void;
   copied: boolean;
-  // The emoji block the share button is about to put on the clipboard,
-  // shown so nobody has to send it to find out what it says.
-  grid: string;
   // Which practice round this was, or null for the daily. What it gates
   // is the SHARE: a daily grid is worth posting because everybody had the
   // same player, and a practice grid is a picture of a puzzle nobody else
@@ -1888,29 +1892,16 @@ function Reveal({
             </span>
           )}
         </div>
-        {/* A preview, not a decoration. leading-none and a tight letter
-            spacing so the rows read as a block of squares rather than as
-            seven separate emoji per line - it should look like the thing
-            that lands in a message, which is how somebody decides whether
-            to send it. */}
-        {/* The grid preview is a share preview, so it goes with the share
-            button. A practice round has neither. */}
-        {practiceRound === null && (
-          <div
-            className="flex flex-col items-center gap-1 rounded-xl px-3 py-2.5"
-            style={{ background: FIELD, border: CARD_EDGE }}
-          >
-            <span className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: MUTED }}>
-              What you&rsquo;ll share
-            </span>
-            <pre
-              className="m-0 text-center font-sans text-[13px] leading-[1.35] tracking-[0.06em] sm:text-[15px]"
-              style={{ color: TEXT }}
-            >
-              {grid}
-            </pre>
-          </div>
-        )}
+        {/* NO SHARE PREVIEW. There used to be a boxed copy of the emoji
+            grid here, captioned "What you'll share", on the theory that
+            nobody should have to send a thing to find out what it says.
+
+            It cost about 90px in the middle of the dialog to answer a
+            question asked once. The line under the button already says
+            what the share does and does not contain, and the share sheet
+            shows the text before anything is sent - so the preview was
+            the third place the same reassurance was being given, and the
+            only one paying for it in height. */}
 
         {/* YOUR RECORD, under the result rather than over it. The board
             you just played is the thing you came for; the run it belongs

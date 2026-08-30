@@ -27,6 +27,7 @@ import { AchievementCard } from "@/components/AchievementCard";
 import { LevelLadder } from "@/components/LevelLadder";
 import { InviteFriendsCard } from "@/components/InviteFriendsCard";
 import { JoinDiscordCard } from "@/components/JoinDiscordCard";
+import { reportError } from "@/lib/sentry";
 
 const ALL_WEEKS = Object.keys(GAMES_BY_WEEK)
   .map(Number)
@@ -80,9 +81,14 @@ export function LevelsAchievementsModal({
   const [puzzlesSolved, setPuzzlesSolved] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Which tab it opens on, settled during render. As an effect this
+  // committed one frame on the previous tab before switching, so opening
+  // Challenges from a link flashed Levels first.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) setTab(initialTab);
-  }, [open, initialTab]);
+  }
 
   // Both tabs share one scroll container, and the Levels tab scrolls it:
   // LevelLadder centres your current rank on mount. Switching to
@@ -97,8 +103,15 @@ export function LevelsAchievementsModal({
     if (open && tab === "achievements") scrollRef.current?.scrollTo({ top: 0 });
   }, [open, tab]);
 
-  useEffect(() => {
-    if (!open || !user) return;
+  // Everything below is fetched for one account, on one opening. Blanking
+  // it DURING RENDER rather than from inside the effect is the difference
+  // between a reopen showing empty tiles and a reopen showing the numbers
+  // it had last time for a frame - which, if you signed into a different
+  // account in between, were somebody else's.
+  const loadFor = open && user ? user.id : null;
+  const [loadedFor, setLoadedFor] = useState(loadFor);
+  if (loadFor !== loadedFor) {
+    setLoadedFor(loadFor);
     setPredictorProgress(null);
     setWeeklyProgress(null);
     setReferralCount(null);
@@ -111,6 +124,10 @@ export function LevelsAchievementsModal({
     setDiscordClaimed(null);
     setPuzzlesSolved(null);
     setError(null);
+  }
+
+  useEffect(() => {
+    if (!open || !user) return;
     Promise.all([
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)),
       syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err)),
@@ -126,7 +143,7 @@ export function LevelsAchievementsModal({
         .catch((err) => setError(errorMessage(err)));
       fetchWeeks()
         .then(setWeeks)
-        .catch(() => {});
+        .catch((err) => reportError("levels.weeks", err));
       fetchReferralCount(user.id)
         .then(setReferralCount)
         .catch((err) => setError(errorMessage(err)));
@@ -476,7 +493,7 @@ export function LevelsAchievementsModal({
                             neverComplete
                           >
                             <p className="text-xs text-white/50 mt-1">
-                              Tap the lock icon on one of your Weekly Pick'em picks to mark it as your Lock of the Week. Get it right and you'll earn a bonus once results are published.
+                              Tap the lock icon on one of your Weekly Pick&rsquo;em picks to mark it as your Lock of the Week. Get it right and you&rsquo;ll earn a bonus once results are published.
                             </p>
                           </AchievementCard>
                         ),

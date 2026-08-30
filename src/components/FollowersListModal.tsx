@@ -24,10 +24,37 @@ export function FollowersListModal({ userId, open, onClose }: { userId: string; 
       });
   }
 
+  // RESET DURING RENDER, not in an effect. This is React's own answer to
+  // "clear some state when a prop changes": compare against the previous
+  // value and set during the render pass, which React re-runs
+  // immediately without committing the first result. An effect doing the
+  // same thing commits a render with the stale query still in it, then
+  // commits a second one - which is both a wasted frame and, for one
+  // frame, the wrong text in the box.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setQuery("");
+  }
+
+  // The fetch stays in an effect - it belongs to the outside world - but
+  // it no longer resets anything on the way in. The initial state IS the
+  // loading state, and on a re-open the previous list is the same list,
+  // so showing it while it refreshes beats a flash of spinner.
   useEffect(() => {
     if (!open) return;
-    setQuery("");
-    load();
+    let cancelled = false;
+    fetchMyFollowers(userId)
+      .then((rows) => {
+        if (!cancelled) setFollowers(rows);
+      })
+      .catch((err) => {
+        console.error("Failed to load followers", errorMessage(err));
+        if (!cancelled) setError("Couldn't load followers.");
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

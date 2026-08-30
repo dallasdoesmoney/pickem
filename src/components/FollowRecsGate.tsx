@@ -40,11 +40,11 @@ export function FollowRecsGate() {
 
   const eligible = !loading && !!user && !!profile && !!profile.username && profile.onboarding_avatar_prompted && !profile.follow_recs_prompted;
 
+  // Not eligible means no recommendations - a fact about the current
+  // profile rather than something to go and unset. Answered at the
+  // bottom of this block instead.
   useEffect(() => {
-    if (!eligible || !user) {
-      setCreators(null);
-      return;
-    }
+    if (!eligible || !user) return;
     let cancelled = false;
     fetchTopCreators(user.id)
       .then((rows) => {

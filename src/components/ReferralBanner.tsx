@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
 import { getPendingReferralCode, DISMISSED_REFERRAL_BANNER_KEY } from "@/lib/referralStorage";
+import { reportError } from "@/lib/sentry";
 
 type Referrer = { label: string; avatarUrl: string | null };
 
@@ -22,6 +23,11 @@ export function ReferralBanner() {
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
+    // Hydration: localStorage does not exist on the server, so this
+    // cannot move into the initialiser without the server and the client
+    // rendering different HTML from the same markup. Starts true so the
+    // banner never flashes before we know it was dismissed.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDismissed(localStorage.getItem(DISMISSED_REFERRAL_BANNER_KEY) === "1");
   }, []);
 
@@ -29,12 +35,16 @@ export function ReferralBanner() {
     if (user || dismissed) return;
     const code = getPendingReferralCode();
     if (!code) {
-      setReferrer(null);
+      // No code means no referrer, which is a fact rather than a fetch -
+      // so it is settled below at render instead of by a setState here.
       return;
     }
     fetchLeaderboardEntry(code)
       .then((row) => setReferrer(row ? { label: row.display_name || row.username, avatarUrl: row.avatar_url } : null))
-      .catch(() => setReferrer(null));
+      .catch((err) => {
+        reportError("referral.banner", err);
+        setReferrer(null);
+      });
   }, [user, dismissed]);
 
   function handleDismiss() {

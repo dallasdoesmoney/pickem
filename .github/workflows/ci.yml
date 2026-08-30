@@ -1,0 +1,133 @@
+# The check that has to pass before anything reaches sidelinebrew.com.
+#
+# Until now the four workflows in this directory were all cron data jobs -
+# rosters, results, two email sends - and NOT ONE of them ran the build, the
+# typechecker, the linter or any of the eight test suites. Netlify deploys on
+# push to main. The only thing standing between a broken build and the live
+# site was somebody remembering to run the checks by hand, which held because
+# the person shipping was careful, and does not survive a second contributor
+# or a rushed evening.
+#
+# Everything here is BLOCKING. There is no continue-on-error anywhere in this
+# file on purpose: a step that always passes is not a check, it is a
+# decoration, and people learn to scroll past it.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A second push to the same branch makes the first run irrelevant. Cancel it
+# rather than queueing behind it - the answer everybody is waiting for is
+# about the newest commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # The suites talk to a stubbed Supabase - every request is intercepted by
+    # Playwright's router and answered locally, so these are placeholders in
+    # the literal sense and no secret is needed to run the tests. PostHog needs
+    # BOTH variables set or instrumentation-client throws on boot and takes
+    # hydration down with it; the host is deliberately unresolvable and the
+    # suites abort requests to it.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+      NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: phc_ci
+      NEXT_PUBLIC_POSTHOG_HOST: https://posthog.invalid
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Six of the eight suites drive a real browser. They import playwright
+      # inside a try/catch and exit 1 with a hint when it is missing, so a
+      # runner without it fails loudly rather than silently passing - but
+      # nothing declared it until now, which is why it is in devDependencies.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # BEFORE the typecheck, and this is what broke the workflow's first run.
+      #
+      # `LayoutProps<"/">` in src/app/layout.tsx is a global Next GENERATES,
+      # into .next/types - which tsconfig includes and which a fresh checkout
+      # does not have. Every local run passed because .next was already there
+      # from an earlier build; the runner starts with nothing, so tsc failed on
+      # a name that is perfectly real.
+      #
+      # typegen rather than reordering the steps: it writes just the route
+      # types, in about a second, which keeps the typecheck where it belongs -
+      # ahead of the four-minute build, so a type error is known immediately
+      # rather than after it.
+      - name: Generate route types
+        run: npx next typegen
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint src scripts
+
+      - name: Build
+        run: npm run build
+
+      # Backgrounded, because the six browser suites need something to point
+      # at. `next start` would be closer to production, but the suites exercise
+      # client behaviour and dev is what they were written against.
+      - name: Start the app
+        run: |
+          npm run dev > dev.log 2>&1 &
+          echo $! > dev.pid
+          for i in $(seq 1 40); do
+            if curl -sf -o /dev/null http://localhost:3000/daily; then
+              echo "up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "the app never came up:"
+          cat dev.log
+          exit 1
+
+      # Node-only suites run first inside test:all. They need no browser and no
+      # server, so a break there is known in seconds instead of after a
+      # five-minute browser run.
+      #
+      # test:profile sits between them and the browser suites and does NOT use
+      # the server started above: it needs one started against its own Supabase
+      # stub, because what it tests happens inside the Next process where
+      # Playwright's request router cannot reach. It gets its own distDir so
+      # the two dev servers do not fight over the lock - see next.config.ts.
+      - name: Test
+        run: npm run test:all
+
+      - name: Stop the app
+        if: always()
+        run: kill "$(cat dev.pid)" 2>/dev/null || true
+
+      # Only on failure, and this is the point of SHOT_DIR: the suites used to
+      # write their screenshots to a hard-coded path inside one laptop's
+      # scratchpad directory, which no runner has.
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-evidence
+          path: |
+            artifacts/
+            dev.log
+          if-no-files-found: ignore
+          retention-days: 7

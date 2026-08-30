@@ -5,13 +5,32 @@ import { TIER_TEMPLATES, getTierTemplate } from "@/data/tierTemplates";
 import TierListPageClient from "./TierListPageClient";
 import { RouteLoading } from "@/components/RouteLoading";
 
-// Soft launch: the page is reachable by anyone with the URL, but nothing
-// links to it and search engines are told to stay away, so it isn't
-// discoverable while it's being tested. Remove this export (and add a nav
-// entry) to actually launch it.
-export const metadata: Metadata = {
-  robots: { index: false, follow: false },
-};
+// Its own card per template, replacing the soft-launch noindex - see the
+// note on the index page for why that came off.
+//
+// Seven routes that each answer a different search, and until now all
+// seven were invisible and would have unfurled as the home page anyway.
+// The title comes from the template rather than being written out here,
+// so an eighth list needs no edit to this file.
+export async function generateMetadata({ params }: { params: Promise<{ list: string }> }): Promise<Metadata> {
+  const { list } = await params;
+  const template = getTierTemplate(list);
+  if (!template) return {};
+  const title = `${template.title} Tier List`;
+  return {
+    title: `${title} - Sideline Brew`,
+    description: `${template.tagline}. Drag them into tiers, save your board and share it.`,
+    alternates: { canonical: `/tier-lists/${list}` },
+    openGraph: {
+      type: "website",
+      siteName: "Sideline Brew",
+      title,
+      description: template.tagline,
+      url: `/tier-lists/${list}`,
+    },
+    twitter: { card: "summary_large_image", title, description: template.tagline },
+  };
+}
 
 export function generateStaticParams() {
   return Object.keys(TIER_TEMPLATES).map((list) => ({ list }));

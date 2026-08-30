@@ -41,12 +41,16 @@ export function EditProfileModal({
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameSaved, setUsernameSaved] = useState(false);
 
-  useEffect(() => {
-    if (!initializedUsername && authProfile?.username) {
-      setUsername(authProfile.username);
-      setInitializedUsername(true);
-    }
-  }, [authProfile?.username, initializedUsername, setUsername]);
+  // SEEDED DURING RENDER, not in an effect. The profile arrives
+  // asynchronously, so the field cannot be initialised from it - but an
+  // effect meant one committed render with the box empty before the name
+  // appeared in it, which reads as a flicker on a slow connection.
+  // Setting during render makes React re-run the component and commit
+  // only the version that already has the name.
+  if (!initializedUsername && authProfile?.username) {
+    setInitializedUsername(true);
+    setUsername(authProfile.username);
+  }
 
   const [displayName, setDisplayName] = useState(authProfile?.display_name ?? "");
   const [initializedDisplayName, setInitializedDisplayName] = useState(false);
@@ -54,12 +58,11 @@ export function EditProfileModal({
   const [displayNameError, setDisplayNameError] = useState<string | null>(null);
   const [displayNameSaved, setDisplayNameSaved] = useState(false);
 
-  useEffect(() => {
-    if (!initializedDisplayName && authProfile) {
-      setDisplayName(authProfile.display_name);
-      setInitializedDisplayName(true);
-    }
-  }, [authProfile, initializedDisplayName]);
+  // Same seeding as the username above.
+  if (!initializedDisplayName && authProfile) {
+    setInitializedDisplayName(true);
+    setDisplayName(authProfile.display_name);
+  }
 
   const displayNameCheck = displayName === (authProfile?.display_name ?? "") ? null : validateDisplayName(displayName);
 

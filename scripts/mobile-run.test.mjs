@@ -32,7 +32,13 @@
 // overridden to 430 - the real shape of the problem. What this still
 // cannot prove is that iOS populates those properties the way every
 // other browser does.
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
 const APP = process.env.APP_URL ?? "http://localhost:3000";
+// Where a failure leaves its evidence. CI uploads this directory, so the
+// screenshot from a red run is the first thing you look at.
+const SHOT_DIR = process.env.SHOT_DIR ?? "artifacts";
 const SB = "https://placeholder.supabase.co";
 
 // A whole phone, and then the part of it a keyboard leaves.
@@ -372,7 +378,12 @@ check(
   `px short of the line, per guess: ${shortfall.join(", ")}`,
 );
 
-await page.screenshot({ path: "/tmp/claude-0/-home-user-pickem/c8c47499-bc03-5b0f-a459-d3a18c357eda/scratchpad/mobile-run.png" });
+// Somewhere that exists on any machine. This was a hard-coded path into
+// one laptop's scratchpad, which meant the line worked for exactly one
+// person and threw on a CI runner - the sort of thing that only shows up
+// the first time somebody else runs the suite.
+await mkdir(SHOT_DIR, { recursive: true });
+await page.screenshot({ path: join(SHOT_DIR, "mobile-run.png") });
 
 // AND THE SAME RUN ON A BIG PHONE, because whether the page can be
 // yanked at all depends on how much of it is left under the card - and

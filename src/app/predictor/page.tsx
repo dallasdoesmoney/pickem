@@ -6,6 +6,7 @@ import { TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchPredictorProgress } from "@/lib/supabase/achievements";
+import { reportError } from "@/lib/sentry";
 
 function CheckIcon({ className }: { className?: string }) {
   return (
@@ -17,17 +18,25 @@ function CheckIcon({ className }: { className?: string }) {
 
 export default function PredictorLandingPage() {
   const { user } = useAuth();
-  const [progress, setProgress] = useState<Partial<Record<TeamAbbr, number>> | null>(null);
+  // Keyed by the user, so signing out needs no reset: progress belongs
+  // to somebody, and if that somebody is not signed in it is not
+  // progress, it is a leftover.
+  const [held, setHeld] = useState<{ id: string; progress: Partial<Record<TeamAbbr, number>> } | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      setProgress(null);
-      return;
-    }
+    if (!user) return;
+    let cancelled = false;
     fetchPredictorProgress(user.id)
-      .then(setProgress)
-      .catch(() => setProgress(null));
+      .then((p) => {
+        if (!cancelled) setHeld({ id: user.id, progress: p });
+      })
+      .catch((err) => reportError("predictor.progress", err));
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
+
+  const progress = user && held?.id === user.id ? held.progress : null;
 
   return (
     <main className="flex-1 px-4 pb-16 pt-10 max-w-4xl w-full mx-auto">
