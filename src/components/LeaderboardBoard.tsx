@@ -85,12 +85,13 @@ export function LeaderboardBoard() {
       .catch((err) => setError(errorMessage(err)));
   }, [user]);
 
+  // Signed out has no friends list and cannot be on the friends tab -
+  // both are facts about the current user rather than things to go and
+  // set. Deriving them means a sign-out never renders the friends tab
+  // with somebody else's list still in it, which the effect version did
+  // for exactly one frame.
   useEffect(() => {
-    if (!user) {
-      setFriendIds(null);
-      if (view === "friends") setView("global");
-      return;
-    }
+    if (!user) return;
     reloadFriends();
   }, [user, reloadFriends]);
 

@@ -42,10 +42,12 @@ export function TierCelebration({
   const [drops, setDrops] = useState<Drop[]>([]);
 
   useEffect(() => {
-    if (!item) {
-      setDrops([]);
-      return;
-    }
+    if (!item) return;
+    // Math.random() after mount, never during render - see the note
+    // above. The rule cannot tell this from a value that could have been
+    // derived; this one could not, because two renders of the same props
+    // must produce the same HTML and this deliberately does not.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDrops(
       Array.from({ length: bin ? BIN_DROPS : PROMOTE_DROPS }, () => ({
         left: Math.random() * 100,

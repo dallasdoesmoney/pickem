@@ -29,19 +29,28 @@ export function FollowButton({
   onChange?: () => void;
   compact?: boolean;
 }) {
-  const [status, setStatus] = useState<FollowStatus | undefined>(undefined);
+  const [fetched, setFetched] = useState<FollowStatus | undefined>(undefined);
+
+  // SIGNED OUT IS A KNOWN STATUS, not a missing one. It used to be set by
+  // the effect, which cost a render - but simply dropping that would have
+  // left status undefined forever for a guest, and the guard below
+  // returns null on undefined. The button would have vanished for exactly
+  // the people it exists to convert, since tapping it is what opens the
+  // sign-in modal.
+  const status: FollowStatus | undefined = myId ? fetched : { iFollow: false, followsMe: false };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { requestSignIn, signInModal } = useSignInModal();
 
   function reload() {
     if (!myId) {
-      setStatus({ iFollow: false, followsMe: false });
+      // Signed out is not a status to fetch and not a status to set - it
+      // is the absence of one, settled at render below.
       return;
     }
     fetchFollowStatus(myId, otherId)
-      .then(setStatus)
-      .catch(() => setStatus({ iFollow: false, followsMe: false }));
+      .then(setFetched)
+      .catch(() => setFetched({ iFollow: false, followsMe: false }));
   }
 
   useEffect(reload, [myId, otherId]);
