@@ -29,22 +29,48 @@ export function SocialLinksModal({ userId, open, onClose }: { userId: string; op
       });
   }
 
+  // Cleared during render when it opens - React's own answer to "reset
+  // some state when a prop changes", and one render cheaper than an
+  // effect that commits the stale url first.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setUrl("");
+      setError(null);
+    }
+  }
+
+  // The fetch on its own, with nothing to reset on the way in - see
+  // load() above, which keeps its resets for the retry button.
   useEffect(() => {
     if (!open) return;
-    setUrl("");
-    setError(null);
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    fetchCreatorLinks(userId)
+      .then((rows) => {
+        if (!cancelled) setLinks(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load your links.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open, userId]);
 
   // Keep the platform select pointed at something still available once
   // links load or change (e.g. after adding one, that platform drops off
   // the list).
-  useEffect(() => {
-    if (!links) return;
-    const available = Object.keys(SOCIAL_PLATFORM_CATALOG).filter((key) => !links.some((l) => l.platform === key));
-    setPlatform((prev) => (available.includes(prev) ? prev : (available[0] ?? "")));
-  }, [links]);
+  //
+  // ANSWERED ON THE WAY OUT rather than corrected afterwards. The effect
+  // version rendered once with the select pointing at a platform that had
+  // just been used up, then corrected it - so for a frame the box offered
+  // something it would have rejected. The stored choice is allowed to go
+  // stale; every reader below uses the resolved one.
+  const available = links
+    ? Object.keys(SOCIAL_PLATFORM_CATALOG).filter((key) => !links.some((l) => l.platform === key))
+    : [];
+  const activePlatform = available.includes(platform) ? platform : (available[0] ?? "");
 
   if (!open) return null;
 
@@ -52,10 +78,10 @@ export function SocialLinksModal({ userId, open, onClose }: { userId: string; op
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!url.trim() || !platform || saving) return;
+    if (!url.trim() || !activePlatform || saving) return;
     setSaving(true);
     setError(null);
-    const { error } = await addCreatorLink(userId, platform, url.trim());
+    const { error } = await addCreatorLink(userId, activePlatform, url.trim());
     setSaving(false);
     if (error) {
       setError(error);
@@ -138,7 +164,7 @@ export function SocialLinksModal({ userId, open, onClose }: { userId: string; op
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs text-white/50 tracking-wide">PLATFORM</span>
                   <select
-                    value={platform}
+                    value={activePlatform}
                     onChange={(e) => setPlatform(e.target.value)}
                     className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-white text-sm outline-none focus:border-white/35"
                   >

@@ -22,6 +22,11 @@ export function ReferralBanner() {
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
+    // Hydration: localStorage does not exist on the server, so this
+    // cannot move into the initialiser without the server and the client
+    // rendering different HTML from the same markup. Starts true so the
+    // banner never flashes before we know it was dismissed.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDismissed(localStorage.getItem(DISMISSED_REFERRAL_BANNER_KEY) === "1");
   }, []);
 
@@ -29,7 +34,8 @@ export function ReferralBanner() {
     if (user || dismissed) return;
     const code = getPendingReferralCode();
     if (!code) {
-      setReferrer(null);
+      // No code means no referrer, which is a fact rather than a fetch -
+      // so it is settled below at render instead of by a setState here.
       return;
     }
     fetchLeaderboardEntry(code)

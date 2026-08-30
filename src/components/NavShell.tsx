@@ -200,28 +200,33 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   const parent = navParent(usePathname());
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [adminTaskCount, setAdminTaskCount] = useState(0);
+  const [pending, setPending] = useState<{ id: string; count: number } | null>(null);
+  const [adminQueue, setAdminQueue] = useState<{ forAdmin: boolean; count: number } | null>(null);
 
+  // Keyed by the user, so signing out zeroes it by comparison rather
+  // than by a render spent setting it. Same shape as AccountMenu, which
+  // carries the same two counts.
   useEffect(() => {
-    if (!user) {
-      setPendingCount(0);
-      return;
-    }
+    if (!user) return;
+    let cancelled = false;
     fetchUnreciprocatedFollowerCount(user.id)
-      .then(setPendingCount)
+      .then((n) => {
+        if (!cancelled) setPending({ id: user.id, count: n });
+      })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [user, mobileOpen]);
+  const pendingCount = user && pending?.id === user.id ? pending.count : 0;
 
   useEffect(() => {
-    if (!profile?.is_admin) {
-      setAdminTaskCount(0);
-      return;
-    }
+    if (!profile?.is_admin) return;
     fetchPendingCreatorRequestCount()
-      .then(setAdminTaskCount)
+      .then((n) => setAdminQueue({ forAdmin: true, count: n }))
       .catch(() => {});
   }, [profile?.is_admin, mobileOpen]);
+  const adminTaskCount = profile?.is_admin && adminQueue?.forAdmin ? adminQueue.count : 0;
 
   return (
     <div className="flex min-h-full">

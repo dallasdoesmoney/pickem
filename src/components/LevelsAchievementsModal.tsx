@@ -80,9 +80,14 @@ export function LevelsAchievementsModal({
   const [puzzlesSolved, setPuzzlesSolved] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Which tab it opens on, settled during render. As an effect this
+  // committed one frame on the previous tab before switching, so opening
+  // Challenges from a link flashed Levels first.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) setTab(initialTab);
-  }, [open, initialTab]);
+  }
 
   // Both tabs share one scroll container, and the Levels tab scrolls it:
   // LevelLadder centres your current rank on mount. Switching to
