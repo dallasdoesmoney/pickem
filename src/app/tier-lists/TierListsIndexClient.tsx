@@ -119,30 +119,33 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
 
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
-  const [saved, setSaved] = useState<SavedTierListSummary[] | null>(null);
+  const [fetchedSaved, setFetchedSaved] = useState<{
+    userId: string;
+    rows: SavedTierListSummary[];
+  } | null>(null);
   const [stats, setStats] = useState<Record<string, TierListStats>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async (userId: string) => {
-    try {
-      setSaved(await listMyTierLists(userId));
-      setLoadError(null);
-    } catch (err) {
-      console.error("Failed to load saved tier lists", err);
-      setLoadError("Couldn't load your saved lists. Try again.");
-    }
-  }, []);
-
+  // Signed out - nothing to fetch, and leaving the previous user's lists
+  // on screen after a sign-out would be a leak. Keying on the owner
+  // closes that without a render spent clearing it: a list that belongs
+  // to somebody else is not shown, whatever is still in memory.
   useEffect(() => {
-    if (!user) {
-      // Signed out - nothing to fetch, and leaving the previous user's
-      // lists on screen after a sign-out would be a leak.
-      setSaved(null);
-      return;
-    }
-    load(user.id);
-  }, [user, load]);
+    if (!user) return;
+    const userId = user.id;
+    listMyTierLists(userId)
+      .then((rows) => {
+        setFetchedSaved({ userId, rows });
+        setLoadError(null);
+      })
+      .catch((err) => {
+        console.error("Failed to load saved tier lists", err);
+        setLoadError("Couldn't load your saved lists. Try again.");
+      });
+  }, [user]);
+
+  const saved = user && fetchedSaved?.userId === user.id ? fetchedSaved.rows : null;
 
   // Public: the counters show for signed-out visitors too.
   useEffect(() => {
@@ -180,7 +183,9 @@ export default function TierListsIndexClient({ templates }: { templates: TierTem
       setLoadError(error);
       return;
     }
-    setSaved((rows) => (rows ?? []).filter((r) => r.id !== row.id));
+    setFetchedSaved((prev) =>
+      prev ? { userId: prev.userId, rows: prev.rows.filter((r) => r.id !== row.id) } : prev
+    );
   }
 
   const savedCount = saved?.length ?? null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { GAMES_BY_WEEK } from "@/data/games";
@@ -56,8 +56,20 @@ function AdminDashboard() {
 
   const [weeks, setWeeks] = useState<WeekRow[] | null>(null);
   const [selectedWeek, setSelectedWeek] = useState(1);
-  const [results, setResults] = useState<Record<string, TeamAbbr>>({});
-  const [resultsLoaded, setResultsLoaded] = useState(false);
+  // Held WITH the week it was fetched for, so "loaded" is a comparison
+  // rather than a second flag the effect has to reset first. The two
+  // used to drift for one commit every time the week changed: the map
+  // was still last week's while resultsLoaded was still true, which is
+  // exactly the render where the winner buttons are enabled.
+  const [fetchedResults, setFetchedResults] = useState<{
+    week: number;
+    map: Record<string, TeamAbbr>;
+  } | null>(null);
+  const resultsLoaded = fetchedResults?.week === selectedWeek;
+  const results = useMemo(
+    () => (fetchedResults?.week === selectedWeek ? fetchedResults.map : {}),
+    [fetchedResults, selectedWeek]
+  );
   const [error, setError] = useState<string | null>(null);
   const [savingWeek, setSavingWeek] = useState(false);
   const [savingGameId, setSavingGameId] = useState<string | null>(null);
@@ -91,12 +103,9 @@ function AdminDashboard() {
   }
 
   useEffect(() => {
-    setResultsLoaded(false);
-    fetchGameResults(selectedWeek)
-      .then((map) => {
-        setResults(map);
-        setResultsLoaded(true);
-      })
+    const week = selectedWeek;
+    fetchGameResults(week)
+      .then((map) => setFetchedResults({ week, map }))
       .catch((err) => setError(errorMessage(err)));
   }, [selectedWeek]);
 
@@ -140,14 +149,19 @@ function AdminDashboard() {
     try {
       if (results[gameId] === team) {
         await clearGameResult(gameId);
-        setResults((prev) => {
-          const next = { ...prev };
-          delete next[gameId];
-          return next;
+        setFetchedResults((prev) => {
+          if (!prev || prev.week !== selectedWeek) return prev;
+          const map = { ...prev.map };
+          delete map[gameId];
+          return { week: prev.week, map };
         });
       } else {
         await setGameResult(gameId, selectedWeek, team);
-        setResults((prev) => ({ ...prev, [gameId]: team }));
+        setFetchedResults((prev) =>
+          prev && prev.week === selectedWeek
+            ? { week: prev.week, map: { ...prev.map, [gameId]: team } }
+            : prev
+        );
       }
     } catch (err) {
       setError(errorMessage(err));

@@ -597,8 +597,20 @@ function LeaderboardCard({ rows }: { rows: LeaderboardRow[] }) {
 export default function HomePage() {
   const { user } = useAuth();
   const [weeks, setWeeks] = useState<WeekRow[]>([]);
-  const [picks, setPicks] = useState<Record<string, TeamAbbr> | null>(null);
-  const [progress, setProgress] = useState<Partial<Record<TeamAbbr, number>> | null>(null);
+  // Both are held WITH the account and week they were fetched for, and
+  // read back only when that still matches. The effect below used to
+  // clear them on sign-out instead, which is a render too late: for the
+  // one commit between a switch and the clear, the cards showed the
+  // previous player's picks.
+  const [fetchedPicks, setFetchedPicks] = useState<{
+    userId: string;
+    week: number;
+    picks: Record<string, TeamAbbr> | null;
+  } | null>(null);
+  const [fetchedProgress, setFetchedProgress] = useState<{
+    userId: string;
+    progress: Partial<Record<TeamAbbr, number>> | null;
+  } | null>(null);
   const [board, setBoard] = useState<LeaderboardRow[]>([]);
   const [daily, setDaily] = useState<PuzzleState | null>(null);
 
@@ -649,18 +661,22 @@ export default function HomePage() {
   }, [user]);
 
   useEffect(() => {
-    if (!user) {
-      setPicks(null);
-      setProgress(null);
-      return;
-    }
-    fetchWeeklyPicks(user.id, activeWeek)
-      .then((result) => setPicks(result.picks))
-      .catch(() => setPicks(null));
-    fetchPredictorProgress(user.id)
-      .then(setProgress)
-      .catch(() => setProgress(null));
+    if (!user) return;
+    const userId = user.id;
+    const week = activeWeek;
+    fetchWeeklyPicks(userId, week)
+      .then((result) => setFetchedPicks({ userId, week, picks: result.picks }))
+      .catch(() => setFetchedPicks({ userId, week, picks: null }));
+    fetchPredictorProgress(userId)
+      .then((progress) => setFetchedProgress({ userId, progress }))
+      .catch(() => setFetchedProgress({ userId, progress: null }));
   }, [user, activeWeek]);
+
+  const picks =
+    user && fetchedPicks?.userId === user.id && fetchedPicks.week === activeWeek
+      ? fetchedPicks.picks
+      : null;
+  const progress = user && fetchedProgress?.userId === user.id ? fetchedProgress.progress : null;
 
   const games = GAMES_BY_WEEK[activeWeek] ?? [];
 

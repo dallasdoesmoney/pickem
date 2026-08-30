@@ -315,7 +315,14 @@ export default function Home() {
   // shared component the standalone /leaderboard page renders.
   const [pageTab, setPageTab] = useState<"picks" | "leaderboard">("picks");
   const [weekSwitcherOpen, setWeekSwitcherOpen] = useState(false);
-  const [results, setResults] = useState<Record<string, TeamAbbr>>({});
+  // Held WITH the week it was fetched for. Switching weeks used to clear
+  // this from inside the effect, one commit after the switch - long
+  // enough for the grading row to count last week's results against this
+  // week's games.
+  const [fetchedResults, setFetchedResults] = useState<{
+    week: number;
+    map: Record<string, TeamAbbr>;
+  } | null>(null);
   // Drives the two-column grid's card scale (see gridScale below) - the
   // grid now runs at every viewport width, not just desktop, so it needs
   // to know the real available width to fit two cards side by side down
@@ -348,19 +355,26 @@ export default function Home() {
   const isEditable = weeks.length === 0 || currentWeekRow?.is_open === true;
   const { user: authUser } = useAuth();
 
+  const resultsPublished = currentWeekRow?.results_published === true;
+
   useEffect(() => {
-    if (currentWeekRow?.results_published) {
-      fetchGameResults(activeWeek)
-        .then(setResults)
-        .catch(() => setResults({}));
-      // Not in streamer mode: nothing on this page writes to the
-      // account while a guest has the board.
-      if (authUser && !view.streamerMode) syncLockBonus().catch((err) => console.error("Lock bonus sync failed", err));
-    } else {
-      setResults({});
-    }
+    if (!resultsPublished) return;
+    const week = activeWeek;
+    fetchGameResults(week)
+      .then((map) => setFetchedResults({ week, map }))
+      .catch(() => setFetchedResults({ week, map: {} }));
+    // Not in streamer mode: nothing on this page writes to the
+    // account while a guest has the board.
+    if (authUser && !view.streamerMode) syncLockBonus().catch((err) => console.error("Lock bonus sync failed", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWeek, currentWeekRow?.results_published, authUser]);
+  }, [activeWeek, resultsPublished, authUser]);
+
+  // An unpublished week has no results, whatever is still in memory from
+  // the week you were looking at a moment ago.
+  const results = useMemo(
+    () => (resultsPublished && fetchedResults?.week === activeWeek ? fetchedResults.map : {}),
+    [resultsPublished, fetchedResults, activeWeek]
+  );
 
   const games = GAMES_BY_WEEK[activeWeek];
   const view = useBoardView();
@@ -426,16 +440,20 @@ export default function Home() {
   // Season-wide record (across every published week), for the record
   // pill's first segment - same query the profile page and leaderboard
   // already use, just scoped to whoever's signed in here.
-  const [myRecord, setMyRecord] = useState<LeaderboardRow | null>(null);
+  // Keyed by whose record it is, so signing out - or switching accounts -
+  // stops showing it on the same render rather than the one after.
+  const [fetchedRecord, setFetchedRecord] = useState<{
+    userId: string;
+    row: LeaderboardRow | null;
+  } | null>(null);
   useEffect(() => {
-    if (!user) {
-      setMyRecord(null);
-      return;
-    }
-    fetchMyLeaderboardEntry(user.id)
-      .then(setMyRecord)
-      .catch(() => setMyRecord(null));
+    if (!user) return;
+    const userId = user.id;
+    fetchMyLeaderboardEntry(userId)
+      .then((row) => setFetchedRecord({ userId, row }))
+      .catch(() => setFetchedRecord({ userId, row: null }));
   }, [user]);
+  const myRecord = user && fetchedRecord?.userId === user.id ? fetchedRecord.row : null;
   // Full board, fetched regardless of auth - there's no rank column in
   // the DB (see leaderboard.ts), so your position has to be found by
   // index in the same sorted array the leaderboard page itself renders.

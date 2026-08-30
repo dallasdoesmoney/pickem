@@ -63,12 +63,8 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      # eslint.config.ci.mjs is the normal config with ONE rule downgraded to a
-      # warning - see the comment in that file. It is deleted, and this line
-      # goes back to plain `npx eslint`, once the 45 setState-in-effect errors
-      # are fixed. Every other rule blocks today.
       - name: Lint
-        run: npx eslint --config eslint.config.ci.mjs src scripts
+        run: npx eslint src scripts
 
       - name: Build
         run: npm run build

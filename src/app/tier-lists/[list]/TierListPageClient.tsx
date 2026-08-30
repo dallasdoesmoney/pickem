@@ -184,7 +184,12 @@ export default function TierListPageClient({
   // null = the unranked pool, otherwise a tier id.
   const [overTier, setOverTier] = useState<string | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState(0);
+  // The board as it stood the last time a save succeeded. "SAVED" is
+  // then a comparison against the live board rather than a flag some
+  // effect has to remember to clear - the reducer hands back a new
+  // object for every edit, so any change stops matching on the same
+  // render it happens, not the one after.
+  const [savedSnapshot, setSavedSnapshot] = useState<TierListState | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [namingOpen, setNamingOpen] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -818,7 +823,7 @@ export default function TierListPageClient({
         return false;
       }
       setSaveError(null);
-      setSavedAt(Date.now());
+      setSavedSnapshot(draft);
       if (rowId) {
         setSavedId(rowId);
         setSavedName(listName);
@@ -842,13 +847,6 @@ export default function TierListPageClient({
     },
     [template.slug]
   );
-
-  // "SAVED" was sticky: it was set on save and never cleared, so the
-  // button went on claiming the list was saved through every edit that
-  // followed. Any change to the board takes the confirmation back off.
-  useEffect(() => {
-    setSavedAt(0);
-  }, [state]);
 
   // Resolves the account to save under, prompting for sign-in if needed.
   // Null means the caller should stop: either the prompt was dismissed,
@@ -948,6 +946,12 @@ export default function TierListPageClient({
     if (!user || !loaded) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
+    // A false positive, and the only one left in the codebase: the rule
+    // follows the call into doSave and finds setState there, but it does
+    // not model `await`. Every setState in doSave lands after the round
+    // trip to saveTierList, so this is a network callback, not the
+    // cascading render the rule is looking for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     doSave(user.id, state, savedId, savedName ?? listTitleFor(state, template));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loaded]);
@@ -1409,7 +1413,7 @@ export default function TierListPageClient({
                   <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
                   SAVING&hellip;
                 </>
-              ) : savedAt ? (
+              ) : state === savedSnapshot ? (
                 <>
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6L9 17l-5-5" />

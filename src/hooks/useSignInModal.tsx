@@ -80,11 +80,18 @@ export function useSignInModal() {
   // Shown regardless of which button opened the modal (banner, Save &
   // Submit, whatever) - anyone signing up with a pending referral code
   // sees the context, not just people who came in through the banner.
+  // Cleared when the modal CLOSES, during render. Reopening it must not
+  // still show whoever invited you last time if the code has since been
+  // spent - which is what the old effect was for, one render later than
+  // it needed to be.
+  const [wasOpen, setWasOpen] = useState(!!state);
+  if (!!state !== wasOpen) {
+    setWasOpen(!!state);
+    if (!state) setReferrer(null);
+  }
+
   useEffect(() => {
-    if (!state) {
-      setReferrer(null);
-      return;
-    }
+    if (!state) return;
     const code = getPendingReferralCode();
     if (!code) return;
     fetchLeaderboardEntry(code)

@@ -102,8 +102,15 @@ export function LevelsAchievementsModal({
     if (open && tab === "achievements") scrollRef.current?.scrollTo({ top: 0 });
   }, [open, tab]);
 
-  useEffect(() => {
-    if (!open || !user) return;
+  // Everything below is fetched for one account, on one opening. Blanking
+  // it DURING RENDER rather than from inside the effect is the difference
+  // between a reopen showing empty tiles and a reopen showing the numbers
+  // it had last time for a frame - which, if you signed into a different
+  // account in between, were somebody else's.
+  const loadFor = open && user ? user.id : null;
+  const [loadedFor, setLoadedFor] = useState(loadFor);
+  if (loadFor !== loadedFor) {
+    setLoadedFor(loadFor);
     setPredictorProgress(null);
     setWeeklyProgress(null);
     setReferralCount(null);
@@ -116,6 +123,10 @@ export function LevelsAchievementsModal({
     setDiscordClaimed(null);
     setPuzzlesSolved(null);
     setError(null);
+  }
+
+  useEffect(() => {
+    if (!open || !user) return;
     Promise.all([
       syncPredictorAchievements().catch((err) => console.error("Achievement sync failed", err)),
       syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err)),

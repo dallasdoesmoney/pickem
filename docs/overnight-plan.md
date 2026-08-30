@@ -105,18 +105,60 @@ same constant `generateStaticParams` does. The two cannot disagree. Worth
 knowing separately that `/tier-lists/nfl-head-coaches` answers 200 rather than
 404 in dev — pre-existing, not advertised anywhere, and not this item's job.
 
-## 3 · The 45 setState errors, and the demo routes  ·  ~2h
+## 3 · The 45 setState errors, and the demo routes  ·  ~2h  ·  DONE
 
-- [ ] Work `npx eslint src` down to zero, in small batches, running the suites
+- [x] Work `npx eslint src` down to zero, in small batches, running the suites
       between them. Each one is a cascading render: React commits, the effect
       fires, state changes, React commits again. Some are only waste; a few are
       the shape of a real bug, where a value is read one render before it is
       correct.
-- [ ] Delete `src/app/animation-demo/`, `src/app/qb-chip-demo/` (and its
+- [x] Delete `src/app/animation-demo/`, `src/app/qb-chip-demo/` (and its
       `layout.tsx`), `src/app/texture-demo/`. Unlinked, crawlable, and three of
       eighteen routes.
-- [ ] Remove the CI lint downgrade from item 1. **This is what makes item 1
+- [x] Remove the CI lint downgrade from item 1. **This is what makes item 1
       finished**, so do not skip it.
+
+**48 errors to 0.** `eslint.config.ci.mjs` is deleted and the CI lint step is
+plain `npx eslint src scripts`, so item 1 is now genuinely finished: every rule
+blocks, with no carve-out.
+
+Four patterns did the work, in rough order of how often they applied:
+
+1. **Key the held value by what it belongs to**, and decide at render.
+   `results` in the admin screen and in `/weekly` is now `{ week, map }`;
+   `picks`, `progress`, `myRecord` and the saved tier lists are keyed by
+   `userId`. The effect that used to clear them ran one commit LATE, and that
+   commit is a real one: the admin screen enabled its winner buttons while the
+   map was still last week's, and `/weekly` counted last week's results against
+   this week's games for a frame.
+2. **React's documented "adjust state during render"** — compare against the
+   previous value, set during render, React re-runs without committing — for
+   the eleven-field reset in LevelsAchievementsModal and for `useSignInModal`.
+   Reopening the Levels modal showed the previous account's numbers for a frame
+   before the reset landed.
+3. **Derive instead of storing.** `savedAt` in the tier list editor became
+   `state === savedSnapshot`, which is what "SAVED" always meant. The toast
+   `current` became `checkInToast ?? queue[0]`, removing the pump effect and
+   with it the empty render between one toast and the next.
+4. **Delete the write.** `FollowRecsGate` cleared a value that a guard three
+   lines down already covered.
+
+**One `eslint-disable` remains, in the whole codebase**, on the tier list
+editor's resume-after-OAuth save. The rule follows a call into an async
+function and finds a setState there, but it does not model `await` — verified
+with a scratch component: `void go()` where `go` awaits a fetch before its
+setState is flagged, while the same setState inside a `.then` is not. Every
+setState in `doSave` lands after the round trip to `saveTierList`, so it is a
+network callback and not the cascading render the rule is looking for. It is
+labelled as a false positive rather than as an exemption.
+
+**Nothing referenced the three demo routes** but Next's own build manifests -
+grepped before deleting. Eighteen routes down to fifteen.
+
+Verified end to end after the last batch: typecheck clean, `eslint src scripts`
+0 errors (83 `<img>` warnings, all pre-existing), build compiled, all eight
+suites green against a dev server, and every page whose state handling changed
+loaded with a clean console.
 
 ## 4 · The creator profile  ·  ~2h
 
