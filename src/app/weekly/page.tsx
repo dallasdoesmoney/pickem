@@ -25,6 +25,7 @@ import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
 import { useBoardView } from "@/hooks/useBoardView";
 import { StreamerSettings } from "@/components/StreamerSettings";
 import { SavePicksPrompt } from "@/components/SavePicksPrompt";
+import { reportError } from "@/lib/sentry";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -346,7 +347,7 @@ export default function Home() {
         const openWeeks = rows.filter((w) => w.is_open).map((w) => w.week);
         if (openWeeks.length > 0) setActiveWeek(Math.max(...openWeeks));
       })
-      .catch(() => {});
+      .catch((err) => reportError("weekly.weeks", err));
   }, []);
 
   const currentWeekRow = weeks.find((w) => w.week === activeWeek);
@@ -362,7 +363,10 @@ export default function Home() {
     const week = activeWeek;
     fetchGameResults(week)
       .then((map) => setFetchedResults({ week, map }))
-      .catch(() => setFetchedResults({ week, map: {} }));
+      .catch((err) => {
+        reportError("weekly.gameResults", err);
+        setFetchedResults({ week, map: {} });
+      });
     // Not in streamer mode: nothing on this page writes to the
     // account while a guest has the board.
     if (authUser && !view.streamerMode) syncLockBonus().catch((err) => console.error("Lock bonus sync failed", err));
@@ -451,7 +455,10 @@ export default function Home() {
     const userId = user.id;
     fetchMyLeaderboardEntry(userId)
       .then((row) => setFetchedRecord({ userId, row }))
-      .catch(() => setFetchedRecord({ userId, row: null }));
+      .catch((err) => {
+        reportError("weekly.myRecord", err);
+        setFetchedRecord({ userId, row: null });
+      });
   }, [user]);
   const myRecord = user && fetchedRecord?.userId === user.id ? fetchedRecord.row : null;
   // Full board, fetched regardless of auth - there's no rank column in
@@ -461,7 +468,10 @@ export default function Home() {
   useEffect(() => {
     fetchLeaderboard()
       .then(setLeaderboardRows)
-      .catch(() => setLeaderboardRows([]));
+      .catch((err) => {
+        reportError("weekly.leaderboard", err);
+        setLeaderboardRows([]);
+      });
   }, []);
   const myRank = user && leaderboardRows ? leaderboardRows.findIndex((r) => r.user_id === user.id) : -1;
   const pickedCount = Object.keys(picks).length;

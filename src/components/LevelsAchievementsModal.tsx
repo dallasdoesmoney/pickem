@@ -27,6 +27,7 @@ import { AchievementCard } from "@/components/AchievementCard";
 import { LevelLadder } from "@/components/LevelLadder";
 import { InviteFriendsCard } from "@/components/InviteFriendsCard";
 import { JoinDiscordCard } from "@/components/JoinDiscordCard";
+import { reportError } from "@/lib/sentry";
 
 const ALL_WEEKS = Object.keys(GAMES_BY_WEEK)
   .map(Number)
@@ -142,7 +143,7 @@ export function LevelsAchievementsModal({
         .catch((err) => setError(errorMessage(err)));
       fetchWeeks()
         .then(setWeeks)
-        .catch(() => {});
+        .catch((err) => reportError("levels.weeks", err));
       fetchReferralCount(user.id)
         .then(setReferralCount)
         .catch((err) => setError(errorMessage(err)));

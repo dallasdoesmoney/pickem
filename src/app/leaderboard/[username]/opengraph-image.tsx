@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fetchProfileRow, fetchProfileRank } from "@/lib/supabase/server";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
+import { reportError } from "@/lib/sentry";
 
 // The card a shared profile link unfurls as. Until now every one of them
 // was /og-default.png - the same generic site card for every player on
@@ -62,7 +63,11 @@ async function avatarDataUri(url: string | null): Promise<string | null> {
     // hostile URL cannot turn one link preview into a memory problem.
     if (buf.byteLength > 2_000_000) return null;
     return `data:${type};base64,${buf.toString("base64")}`;
-  } catch {
+  } catch (err) {
+    // Reported and then dropped: a card with an initial in place of a
+    // photo is a fine card, but an avatar host that has started failing
+    // for everybody is something we should hear about once.
+    reportError("profile.cardAvatar", err);
     return null;
   }
 }
@@ -89,7 +94,10 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
 
 export default async function Image({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
-  const row = await fetchProfileRow(username).catch(() => null);
+  const row = await fetchProfileRow(username).catch((err) => {
+    reportError("profile.cardRow", err);
+    return null;
+  });
 
   // No player, or no database: still a valid card. A link preview that
   // fails to render is a broken-looking link, which is worse than a
@@ -118,7 +126,13 @@ export default async function Image({ params }: { params: Promise<{ username: st
     );
   }
 
-  const [rank, avatar] = await Promise.all([fetchProfileRank(row).catch(() => null), avatarDataUri(row.avatar_url)]);
+  const [rank, avatar] = await Promise.all([
+    fetchProfileRank(row).catch((err) => {
+      reportError("profile.cardRank", err);
+      return null;
+    }),
+    avatarDataUri(row.avatar_url),
+  ]);
   const level = getLevelInfo(row.total_points);
   const name = row.display_name || row.username;
   const accent = level.rankColor;

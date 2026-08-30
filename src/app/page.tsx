@@ -17,6 +17,7 @@ import { getTierTemplate } from "@/data/tierTemplates";
 import { BoardZoom, previewFor } from "@/components/tierList/BoardThumb";
 import { widestWordEm } from "@/components/tierList/bungee";
 import { useAuth } from "@/hooks/useAuth";
+import { reportError } from "@/lib/sentry";
 
 // Every card fronts a destination with a live picture of what is behind
 // it - the week's actual matchups, your actual predictor progress, the
@@ -617,10 +618,10 @@ export default function HomePage() {
   useEffect(() => {
     fetchWeeks()
       .then(setWeeks)
-      .catch(() => {});
+      .catch((err) => reportError("home.weeks", err));
     fetchLeaderboard()
       .then(setBoard)
-      .catch(() => {});
+      .catch((err) => reportError("home.leaderboard", err));
   }, []);
 
   const activeWeek = useMemo(() => {
@@ -636,7 +637,10 @@ export default function HomePage() {
     if (user) {
       fetchDailyPuzzle()
         .then(setDaily)
-        .catch(() => setDaily(null));
+        .catch((err) => {
+          reportError("home.dailyBoard", err);
+          setDaily(null);
+        });
       return;
     }
     const on = puzzleToday();
@@ -666,10 +670,16 @@ export default function HomePage() {
     const week = activeWeek;
     fetchWeeklyPicks(userId, week)
       .then((result) => setFetchedPicks({ userId, week, picks: result.picks }))
-      .catch(() => setFetchedPicks({ userId, week, picks: null }));
+      .catch((err) => {
+        reportError("home.weeklyPicks", err);
+        setFetchedPicks({ userId, week, picks: null });
+      });
     fetchPredictorProgress(userId)
       .then((progress) => setFetchedProgress({ userId, progress }))
-      .catch(() => setFetchedProgress({ userId, progress: null }));
+      .catch((err) => {
+        reportError("home.predictorProgress", err);
+        setFetchedProgress({ userId, progress: null });
+      });
   }, [user, activeWeek]);
 
   const picks =

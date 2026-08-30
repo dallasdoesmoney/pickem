@@ -6,6 +6,7 @@ import { TEAMS_SORTED, TeamAbbr } from "@/data/teams";
 import { REQUIRED_PREDICTOR_WEEKS } from "@/lib/teamSchedule";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchPredictorProgress } from "@/lib/supabase/achievements";
+import { reportError } from "@/lib/sentry";
 
 function CheckIcon({ className }: { className?: string }) {
   return (
@@ -29,7 +30,7 @@ export default function PredictorLandingPage() {
       .then((p) => {
         if (!cancelled) setHeld({ id: user.id, progress: p });
       })
-      .catch(() => {});
+      .catch((err) => reportError("predictor.progress", err));
     return () => {
       cancelled = true;
     };

@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 import { fetchPendingCreatorRequestCount } from "@/lib/supabase/creatorRequests";
 import { navParent } from "@/lib/navParent";
+import { reportError } from "@/lib/sentry";
 
 type NavItem = {
   href: string;
@@ -213,7 +214,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       .then((n) => {
         if (!cancelled) setPending({ id: user.id, count: n });
       })
-      .catch(() => {});
+      .catch((err) => reportError("nav.unreadCount", err));
     return () => {
       cancelled = true;
     };
@@ -224,7 +225,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
     if (!profile?.is_admin) return;
     fetchPendingCreatorRequestCount()
       .then((n) => setAdminQueue({ forAdmin: true, count: n }))
-      .catch(() => {});
+      .catch((err) => reportError("nav.adminQueue", err));
   }, [profile?.is_admin, mobileOpen]);
   const adminTaskCount = profile?.is_admin && adminQueue?.forAdmin ? adminQueue.count : 0;
 

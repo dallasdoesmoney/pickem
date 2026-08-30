@@ -9,6 +9,7 @@ import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 import { fetchMyLeaderboardEntry } from "@/lib/supabase/leaderboard";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
+import { reportError } from "@/lib/sentry";
 
 const PANEL_WIDTH = 200;
 
@@ -66,7 +67,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
     if (user) {
       fetchMyLeaderboardEntry(user.id)
         .then((row) => setTotalPoints(row?.total_points))
-        .catch(() => {});
+        .catch((err) => reportError("accountMenu.points", err));
     }
   }
 
@@ -81,7 +82,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
       .then((n) => {
         if (!cancelled) setPending({ id: user.id, count: n });
       })
-      .catch(() => {});
+      .catch((err) => reportError("accountMenu.unreadCount", err));
     return () => {
       cancelled = true;
     };
@@ -95,7 +96,7 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
     if (!profile?.is_admin) return;
     fetchPendingCreatorRequestCount()
       .then((n) => setAdminQueue({ forAdmin: true, count: n }))
-      .catch(() => {});
+      .catch((err) => reportError("accountMenu.adminQueue", err));
   }, [profile?.is_admin, open]);
   const adminTaskCount = profile?.is_admin && adminQueue?.forAdmin ? adminQueue.count : 0;
 

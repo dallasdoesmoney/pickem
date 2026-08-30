@@ -29,6 +29,7 @@ import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
+import { reportError } from "@/lib/sentry";
 
 // A layout effect on the client, a no-op on the server. The FLIP below
 // has to measure and set a transform BEFORE the browser paints, or the
@@ -288,7 +289,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       .then((n) => {
         if (!cancelled) setGuestNumber(n);
       })
-      .catch(() => {});
+      .catch((err) => reportError("daily.guestBoardNumber", err));
     return () => {
       cancelled = true;
     };
@@ -313,7 +314,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
       .then((s) => {
         if (!cancelled) setStats(s);
       })
-      .catch(() => {});
+      .catch((err) => reportError("daily.nameplateStats", err));
     return () => {
       cancelled = true;
     };
@@ -650,10 +651,18 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
               if (board.finished) break;
               try {
                 board = await submitDailyGuess(g.espnId);
-              } catch {
+              } catch (err) {
                 // A guess the server refuses (already used, day over)
                 // stops the handover rather than failing the page - the
                 // board it has is still the true one.
+                //
+                // Reported, because the two cases look identical from
+                // here and only one of them is fine: a refusal is
+                // expected, and a network failure means somebody just
+                // signed in and quietly lost the guesses they made as a
+                // guest, which is the worst moment on the site to lose
+                // anything.
+                reportError("daily.guestHandover", err);
                 break;
               }
             }

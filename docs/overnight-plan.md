@@ -219,14 +219,54 @@ description — a level-15 player and a fresh account. If the palette or the
 proportions are wrong, `opengraph-image.tsx` is one file and nothing else
 depends on it.
 
-## 5 · Error monitoring  ·  ~45m
+## 5 · Error monitoring  ·  ~45m  ·  DONE, **BLOCKED on Dallas for the DSN**
 
-- [ ] Add `@sentry/nextjs`, initialised from `NEXT_PUBLIC_SENTRY_DSN`, **inert
+- [x] Add `@sentry/nextjs`, initialised from `NEXT_PUBLIC_SENTRY_DSN`, **inert
       when the variable is absent** so nothing changes for anybody until Dallas
       adds it. `BLOCKED` on him for the DSN itself.
-- [ ] Pass over every silent `catch` — the Nameplate stats fetch, the guest
+- [x] Pass over every silent `catch` — the Nameplate stats fetch, the guest
       board number, the play-again focus — so each reports before it swallows.
       The swallow is right for the player; the silence is not right for us.
+
+**Inert is measured, not asserted.** The `import` itself is behind the DSN
+check in `src/lib/sentry.ts`, so with no variable the browser never downloads
+the SDK: built and served, then loaded `/daily` in a real browser and watched
+the network — 20 chunks fetched, and the 568KB one containing `@sentry/nextjs`
+is not among them. Then the same page with a DSN set, where `window.__SENTRY__`
+comes back initialised at 10.72.0. Both directions.
+
+**What this actually adds is the SERVER side.** PostHog has captured browser
+exceptions since it went in (`capture_exceptions` in
+`instrumentation-client.ts`), so the client was never fully blind. Nothing at
+all was watching the server — and item 4 just put the creator profile there,
+which is the first page whose data fetch can fail before a browser exists.
+`instrumentation.ts` exports `onRequestError` for exactly that.
+
+**28 silent failures now report before they swallow.** The swallow stays: a
+stats panel that fails should not take the game down. `reportError(where, err)`
+takes a short stable label so the same failure groups in the issue list however
+its message varies. The one worth naming: `daily.guestHandover`, where a guest
+signing in mid-run replays their guesses to the server — a refusal is expected
+and fine, a network failure means somebody just lost the guesses they made as a
+guest, and the two looked identical from inside the `catch`.
+
+Left alone on purpose: the `catch` around `navigator.share` (that is a person
+cancelling a share sheet) and the storage probes in `useBoardView` /
+`useTierList` (that is private browsing, not a fault). **The plan named "the
+play-again focus" as a silent catch — it has no `catch` at all**, so there was
+nothing there to fix.
+
+**Two things left for Dallas, both of which only he can do:**
+
+1. **The DSN.** Create a Sentry project and set `NEXT_PUBLIC_SENTRY_DSN` in
+   Netlify. Nothing reports until then. `NEXT_PUBLIC_SENTRY_ENVIRONMENT` is
+   optional and is what keeps deploy-preview noise out of the live project.
+2. **Source maps, deliberately not wired.** `withSentryConfig` is what uploads
+   them, and it needs a `SENTRY_AUTH_TOKEN` plus an org and project slug that
+   do not exist yet — and it changes the production build, which is not
+   something to add unattended and unverifiable. Without it the reports arrive
+   with minified stack traces: useful, but not as useful as they will be. It is
+   a follow-up, not a gap in this item.
 
 ---
 

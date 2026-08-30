@@ -12,6 +12,7 @@ import { LevelBadge } from "@/components/LevelBadge";
 import { CreatorBadgeIcon } from "@/components/CreatorBadgeIcon";
 import { StreakBadge } from "@/components/StreakBadge";
 import { getLevelInfo } from "@/lib/levels";
+import { reportError } from "@/lib/sentry";
 
 type BoardView = "global" | "friends";
 
@@ -73,7 +74,7 @@ export function LeaderboardBoard() {
         setRows(fetched);
         fetchCreatorUserIds(fetched.map((r) => r.user_id))
           .then(setCreatorIds)
-          .catch(() => {});
+          .catch((err) => reportError("leaderboard.creatorIds", err));
       })
       .catch((err) => setError(errorMessage(err)));
   }, []);

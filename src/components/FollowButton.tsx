@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import posthog from "posthog-js";
 import { fetchFollowStatus, followUser, unfollowUser, FollowStatus } from "@/lib/supabase/follows";
 import { useSignInModal } from "@/hooks/useSignInModal";
+import { reportError } from "@/lib/sentry";
 
 // Four states, derived from {iFollow, followsMe} - no more pending/accept
 // dance, every action is a single instant button. compact: a single-row,
@@ -50,7 +51,10 @@ export function FollowButton({
     }
     fetchFollowStatus(myId, otherId)
       .then(setFetched)
-      .catch(() => setFetched({ iFollow: false, followsMe: false }));
+      .catch((err) => {
+        reportError("follow.status", err);
+        setFetched({ iFollow: false, followsMe: false });
+      });
   }
 
   useEffect(reload, [myId, otherId]);

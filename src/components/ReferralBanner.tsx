@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
 import { getPendingReferralCode, DISMISSED_REFERRAL_BANNER_KEY } from "@/lib/referralStorage";
+import { reportError } from "@/lib/sentry";
 
 type Referrer = { label: string; avatarUrl: string | null };
 
@@ -40,7 +41,10 @@ export function ReferralBanner() {
     }
     fetchLeaderboardEntry(code)
       .then((row) => setReferrer(row ? { label: row.display_name || row.username, avatarUrl: row.avatar_url } : null))
-      .catch(() => setReferrer(null));
+      .catch((err) => {
+        reportError("referral.banner", err);
+        setReferrer(null);
+      });
   }, [user, dismissed]);
 
   function handleDismiss() {

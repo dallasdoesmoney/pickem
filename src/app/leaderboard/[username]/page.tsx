@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchProfileRow, fetchProfileRank } from "@/lib/supabase/server";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
+import { reportError } from "@/lib/sentry";
 import { ProfileClient } from "./ProfileClient";
 
 // A SERVER page now. It used to be a client component that rendered a
@@ -51,10 +52,16 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
   // exist, so a failure here gives up on the metadata rather than
   // asserting the player is missing - the page below is what decides
   // whether this is a 404.
-  const row = await fetchProfileRow(username).catch(() => null);
+  const row = await fetchProfileRow(username).catch((err) => {
+    reportError("profile.metadataRow", err);
+    return null;
+  });
   if (!row) return { title: "Player not found - Sideline Brew", robots: { index: false } };
 
-  const rank = await fetchProfileRank(row).catch(() => null);
+  const rank = await fetchProfileRank(row).catch((err) => {
+    reportError("profile.metadataRank", err);
+    return null;
+  });
   const d = describe(row, rank)!;
   const url = `/leaderboard/${row.username}`;
   return {

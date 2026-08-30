@@ -13,6 +13,7 @@ import { SOCIAL_PLATFORM_CATALOG } from "@/lib/socialPlatforms";
 import { buildReferralLink } from "@/lib/referralStorage";
 import { rankWashStyle } from "@/components/RankPanel";
 import { errorMessage } from "@/lib/errorMessage";
+import { reportError } from "@/lib/sentry";
 
 // The creator application. Red rather than the app's usual navy, with
 // the same wash the profile cards carry - this is the one thing on the
@@ -119,7 +120,10 @@ export function CreatorRequestModal({ userId, open, onClose }: { userId: string;
       });
     fetchReferralCount(userId)
       .then(setReferrals)
-      .catch(() => setReferrals(null));
+      .catch((err) => {
+        reportError("creatorRequest.referrals", err);
+        setReferrals(null);
+      });
     // The referral link is built from the username, which the profile
     // already has - read straight off the row rather than threading it
     // through props from three different callers.
@@ -158,7 +162,7 @@ export function CreatorRequestModal({ userId, open, onClose }: { userId: string;
       return;
     }
     setStep("done");
-    fetchMyCreatorRequest(userId).then(setExisting).catch(() => {});
+    fetchMyCreatorRequest(userId).then(setExisting).catch((err) => reportError("creatorRequest.existing", err));
   }
 
   // Where APPLY goes: straight past the referral screen once they're at

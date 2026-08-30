@@ -6,6 +6,7 @@ import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
 import { getPendingReferralCode } from "@/lib/referralStorage";
 import { sendPasswordReset } from "@/lib/supabase/profile";
 import { errorMessage } from "@/lib/errorMessage";
+import { reportError } from "@/lib/sentry";
 
 type ModalState = { resolve: (ok: boolean) => void } | null;
 
@@ -96,7 +97,10 @@ export function useSignInModal() {
     if (!code) return;
     fetchLeaderboardEntry(code)
       .then((row) => setReferrer(row ? { label: row.display_name || row.username, avatarUrl: row.avatar_url } : null))
-      .catch(() => setReferrer(null));
+      .catch((err) => {
+        reportError("signIn.referrer", err);
+        setReferrer(null);
+      });
   }, [state]);
 
   const close = useCallback(

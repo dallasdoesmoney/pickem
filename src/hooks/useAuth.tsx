@@ -8,6 +8,7 @@ import { migrateLocalDataToAccount } from "@/lib/supabase/migration";
 import { claimReferral } from "@/lib/supabase/referrals";
 import { fetchLeaderboardEntry } from "@/lib/supabase/leaderboard";
 import { PENDING_REFERRAL_KEY } from "@/lib/referralStorage";
+import { reportError } from "@/lib/sentry";
 
 export type Profile = {
   id: string;
@@ -221,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .then((row) => {
                 if (row) setPendingReferrerSuggestion({ userId: row.user_id, label: row.display_name || row.username, avatarUrl: row.avatar_url });
               })
-              .catch(() => {});
+              .catch((err) => reportError("auth.referrerSuggestion", err));
           }
         } catch (err) {
           console.error("Referral claim failed", err);
