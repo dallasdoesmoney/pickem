@@ -69,21 +69,41 @@ Left for Dallas: making the check **required** on `main` is a repo setting
 only he can flip. Settings -> Branches -> add a rule for `main` -> require
 status checks -> `check`.
 
-## 2 · Search surface  ·  ~1h
+## 2 · Search surface  ·  ~1h  ·  DONE
 
-- [ ] `src/app/sitemap.ts` — `/`, `/daily`, `/weekly`, `/predictor`,
+- [x] `src/app/sitemap.ts` — `/`, `/daily`, `/weekly`, `/predictor`,
       `/leaderboard`, `/tier-lists`, and the seven template routes:
       `nfl-teams`, `nfl-quarterbacks`, `nfl-running-backs`, `nfl-wide-receivers`,
       `nfl-tight-ends`, `nfl-kickers`, `nfl-head-coaches`. Read them from
       `tierTemplates.ts` rather than retyping them, so a new template appears on
       its own.
-- [ ] `src/app/robots.ts` — allow, point at the sitemap, disallow `/admin`,
+- [x] `src/app/robots.ts` — allow, point at the sitemap, disallow `/admin`,
       `/account`, `/notifications`, `/reset-password`, `/unsubscribe`.
       Leave the tier list share codes alone; they set their own `noindex`
       deliberately and that is correct.
-- [ ] Route layouts with metadata for `/leaderboard`, `/weekly`, `/predictor`,
+- [x] Route layouts with metadata for `/leaderboard`, `/weekly`, `/predictor`,
       `/tier-lists/[list]`. They are client components, so metadata has to live
       in a `layout.tsx` — `src/app/daily/layout.tsx` is the working example.
+
+**44 URLs**: 6 fixed, 6 tier lists, 32 team pages. Verified against a real
+build — sitemap.xml and robots.txt both serve, and every route's `<title>`
+renders server-side ("Kansas City Chiefs Record Predictor", "NFL Quarterbacks
+Tier List").
+
+**Two things turned up that were not in the plan.**
+
+The tier list routes carried `robots: index:false` from a soft launch, and both
+files said to drop it "when the nav entry goes in". The nav entry is in
+NavShell.tsx line 44. The condition their own comments named had been met, so
+the noindex came off — it was the difference between a sitemap covering 44
+pages and one covering 6. **One line each to put back if Dallas disagrees**;
+nothing is live until he merges.
+
+`nfl-head-coaches` is correctly absent: `HEAD_COACHES` is empty in this
+checkout, so `TIER_TEMPLATES` does not register it, and the sitemap reads the
+same constant `generateStaticParams` does. The two cannot disagree. Worth
+knowing separately that `/tier-lists/nfl-head-coaches` answers 200 rather than
+404 in dev — pre-existing, not advertised anywhere, and not this item's job.
 
 ## 3 · The 45 setState errors, and the demo routes  ·  ~2h
 
