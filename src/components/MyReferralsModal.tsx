@@ -48,10 +48,24 @@ export function MyReferralsModal({ open, onClose }: { open: boolean; onClose: ()
       });
   }
 
+  // The fetch without the reset - see load() above, which keeps its
+  // resets because the retry button calls it from an event handler where
+  // a setState is exactly right. On the way in there is nothing to
+  // reset: the initial state is already the loading state.
   useEffect(() => {
     if (!open) return;
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    fetchMyReferrals()
+      .then((rows) => {
+        if (!cancelled) setReferrals(rows);
+      })
+      .catch((err) => {
+        console.error("Failed to load referrals", errorMessage(err));
+        if (!cancelled) setError("Couldn't load your referrals.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   if (!open || !user) return null;
