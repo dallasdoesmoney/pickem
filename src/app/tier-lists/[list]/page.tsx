@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TIER_TEMPLATES, getTierTemplate } from "@/data/tierTemplates";
 import TierListPageClient from "./TierListPageClient";
-import { RouteLoading } from "@/components/RouteLoading";
+import { TierListIntro } from "./TierListIntro";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbJsonLd } from "@/lib/structuredData";
 
 // Its own card per template, replacing the soft-launch noindex - see the
 // note on the index page for why that came off.
@@ -43,9 +45,21 @@ export default async function Page({ params }: { params: Promise<{ list: string 
 
   // The editor reads ?id= through useSearchParams, which needs a Suspense
   // boundary for this route to stay statically prerendered.
+  //
+  // The fallback lands in the prerendered HTML, so it is what anything
+  // that does not run JavaScript sees. Same content the client component
+  // shows before its saved board loads - see TierListIntro.
   return (
-    <Suspense fallback={<RouteLoading label="Tier List" />}>
-      <TierListPageClient template={template} />
-    </Suspense>
+    <>
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Tier Lists", path: "/tier-lists" },
+          { name: `${template.title} Tier List`, path: `/tier-lists/${list}` },
+        ])}
+      />
+      <Suspense fallback={<TierListIntro template={template} />}>
+        <TierListPageClient template={template} />
+      </Suspense>
+    </>
   );
 }
