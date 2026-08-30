@@ -1,5 +1,34 @@
 # Overnight plan
 
+## All five landed. Read this bit first.
+
+Five commits on `claude/mobile-pill-sizing-86dtgh`, one per item, nothing
+merged. **No PR is open** — say the word and I'll raise one, or merge the branch
+yourself. Netlify deploys on push to `main`, so nothing is live until you do.
+
+Everything was verified against a real build and a real browser: typecheck
+clean, `eslint src scripts` at **0 errors** (down from 48), build compiled, and
+all **nine** suites green — there are two more than there were, and one of them
+is new.
+
+**Four things are yours to decide, and none of them block anything:**
+
+| | What | Where |
+|---|---|---|
+| 1 | Make the CI check **required** on `main` — a repo setting only you can flip | Settings → Branches → rule for `main` → require status checks → `check` |
+| 2 | The tier list pages carried `noindex` from the soft launch and it came off. **One line each to put back** if you disagree | item 2 |
+| 3 | The profile share card's look. Both renders are in the commit; it is one file and nothing depends on it | item 4 |
+| 4 | A Sentry DSN. Nothing reports until `NEXT_PUBLIC_SENTRY_DSN` exists, and source-map upload is a follow-up that needs an auth token | item 5 |
+
+**The one thing worth knowing about the code:** splitting the profile into a
+server page was not enough on its own. `leaderboard/loading.tsx` covered the
+whole segment, and a `loading.tsx` is a Suspense boundary — so the first bytes
+of a profile were *still* a spinner, with the player hidden behind it until
+JavaScript ran. Exactly what the split was meant to fix, and invisible in a
+screenshot. Only the new suite caught it.
+
+---
+
 State for an unattended `/loop` run. **The loop reads this file, does the next
 unchecked item, and ticks it off.** State lives here rather than in the
 conversation because a long run gets summarized and detail is lost; a file does
