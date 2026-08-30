@@ -23,7 +23,7 @@ not forget.
 
 ---
 
-## 1 · CI that gates production  ·  ~1h
+## 1 · CI that gates production  ·  ~1h  ·  DONE
 
 Two things will break this on its first run, both found before starting:
 
@@ -34,28 +34,40 @@ Two things will break this on its first run, both found before starting:
 
 Steps:
 
-- [ ] `package.json`: add `playwright` to devDependencies — the suites
+- [x] `package.json`: add `playwright` to devDependencies — the suites
       `import("playwright")` in a try/catch and **exit 1 with a hint if it is
       missing**, so a runner without it would fail loudly, but nothing declares
       it. Add `test:results` for the orphan, and a `test:all` that runs the two
       node-only suites then the six browser ones.
-- [ ] Replace the hard-coded screenshot path with
+- [x] Replace the hard-coded screenshot path with
       `process.env.SHOT_DIR ?? "artifacts"`, and `mkdir -p` it. Add
       `artifacts/` to `.gitignore`.
-- [ ] `.github/workflows/ci.yml`, on `pull_request` and `push` to `main`:
+- [x] `.github/workflows/ci.yml`, on `pull_request` and `push` to `main`:
       checkout, node 20, `npm ci`, `npx playwright install --with-deps chromium`,
       `npx tsc --noEmit`, `npm run build`, start `next dev` in the background
       with the placeholder Supabase env the suites already expect, wait for
       `:3000`, then `npm run test:all`. Upload `artifacts/` on failure.
-- [ ] **Lint is the one wrinkle.** `eslint src` currently reports 48 errors, 45
+- [x] **Lint is the one wrinkle.** `eslint src` currently reports 48 errors, 45
       of them one rule, so a blocking lint step fails on day one. Run it
       blocking with that single rule downgraded to `warn` **in the CI config
       only**, and leave a comment saying item 3 removes the downgrade. Do not
       use `continue-on-error` — a step that always passes is not a check.
-- [ ] Note in the PR that making the check **required** on `main` is a repo
+- [x] Note in the PR that making the check **required** on `main` is a repo
       setting only Dallas can flip.
 
-Do this first. Every item below is safer once it exists.
+**Both first-run blockers were real and are fixed.** Verified by running the
+workflow's exact sequence locally end to end: typecheck clean, CI lint 0
+errors, build compiled, app up in 2s, `test:all` exit 0 across 70 checks, and
+the screenshot landing in the gitignored `artifacts/`.
+
+Three errors that were NOT the setState rule turned up while wiring the lint
+step - unescaped apostrophes in LevelsAchievementsModal and MyReferralsModal.
+Fixed rather than exempted, so the lint step is genuinely green from day one
+rather than green by carve-out.
+
+Left for Dallas: making the check **required** on `main` is a repo setting
+only he can flip. Settings -> Branches -> add a rule for `main` -> require
+status checks -> `check`.
 
 ## 2 · Search surface  ·  ~1h
 

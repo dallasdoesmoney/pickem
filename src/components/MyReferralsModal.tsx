@@ -118,7 +118,7 @@ export function MyReferralsModal({ open, onClose }: { open: boolean; onClose: ()
           ) : referrals.length === 0 ? (
             <div className="text-center py-10 text-white/50">
               <div className="text-3xl mb-3">🎉</div>
-              <p className="text-sm">Nobody's joined with your invite link yet.</p>
+              <p className="text-sm">Nobody&rsquo;s joined with your invite link yet.</p>
             </div>
           ) : (
             referrals.map((r) => {

@@ -45,3 +45,6 @@ build-stamp.txt
 
 # Rendered email previews - scripts/preview-emails.mjs writes them here.
 .email-preview/
+
+# Test evidence - screenshots from a failed run, uploaded by CI.
+/artifacts

@@ -476,7 +476,7 @@ export function LevelsAchievementsModal({
                             neverComplete
                           >
                             <p className="text-xs text-white/50 mt-1">
-                              Tap the lock icon on one of your Weekly Pick'em picks to mark it as your Lock of the Week. Get it right and you'll earn a bonus once results are published.
+                              Tap the lock icon on one of your Weekly Pick&rsquo;em picks to mark it as your Lock of the Week. Get it right and you&rsquo;ll earn a bonus once results are published.
                             </p>
                           </AchievementCard>
                         ),
