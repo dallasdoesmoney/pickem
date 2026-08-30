@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+# The profile SSR suite's own build output - see distDir in next.config.ts.
+/.next-profile-ssr/
 
 # production
 /build

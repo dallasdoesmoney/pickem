@@ -19,7 +19,8 @@
     "test:mobile": "node scripts/mobile-run.test.mjs",
     "test:playagain": "node scripts/play-again-focus.test.mjs",
     "test:results": "node scripts/sync-results.test.mjs",
-    "test:all": "npm run test:sync && npm run test:results && npm run test:streak && npm run test:signup && npm run test:migration && npm run test:unlimited && npm run test:mobile && npm run test:playagain"
+    "test:profile": "node scripts/profile-ssr.test.mjs",
+    "test:all": "npm run test:sync && npm run test:results && npm run test:streak && npm run test:signup && npm run test:migration && npm run test:profile && npm run test:unlimited && npm run test:mobile && npm run test:playagain"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

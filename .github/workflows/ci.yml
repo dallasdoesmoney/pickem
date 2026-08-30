@@ -90,6 +90,12 @@ jobs:
       # Node-only suites run first inside test:all. They need no browser and no
       # server, so a break there is known in seconds instead of after a
       # five-minute browser run.
+      #
+      # test:profile sits between them and the browser suites and does NOT use
+      # the server started above: it needs one started against its own Supabase
+      # stub, because what it tests happens inside the Next process where
+      # Playwright's request router cannot reach. It gets its own distDir so
+      # the two dev servers do not fight over the lock - see next.config.ts.
       - name: Test
         run: npm run test:all
 

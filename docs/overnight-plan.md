@@ -160,22 +160,64 @@ Verified end to end after the last batch: typecheck clean, `eslint src scripts`
 suites green against a dev server, and every page whose state handling changed
 loaded with a clean console.
 
-## 4 · The creator profile  ·  ~2h
+## 4 · The creator profile  ·  ~2h  ·  DONE
 
-- [ ] Split `src/app/leaderboard/[username]/page.tsx` — currently `"use client"`
+- [x] Split `src/app/leaderboard/[username]/page.tsx` — currently `"use client"`
       — into a server component that fetches the row, plus a
       `ProfileClient.tsx` for the interactive parts (follow button, modals).
-- [ ] `generateMetadata` on the server page: display name, rank and record in
+- [x] `generateMetadata` on the server page: display name, rank and record in
       the title and description, and a canonical URL.
-- [ ] `src/app/leaderboard/[username]/opengraph-image.tsx` — avatar, name,
+- [x] `src/app/leaderboard/[username]/opengraph-image.tsx` — avatar, name,
       rank, streak. `src/lib/shareImage.ts` and `src/lib/tierShareImage.ts` are
       the existing craft to draw on.
-- [ ] Verify with a Playwright pass that the HTML contains the name and the
+- [x] Verify with a Playwright pass that the HTML contains the name and the
       meta tags **before** any JavaScript runs. That is the whole point, and it
       is the one thing a screenshot cannot show.
 
-If the card layout is genuinely ambiguous, build the plainest honest version
-and flag it. Do not stall the queue on a taste question.
+A shared profile link now unfurls as that player:
+`Ripcord Randall (@ripcord_randall) - Sideline Brew`, described as
+`#4 on the leaderboard · 40-22 on picks · Role Player V · 7 day streak`, with a
+card drawn for them rather than `/og-default.png`.
+
+**The verification found a real bug that nothing else would have.** The split
+alone was not enough: `src/app/leaderboard/loading.tsx` covered the whole
+segment, and a `loading.tsx` is a Suspense boundary — so the first bytes of a
+profile were still a spinner, with the player hidden behind it until
+JavaScript ran. Exactly the thing the split was for. The fix is a route group,
+`(index)/`, which is URL-transparent: `/leaderboard` still has its loading
+state, `/leaderboard/[username]` no longer sits inside it. Confirmed by loading
+the page in a browser **with JavaScript disabled** and finding the name and the
+handle on screen.
+
+**Four supporting pieces, each with a reason:**
+
+- `src/lib/supabase/server.ts` — the first server-side reader in the codebase.
+  Per-call, holds no session, same ANON key, so RLS still applies. Not a
+  service-role client and must never become one.
+- Rank is a COUNT of who is ahead, not an index into the whole board — same
+  three sort keys as `leaderboard.ts`, so the number and the board cannot
+  disagree, and it does not fetch forty thousand rows to number one of them.
+- `not-found.tsx` and `error.tsx`. The old page answered 200 with "no player
+  found", which told crawlers every misspelling was a real page; it is a real
+  404 now. And a server page that throws gets the framework's error screen,
+  which this app did not have — a Supabase outage is still a 500, but it says
+  so in the site's own voice with a retry.
+- The two fonts are vendored under `assets/` and named in
+  `outputFileTracingIncludes`. File tracing follows imports, and a `readFile`
+  is not an import: without that line the fonts are absent from the deployed
+  bundle and every card 500s in production while working perfectly locally.
+
+`scripts/profile-ssr.test.mjs` — 24 checks — is the only suite that starts its
+own dev server. It has to: what it tests happens inside the Next process,
+where Playwright's request router cannot reach, so Supabase is stubbed by a
+real HTTP server (`scripts/lib/leaderboardStub.mjs`) and the app is started
+pointed at it. `distDir` is now settable by env so its server and a normal
+`npm run dev` do not fight over the dev lock.
+
+**Left for Dallas: the card's look.** Both renders are in the commit's
+description — a level-15 player and a fresh account. If the palette or the
+proportions are wrong, `opengraph-image.tsx` is one file and nothing else
+depends on it.
 
 ## 5 · Error monitoring  ·  ~45m
 
