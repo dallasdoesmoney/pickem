@@ -7,17 +7,19 @@ not forget.
 
 ## Rules for the loop
 
-1. **Never merge to `main`.** Branch, implement, push, open or update a PR.
-   Dallas reviews in the morning. A deploy nobody watched is the thing this
-   whole plan exists to prevent.
-2. **Everything green before the commit**: `npx tsc --noEmit`,
+1. **Never merge to `main`.** Dallas reviews in the morning. A deploy nobody
+   watched is the thing this whole plan exists to prevent.
+2. **One branch, one PR** — `claude/mobile-pill-sizing-86dtgh`, his decision.
+   Five commits on it, one per item, and the PR body updated as each lands so
+   it reads as a list of what is done rather than a wall at the end.
+3. **Everything green before the commit**: `npx tsc --noEmit`,
    `npx eslint src scripts`, `npm run build`, and every suite against a dev
    server. If a suite fails, fix it before moving on — do not tick the item.
-3. **One item per commit**, with the reasoning in the message.
-4. **If an item needs a decision only Dallas can make** — a product call, a
+4. **One item per commit**, with the reasoning in the message.
+5. **If an item needs a decision only Dallas can make** — a product call, a
    secret, a visual direction — mark it `BLOCKED` with the exact question and
    move on. Do not guess and build something he did not ask for.
-5. **Do not run migrations.** There is no way to reach the database from here.
+6. **Do not run migrations.** There is no way to reach the database from here.
 
 ---
 
