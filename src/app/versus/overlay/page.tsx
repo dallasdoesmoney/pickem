@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AUCTION_FORMATS } from "@/lib/auction/formats";
-import { startAuction, reduce, AuctionState } from "@/lib/auction/engine";
+import { startAuction, openLot, reduce, AuctionState } from "@/lib/auction/engine";
 import type { AuctionFormat } from "@/lib/auction/format";
 import { isRoomCode } from "@/lib/auction/room";
 import { useRoomState } from "@/components/versus/useRoom";
@@ -20,6 +20,7 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/versus/OverlayBoard
 //   ?bottom=560       pixels reserved for the bottom cam
 //   ?preview=1        look at it WITHOUT OBS - see below
 //   ?format=nfl-teams which mode the DEMO draws (ignored in a room)
+//   ?phase=ready|spinning  which moment of a lot the DEMO holds on
 //   ?p1=Noah&p2=Ben   names on the DEMO rails (ignored in a room)
 //
 // The cam bands are query parameters rather than constants because they
@@ -30,10 +31,11 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/versus/OverlayBoard
 // A deterministic mid-draft position, so the graphic can be judged with
 // real names in the rails rather than five em dashes. Demo only - in a
 // room every one of these numbers comes off the wire.
-function demoState(format: AuctionFormat, names: string[], seed: string, lots: number): AuctionState {
+function demoState(format: AuctionFormat, names: string[], seed: string, lots: number, phase: string | null): AuctionState {
   let state = startAuction(format, names, seed);
   for (let i = 0; i < lots && state.phase !== "done"; i++) {
     const who = state.opener;
+    state = openLot(state, format);
     state = reduce(state, { type: "bid", by: who, amount: (i * 3) % 7 }, format);
     if (state.phase === "bidding") state = reduce(state, { type: "pass", by: (who + 1) % 2 }, format);
     if (state.phase === "assigning") {
@@ -43,6 +45,13 @@ function demoState(format: AuctionFormat, names: string[], seed: string, lots: n
       if (slot) state = reduce(state, { type: "assign", slotKey: slot.key }, format);
     }
   }
+  // Which moment of a lot to hold on. The reel and the not-yet-started
+  // card are two thirds of what is on screen during a draft, so they have
+  // to be lookable-at without playing a game to reach them.
+  if (phase === "ready") return state;
+  state = reduce(state, { type: "spin" }, format);
+  if (phase === "spinning") return state;
+  state = reduce(state, { type: "reveal" }, format);
   // Stop one action short so the "X BIDS $n" line has something in it.
   if (state.phase === "bidding") state = reduce(state, { type: "bid", by: state.opener, amount: 4 }, format);
   return state;
@@ -121,6 +130,7 @@ function OverlayInner() {
             [params.get("p1") ?? "Player 1", params.get("p2") ?? "Player 2"],
             params.get("seed") ?? "overlay-demo",
             Number(params.get("lots") ?? 3),
+            params.get("phase"),
           )
         : null;
 

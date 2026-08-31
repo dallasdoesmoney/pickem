@@ -71,6 +71,8 @@ export function isBoardMessage(value: unknown): value is BoardMessage {
     Array.isArray(s.history) &&
     typeof s.index === "number" &&
     typeof s.opener === "number" &&
-    (s.phase === "bidding" || s.phase === "assigning" || s.phase === "done")
+    // Every phase, including the two the reel lives in - an overlay that
+    // joins mid-spin has to be able to draw one.
+    (s.phase === "ready" || s.phase === "spinning" || s.phase === "bidding" || s.phase === "assigning" || s.phase === "done")
   );
 }

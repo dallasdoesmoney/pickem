@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AuctionFormat } from "@/lib/auction/format";
 import { PLAYER_COLORS, MONEY, outlined, display } from "./style";
+import { OverlayStage } from "./OverlayStage";
 import {
   AuctionState,
   AuctionAction,
@@ -151,16 +152,14 @@ export function AuctionBoard({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ---- the lot on the block ---- */}
-      <div
-        className="relative overflow-hidden rounded-2xl border p-5"
-        style={{
-          background: CARD,
-          borderColor: RULE,
-          backgroundImage: item.accent ? `radial-gradient(circle at 15% 20%, ${item.accent}33 0%, ${item.accent}00 55%)` : undefined,
-        }}
-      >
-        <div className="flex items-center justify-between gap-3">
+      {/* ---- what the stream is looking at, right now ----
+
+           This used to be a lot card of its own: the same team, drawn a
+           second way, from the same state. Two versions of one thing is
+           how the board and the overlay drifted apart in the first place,
+           so the card is gone and this is the actual overlay, scaled. */}
+      <div className="rounded-2xl border p-3" style={{ background: CARD, borderColor: RULE }}>
+        <div className="mb-2 flex items-center justify-between gap-3 px-1">
           <span className="text-[10px] tracking-[0.22em] text-white/35" style={{ fontFamily: "var(--font-display)" }}>
             LOT {state.history.length + 1}
           </span>
@@ -168,28 +167,29 @@ export function AuctionBoard({
             {format.title.toUpperCase()}
           </span>
         </div>
-
-        <div className="mt-3 flex items-center gap-4">
-          {item.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.imageUrl}
-              alt=""
-              className="h-20 w-20 shrink-0 rounded-full object-cover"
-              style={{ background: "rgba(255,255,255,0.05)", border: `3px solid ${item.accent ?? RULE}` }}
-            />
-          )}
-          <div className="min-w-0">
-            <div
-              className="truncate text-[clamp(1.4rem,6vw,2.4rem)] leading-none tracking-wide"
-              style={{ fontFamily: "var(--font-display)", ...outlined(34, "soft") }}
-            >
-              {item.label.toUpperCase()}
-            </div>
-            {item.subtitle && <div className="mt-1.5 text-[13px] text-white/50">{item.subtitle}</div>}
-          </div>
+        <div className="mx-auto w-full max-w-[380px]">
+          <OverlayStage state={state} format={format} />
         </div>
       </div>
+
+      {/* ---- start the lot ---- */}
+      {(state.phase === "ready" || state.phase === "spinning") && (
+        <div className="rounded-2xl border p-5 text-center" style={{ background: CARD, borderColor: RULE }}>
+          <button
+            onClick={() => act({ type: "spin" })}
+            disabled={state.phase === "spinning"}
+            className="w-full rounded-xl px-5 py-4 text-[15px] tracking-[0.18em] text-[#05070d] transition-transform active:scale-[0.99] disabled:opacity-45"
+            style={{ fontFamily: "var(--font-display)", background: MONEY }}
+          >
+            {state.phase === "spinning" ? "SPINNING…" : "START"}
+          </button>
+          <p className="mt-2.5 text-[11px] text-white/35">
+            {state.phase === "spinning"
+              ? "Bidding opens when it lands."
+              : `${state.players[state.opener].name} opens this one.`}
+          </p>
+        </div>
+      )}
 
       {/* ---- bidding, or choosing a slot ---- */}
       {state.phase === "bidding" && acting !== null && range && (

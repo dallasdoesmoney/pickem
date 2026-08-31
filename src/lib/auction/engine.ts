@@ -68,7 +68,16 @@ export type AuctionState = {
   // reconnecting overlay sees the same draft rather than a new shuffle.
   order: string[];
   index: number;
-  phase: "bidding" | "assigning" | "done";
+  // A lot comes up "ready" - drawn, but not shown. The host starts it,
+  // which puts it in "spinning" while the reel runs, and only then does
+  // bidding open.
+  //
+  // These are phases rather than a flag beside the state because toAct()
+  // keys off the phase: during a spin it returns null, so there is no way
+  // for a bid button to appear over a reel that has not landed yet. A
+  // separate "revealed" boolean would have needed the same guard added by
+  // hand in every place that draws a control.
+  phase: "ready" | "spinning" | "bidding" | "assigning" | "done";
   // Who has to open the bidding on the current item. Alternates, so the
   // advantage of opening is shared.
   opener: PlayerIndex;
@@ -81,9 +90,18 @@ export type AuctionState = {
 };
 
 export type AuctionAction =
+  | { type: "spin" }
+  | { type: "reveal" }
   | { type: "bid"; by: PlayerIndex; amount: number }
   | { type: "pass"; by: PlayerIndex }
   | { type: "assign"; slotKey: string };
+
+// Straight from a fresh lot to open bidding. The two steps exist for the
+// screen - somebody presses start, a reel runs - and a rules test has no
+// screen, so it says what it means and moves on.
+export function openLot(state: AuctionState, format: AuctionFormat): AuctionState {
+  return reduce(reduce(state, { type: "spin" }, format), { type: "reveal" }, format);
+}
 
 // A tiny seeded shuffle, so a draft is reproducible from its seed. Tests
 // need that, and it means a room can be rebuilt from a short string
@@ -165,7 +183,10 @@ export function advance(state: AuctionState, format: AuctionFormat): AuctionStat
     // it ever does.
     if (s.index >= s.order.length) return { ...s, phase: "done", bid: null, won: null };
     if (s.players.some((_, i) => couldUse(s, format, i))) {
-      return { ...s, phase: "bidding", bid: null, won: null };
+      // Held at "ready" rather than opening straight into bidding: the
+      // host starts each lot, so there is a beat to talk over before the
+      // reel runs.
+      return { ...s, phase: "ready", bid: null, won: null };
     }
     s = { ...s, index: s.index + 1 };
   }
@@ -254,6 +275,16 @@ function settle(state: AuctionState, format: AuctionFormat): AuctionState {
 
 export function reduce(state: AuctionState, action: AuctionAction, format: AuctionFormat): AuctionState {
   if (state.phase === "done") return state;
+
+  // The host starts the lot. Only ever from "ready", so a second press of
+  // the button - or a stray click on a stream deck - cannot restart a
+  // reel that is already running or replay one that has landed.
+  if (action.type === "spin") return state.phase === "ready" ? { ...state, phase: "spinning" } : state;
+
+  // The reel finished. Sent by the board on a timer rather than by a
+  // person, and idempotent for the same reason: the board re-arms that
+  // timer when it reloads, so this can arrive twice.
+  if (action.type === "reveal") return state.phase === "spinning" ? { ...state, phase: "bidding" } : state;
 
   if (action.type === "bid") {
     const range = bidRange(state, format, action.by);

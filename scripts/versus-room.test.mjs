@@ -14,7 +14,7 @@
 
 import assert from "node:assert/strict";
 import { AUCTION_FORMATS } from "../src/lib/auction/formats.ts";
-import { startAuction, reduce, toAct, bidRange, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
+import { startAuction, openLot, reduce, toAct, bidRange, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
 import { newRoomCode, isRoomCode, roomChannel, isBoardMessage } from "../src/lib/auction/room.ts";
 
 let failed = 0;
@@ -66,6 +66,13 @@ while (state.phase !== "done" && steps < 500) {
   roundTripped++;
   if (isBoardMessage(wire)) accepted++;
 
+  if (state.phase === "ready" || state.phase === "spinning") {
+    // Both are broadcast states in their own right - an overlay that
+    // joins mid-spin has to be able to draw one - so they go over the
+    // wire like every other.
+    state = openLot(state, format);
+    continue;
+  }
   if (state.phase === "assigning" && state.won) {
     const item = currentItem(state, format);
     const slot = slotsItemCanFill(item, openSlots(state.players[state.won.by]))[0];

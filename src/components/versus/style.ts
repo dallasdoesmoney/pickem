@@ -34,6 +34,20 @@ export function outlined(px: number, depth: "full" | "soft" = "full"): CSSProper
   };
 }
 
+// THE SPIN. One number, in one place, because two things depend on it and
+// they must not disagree: the reel's CSS transition, and the timer the
+// board sets before it tells everyone bidding is open. The reel lands a
+// beat early on purpose - the winning team sits there for a moment before
+// the bidding controls appear under it.
+export const SPIN_MS = 2600;
+export const REEL_MS = 2250;
+
+// Every lot is drawn in a box of exactly this height, whether it is
+// spinning, landed, or not yet started. A fixed cell is what makes the
+// reel stop dead on the real thing instead of the layout jumping as the
+// graphic swaps from an animation to a static lot.
+export const LOT_CELL_H = 260;
+
 export const display = (size: number, extra: CSSProperties = {}): CSSProperties => ({
   fontFamily: "var(--font-display)",
   fontSize: size,

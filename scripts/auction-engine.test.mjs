@@ -6,6 +6,7 @@
 // stream. So they are checked here rather than by playing.
 import {
   startAuction,
+  openLot,
   reduce,
   toAct,
   canBid,
@@ -44,11 +45,18 @@ const FORMAT = {
   ],
 };
 
-const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT), state);
+// A lot now comes up "ready" and is started by the host, with a reel in
+// between. That is the screen's business, not the rules', so these tests
+// step over it: `play` opens any waiting lot before and after every
+// action, and the rules read exactly as they did before it existed. The
+// reveal sequence itself is checked on its own, further down.
+const begun = (s, format = FORMAT) => (s.phase === "ready" ? openLot(s, format) : s);
+const play = (state, ...actions) =>
+  begun(actions.reduce((s, a) => reduce(begun(s), a, FORMAT), begun(state)));
 
 // --- setup ------------------------------------------------------------
 {
-  const s = startAuction(FORMAT, ["P1", "P2"], "seed");
+  const s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
   ok("the pool is the whole list, not a slice", s.order.length === 4, `${s.order.length} items`);
   ok("everybody starts with the budget", s.players.every((p) => p.budget === 20), "");
   ok("everybody starts empty", s.players.every((p) => openSlots(p).length === 2), "");
@@ -58,7 +66,7 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
 
 // --- rule 2: a bid can be zero ---------------------------------------
 {
-  const s = startAuction(FORMAT, ["P1", "P2"], "seed");
+  const s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
   ok("an opening bid may be zero", bidRange(s, FORMAT, 0).min === 0, "");
   const afterZero = play(s, { type: "bid", by: 0, amount: 0 });
   ok("zero opens the auction rather than ending it", afterZero.phase === "bidding", "P2 still gets to answer");
@@ -72,7 +80,7 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
 
 // --- the opener must bid ---------------------------------------------
 {
-  const s = startAuction(FORMAT, ["P1", "P2"], "seed");
+  const s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
   const passed = play(s, { type: "pass", by: 0 });
   ok("the opener cannot pass without bidding", passed === s, "the action is ignored");
   const outOfTurn = play(s, { type: "bid", by: 1, amount: 5 });
@@ -81,7 +89,7 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
 
 // --- bidding back and forth ------------------------------------------
 {
-  let s = startAuction(FORMAT, ["P1", "P2"], "seed");
+  let s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
   s = play(s, { type: "bid", by: 0, amount: 3 });
   ok("a raise has to beat the standing bid", bidRange(s, FORMAT, 1).min === 4, "");
   ok("and an equal bid is refused", play(s, { type: "bid", by: 1, amount: 3 }) === s, "");
@@ -95,7 +103,7 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
 
 // --- nobody can bid more than they have ------------------------------
 {
-  let s = startAuction(FORMAT, ["P1", "P2"], "seed");
+  let s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
   s = play(s, { type: "bid", by: 0, amount: 20 }, { type: "pass", by: 1 }, { type: "assign", slotKey: "a" });
   ok("a player can spend everything", s.players[0].budget === 0, "");
 
@@ -116,7 +124,7 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
 // --- rule 1 + 3: nothing is skipped, and a full roster is out --------
 {
   // Drive a whole draft: P1 takes everything it can until it is full.
-  let s = startAuction(FORMAT, ["P1", "P2"], "seed");
+  let s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
   const openerFirst = [];
   let guard = 0;
   while (s.phase !== "done" && guard++ < 20) {
@@ -126,6 +134,8 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
       s = play(s, { type: "bid", by: who, amount: 0 });
       const answering = toAct(s, FORMAT);
       if (answering !== null) s = play(s, { type: "pass", by: answering });
+    } else if (s.phase === "ready" || s.phase === "spinning") {
+      s = begun(s);
     } else if (s.phase === "assigning") {
       const winner = s.won.by;
       const item = currentItem(s, FORMAT);
@@ -144,7 +154,7 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
 // --- a full roster cannot bid ----------------------------------------
 {
   // Two slots, so two wins fills P1 up.
-  let s = startAuction(FORMAT, ["P1", "P2"], "seed");
+  let s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
   s = play(s, { type: "bid", by: 0, amount: 1 }, { type: "pass", by: 1 }, { type: "assign", slotKey: "a" });
   s = play(s, { type: "bid", by: 1, amount: 0 }, { type: "pass", by: 0 }, { type: "assign", slotKey: "a" });
   s = play(s, { type: "bid", by: 0, amount: 1 }, { type: "pass", by: 1 }, { type: "assign", slotKey: "b" });
@@ -169,7 +179,7 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
       { id: "r4", label: "Anything two" },
     ],
   };
-  const base = startAuction(RESTRICTED, ["P1", "P2"], "fixed");
+  const base = begun(startAuction(RESTRICTED, ["P1", "P2"], "fixed"), RESTRICTED);
   // P1 has filled A; P2 has filled B. An A-only item is on the block.
   const state = {
     ...base,
@@ -203,6 +213,41 @@ const play = (state, ...actions) => actions.reduce((s, a) => reduce(s, a, FORMAT
   ok("the same seed deals the same draft", a.join() === b.join(), "a reconnect sees the same game");
   ok("a different seed deals a different one", a.join() !== c.join(), "");
   ok("and it is still a permutation", a.slice().sort().join() === "1,2,3,4,5,6,7,8", "");
+}
+
+// --- starting a lot: ready -> spinning -> bidding ---------------------
+//
+// The one thing that must hold here is that NOBODY CAN BID AT A REEL.
+// toAct is what every control on both screens keys off, so as long as it
+// stays null until the reel lands, a bid button cannot appear over an
+// animation - on the board or on the stream.
+{
+  const fresh = startAuction(FORMAT, ["P1", "P2"], "seed");
+  ok("a lot comes up waiting to be started", fresh.phase === "ready", "");
+  ok("and nobody is on the clock yet", toAct(fresh, FORMAT) === null, "no bid controls over a reel");
+  ok("nor can anyone bid into it", bidRange(fresh, FORMAT, 0) === null, "");
+  ok("a bid at a lot that has not started does nothing", reduce(fresh, { type: "bid", by: 0, amount: 3 }, FORMAT) === fresh, "");
+
+  const spinning = reduce(fresh, { type: "spin" }, FORMAT);
+  ok("start sets it spinning", spinning.phase === "spinning", "");
+  ok("still nobody on the clock", toAct(spinning, FORMAT) === null, "");
+  ok("a second press cannot restart the reel", reduce(spinning, { type: "spin" }, FORMAT) === spinning, "stream deck double-tap");
+
+  const open = reduce(spinning, { type: "reveal" }, FORMAT);
+  ok("landing opens the bidding", open.phase === "bidding", "");
+  ok("and the opener is on the clock", toAct(open, FORMAT) === open.opener, "");
+  ok("the lot itself never changed", open.order.join() === fresh.order.join() && open.index === fresh.index, "the reel lands on what was already drawn");
+
+  // The board re-arms its timer when it reloads, so this genuinely can
+  // arrive twice.
+  ok("a second landing is ignored", reduce(open, { type: "reveal" }, FORMAT) === open, "");
+  ok("revealing a lot nobody started is ignored", reduce(fresh, { type: "reveal" }, FORMAT) === fresh, "");
+
+  // And the next lot goes back to waiting, rather than opening itself.
+  const sold = play(open, { type: "bid", by: open.opener, amount: 0 }, { type: "pass", by: (open.opener + 1) % 2 });
+  ok("the winner is choosing a slot", sold.phase === "assigning", "");
+  const next = reduce(sold, { type: "assign", slotKey: slotsItemCanFill(currentItem(sold, FORMAT), openSlots(sold.players[sold.won.by]))[0] }, FORMAT);
+  ok("the next lot waits to be started too", next.phase === "ready", "every lot gets its own spin");
 }
 
 console.log(failed === 0 ? "\nall checks pass" : `\n${failed} check(s) failed`);

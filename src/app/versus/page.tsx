@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AUCTION_FORMATS } from "@/lib/auction/formats";
 import { startAuction, reduce, AuctionState, AuctionAction } from "@/lib/auction/engine";
 import { AuctionBoard } from "@/components/versus/AuctionBoard";
 import { OverlayLink } from "@/components/versus/OverlayLink";
 import { useRoomCode, useBroadcast } from "@/components/versus/useRoom";
+import { SPIN_MS } from "@/components/versus/style";
 
 // THE CONTROL BOARD. Both players act on this one screen - which is how
 // you play it sitting next to somebody, and is also what a host does on a
@@ -42,12 +43,27 @@ export default function VersusPage() {
     setGame({ slug, state: startAuction(format, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed) });
   }
 
-  function act(action: AuctionAction) {
+  const act = useCallback((action: AuctionAction) => {
     setGame((g) => {
       const f = g && AUCTION_FORMATS[g.slug];
       return g && f ? { ...g, state: reduce(g.state, action, f) } : g;
     });
-  }
+  }, []);
+
+  // THE REEL LANDING. The spin is an animation, so something has to say
+  // when it is over, and that something is the board - the one screen
+  // that is allowed to change the game. The overlay just watches.
+  //
+  // Driven off the phase rather than fired alongside the click, so a
+  // board that reloads mid-spin re-arms the timer and the draft carries
+  // on instead of sitting on a stopped reel forever.
+  const phase = liveGame?.state.phase;
+  const lot = liveGame?.state.index;
+  useEffect(() => {
+    if (phase !== "spinning") return;
+    const id = setTimeout(() => act({ type: "reveal" }), SPIN_MS);
+    return () => clearTimeout(id);
+  }, [phase, lot, act]);
 
   if (liveGame) {
     return (

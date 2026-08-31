@@ -3,6 +3,7 @@
 import type { AuctionFormat } from "@/lib/auction/format";
 import { AuctionState, toAct, currentItem, fillLabel } from "@/lib/auction/engine";
 import { PLAYER_COLORS, MONEY, outlined } from "./style";
+import { LotCell, LotReel, LotWaiting } from "./LotReel";
 
 export { PLAYER_COLORS };
 
@@ -159,6 +160,10 @@ export function OverlayBoard({
   const item = currentItem(state, format);
   const acting = toAct(state, format);
   const bandHeight = STAGE_H - camTop - camBottom;
+  // Nobody is "to act" while a lot is waiting or spinning - but the line
+  // under the reel should already name whoever has to open, so it does
+  // not blink into existence the moment the reel stops.
+  const waitingOn = acting ?? (state.phase === "ready" || state.phase === "spinning" ? state.opener : null);
 
   return (
     <div style={{ width: STAGE_W, height: STAGE_H, position: "relative", overflow: "hidden" }}>
@@ -194,39 +199,20 @@ export function OverlayBoard({
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16, width: STAGE_W, padding: "0 26px" }}>
           <Rail state={state} format={format} who={0} align="left" />
 
-          {/* The lot on the block. */}
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-            {item?.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={item.imageUrl}
-                alt=""
-                width={190}
-                height={190}
-                style={{
-                  width: 190,
-                  height: 190,
-                  objectFit: "contain",
-                  filter: `drop-shadow(0 6px 0 rgba(5,7,13,0.8)) drop-shadow(0 0 26px ${item.accent ?? "#ffffff"}88)`,
-                }}
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
+          {/* The lot on the block - or the reel that is about to land on
+              it. All three states are the same fixed-height cell, so
+              nothing shifts as one becomes the next. */}
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+            {state.phase === "ready" ? (
+              <LotWaiting />
+            ) : state.phase === "spinning" && item ? (
+              // Keyed on the lot, so every new lot mounts a fresh reel and
+              // spins again rather than reusing one that has already
+              // landed.
+              <LotReel key={item.id} format={format} targetId={item.id} />
+            ) : (
+              <LotCell item={item} />
             )}
-            <div
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: item && item.label.length > 17 ? 32 : 42,
-                lineHeight: 1.02,
-                color: "#ffffff",
-                textAlign: "center",
-                maxWidth: "100%",
-                ...outlined(38),
-              }}
-            >
-              {(item?.label ?? "").toUpperCase()}
-            </div>
           </div>
 
           <Rail state={state} format={format} who={1} align="right" />
@@ -265,14 +251,16 @@ export function OverlayBoard({
                   // standing bid names the bidder, so it takes the
                   // bidder's colour; only the "to open" prompt is about
                   // the player being waited on.
-                  color: state.bid ? PLAYER_COLORS[state.bid.by] : acting === null ? "#ffffff" : PLAYER_COLORS[acting],
+                  color: state.bid ? PLAYER_COLORS[state.bid.by] : waitingOn === null ? "#ffffff" : PLAYER_COLORS[waitingOn],
                   letterSpacing: 3,
                   ...outlined(28),
                 }}
               >
                 {state.bid
                   ? `${state.players[state.bid.by].name.toUpperCase()} BIDS`
-                  : `${acting === null ? "" : state.players[acting].name.toUpperCase()} TO OPEN`}
+                  : waitingOn === null
+                    ? ""
+                    : `${state.players[waitingOn].name.toUpperCase()} TO OPEN`}
               </div>
               <Money amount={state.bid?.amount ?? 0} size={104} color={state.bid ? MONEY : "rgba(255,255,255,0.55)"} />
             </>

@@ -13,7 +13,7 @@
 // thousand simulated drafts to know it cannot happen.
 import { AUCTION_FORMATS } from "../src/lib/auction/formats.ts";
 import { formatProblems } from "../src/lib/auction/format.ts";
-import { startAuction, reduce, toAct, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
+import { startAuction, openLot, reduce, toAct, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
 
 let failed = 0;
 function ok(name, cond, detail = "") {
@@ -55,7 +55,10 @@ for (const format of formats) {
     let stuck = false;
 
     while (s.phase !== "done" && guard++ < 2000) {
-      if (s.phase === "bidding") {
+      if (s.phase === "ready" || s.phase === "spinning") {
+        // The host starts each lot; a fuzz run has no host.
+        s = openLot(s, format);
+      } else if (s.phase === "bidding") {
         const who = toAct(s, format);
         if (who === null) {
           stuck = true;

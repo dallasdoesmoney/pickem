@@ -9,6 +9,10 @@
 // Needs a dev server on :3000 and the /versus route, which is unlinked -
 // see src/app/versus/layout.tsx.
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
+// Kept in step with src/components/versus/style.ts by hand - a browser
+// test cannot import a TS module, and getting this wrong only makes the
+// test slow or flaky, never wrong about the game.
+const SPIN_MS = 2600;
 
 let playwright;
 try {
@@ -47,6 +51,16 @@ try {
   await page.getByText(/LOT 1/).waitFor({ timeout: 10000 });
   ok("the first lot comes up", true, "");
 
+  // Every lot is started by the host and lands off a reel. Until it does,
+  // nobody can bid - the engine keeps toAct null through both phases, and
+  // this is that guarantee seen from the screen, which is where it
+  // actually matters.
+  const beforeStart = await page.locator("main button").allInnerTexts();
+  ok("a lot waits to be started", beforeStart.includes("START"), "");
+  ok("and no bid is offered at a reel", !beforeStart.some((t) => t.startsWith("BID $")), "");
+  await page.getByRole("button", { name: /^START$/ }).click();
+  await page.waitForTimeout(SPIN_MS + 400);
+
   // The opener has to bid, even if it is nothing - so there is no PASS
   // until somebody has opened. Rule 2, as seen from the screen.
   const labels0 = await page.locator("main button").allInnerTexts();
@@ -60,6 +74,12 @@ try {
   for (; steps < 400; steps++) {
     if (await page.getByText("DRAFT COMPLETE").count()) break;
     const labels = await page.locator("main button").allInnerTexts();
+    // A new lot: start it, and let the reel land.
+    if (labels.includes("START")) {
+      await page.getByRole("button", { name: /^START$/ }).click();
+      await page.waitForTimeout(SPIN_MS + 400);
+      continue;
+    }
     // An assign button is the only one carrying two lines: the slot, then
     // what you get in it.
     const assignIdx = labels.findIndex((t) => t.includes("\n"));
