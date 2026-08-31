@@ -13,7 +13,6 @@ import { SOCIAL_PLATFORM_CATALOG } from "@/lib/socialPlatforms";
 import { buildReferralLink } from "@/lib/referralStorage";
 import { rankWashStyle } from "@/components/RankPanel";
 import { errorMessage } from "@/lib/errorMessage";
-import { reportError } from "@/lib/sentry";
 
 // The creator application. Red rather than the app's usual navy, with
 // the same wash the profile cards carry - this is the one thing on the
@@ -93,25 +92,14 @@ export function CreatorRequestModal({ userId, open, onClose }: { userId: string;
   const [loadError, setLoadError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Back to the start each time it opens, during render rather than in
-  // an effect - six setStates in an effect body meant a committed render
-  // still showing the last application, on the step it was abandoned on,
-  // before any of it was cleared.
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) {
-      setExisting(undefined);
-      setStep("why");
-      setApp(EMPTY);
-      setSubmitError(null);
-      setLoadError(null);
-      setCopied(false);
-    }
-  }
-
   useEffect(() => {
     if (!open) return;
+    setExisting(undefined);
+    setStep("why");
+    setApp(EMPTY);
+    setSubmitError(null);
+    setLoadError(null);
+    setCopied(false);
     fetchMyCreatorRequest(userId)
       .then(setExisting)
       .catch((err) => {
@@ -120,10 +108,7 @@ export function CreatorRequestModal({ userId, open, onClose }: { userId: string;
       });
     fetchReferralCount(userId)
       .then(setReferrals)
-      .catch((err) => {
-        reportError("creatorRequest.referrals", err);
-        setReferrals(null);
-      });
+      .catch(() => setReferrals(null));
     // The referral link is built from the username, which the profile
     // already has - read straight off the row rather than threading it
     // through props from three different callers.
@@ -162,7 +147,7 @@ export function CreatorRequestModal({ userId, open, onClose }: { userId: string;
       return;
     }
     setStep("done");
-    fetchMyCreatorRequest(userId).then(setExisting).catch((err) => reportError("creatorRequest.existing", err));
+    fetchMyCreatorRequest(userId).then(setExisting).catch(() => {});
   }
 
   // Where APPLY goes: straight past the referral screen once they're at

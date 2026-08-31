@@ -78,7 +78,6 @@ import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
 import { tierRailNameSize } from "@/components/tierList/tierLabel";
-import { TierListIntro } from "./TierListIntro";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 // Per list, keyed the same way the board's own state is (see
@@ -185,12 +184,7 @@ export default function TierListPageClient({
   // null = the unranked pool, otherwise a tier id.
   const [overTier, setOverTier] = useState<string | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
-  // The board as it stood the last time a save succeeded. "SAVED" is
-  // then a comparison against the live board rather than a flag some
-  // effect has to remember to clear - the reducer hands back a new
-  // object for every edit, so any change stops matching on the same
-  // render it happens, not the one after.
-  const [savedSnapshot, setSavedSnapshot] = useState<TierListState | null>(null);
+  const [savedAt, setSavedAt] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [namingOpen, setNamingOpen] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -824,7 +818,7 @@ export default function TierListPageClient({
         return false;
       }
       setSaveError(null);
-      setSavedSnapshot(draft);
+      setSavedAt(Date.now());
       if (rowId) {
         setSavedId(rowId);
         setSavedName(listName);
@@ -848,6 +842,13 @@ export default function TierListPageClient({
     },
     [template.slug]
   );
+
+  // "SAVED" was sticky: it was set on save and never cleared, so the
+  // button went on claiming the list was saved through every edit that
+  // followed. Any change to the board takes the confirmation back off.
+  useEffect(() => {
+    setSavedAt(0);
+  }, [state]);
 
   // Resolves the account to save under, prompting for sign-in if needed.
   // Null means the caller should stop: either the prompt was dismissed,
@@ -947,12 +948,6 @@ export default function TierListPageClient({
     if (!user || !loaded) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
-    // A false positive, and the only one left in the codebase: the rule
-    // follows the call into doSave and finds setState there, but it does
-    // not model `await`. Every setState in doSave lands after the round
-    // trip to saveTierList, so this is a network callback, not the
-    // cascading render the rule is looking for.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     doSave(user.id, state, savedId, savedName ?? listTitleFor(state, template));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loaded]);
@@ -1028,19 +1023,15 @@ export default function TierListPageClient({
 
   const activeItem = draggingId ? resolveItem(template, draggingId) : null;
 
-  // `loaded` goes true once the saved board has been read out of
-  // localStorage, which cannot happen on the server - so THIS return is the
-  // server-rendered HTML for the whole route, and it used to be a spinner.
-  // Fetched the way a crawler fetches it, /tier-lists/nfl-quarterbacks came
-  // back as a nav bar and a spinning div: no heading, and not one
-  // quarterback's name, on the page whose entire reason to exist is the
-  // search "NFL quarterback tier list".
-  //
-  // TierListIntro is the same heading and the same names the board shows a
-  // moment later, so nothing here is written for crawlers that a person
-  // does not also see. It is a better loading state as well - a spinner
-  // tells you to wait, this tells you that you are on the right page.
-  if (!loaded) return <TierListIntro template={template} />;
+  if (!loaded) {
+    return (
+      <main className="flex-1 px-4 pb-16 pt-10 max-w-[66rem] w-full mx-auto">
+        <div className="flex justify-center pt-16">
+          <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+        </div>
+      </main>
+    );
+  }
 
   // max-w-[66rem] is 1000px, and the chip solver above hardcodes that
   // same 1000 as its ceiling and as its ten-across breakpoint - all three
@@ -1418,7 +1409,7 @@ export default function TierListPageClient({
                   <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
                   SAVING&hellip;
                 </>
-              ) : state === savedSnapshot ? (
+              ) : savedAt ? (
                 <>
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6L9 17l-5-5" />

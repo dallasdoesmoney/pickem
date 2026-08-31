@@ -11,7 +11,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 import { fetchPendingCreatorRequestCount } from "@/lib/supabase/creatorRequests";
 import { navParent } from "@/lib/navParent";
-import { reportError } from "@/lib/sentry";
 
 type NavItem = {
   href: string;
@@ -201,33 +200,28 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   const parent = navParent(usePathname());
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [pending, setPending] = useState<{ id: string; count: number } | null>(null);
-  const [adminQueue, setAdminQueue] = useState<{ forAdmin: boolean; count: number } | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [adminTaskCount, setAdminTaskCount] = useState(0);
 
-  // Keyed by the user, so signing out zeroes it by comparison rather
-  // than by a render spent setting it. Same shape as AccountMenu, which
-  // carries the same two counts.
   useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
+    if (!user) {
+      setPendingCount(0);
+      return;
+    }
     fetchUnreciprocatedFollowerCount(user.id)
-      .then((n) => {
-        if (!cancelled) setPending({ id: user.id, count: n });
-      })
-      .catch((err) => reportError("nav.unreadCount", err));
-    return () => {
-      cancelled = true;
-    };
+      .then(setPendingCount)
+      .catch(() => {});
   }, [user, mobileOpen]);
-  const pendingCount = user && pending?.id === user.id ? pending.count : 0;
 
   useEffect(() => {
-    if (!profile?.is_admin) return;
+    if (!profile?.is_admin) {
+      setAdminTaskCount(0);
+      return;
+    }
     fetchPendingCreatorRequestCount()
-      .then((n) => setAdminQueue({ forAdmin: true, count: n }))
-      .catch((err) => reportError("nav.adminQueue", err));
+      .then(setAdminTaskCount)
+      .catch(() => {});
   }, [profile?.is_admin, mobileOpen]);
-  const adminTaskCount = profile?.is_admin && adminQueue?.forAdmin ? adminQueue.count : 0;
 
   return (
     <div className="flex min-h-full">

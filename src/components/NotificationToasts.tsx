@@ -163,6 +163,7 @@ export function NotificationToasts() {
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
   const [checkIn, setCheckIn] = useState<CheckInResult | null>(null);
   const [actors, setActors] = useState<Map<string, Actor>>(new Map());
+  const [current, setCurrent] = useState<NotificationRow | null>(null);
   const [checkInToast, setCheckInToast] = useState<NotificationRow | null>(null);
 
   // THE CHECK-IN, ON ITS OWN, CLAIMED ONCE. It used to live in the effect
@@ -250,17 +251,22 @@ export function NotificationToasts() {
     };
   }, [user, profile?.referred_by]);
 
-  // Which toast is on screen is a QUESTION ABOUT THE QUEUE, not a third
-  // piece of state that has to be kept in step with it. It used to be an
-  // effect that pulled the head off the queue into `current`, which meant
-  // one render showing nothing between every toast and the next.
-  //
-  // The check-in goes first when it is there, and it is held beside the
-  // queue rather than merged into it because the fetch above REPLACES the
-  // queue - the two arrive independently. Neither can land on top of the
-  // other here: they are two slots read in a fixed order, not one slot
-  // written twice.
-  const current = checkInToast ?? queue[0] ?? null;
+  useEffect(() => {
+    if (current) return;
+    // The check-in goes first when it is there, and it is held in state
+    // rather than merged into the queue because the fetch above REPLACES
+    // the queue - the two arrive independently, and whichever lands
+    // second used to win.
+    if (checkInToast) {
+      setCurrent(checkInToast);
+      setCheckInToast(null);
+      return;
+    }
+    if (queue.length === 0) return;
+    const [next, ...rest] = queue;
+    setCurrent(next);
+    setQueue(rest);
+  }, [queue, current, checkInToast]);
 
   useEffect(() => {
     if (!current) return;
@@ -274,10 +280,7 @@ export function NotificationToasts() {
     if (!n.id.startsWith(LOCAL_ID)) {
       markNotificationRead(n.id).catch((err) => console.error("Failed to mark notification read", err));
     }
-    // Dropping it from whichever slot it is showing from is what advances
-    // to the next one - there is nothing else to advance.
-    if (checkInToast && checkInToast.id === n.id) setCheckInToast(null);
-    else setQueue((q) => q.filter((r) => r.id !== n.id));
+    setCurrent(null);
   }
 
   function dismiss(e?: React.MouseEvent | React.KeyboardEvent) {

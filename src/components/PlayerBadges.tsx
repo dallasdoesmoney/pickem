@@ -12,26 +12,15 @@ import { badgeGradient } from "@/lib/colorUtils";
 // for any of these exists and a row shows up in user_badges, so a profile
 // with none just looks like today's profile.
 export function PlayerBadges({ userId }: { userId: string }) {
-  // Keyed by the user rather than cleared on a change of user - see the
-  // same shape in CreatorLinks for why.
-  const [held, setHeld] = useState<{ id: string; keys: string[] } | null>(null);
+  const [keys, setKeys] = useState<string[] | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    setKeys(null);
     fetchUserBadges(userId)
-      .then((rows) => {
-        if (!cancelled) setHeld({ id: userId, keys: rows.map((r) => r.badge_key) });
-      })
-      .catch(() => {
-        if (!cancelled) setHeld({ id: userId, keys: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((rows) => setKeys(rows.map((r) => r.badge_key)))
+      .catch(() => setKeys([]));
   }, [userId]);
-
-  const keys = held && held.id === userId ? held.keys : null;
 
   if (!keys || keys.length === 0) return null;
 

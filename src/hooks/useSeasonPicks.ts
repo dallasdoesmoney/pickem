@@ -13,19 +13,7 @@ export function useSeasonPicks(team: TeamAbbr, sandbox = false) {
   const { user, loading: authLoading } = useAuth();
   const picksKey = `pickem:season-predictor:${team}`;
   const [picks, setPicks] = useState<Picks>({});
-  // LOADED IS A COMPARISON, not a flag to be reset.
-  //
-  // It used to be a boolean set false at the top of the effect and true
-  // when the fetch landed, which cost a render before the fetch had even
-  // started. What it actually means is "the picks in hand belong to the
-  // thing being asked about", so it records WHICH key it loaded and the
-  // answer is a comparison at render. A user edit does not change the
-  // key, so editing does not make the board look unloaded.
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  // Everything the load depends on, in one string, so the effect and
-  // the comparison below cannot fall out of step with each other.
-  const loadKey = `${picksKey}|${team}|${user?.id ?? ""}|${sandbox}`;
-  const loaded = loadedFor === loadKey;
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     // Wait for the session check so signed-in users don't briefly flash
@@ -33,13 +21,14 @@ export function useSeasonPicks(team: TeamAbbr, sandbox = false) {
     if (authLoading) return;
 
     let cancelled = false;
+    setLoaded(false);
 
     async function load() {
       // A sandbox starts empty and reads nothing - not the account, not
       // this device.
       if (sandbox) {
         setPicks({});
-        setLoadedFor(loadKey);
+        setLoaded(true);
         return;
       }
       if (user) {
@@ -51,7 +40,7 @@ export function useSeasonPicks(team: TeamAbbr, sandbox = false) {
           if (cancelled) return;
           setPicks(dbPicks);
           localStorage.setItem(picksKey, JSON.stringify(dbPicks));
-          setLoadedFor(loadKey);
+          setLoaded(true);
           return;
         } catch (err) {
           console.error("Failed to load predictions from account, falling back to this device's local copy", err);
@@ -66,18 +55,14 @@ export function useSeasonPicks(team: TeamAbbr, sandbox = false) {
       } catch {
         if (!cancelled) setPicks({});
       }
-      if (!cancelled) setLoadedFor(loadKey);
+      if (!cancelled) setLoaded(true);
     }
 
     load();
     return () => {
       cancelled = true;
     };
-    // loadKey is built from the rest of these, so listing both is
-    // redundant - but the linter cannot see through a template string,
-    // and a suppression here would be hiding a real dependency to save
-    // one line.
-  }, [loadKey, picksKey, team, user, authLoading, sandbox]);
+  }, [picksKey, team, user, authLoading, sandbox]);
 
   useEffect(() => {
     if (!loaded || sandbox) return;

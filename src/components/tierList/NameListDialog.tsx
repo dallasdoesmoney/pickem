@@ -27,14 +27,10 @@ export function NameListDialog({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reseed each time it opens - the board may have been renamed since.
-  // Done during render rather than in an effect: React re-runs the
-  // component immediately and never commits the render carrying the old
-  // name, so the field cannot be seen holding it.
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) setName(initialName);
-  }
+  useEffect(() => {
+    if (!open) return;
+    setName(initialName);
+  }, [open, initialName]);
 
   useEffect(() => {
     if (!open) return;

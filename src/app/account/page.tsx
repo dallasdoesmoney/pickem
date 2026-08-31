@@ -20,7 +20,6 @@ import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { getLevelInfo, subLevelRoman } from "@/lib/levels";
 import { RankPanel } from "@/components/RankPanel";
 import { ProfileCard } from "@/components/ProfileCard";
-import { reportError } from "@/lib/sentry";
 
 export default function AccountPage() {
   const { user, profile: authProfile, loading: authLoading, signOut, refreshProfile } = useAuth();
@@ -61,10 +60,7 @@ function SignedInAccount({
   useEffect(() => {
     fetchMyLeaderboardEntry(userId)
       .then(setMyRecord)
-      .catch((err) => {
-        reportError("account.myRecord", err);
-        setMyRecord(null);
-      });
+      .catch(() => setMyRecord(null));
   }, [userId]);
 
   const [progressModalOpen, setProgressModalOpen] = useState(false);
@@ -89,7 +85,7 @@ function SignedInAccount({
       .then((s) => {
         if (!cancelled) setNameplate(s);
       })
-      .catch((err) => reportError("account.nameplateStats", err));
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -98,10 +94,7 @@ function SignedInAccount({
   useEffect(() => {
     fetchUserBadges(userId)
       .then((badges) => setIsCreator(badges.some((b) => b.badge_key === "creator")))
-      .catch((err) => {
-        reportError("account.isCreator", err);
-        setIsCreator(false);
-      });
+      .catch(() => setIsCreator(false));
   }, [userId]);
 
   // One derivation of the wash colour, shared by every panel on the page.
