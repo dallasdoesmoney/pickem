@@ -2,6 +2,9 @@
 
 import type { AuctionFormat } from "@/lib/auction/format";
 import { AuctionState, toAct, currentItem, fillLabel } from "@/lib/auction/engine";
+import { PLAYER_COLORS, MONEY, outlined } from "./style";
+
+export { PLAYER_COLORS };
 
 // THE OBS LAYER. Not a web page that happens to be on a stream - a
 // graphic, sitting on a transparent background, over two face cams.
@@ -22,25 +25,6 @@ import { AuctionState, toAct, currentItem, fillLabel } from "@/lib/auction/engin
 
 export const STAGE_W = 1080;
 export const STAGE_H = 1920;
-
-// One colour each, held for the whole draft. Names, budgets, the glow on
-// whoever is bidding - all of it keyed to the same two colours so a viewer
-// learns them in the first ten seconds and never has to read a label
-// again.
-export const PLAYER_COLORS = ["#3aa8ff", "#ffd23a"];
-const MONEY = "#00e35f";
-
-// A black outline heavy enough to hold up over a bright camera feed.
-// -webkit-text-stroke alone thins the letterform, because it draws
-// centred on the edge; the shadows put the weight back on the outside.
-function outlined(px: number): React.CSSProperties {
-  const o = Math.max(2, Math.round(px * 0.06));
-  return {
-    WebkitTextStroke: `${o}px #05070d`,
-    paintOrder: "stroke fill",
-    textShadow: `0 ${Math.round(o * 1.6)}px 0 rgba(5,7,13,0.85)`,
-  };
-}
 
 function Money({ amount, size, color = MONEY }: { amount: number; size: number; color?: string }) {
   return (

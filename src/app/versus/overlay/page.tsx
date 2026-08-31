@@ -16,6 +16,7 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/versus/OverlayBoard
 //   ?top=560            pixels reserved for the top cam
 //   ?bottom=560         pixels reserved for the bottom cam
 //   ?p1=Noah&p2=Ben     names on the rails
+//   ?preview=1          look at it WITHOUT OBS - see below
 //
 // The cam bands are query parameters rather than constants because they
 // are the thing that gets adjusted while looking at the actual shot, and
@@ -40,6 +41,15 @@ function OverlayInner() {
   // How far into a demo draft to be. Lets a still be taken of an empty
   // board, a half-full one, or the moment something sells.
   const lots = Number(params.get("lots") ?? 3);
+  // WITHOUT OBS. The graphic is a 1080x1920 transparent layer, which in a
+  // normal browser tab is a cropped mess on a white page - so there is no
+  // way to judge it, or to check a change, without setting up streaming
+  // software first.
+  //
+  // preview=1 shrinks the whole stage to fit the window and paints stand-
+  // ins where the two cams will be. It is the same graphic, composited
+  // the same way; only the surroundings are fake.
+  const preview = params.get("preview") === "1";
 
   if (!format) return null;
 
@@ -67,11 +77,46 @@ function OverlayInner() {
           turned off here rather than by restructuring the app around one
           route. NavShell skips its chrome for this path on its own. */}
       <style>{`
-        html, body { background: transparent !important; }
+        html, body { background: ${preview ? "#0a0f1a" : "transparent"} !important; }
         body > svg[aria-hidden="true"] { display: none !important; }
         body { overflow: hidden; }
       `}</style>
-      <div style={{ width: STAGE_W, height: STAGE_H, position: "fixed", top: 0, left: 0 }}>
+
+      {preview && (
+        // Sets --stage-scale from the window size. A script rather than a
+        // resize effect in React: it runs before hydration, so the stage
+        // is the right size on the first paint rather than after a jump,
+        // and it holds no state to get out of step.
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){function f(){document.documentElement.style.setProperty("--stage-scale",Math.min(innerWidth/${STAGE_W},innerHeight/${STAGE_H}));}f();addEventListener("resize",f);})();`,
+          }}
+        />
+      )}
+
+      <div
+        style={{
+          width: STAGE_W,
+          height: STAGE_H,
+          position: "fixed",
+          top: 0,
+          left: preview ? "50%" : 0,
+          transform: preview ? "translateX(-50%) scale(var(--stage-scale, 0.4))" : undefined,
+          transformOrigin: "top center",
+        }}
+      >
+        {preview && (
+          // Stand-ins for the two face cams, behind the graphic. Nothing
+          // here ships to OBS - it is the wallpaper that makes the
+          // transparent parts legible on a monitor.
+          <div aria-hidden style={{ position: "absolute", inset: 0, zIndex: -1 }}>
+            <div style={{ position: "absolute", top: 0, left: 0, width: STAGE_W, height: camTop, background: "linear-gradient(160deg,#6b4f3a,#c8a882)" }} />
+            <div style={{ position: "absolute", top: camTop, left: 0, width: STAGE_W, height: STAGE_H - camTop - camBottom, background: "#101a2e" }} />
+            <div style={{ position: "absolute", top: STAGE_H - camBottom, left: 0, width: STAGE_W, height: camBottom, background: "linear-gradient(160deg,#33506b,#7fa8c8)" }} />
+            <div style={{ position: "absolute", top: camTop - 1, left: 0, width: STAGE_W, height: 2, background: "rgba(255,255,255,0.25)" }} />
+            <div style={{ position: "absolute", top: STAGE_H - camBottom - 1, left: 0, width: STAGE_W, height: 2, background: "rgba(255,255,255,0.25)" }} />
+          </div>
+        )}
         <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} />
       </div>
     </>

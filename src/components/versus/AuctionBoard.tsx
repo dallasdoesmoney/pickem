@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AuctionFormat } from "@/lib/auction/format";
+import { PLAYER_COLORS, MONEY, outlined, display } from "./style";
 import {
   AuctionState,
   AuctionAction,
@@ -14,12 +15,16 @@ import {
   fillLabel,
 } from "@/lib/auction/engine";
 
+// Same vocabulary as the overlay - see style.ts. The panels stay, because
+// this is a page somebody sits and reads rather than a graphic over a
+// face cam, but the lettering, the colours and the money match what a
+// viewer is looking at on the stream.
 const CARD = "#101d38";
 const RULE = "rgba(255,255,255,0.12)";
 
-function Money({ amount, size = 34 }: { amount: number; size?: number }) {
+function Money({ amount, size = 34, color = MONEY }: { amount: number; size?: number; color?: string }) {
   return (
-    <span style={{ fontFamily: "var(--font-display)", fontSize: size, fontVariantNumeric: "tabular-nums" }}>
+    <span style={{ ...display(size, { color, fontVariantNumeric: "tabular-nums" }), ...outlined(size, "soft") }}>
       ${amount}
     </span>
   );
@@ -38,16 +43,17 @@ function PlayerPanel({
   active: boolean;
 }) {
   const player = state.players[who];
+  const color = PLAYER_COLORS[who] ?? "#ffffff";
   return (
     <div
       className="flex flex-col rounded-2xl border p-4 transition-colors"
-      style={{ background: CARD, borderColor: active ? "rgba(62,203,120,0.55)" : RULE }}
+      style={{ background: CARD, borderColor: active ? `${color}99` : RULE }}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <span className="truncate text-[13px] tracking-[0.16em] text-white/70" style={{ fontFamily: "var(--font-display)" }}>
+        <span className="min-w-0 truncate" style={{ ...display(26, { color }), ...outlined(26, "soft") }}>
           {player.name.toUpperCase()}
         </span>
-        <Money amount={player.budget} size={26} />
+        <Money amount={player.budget} size={32} />
       </div>
 
       <div className="mt-3 flex flex-col gap-1.5">
@@ -60,7 +66,9 @@ function PlayerPanel({
               </span>
               {entry ? (
                 <>
-                  <span className="min-w-0 flex-1 truncate text-white/85">{entry.label}</span>
+                  <span className="min-w-0 flex-1 truncate" style={{ color }}>
+                    {entry.label}
+                  </span>
                   <span className="shrink-0 text-white/45" style={{ fontVariantNumeric: "tabular-nums" }}>
                     ${entry.price}
                   </span>
@@ -165,7 +173,7 @@ export function AuctionBoard({
           <div className="min-w-0">
             <div
               className="truncate text-[clamp(1.4rem,6vw,2.4rem)] leading-none tracking-wide"
-              style={{ fontFamily: "var(--font-display)" }}
+              style={{ fontFamily: "var(--font-display)", ...outlined(34, "soft") }}
             >
               {item.label.toUpperCase()}
             </div>
@@ -178,7 +186,7 @@ export function AuctionBoard({
       {state.phase === "bidding" && acting !== null && range && (
         <div className="rounded-2xl border p-5" style={{ background: CARD, borderColor: RULE }}>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[12px] tracking-[0.16em] text-white/70" style={{ fontFamily: "var(--font-display)" }}>
+            <span style={{ ...display(15, { color: PLAYER_COLORS[acting], letterSpacing: 1 }), ...outlined(15, "soft") }}>
               {state.players[acting].name.toUpperCase()} TO {state.bid ? "ANSWER" : "OPEN"}
             </span>
             {state.bid ? (
@@ -214,8 +222,8 @@ export function AuctionBoard({
 
             <button
               onClick={() => bid(amount)}
-              className="h-11 flex-1 rounded-xl px-5 text-[13px] tracking-[0.14em] text-[#08111f] transition-transform active:scale-[0.98]"
-              style={{ fontFamily: "var(--font-display)", background: "#3ecb78" }}
+              className="h-11 flex-1 rounded-xl px-5 text-[13px] tracking-[0.14em] text-[#05070d] transition-transform active:scale-[0.98]"
+              style={{ fontFamily: "var(--font-display)", background: MONEY }}
             >
               BID ${amount}
             </button>
@@ -291,7 +299,9 @@ export function AuctionBoard({
               .map((h, i) => (
                 <div key={`${h.itemId}-${i}`} className="flex items-center gap-2 text-[12.5px]">
                   <span className="min-w-0 flex-1 truncate text-white/70">{h.label}</span>
-                  <span className="shrink-0 text-white/40">{state.players[h.by].name}</span>
+                  <span className="shrink-0" style={{ color: PLAYER_COLORS[h.by] }}>
+                    {state.players[h.by].name}
+                  </span>
                   <span className="w-10 shrink-0 text-right text-white/55" style={{ fontVariantNumeric: "tabular-nums" }}>
                     ${h.price}
                   </span>
