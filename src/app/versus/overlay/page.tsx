@@ -4,6 +4,9 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AUCTION_FORMATS } from "@/lib/auction/formats";
 import { startAuction, reduce, AuctionState } from "@/lib/auction/engine";
+import type { AuctionFormat } from "@/lib/auction/format";
+import { isRoomCode } from "@/lib/auction/room";
+import { useRoomState } from "@/components/versus/useRoom";
 import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/versus/OverlayBoard";
 
 // THE OBS BROWSER SOURCE.
@@ -12,23 +15,38 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/versus/OverlayBoard
 // the draft over a transparent background with the top and bottom left
 // clear for two face cams.
 //
-//   ?format=nfl-teams   which mode to draw
-//   ?top=560            pixels reserved for the top cam
-//   ?bottom=560         pixels reserved for the bottom cam
-//   ?p1=Noah&p2=Ben     names on the rails
-//   ?preview=1          look at it WITHOUT OBS - see below
+//   ?room=k7m2xq...   follow a live board. Without it, a demo draft.
+//   ?top=560          pixels reserved for the top cam
+//   ?bottom=560       pixels reserved for the bottom cam
+//   ?preview=1        look at it WITHOUT OBS - see below
+//   ?format=nfl-teams which mode the DEMO draws (ignored in a room)
+//   ?p1=Noah&p2=Ben   names on the DEMO rails (ignored in a room)
 //
 // The cam bands are query parameters rather than constants because they
 // are the thing that gets adjusted while looking at the actual shot, and
 // waiting on a deploy to nudge a graphic down forty pixels is no way to
 // set up a stream.
-//
-// STILL DRIVEN BY A DEMO STATE. The live wiring - a room code, and the
-// control page broadcasting its state to this one over Supabase Realtime
-// - is the next step. This exists first so the graphic can be looked at
-// in OBS, over the real cams, and argued about before any of that is
-// built: the layout is the part that needs eyes on it, and it is also the
-// part that costs nothing to change.
+
+// A deterministic mid-draft position, so the graphic can be judged with
+// real names in the rails rather than five em dashes. Demo only - in a
+// room every one of these numbers comes off the wire.
+function demoState(format: AuctionFormat, names: string[], seed: string, lots: number): AuctionState {
+  let state = startAuction(format, names, seed);
+  for (let i = 0; i < lots && state.phase !== "done"; i++) {
+    const who = state.opener;
+    state = reduce(state, { type: "bid", by: who, amount: (i * 3) % 7 }, format);
+    if (state.phase === "bidding") state = reduce(state, { type: "pass", by: (who + 1) % 2 }, format);
+    if (state.phase === "assigning") {
+      const open = format.slots.filter((s) => state.players[state.won!.by].roster[s.key] === null);
+      const item = format.items.find((it) => it.id === state.order[state.index]);
+      const slot = open.find((s) => !item?.fills || s.key in item.fills);
+      if (slot) state = reduce(state, { type: "assign", slotKey: slot.key }, format);
+    }
+  }
+  // Stop one action short so the "X BIDS $n" line has something in it.
+  if (state.phase === "bidding") state = reduce(state, { type: "bid", by: state.opener, amount: 4 }, format);
+  return state;
+}
 
 // A cam band in preview: a translucent tint over the checkerboard, not a
 // solid block. Solid read as "the overlay draws here", which is the one
@@ -61,15 +79,16 @@ function CamStandIn({ top, height, tint, label }: { top: number; height: number;
 
 function OverlayInner() {
   const params = useSearchParams();
-  const slug = params.get("format") ?? "nfl-teams";
-  const format = AUCTION_FORMATS[slug] ?? Object.values(AUCTION_FORMATS)[0];
+
+  // A room turns this from a demo into a mirror of a live board. Checked
+  // for shape before it is used, so a mangled URL opens a demo rather
+  // than subscribing to a channel named after somebody's typo.
+  const roomParam = params.get("room");
+  const room = roomParam && isRoomCode(roomParam) ? roomParam : null;
+  const { message } = useRoomState(room);
 
   const camTop = Number(params.get("top") ?? 560);
   const camBottom = Number(params.get("bottom") ?? 560);
-  const names = [params.get("p1") ?? "Player 1", params.get("p2") ?? "Player 2"];
-  // How far into a demo draft to be. Lets a still be taken of an empty
-  // board, a half-full one, or the moment something sells.
-  const lots = Number(params.get("lots") ?? 3);
   // WITHOUT OBS. The graphic is a 1080x1920 transparent layer, which in a
   // normal browser tab is a cropped mess on a white page - so there is no
   // way to judge it, or to check a change, without setting up streaming
@@ -86,24 +105,24 @@ function OverlayInner() {
   // - the opposite of what the preview exists to show.
   const preview = params.get("preview") === "1";
 
-  if (!format) return null;
+  const demoFormat = AUCTION_FORMATS[params.get("format") ?? "nfl-teams"] ?? Object.values(AUCTION_FORMATS)[0];
+  const format = message ? AUCTION_FORMATS[message.slug] : demoFormat;
 
-  // A deterministic mid-draft position, so the graphic can be judged with
-  // real names in the rails rather than five em dashes.
-  let state: AuctionState = startAuction(format, names, params.get("seed") ?? "overlay-demo");
-  for (let i = 0; i < lots && state.phase !== "done"; i++) {
-    const who = state.opener;
-    state = reduce(state, { type: "bid", by: who, amount: (i * 3) % 7 }, format);
-    if (state.phase === "bidding") state = reduce(state, { type: "pass", by: (who + 1) % 2 }, format);
-    if (state.phase === "assigning") {
-      const open = format.slots.filter((s) => state.players[state.won!.by].roster[s.key] === null);
-      const item = format.items.find((it) => it.id === state.order[state.index]);
-      const slot = open.find((s) => !item?.fills || s.key in item.fills);
-      if (slot) state = reduce(state, { type: "assign", slotKey: slot.key }, format);
-    }
-  }
-  // Stop one action short so the "X BIDS $n" line has something in it.
-  if (state.phase === "bidding") state = reduce(state, { type: "bid", by: state.opener, amount: 4 }, format);
+  // In a room, nothing is drawn until the board has said something. The
+  // alternative - falling back to the demo - would put two invented names
+  // and a fake $4 bid on a live stream when a connection hiccups.
+  const state = message
+    ? message.state
+    : room
+      ? null
+      : format
+        ? demoState(
+            format,
+            [params.get("p1") ?? "Player 1", params.get("p2") ?? "Player 2"],
+            params.get("seed") ?? "overlay-demo",
+            Number(params.get("lots") ?? 3),
+          )
+        : null;
 
   return (
     <>
@@ -158,7 +177,31 @@ function OverlayInner() {
             <CamStandIn top={STAGE_H - camBottom} height={camBottom} tint="#7fa8c8" label="BOTTOM CAM" />
           </div>
         )}
-        <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} />
+
+        {format && state ? (
+          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} />
+        ) : room ? (
+          // Small and dim on purpose. If this ever does appear on a live
+          // stream it should read as a status light, not an error page.
+          <div
+            style={{
+              position: "absolute",
+              top: camTop,
+              left: 0,
+              width: STAGE_W,
+              height: STAGE_H - camTop - camBottom,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: "var(--font-display)",
+              fontSize: 26,
+              letterSpacing: 5,
+              color: "rgba(255,255,255,0.4)",
+            }}
+          >
+            WAITING FOR THE BOARD
+          </div>
+        ) : null}
       </div>
 
       {preview && (

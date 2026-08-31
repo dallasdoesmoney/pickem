@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import { AUCTION_FORMATS } from "@/lib/auction/formats";
-import { startAuction, AuctionState } from "@/lib/auction/engine";
+import { startAuction, reduce, AuctionState, AuctionAction } from "@/lib/auction/engine";
 import { AuctionBoard } from "@/components/versus/AuctionBoard";
+import { OverlayLink } from "@/components/versus/OverlayLink";
+import { useRoomCode, useBroadcast } from "@/components/versus/useRoom";
 
-// HOTSEAT ONLY, for now. Both players act on one screen, which is how you
-// play it sitting next to somebody - and is also the version that needs no
-// network at all, so the rules can be proved right before anything is
-// broadcast anywhere.
+// THE CONTROL BOARD. Both players act on this one screen - which is how
+// you play it sitting next to somebody, and is also what a host does on a
+// stream while the viewers watch the OBS overlay.
 //
-// Remote play and the OBS overlay come next, on top of the same engine:
-// the rules live in src/lib/auction/engine.ts as a pure function, so the
-// networked version reduces the same actions rather than reimplementing
-// them.
+// The game lives HERE rather than in AuctionBoard, because it has two
+// consumers now: the board that draws it and the room that broadcasts it.
+// The rules stay in src/lib/auction/engine.ts as a pure function, so this
+// page reduces actions rather than knowing any of them.
 //
 // Deliberately unlinked - see layout.tsx.
 const formats = Object.values(AUCTION_FORMATS);
@@ -24,25 +25,41 @@ export default function VersusPage() {
   const [game, setGame] = useState<{ slug: string; state: AuctionState } | null>(null);
 
   const format = AUCTION_FORMATS[slug];
+  const { code, rotate } = useRoomCode();
+
+  // Joined before a draft starts, not after. The overlay can then be set
+  // up in OBS and confirmed working while the setup screen is still up -
+  // the point at which there is time to fix it.
+  const liveGame = game && AUCTION_FORMATS[game.slug] ? game : null;
+  const { live, viewers } = useBroadcast(code, liveGame?.slug ?? slug, liveGame?.state ?? null);
 
   function start() {
     if (!format) return;
-    // The seed is what makes a draft reproducible. Random here; when rooms
-    // arrive it becomes the room code, so everyone in a room deals the
-    // same cards.
+    // The seed is what makes a draft reproducible. Random per draft, and
+    // deliberately NOT the room code - the code outlives the draft, so
+    // seeding from it would deal the same cards every single time.
     const seed = Math.random().toString(36).slice(2, 10);
     setGame({ slug, state: startAuction(format, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed) });
   }
 
-  if (game && AUCTION_FORMATS[game.slug]) {
+  function act(action: AuctionAction) {
+    setGame((g) => {
+      const f = g && AUCTION_FORMATS[g.slug];
+      return g && f ? { ...g, state: reduce(g.state, action, f) } : g;
+    });
+  }
+
+  if (liveGame) {
     return (
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-16 pt-8">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 pb-16 pt-8">
         <AuctionBoard
-          key={game.state.order.join(",")}
-          format={AUCTION_FORMATS[game.slug]}
-          initial={game.state}
+          key={liveGame.state.order.join(",")}
+          format={AUCTION_FORMATS[liveGame.slug]}
+          state={liveGame.state}
+          onAction={act}
           onRestart={() => setGame(null)}
         />
+        <OverlayLink code={code} live={live} viewers={viewers} onRotate={rotate} />
       </main>
     );
   }
@@ -107,6 +124,10 @@ export default function VersusPage() {
           >
             START THE DRAFT
           </button>
+
+          <div className="mt-6">
+            <OverlayLink code={code} live={live} viewers={viewers} onRotate={rotate} />
+          </div>
         </>
       )}
     </main>

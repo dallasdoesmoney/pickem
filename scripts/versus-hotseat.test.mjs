@@ -83,7 +83,12 @@ try {
 
   // Both rosters full, and neither budget below zero - the same two
   // guarantees the engine fuzz checks, confirmed through the UI.
-  const body = await page.locator("main").innerText();
+  // Scoped to the roster panels, not the whole page. Any other copy that
+  // happens to contain an em dash or a dollar sign is none of this
+  // check's business.
+  const panels = await page.locator("main [data-roster]").allInnerTexts();
+  ok("both rosters are on screen", panels.length === 2, `${panels.length} panels`);
+  const body = panels.join("\n");
   ok("no slot was left empty", !body.includes("—"), "an em dash is an empty slot");
   const budgets = [...body.matchAll(/\$(\d+)\n/g)].map((m) => Number(m[1]));
   ok("nobody finished overdrawn", budgets.every((b) => b >= 0), budgets.join(", "));

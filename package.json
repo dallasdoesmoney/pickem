@@ -21,7 +21,8 @@
     "test:names": "node --experimental-strip-types scripts/name-search.test.mjs",
     "test:auction": "node --experimental-strip-types scripts/auction-engine.test.mjs",
     "test:formats": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/auction-formats.test.mjs",
-    "test:versus": "node scripts/versus-hotseat.test.mjs"
+    "test:versus": "node scripts/versus-hotseat.test.mjs",
+    "test:room": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/versus-room.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -6,7 +6,6 @@ import { PLAYER_COLORS, MONEY, outlined, display } from "./style";
 import {
   AuctionState,
   AuctionAction,
-  reduce,
   toAct,
   bidRange,
   currentItem,
@@ -46,6 +45,11 @@ function PlayerPanel({
   const color = PLAYER_COLORS[who] ?? "#ffffff";
   return (
     <div
+      // Marked so a test can read the rosters specifically. It used to
+      // scan the whole page for an em dash to find an unfilled slot,
+      // which quietly became wrong the moment any other copy on the page
+      // contained one.
+      data-roster={who}
       className="flex flex-col rounded-2xl border p-4 transition-colors"
       style={{ background: CARD, borderColor: active ? `${color}99` : RULE }}
     >
@@ -84,17 +88,22 @@ function PlayerPanel({
   );
 }
 
+// CONTROLLED. The game used to live in here, which was fine while this
+// was the only screen it appeared on. Now the page also broadcasts it to
+// an OBS overlay, and a game the page cannot see is a game it cannot
+// send - so the state moved up and this draws what it is given.
 export function AuctionBoard({
   format,
-  initial,
+  state,
+  onAction,
   onRestart,
 }: {
   format: AuctionFormat;
-  initial: AuctionState;
+  state: AuctionState;
+  onAction: (action: AuctionAction) => void;
   onRestart: () => void;
 }) {
-  const [state, setState] = useState(initial);
-  const act = (action: AuctionAction) => setState((s) => reduce(s, action, format));
+  const act = onAction;
 
   const item = currentItem(state, format);
   const acting = toAct(state, format);
