@@ -17,7 +17,8 @@
     "test:migration": "node scripts/local-migration.test.mjs",
     "test:unlimited": "node scripts/unlimited-mode.test.mjs",
     "test:mobile": "node scripts/mobile-run.test.mjs",
-    "test:playagain": "node scripts/play-again-focus.test.mjs"
+    "test:playagain": "node scripts/play-again-focus.test.mjs",
+    "test:names": "node --experimental-strip-types scripts/name-search.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

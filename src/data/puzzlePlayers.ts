@@ -4,6 +4,7 @@ import { QUARTERBACKS } from "@/data/rosters/qbs";
 import { RUNNING_BACKS } from "@/data/rosters/rbs";
 import { WIDE_RECEIVERS } from "@/data/rosters/wrs";
 import { TIGHT_ENDS } from "@/data/rosters/tes";
+import { searchKeys, type SearchKeys } from "@/lib/nameSearch";
 
 // TWO POOLS, and they are not the same set.
 //
@@ -168,6 +169,15 @@ export const PUZZLE_PLAYERS: PuzzlePlayer[] = GUESS_POOL
   .sort((a, b) => a.name.localeCompare(b.name));
 
 export const PUZZLE_PLAYERS_BY_ID = new Map(PUZZLE_PLAYERS.map((p) => [p.espnId, p]));
+
+// The search keys, built ONCE at module load rather than per keystroke.
+// Normalising eighteen hundred names on every letter typed is work that
+// only has one answer, and the guess field is the most latency-sensitive
+// thing on the site - somebody is typing into it against a clock.
+export const PUZZLE_PLAYER_SEARCH: { player: PuzzlePlayer; keys: SearchKeys }[] = PUZZLE_PLAYERS.map((player) => ({
+  player,
+  keys: searchKeys(player.name),
+}));
 
 // Re-exported so callers that already hold a player can reach for the
 // URL here; the function itself lives in its own module so anything that
