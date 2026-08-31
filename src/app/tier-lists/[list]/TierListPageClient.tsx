@@ -78,6 +78,7 @@ import { ShareDialog } from "@/components/tierList/ShareDialog";
 import { NameListDialog } from "@/components/tierList/NameListDialog";
 import { CelebrationVariant, TierCelebration } from "@/components/tierList/TierCelebration";
 import { tierRailNameSize } from "@/components/tierList/tierLabel";
+import { TierListIntro } from "./TierListIntro";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 // Per list, keyed the same way the board's own state is (see
@@ -1027,15 +1028,19 @@ export default function TierListPageClient({
 
   const activeItem = draggingId ? resolveItem(template, draggingId) : null;
 
-  if (!loaded) {
-    return (
-      <main className="flex-1 px-4 pb-16 pt-10 max-w-[66rem] w-full mx-auto">
-        <div className="flex justify-center pt-16">
-          <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-        </div>
-      </main>
-    );
-  }
+  // `loaded` goes true once the saved board has been read out of
+  // localStorage, which cannot happen on the server - so THIS return is the
+  // server-rendered HTML for the whole route, and it used to be a spinner.
+  // Fetched the way a crawler fetches it, /tier-lists/nfl-quarterbacks came
+  // back as a nav bar and a spinning div: no heading, and not one
+  // quarterback's name, on the page whose entire reason to exist is the
+  // search "NFL quarterback tier list".
+  //
+  // TierListIntro is the same heading and the same names the board shows a
+  // moment later, so nothing here is written for crawlers that a person
+  // does not also see. It is a better loading state as well - a spinner
+  // tells you to wait, this tells you that you are on the right page.
+  if (!loaded) return <TierListIntro template={template} />;
 
   // max-w-[66rem] is 1000px, and the chip solver above hardcodes that
   // same 1000 as its ceiling and as its ten-across breakpoint - all three

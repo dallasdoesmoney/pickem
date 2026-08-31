@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import PredictorPageClient from "./PredictorPageClient";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbJsonLd } from "@/lib/structuredData";
 
 // Thirty-two pages that each answer a real search - "Chiefs record
 // prediction" and thirty-one like it. They were already being generated
@@ -33,5 +35,16 @@ export default async function Page({ params }: { params: Promise<{ team: string 
   const abbr = team.toUpperCase() as TeamAbbr;
   if (!(abbr in TEAMS)) notFound();
 
-  return <PredictorPageClient trackedTeam={abbr} />;
+  const t = TEAMS[abbr];
+  return (
+    <>
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Record Predictor", path: "/predictor" },
+          { name: `${t.city} ${t.name} Record Predictor`, path: `/predictor/${team.toLowerCase()}` },
+        ])}
+      />
+      <PredictorPageClient trackedTeam={abbr} />
+    </>
+  );
 }

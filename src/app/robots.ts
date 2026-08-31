@@ -24,5 +24,10 @@ export default function robots(): MetadataRoute.Robots {
     },
     sitemap: `${SITE}/sitemap.xml`,
     host: SITE,
+    // AI crawlers are covered by the `*` rule above, which allows them -
+    // and that is the intended answer, not an oversight. Being read by the
+    // things that answer "what should I play this NFL season" is the point.
+    // To change your mind later, add per-agent rules here for GPTBot,
+    // ClaudeBot, PerplexityBot and Google-Extended.
   };
 }
