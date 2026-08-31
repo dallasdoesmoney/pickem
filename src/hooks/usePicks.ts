@@ -20,19 +20,7 @@ export function usePicks(week: number, sandbox = false) {
   const lockKey = `pickem:lock:week-${week}`;
   const [picks, setPicks] = useState<Picks>({});
   const [lockedGameId, setLockedGameId] = useState<string | null>(null);
-  // LOADED IS A COMPARISON, not a flag to be reset.
-  //
-  // It used to be a boolean set false at the top of the effect and true
-  // when the fetch landed, which cost a render before the fetch had even
-  // started. What it actually means is "the picks in hand belong to the
-  // thing being asked about", so it records WHICH key it loaded and the
-  // answer is a comparison at render. A user edit does not change the
-  // key, so editing does not make the board look unloaded.
-  const [loadedFor, setLoadedFor] = useState<string | null>(null);
-  // Everything the load depends on, in one string, so the effect and
-  // the comparison below cannot fall out of step with each other.
-  const loadKey = `${picksKey}|${lockKey}|${week}|${user?.id ?? ""}|${sandbox}`;
-  const loaded = loadedFor === loadKey;
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     // Wait for the session check so signed-in users don't briefly flash
@@ -40,6 +28,7 @@ export function usePicks(week: number, sandbox = false) {
     if (authLoading) return;
 
     let cancelled = false;
+    setLoaded(false);
 
     async function load() {
       // A sandbox starts empty and reads nothing: not the account, not
@@ -49,7 +38,7 @@ export function usePicks(week: number, sandbox = false) {
       if (sandbox) {
         setPicks({});
         setLockedGameId(null);
-        setLoadedFor(loadKey);
+        setLoaded(true);
         return;
       }
       if (user) {
@@ -65,7 +54,7 @@ export function usePicks(week: number, sandbox = false) {
           localStorage.setItem(picksKey, JSON.stringify(dbPicks));
           if (dbLock) localStorage.setItem(lockKey, dbLock);
           else localStorage.removeItem(lockKey);
-          setLoadedFor(loadKey);
+          setLoaded(true);
           return;
         } catch (err) {
           console.error("Failed to load picks from account, falling back to this device's local copy", err);
@@ -81,18 +70,14 @@ export function usePicks(week: number, sandbox = false) {
         if (!cancelled) setPicks({});
       }
       if (!cancelled) setLockedGameId(localStorage.getItem(lockKey));
-      if (!cancelled) setLoadedFor(loadKey);
+      if (!cancelled) setLoaded(true);
     }
 
     load();
     return () => {
       cancelled = true;
     };
-    // loadKey is built from the rest of these, so listing both is
-    // redundant - but the linter cannot see through a template string,
-    // and a suppression here would be hiding a real dependency to save
-    // one line.
-  }, [loadKey, picksKey, lockKey, week, user, authLoading, sandbox]);
+  }, [picksKey, lockKey, week, user, authLoading, sandbox]);
 
   useEffect(() => {
     if (!loaded || sandbox) return;
@@ -109,14 +94,9 @@ export function usePicks(week: number, sandbox = false) {
   // switched to the other team) can't stay the lock - keeps the two
   // pieces of state honest without every call site remembering to clear
   // it manually.
-  //
-  // DERIVED, not synchronised. This was an effect that watched picks and
-  // cleared the lock afterwards, which meant one render where a game was
-  // unpicked and still showed as locked. It is a question with an answer
-  // - is the locked game still picked? - so it is answered on the way
-  // out instead. The stored id is allowed to go stale; nothing reads it
-  // directly.
-  const effectiveLock = lockedGameId && picks[lockedGameId] ? lockedGameId : null;
+  useEffect(() => {
+    if (lockedGameId && !picks[lockedGameId]) setLockedGameId(null);
+  }, [picks, lockedGameId]);
 
   function setPick(gameId: string, team: TeamAbbr) {
     setPicks((prev) => {
@@ -138,5 +118,5 @@ export function usePicks(week: number, sandbox = false) {
     setLockedGameId(null);
   }
 
-  return { picks, setPick, resetPicks, loaded, lockedGameId: effectiveLock, toggleLock };
+  return { picks, setPick, resetPicks, loaded, lockedGameId, toggleLock };
 }

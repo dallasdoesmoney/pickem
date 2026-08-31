@@ -16,8 +16,6 @@
 # next.js
 /.next/
 /out/
-# The profile SSR suite's own build output - see distDir in next.config.ts.
-/.next-profile-ssr/
 
 # production
 /build
@@ -47,6 +45,3 @@ build-stamp.txt
 
 # Rendered email previews - scripts/preview-emails.mjs writes them here.
 .email-preview/
-
-# Test evidence - screenshots from a failed run, uploaded by CI.
-/artifacts

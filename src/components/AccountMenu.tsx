@@ -9,7 +9,6 @@ import { useAnchoredMenu } from "@/hooks/useAnchoredMenu";
 import { fetchUnreciprocatedFollowerCount } from "@/lib/supabase/follows";
 import { fetchMyLeaderboardEntry } from "@/lib/supabase/leaderboard";
 import { LevelsAchievementsModal } from "@/components/LevelsAchievementsModal";
-import { reportError } from "@/lib/sentry";
 
 const PANEL_WIDTH = 200;
 
@@ -46,11 +45,11 @@ function AccountIcon({ className }: { className?: string }) {
 export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { user, profile, loading, signOut } = useAuth();
   const { buttonRef, panelRef, coords } = useAnchoredMenu<HTMLButtonElement>(open, onOpenChange, PANEL_WIDTH);
-  const [pending, setPending] = useState<{ id: string; count: number } | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
   // Admin's own queue, separate from the follower count above it. Fetched
   // here rather than only inside /admin so an admin sees work waiting
   // without having to go looking for it.
-  const [adminQueue, setAdminQueue] = useState<{ forAdmin: boolean; count: number } | null>(null);
+  const [adminTaskCount, setAdminTaskCount] = useState(0);
   // Challenges were previously reachable only by finding your level and
   // then noticing the tab beside it, which is a lot of steps for the
   // screen that answers "what can I do to earn points."
@@ -67,38 +66,29 @@ export function AccountMenu({ open, onOpenChange }: { open: boolean; onOpenChang
     if (user) {
       fetchMyLeaderboardEntry(user.id)
         .then((row) => setTotalPoints(row?.total_points))
-        .catch((err) => reportError("accountMenu.points", err));
+        .catch(() => {});
     }
   }
 
-  // KEYED BY THE USER, so signing out needs no reset. A count belongs to
-  // somebody; if that somebody is not who is signed in now, it is not a
-  // count, it is a leftover. Zero falls out of the comparison rather than
-  // out of a render spent setting it.
   useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
+    if (!user) {
+      setPendingCount(0);
+      return;
+    }
     fetchUnreciprocatedFollowerCount(user.id)
-      .then((n) => {
-        if (!cancelled) setPending({ id: user.id, count: n });
-      })
-      .catch((err) => reportError("accountMenu.unreadCount", err));
-    return () => {
-      cancelled = true;
-    };
+      .then(setPendingCount)
+      .catch(() => {});
   }, [user, open]);
-  const pendingCount = user && pending?.id === user.id ? pending.count : 0;
 
-  // Same shape: the queue length only counts while you are still an
-  // admin, so losing the flag zeroes it by comparison rather than by a
-  // setState in an effect.
   useEffect(() => {
-    if (!profile?.is_admin) return;
+    if (!profile?.is_admin) {
+      setAdminTaskCount(0);
+      return;
+    }
     fetchPendingCreatorRequestCount()
-      .then((n) => setAdminQueue({ forAdmin: true, count: n }))
-      .catch((err) => reportError("accountMenu.adminQueue", err));
+      .then(setAdminTaskCount)
+      .catch(() => {});
   }, [profile?.is_admin, open]);
-  const adminTaskCount = profile?.is_admin && adminQueue?.forAdmin ? adminQueue.count : 0;
 
   // Hold the slot with a plain disc until the session resolves. Without
   // this the header renders the signed-out control first and swaps it a

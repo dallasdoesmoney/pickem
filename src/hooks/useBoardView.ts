@@ -87,26 +87,15 @@ function columnsFit(viewportWidth: number, cols: number): boolean {
 
 export function useBoardView() {
   const [streamerState, setStreamerState] = useState<BoardViewState>(STREAMER_DEFAULTS);
-  const [streamerModeRaw, setStreamerModeState] = useState(false);
+  const [streamerMode, setStreamerModeState] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(390);
   const [viewportHeight, setViewportHeight] = useState(800);
-
-  // Both derived here rather than further down, because `state` below
-  // reads the mode and a narrow window must never resolve to streamer
-  // mode for even one render - there is no control to escape it at that
-  // width. The raw flag is what the user asked for; this is what they
-  // get.
-  const streamerAvailable = viewportWidth >= STREAMER_MIN_WIDTH;
-  const streamerMode = streamerModeRaw && streamerAvailable;
 
   // Read after mount, never during render: the server has no local
   // storage, and seeding state from it directly tears on hydration.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      // The comment above is the whole justification: this cannot move
-      // into the initialiser without tearing on hydration.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setStreamerState({ ...STREAMER_DEFAULTS, ...JSON.parse(raw) });
     } catch {
       /* a corrupt or legacy value just means defaults */
@@ -115,8 +104,6 @@ export function useBoardView() {
 
   useEffect(() => {
     try {
-      // sessionStorage, same as localStorage above: absent on the server.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (sessionStorage.getItem(STREAMER_KEY) === "1") setStreamerModeState(true);
     } catch {
       /* private mode - the mode just starts off */
@@ -202,22 +189,11 @@ export function useBoardView() {
   const [fitPasses, setFitPasses] = useState(0);
   const fitToScreen = useCallback(() => setFitPasses(10), []);
 
-  // A CONVERGING LOOP, and the one place on this list where setting state
-  // from an effect is not a mistake but the method.
-  //
-  // Zoom-to-fit cannot be computed in one go: changing the zoom rewraps
-  // the board, which changes its height, which changes the ratio. So each
-  // pass measures what the last one produced and takes another step,
-  // counting down from ten so a board that will not settle stops anyway.
-  // There is nothing to derive - the input to pass N+1 is the rendered
-  // output of pass N, which only exists after a commit.
-  //
   useLayoutEffect(() => {
     if (fitPasses <= 0) return;
     const total = document.documentElement.scrollHeight;
     const available = window.innerHeight;
     if (total <= 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFitPasses(0);
       return;
     }
@@ -242,23 +218,19 @@ export function useBoardView() {
     update({ zoom: next });
   }, [fitPasses, state.zoom, update]);
 
+  const streamerAvailable = viewportWidth >= STREAMER_MIN_WIDTH;
   // Narrowing the window past the cutoff has to take the mode with it,
   // or the board stays sandboxed with no visible control to turn it off.
-  //
-  // The MODE is derived, so a narrow window is never streamer mode for
-  // even one render - the effect version rendered the sandboxed board
-  // once at a width that has no control to escape it. What stays in the
-  // effect is the sessionStorage cleanup, which is a real side effect on
-  // the world and belongs in one.
   useEffect(() => {
-    if (!streamerAvailable && streamerModeRaw) {
+    if (!streamerAvailable && streamerMode) {
+      setStreamerModeState(false);
       try {
         sessionStorage.removeItem(STREAMER_KEY);
       } catch {
         /* nothing to clean up */
       }
     }
-  }, [streamerAvailable, streamerModeRaw]);
+  }, [streamerAvailable, streamerMode]);
 
   const setStreamerMode = useCallback((on: boolean) => {
     setStreamerModeState(on);

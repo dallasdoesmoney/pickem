@@ -8,8 +8,6 @@ import { ReferralPromptGate } from "@/components/ReferralPromptGate";
 import { ChunkReload } from "@/components/ChunkReload";
 import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
-import { JsonLd } from "@/components/JsonLd";
-import { SITE_JSON_LD } from "@/lib/structuredData";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -71,11 +69,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${bungee.variable} ${fredoka.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* Who this site is, in the one form a search engine reads
-            directly. See src/lib/structuredData.ts - the short version is
-            that "Sideline Brew" reads like a coffee shop, and nothing on
-            the site told an engine otherwise. */}
-        <JsonLd data={SITE_JSON_LD} />
         <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-20">
           {/*
             Brick-style stagger: each pattern tile holds two logos, one at

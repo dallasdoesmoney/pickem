@@ -63,13 +63,6 @@ export function useTierList(template: TierTemplate): TierListHistory {
       // Corrupt or hand-edited local state falls back to a fresh list
       // rather than breaking the page.
     }
-    // Hydration again: localStorage is not readable on the server, so the
-    // restore cannot happen in the initialiser without the server and the
-    // client disagreeing about the same HTML. See useProfile for the long
-    // version. useSyncExternalStore does not fit - what comes out of
-    // storage becomes an undo history that React then owns and mutates,
-    // not a store this subscribes to.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHistory({ past: [], present: restored ?? createInitialState(template), future: [] });
   }, [template]);
 
