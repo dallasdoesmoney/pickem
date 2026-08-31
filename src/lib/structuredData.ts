@@ -19,16 +19,27 @@ export const SITE_NAME = "Sideline Brew";
 
 // Every profile that is unmistakably this brand or its owner.
 //
-// EMPTY EXCEPT THE DISCORD, on purpose. The Discord invite is in the repo
-// already (src/data/achievements.ts) so it is known to be real; the social
-// accounts are not, and a `sameAs` pointing at an account that is not
-// actually ours is worse than no `sameAs` at all - it teaches the engine a
-// wrong fact about the brand and there is no quick way to unteach it.
+// This is the field that answers "does the name Sideline Brew mean this
+// site". An engine cannot tell a new domain from a coffee shop by looking
+// at it; what it can do is check whether the site claims accounts that
+// already have a reputation, and whether those accounts point back. The
+// bio links on the accounts are the other half of that handshake, and they
+// are in place - Instagram and Facebook mark them nofollow, so this is the
+// half that actually gets read.
 //
-// Add the real handles here and they take effect on the next deploy:
-//   "https://www.tiktok.com/@...", "https://www.instagram.com/...",
-//   "https://www.youtube.com/@...", "https://x.com/..."
-export const BRAND_PROFILES: string[] = ["https://discord.gg/pcteJyuJXj"];
+// The personal accounts rather than brand-only ones, because for a solo
+// creator they are the same audience and the same person; that is who the
+// engine will find behind the name either way.
+//
+// Add to this list only when the account is certainly ours. A `sameAs`
+// pointing somewhere wrong teaches an engine a wrong fact about the brand
+// and there is no quick way to unteach it.
+export const BRAND_PROFILES: string[] = [
+  "https://www.tiktok.com/@dallaswsteven",
+  "https://www.instagram.com/dallaswsteven",
+  "https://www.facebook.com/profile.php?id=61593104371486",
+  "https://discord.gg/pcteJyuJXj",
+];
 
 const ORGANIZATION = {
   "@type": "Organization",
