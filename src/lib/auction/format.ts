@@ -1,0 +1,97 @@
+// WHAT IS BEING AUCTIONED, as data.
+//
+// There are going to be a lot of these - a full roster off NFL teams, a
+// quarterback room, receiving corps, defenses, and things that are not
+// football at all - so the engine knows none of it. It knows there is a
+// pool, that each player has slots to fill, and that everything in the
+// pool gets sold. Everything else lives in a format.
+//
+// Same arrangement as tierTemplates.ts, and for the same reason: a new
+// mode should be an entry in a file, not a change to the game.
+
+export type SlotDef = {
+  // Stable key. Used in saved state, so it does not change once a format
+  // has been played.
+  key: string;
+  label: string;
+};
+
+export type AuctionItem = {
+  id: string;
+  // What goes on the card when it comes up for auction.
+  label: string;
+  // The line under it - a team's record, a player's team, whatever the
+  // format wants somebody to be bidding on.
+  subtitle?: string;
+  imageUrl?: string;
+  // Drives the card's glow. Team colour, usually.
+  accent?: string;
+
+  // WHICH SLOTS THIS CAN FILL, and what you actually get in each one.
+  //
+  // This is the difference between the two shapes of this game. Auction a
+  // whole TEAM and the Bengals are worth Joe Burrow in the QB slot and
+  // Chase and Higgins in the receiving slot - one item, different value
+  // per slot, which is what makes two people bid on it for different
+  // reasons. Auction PLAYERS and there is nothing to choose: a
+  // quarterback fills a quarterback slot and is worth himself.
+  //
+  // So: present means "only these slots, and here is what each gives
+  // you". Absent means "any open slot, worth its own label".
+  fills?: Record<string, string>;
+};
+
+export type AuctionFormat = {
+  slug: string;
+  title: string;
+  tagline: string;
+  // Dollars each player starts with. Twenty is the version people play.
+  budget: number;
+  // What every player has to fill, in the order they are shown.
+  slots: SlotDef[];
+  items: AuctionItem[];
+};
+
+// The pool has to be exactly big enough that everyone fills every slot
+// and nothing is skipped - see the note on `NO SKIPPING` in engine.ts.
+// Getting this wrong is the kind of thing that looks fine until the last
+// pick of a live stream, so it is checked rather than trusted.
+export function poolSizeFor(format: AuctionFormat, playerCount: number): number {
+  return format.slots.length * playerCount;
+}
+
+export function formatProblems(format: AuctionFormat, playerCount: number): string[] {
+  const problems: string[] = [];
+  const need = poolSizeFor(format, playerCount);
+
+  if (format.slots.length === 0) problems.push("a format needs at least one slot");
+  if (format.budget < 0) problems.push("budget cannot be negative");
+  if (format.items.length < need) {
+    problems.push(`needs ${need} items for ${playerCount} players, has ${format.items.length}`);
+  }
+
+  const slotKeys = new Set(format.slots.map((s) => s.key));
+  if (slotKeys.size !== format.slots.length) problems.push("two slots share a key");
+
+  const ids = new Set<string>();
+  for (const item of format.items) {
+    if (ids.has(item.id)) problems.push(`two items share the id ${item.id}`);
+    ids.add(item.id);
+    for (const key of Object.keys(item.fills ?? {})) {
+      if (!slotKeys.has(key)) problems.push(`${item.label} fills "${key}", which is not a slot`);
+    }
+    // An item that can fill nothing would come up for auction and be
+    // unwinnable, which stalls the draft with no way forward.
+    if (item.fills && Object.keys(item.fills).length === 0) {
+      problems.push(`${item.label} cannot fill any slot`);
+    }
+  }
+
+  return problems;
+}
+
+// The two runtime helpers that used to live here are in engine.ts now.
+// This file is types plus the authoring-time check, and imports nothing,
+// which is what lets the engine depend on it with `import type` alone -
+// erased at runtime, so the rules can be run directly by a test with no
+// build step in front of them.

@@ -9,7 +9,7 @@
 // registered off the length of this array (see tierTemplates.ts), so an
 // unsynced checkout simply doesn't offer the category rather than
 // offering one full of blanks.
-import { TeamAbbr } from "@/data/teams";
+import type { TeamAbbr } from "@/data/teams";
 
 export type Coach = {
   espnId: string;

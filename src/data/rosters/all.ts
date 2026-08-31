@@ -8,7 +8,7 @@
 // Empty until the script has been run once, and the puzzle falls back to
 // the five position rosters when it is - see src/data/puzzlePlayers.ts -
 // so an unsynced checkout plays a smaller game rather than none.
-import { TeamAbbr } from "@/data/teams";
+import type { TeamAbbr } from "@/data/teams";
 
 export type ActivePlayer = {
   espnId: string;

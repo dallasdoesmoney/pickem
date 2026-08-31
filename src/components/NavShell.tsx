@@ -197,7 +197,8 @@ function MobileNavLink({ item, onClick }: { item: NavItem; onClick?: () => void 
 
 export function NavShell({ children }: { children: React.ReactNode }) {
   const { user, profile, signOut } = useAuth();
-  const parent = navParent(usePathname());
+  const pathname = usePathname();
+  const parent = navParent(pathname);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -222,6 +223,15 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       .then(setAdminTaskCount)
       .catch(() => {});
   }, [profile?.is_admin, mobileOpen]);
+
+  // THE OBS OVERLAY GETS NO CHROME. It is a transparent page pointed at
+  // by a browser source in streaming software, so a nav bar, a sidebar and
+  // a breadcrumb would all be composited over somebody's face cam.
+  //
+  // An early return here rather than moving NavShell into a route group:
+  // the group would change how every page on the site is wrapped, and this
+  // changes one route. Below every hook, so the hook order is unaffected.
+  if (pathname.startsWith("/versus/overlay")) return <>{children}</>;
 
   return (
     <div className="flex min-h-full">
