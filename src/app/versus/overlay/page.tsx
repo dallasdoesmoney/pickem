@@ -30,6 +30,35 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/versus/OverlayBoard
 // built: the layout is the part that needs eyes on it, and it is also the
 // part that costs nothing to change.
 
+// A cam band in preview: a translucent tint over the checkerboard, not a
+// solid block. Solid read as "the overlay draws here", which is the one
+// thing it must not say - these bands are the emptiest part of the layer.
+function CamStandIn({ top, height, tint, label }: { top: number; height: number; tint: string; label: string }) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top,
+        left: 0,
+        width: STAGE_W,
+        height,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: `${tint}44`,
+        borderTop: "2px dashed rgba(255,255,255,0.35)",
+        borderBottom: "2px dashed rgba(255,255,255,0.35)",
+        fontFamily: "var(--font-display)",
+        fontSize: 42,
+        letterSpacing: 6,
+        color: "rgba(255,255,255,0.65)",
+      }}
+    >
+      {label}
+    </div>
+  );
+}
+
 function OverlayInner() {
   const params = useSearchParams();
   const slug = params.get("format") ?? "nfl-teams";
@@ -49,6 +78,12 @@ function OverlayInner() {
   // preview=1 shrinks the whole stage to fit the window and paints stand-
   // ins where the two cams will be. It is the same graphic, composited
   // the same way; only the surroundings are fake.
+  //
+  // Everything behind the graphic in preview is a CHECKERBOARD, the one
+  // pattern everybody already reads as "nothing is here". The first
+  // version painted the cam bands as flat colour and the middle band as
+  // flat dark, which looked exactly like a graphic with a dark background
+  // - the opposite of what the preview exists to show.
   const preview = params.get("preview") === "1";
 
   if (!format) return null;
@@ -80,6 +115,11 @@ function OverlayInner() {
         html, body { background: ${preview ? "#0a0f1a" : "transparent"} !important; }
         body > svg[aria-hidden="true"] { display: none !important; }
         body { overflow: hidden; }
+        ${
+          preview
+            ? `.obs-void { background: repeating-conic-gradient(#59617a 0% 25%, #444b60 0% 50%) 50% / 64px 64px; }`
+            : ""
+        }
       `}</style>
 
       {preview && (
@@ -106,19 +146,45 @@ function OverlayInner() {
         }}
       >
         {preview && (
-          // Stand-ins for the two face cams, behind the graphic. Nothing
-          // here ships to OBS - it is the wallpaper that makes the
-          // transparent parts legible on a monitor.
-          <div aria-hidden style={{ position: "absolute", inset: 0, zIndex: -1 }}>
-            <div style={{ position: "absolute", top: 0, left: 0, width: STAGE_W, height: camTop, background: "linear-gradient(160deg,#6b4f3a,#c8a882)" }} />
-            <div style={{ position: "absolute", top: camTop, left: 0, width: STAGE_W, height: STAGE_H - camTop - camBottom, background: "#101a2e" }} />
-            <div style={{ position: "absolute", top: STAGE_H - camBottom, left: 0, width: STAGE_W, height: camBottom, background: "linear-gradient(160deg,#33506b,#7fa8c8)" }} />
-            <div style={{ position: "absolute", top: camTop - 1, left: 0, width: STAGE_W, height: 2, background: "rgba(255,255,255,0.25)" }} />
-            <div style={{ position: "absolute", top: STAGE_H - camBottom - 1, left: 0, width: STAGE_W, height: 2, background: "rgba(255,255,255,0.25)" }} />
+          // Stand-ins, behind the graphic. Nothing here ships to OBS.
+          //
+          // The whole stage is checkerboard, because the whole stage IS
+          // transparent - top to bottom, cam bands included. The two cam
+          // blocks are drawn as translucent tint over that checker rather
+          // than solid colour, so it stays readable as "the overlay puts
+          // nothing here; your camera does".
+          <div aria-hidden className="obs-void" style={{ position: "absolute", inset: 0, zIndex: -1 }}>
+            <CamStandIn top={0} height={camTop} tint="#c8a882" label="TOP CAM" />
+            <CamStandIn top={STAGE_H - camBottom} height={camBottom} tint="#7fa8c8" label="BOTTOM CAM" />
           </div>
         )}
         <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} />
       </div>
+
+      {preview && (
+        // Outside the stage, so it is not scaled with the graphic and
+        // never gets mistaken for part of it.
+        <div
+          style={{
+            position: "fixed",
+            left: 12,
+            bottom: 12,
+            zIndex: 10,
+            maxWidth: 340,
+            padding: "10px 14px",
+            borderRadius: 12,
+            background: "rgba(5,7,13,0.82)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            color: "rgba(255,255,255,0.72)",
+            font: "12px/1.45 system-ui, sans-serif",
+          }}
+        >
+          Preview only. The checkerboard and the two cam blocks are not in the
+          graphic &mdash; in OBS every one of those pixels is transparent and
+          your cameras show through. Drop <code>&amp;preview=1</code> for the
+          real browser source.
+        </div>
+      )}
     </>
   );
 }
