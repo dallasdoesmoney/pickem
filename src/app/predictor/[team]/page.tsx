@@ -4,6 +4,7 @@ import { TEAMS, TeamAbbr } from "@/data/teams";
 import PredictorPageClient from "./PredictorPageClient";
 import { JsonLd } from "@/components/JsonLd";
 import { breadcrumbJsonLd } from "@/lib/structuredData";
+import { TeamScheduleText } from "./TeamScheduleText";
 
 // Thirty-two pages that each answer a real search - "Chiefs record
 // prediction" and thirty-one like it. They were already being generated
@@ -45,6 +46,7 @@ export default async function Page({ params }: { params: Promise<{ team: string 
         ])}
       />
       <PredictorPageClient trackedTeam={abbr} />
+      <TeamScheduleText team={abbr} />
     </>
   );
 }
