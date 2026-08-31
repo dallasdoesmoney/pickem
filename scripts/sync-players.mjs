@@ -315,7 +315,7 @@ function allPlayersFile(rows) {
 // Empty until the script has been run once, and the puzzle falls back to
 // the five position rosters when it is - see src/data/puzzlePlayers.ts -
 // so an unsynced checkout plays a smaller game rather than none.
-import { TeamAbbr } from "@/data/teams";
+import type { TeamAbbr } from "@/data/teams";
 
 export type ActivePlayer = {
   espnId: string;
@@ -414,7 +414,7 @@ function fileFor(position, rows) {
 // registered off the length of this array (see tierTemplates.ts), so an
 // unsynced checkout simply doesn't offer the category rather than
 // offering one full of blanks.
-import { TeamAbbr } from "@/data/teams";
+import type { TeamAbbr } from "@/data/teams";
 
 export type ${position.typeName} = {
   // ESPN's player id, which is also what its headshot URL is keyed on.
@@ -648,7 +648,7 @@ function coachesFile(rows) {
 // registered off the length of this array (see tierTemplates.ts), so an
 // unsynced checkout simply doesn't offer the category rather than
 // offering one full of blanks.
-import { TeamAbbr } from "@/data/teams";
+import type { TeamAbbr } from "@/data/teams";
 
 export type Coach = {
   espnId: string;
