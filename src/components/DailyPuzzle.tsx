@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
-import { PUZZLE_PLAYERS, PUZZLE_PLAYERS_BY_ID, PuzzlePlayer } from "@/data/puzzlePlayers";
+import { PUZZLE_PLAYERS, PUZZLE_PLAYERS_BY_ID, PUZZLE_PLAYER_SEARCH, PuzzlePlayer } from "@/data/puzzlePlayers";
+import { searchKeys, matchRank } from "@/lib/nameSearch";
 import { TEAMS, TeamAbbr } from "@/data/teams";
 import { teamTile } from "@/lib/colorUtils";
 import { PlayerFace } from "@/components/PlayerFace";
@@ -695,15 +696,19 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // Someone typing "jam" wants Jameson before Benjamin. Starts-with wins,
   // then contains, and the tie inside each is alphabetical because the
   // list is already sorted that way.
+  // Punctuation-blind, both ways - see nameSearch.ts. "aj" finds A.J.
+  // Brown, "jam" finds Ja'Marr Chase, and typing the period or the
+  // apostrophe still works for anyone who does. A third of the pool has
+  // one of the two in it, so this is not an edge case.
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
+    const q = searchKeys(query);
+    if (!q.loose) return [];
     const starts: PuzzlePlayer[] = [];
     const contains: PuzzlePlayer[] = [];
-    for (const p of PUZZLE_PLAYERS) {
-      const name = p.name.toLowerCase();
-      if (name.startsWith(q)) starts.push(p);
-      else if (name.includes(q)) contains.push(p);
+    for (const { player, keys } of PUZZLE_PLAYER_SEARCH) {
+      const rank = matchRank(keys, q);
+      if (rank === 0) starts.push(player);
+      else if (rank === 1) contains.push(player);
       if (starts.length >= 8) break;
     }
     return [...starts, ...contains].slice(0, 8);
