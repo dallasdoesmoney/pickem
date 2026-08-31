@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { HowToPlay } from "./HowToPlay";
 
 // The daily game's own card, and the only reason this file exists: a
 // result is shared far more often than the site is, so the link a result
@@ -27,5 +28,14 @@ export const metadata: Metadata = {
 };
 
 export default function DailyLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  // The explanation lives here rather than in page.tsx because page.tsx is
+  // a client component: on the server it is a spinner until useAuth
+  // resolves, so nothing inside it reaches the first response. See
+  // HowToPlay.
+  return (
+    <>
+      {children}
+      <HowToPlay />
+    </>
+  );
 }
