@@ -67,7 +67,7 @@ export default function VersusPage() {
 
   if (liveGame) {
     return (
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 pb-16 pt-8">
+      <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-16 pt-6">
         <AuctionBoard
           key={liveGame.state.order.join(",")}
           format={AUCTION_FORMATS[liveGame.slug]}

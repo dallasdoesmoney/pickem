@@ -103,14 +103,21 @@ try {
 
   // Both rosters full, and neither budget below zero - the same two
   // guarantees the engine fuzz checks, confirmed through the UI.
-  // Scoped to the roster panels, not the whole page. Any other copy that
-  // happens to contain an em dash or a dollar sign is none of this
-  // check's business.
-  const panels = await page.locator("main [data-roster]").allInnerTexts();
-  ok("both rosters are on screen", panels.length === 2, `${panels.length} panels`);
-  const body = panels.join("\n");
-  ok("no slot was left empty", !body.includes("—"), "an em dash is an empty slot");
-  const budgets = [...body.matchAll(/\$(\d+)\n/g)].map((m) => Number(m[1]));
+  //
+  // Read off the GRAPHIC. The board used to print both rosters a second
+  // time below the overlay and this read those; the graphic is the only
+  // copy now, which is the better thing to be asserting on anyway - it is
+  // the copy the viewers see.
+  const picks = page.locator("main [data-pick]");
+  const total = await picks.count();
+  ok("every slot is on screen", total === 10, `${total} picks drawn`);
+  const filled = await page.locator('main [data-pick][data-filled="1"]').count();
+  ok("no slot was left empty", filled === total, `${filled}/${total} filled`);
+
+  const budgets = await page.locator("main [data-budget]").evaluateAll((els) =>
+    els.map((e) => Number(e.getAttribute("data-amount"))),
+  );
+  ok("both budgets are on screen", budgets.length === 2, `${budgets.length}`);
   ok("nobody finished overdrawn", budgets.every((b) => b >= 0), budgets.join(", "));
 
   ok("nothing threw", errors.length === 0, errors.slice(0, 2).join(" | "));

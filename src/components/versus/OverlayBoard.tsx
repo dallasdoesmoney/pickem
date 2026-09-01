@@ -30,7 +30,7 @@ export { PLAYER_COLORS };
 
 export const STAGE_W = 1080;
 export const STAGE_H = 1920;
-export const DEFAULT_LAYOUT: LayoutKey = "c1";
+export const DEFAULT_LAYOUT: LayoutKey = "s1";
 
 export function OverlayBoard({
   state,
@@ -56,6 +56,11 @@ export function OverlayBoard({
           the rest of the band stays clear, which is the whole point of
           making them short. */}
       <div
+        // Marked so OverlayStage can measure it. Cropping the graphic out
+        // of the stage means knowing how tall the graphic actually is,
+        // and every layout is a different height - guessing produced a
+        // band that cut "DEFENSE" off the bottom.
+        data-band
         style={{
           position: "absolute",
           top: camTop,

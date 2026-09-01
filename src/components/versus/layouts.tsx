@@ -326,13 +326,20 @@ function SpineLayout({ state, format }: LayoutProps) {
   // The badge sits INSIDE, next to the label, on both sides - so the
   // badges form two columns flanking the spine and the eye runs
   // label, badge, name outwards instead of hunting for the start.
+  // data-pick / data-filled are read by scripts/versus-hotseat.test.mjs.
+  // The board used to print both rosters a second time underneath the
+  // graphic and the test read those; now that the graphic is the only
+  // copy, the test reads the graphic - which is the copy that has to be
+  // right regardless.
   const pick = (who: number, slotKey: string) => {
     const entry = state.players[who].roster[slotKey];
-    if (!entry) return <span style={{ width: 46, height: 4, background: "rgba(255,255,255,0.14)", borderRadius: 2 }} />;
+    if (!entry) {
+      return <span data-pick={who} data-filled="0" style={{ width: 46, height: 4, background: "rgba(255,255,255,0.14)", borderRadius: 2 }} />;
+    }
     const text = (entry.short ?? entry.label).toUpperCase();
     const size = fitSize(text, 30, 11);
     return (
-      <div style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 9, minWidth: 0 }}>
+      <div data-pick={who} data-filled="1" style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 9, minWidth: 0 }}>
         <Badge url={entry.badge} size={34} />
         <span
           style={{
@@ -352,6 +359,8 @@ function SpineLayout({ state, format }: LayoutProps) {
 
   const budget = (who: number) => (
     <div
+      data-budget={who}
+      data-amount={state.players[who].budget}
       style={{
         display: "flex",
         alignItems: "baseline",

@@ -49,7 +49,10 @@ export function OverlayLink({
   }
 
   return (
-    <div className="rounded-2xl border p-4" style={{ background: "#101d38", borderColor: "rgba(255,255,255,0.12)" }}>
+    // Flat, like everything else on this screen now. It was the last
+    // filled card left, and a panel with its own background under a
+    // graphic that has none read as a different piece of software.
+    <div className="border-t pt-4" style={{ borderColor: "rgba(255,255,255,0.10)" }}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[10px] tracking-[0.2em] text-white/40" style={{ fontFamily: "var(--font-display)" }}>
           OBS OVERLAY
@@ -71,12 +74,13 @@ export function OverlayLink({
           readOnly
           value={url || "—"}
           onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 rounded-xl border border-white/15 bg-black/25 px-3 py-2 text-[12px] text-white/70 outline-none"
+          className="min-w-0 flex-1 rounded-xl bg-black/25 px-3 py-2.5 text-[12px] text-white/60 outline-none"
+          style={{ border: "2px solid rgba(255,255,255,0.10)" }}
         />
         <button
           onClick={copy}
           disabled={!url}
-          className="shrink-0 rounded-xl px-4 text-[12px] tracking-[0.12em] text-[#05070d] transition-transform active:scale-[0.98] disabled:opacity-40"
+          className="shrink-0 rounded-xl px-5 text-[12px] tracking-[0.14em] text-[#05070d] transition-transform active:scale-[0.98] disabled:opacity-40"
           style={{ fontFamily: "var(--font-display)", background: "#00e35f" }}
         >
           {copied ? "COPIED" : "COPY"}
