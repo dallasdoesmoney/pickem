@@ -299,9 +299,108 @@ function makeSplit(opts: Split) {
   };
 }
 
-export type LayoutKey = "c1" | "c2" | "c3" | "c4" | "c5";
 
-const SPLITS: Record<LayoutKey, Split> = {
+// ------------------------------------------------------------- the spine
+//
+// A different idea from the five above, and a better one: the POSITIONS
+// run down the middle, big, and each pick sits to the left or the right
+// of its own position depending on who won it. Above them, centred, the
+// team on the block; above that, biggest thing on the graphic, the price
+// as it climbs.
+//
+// What it buys is the comparison. Every other arrangement puts two
+// rosters side by side and leaves the viewer to work out who has the
+// better quarterback; here the two quarterbacks are on the same line with
+// the word QB between them. Nobody has to be told what to compare.
+function SpineLayout({ state, format }: LayoutProps) {
+  const head = headline(state, format);
+  const name = lotName(state, format);
+
+  // The badge sits INSIDE, next to the label, on both sides - so the
+  // badges form two columns flanking the spine and the eye runs
+  // label, badge, name outwards instead of hunting for the start.
+  const pick = (who: number, slotKey: string) => {
+    const entry = state.players[who].roster[slotKey];
+    if (!entry) return <span style={{ width: 46, height: 4, background: "rgba(255,255,255,0.14)", borderRadius: 2 }} />;
+    const text = (entry.short ?? entry.label).toUpperCase();
+    const size = fitSize(text, 30, 11);
+    return (
+      <div style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 9, minWidth: 0 }}>
+        <Badge url={entry.badge} size={34} />
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: size,
+            lineHeight: 1,
+            color: PLAYER_COLORS[who],
+            whiteSpace: "nowrap",
+            ...outlined(size),
+          }}
+        >
+          {text}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "0 24px" }}>
+      {/* THE PRICE, on top and biggest. It is the number that moves. */}
+      {head.amount !== null && <Money amount={head.amount} size={150} color={head.live ? MONEY : "rgba(255,255,255,0.45)"} />}
+      <div style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: 4, color: head.color, marginTop: -6, ...outlined(26) }}>
+        {head.text}
+      </div>
+
+      {/* THE TEAM on the block, under the price. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 2 }}>
+        <Lot state={state} format={format} size={128} />
+        <div style={nameStyle(name, 38)}>{name}</div>
+      </div>
+
+      {/* Who is spending what. Straddles the spine, so each budget sits
+          over the column its picks land in. */}
+      <div style={{ width: "100%", display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 10 }}>
+        {[0, 1].map((who) => (
+          <div key={who} style={{ display: "flex", alignItems: "baseline", gap: 10, flexDirection: who === 0 ? "row" : "row-reverse", opacity: toAct(state, format) === who ? 1 : 0.8 }}>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
+              {state.players[who].name.toUpperCase()}
+            </span>
+            <Money amount={state.players[who].budget} size={34} />
+          </div>
+        ))}
+      </div>
+
+      {/* THE SPINE. One line per position, both picks on it. */}
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 3 }}>
+        {format.slots.map((slot) => (
+          <div key={slot.key} style={{ display: "flex", alignItems: "center", width: "100%" }}>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-end" }}>{pick(0, slot.key)}</div>
+            <div
+              style={{
+                width: 250,
+                flexShrink: 0,
+                textAlign: "center",
+                fontFamily: "var(--font-display)",
+                fontSize: slot.label.length > 6 ? 34 : 42,
+                lineHeight: 1.25,
+                color: "#ffffff",
+                letterSpacing: 2,
+                ...outlined(42),
+              }}
+            >
+              {slot.label.toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-start" }}>{pick(1, slot.key)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export type LayoutKey = "s1" | "c1" | "c2" | "c3" | "c4" | "c5";
+
+const SPLITS = {
   c1: {
     name: "Even",
     note: "The straight combination. Rails and centre share the height, everything lined up through the middle.",
@@ -327,15 +426,23 @@ const SPLITS: Record<LayoutKey, Split> = {
     note: "Logo and money side by side instead of stacked. Costs a little size, and is the shortest of the five by some way.",
     centre: "beside", logo: 148, money: 122, railWidth: 320, rowSize: 24, railAlign: "center", edge: 24,
   },
-};
+} satisfies Record<string, Split>;
 
-export const LAYOUTS: Record<LayoutKey, { name: string; note: string; Component: (p: LayoutProps) => React.ReactElement }> =
-  Object.fromEntries(
-    (Object.keys(SPLITS) as LayoutKey[]).map((key) => [
+type Entry = { name: string; note: string; Component: (p: LayoutProps) => React.ReactElement };
+
+export const LAYOUTS: Record<LayoutKey, Entry> = {
+  s1: {
+    name: "Spine",
+    note: "Positions down the middle, big. Each pick sits on the side of the player who won it, so the two quarterbacks are on the same line with the word QB between them. Price on top, team under it.",
+    Component: SpineLayout,
+  },
+  ...(Object.fromEntries(
+    (Object.keys(SPLITS) as (keyof typeof SPLITS)[]).map((key) => [
       key,
       { name: SPLITS[key].name, note: SPLITS[key].note, Component: makeSplit(SPLITS[key]) },
     ]),
-  ) as Record<LayoutKey, { name: string; note: string; Component: (p: LayoutProps) => React.ReactElement }>;
+  ) as Record<keyof typeof SPLITS, Entry>),
+};
 
 export function isLayoutKey(value: string | null): value is LayoutKey {
   return value !== null && value in LAYOUTS;

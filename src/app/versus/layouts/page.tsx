@@ -72,8 +72,8 @@ export default function LayoutsPage() {
         OVERLAY LAYOUTS
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-white/50">
-        Lot and money big in the middle, positions down both outside edges &mdash; five ways. Same moment of
-        the same draft in each. Grey bands are where the cameras sit; on the stream those are transparent.
+        S1 is the new idea: positions down the middle, picks fanning left or right by who won them. C1&ndash;C5
+        are the earlier shape. Same moment of the same draft in each &mdash; grey bands are where the cameras sit.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
