@@ -45,7 +45,7 @@ export const QUARTERBACKS: Quarterback[] = [
   { espnId: "2577417", name: "Dak Prescott", team: "DAL", depth: 1, heightIn: 74, weightLb: 230, age: 33, jersey: 4 },
   { espnId: "3917792", name: "Daniel Jones", team: "IND", depth: 1, heightIn: 77, weightLb: 230, age: 29, jersey: 17 },
   { espnId: "3122840", name: "Deshaun Watson", team: "CLE", depth: 1, heightIn: 75, weightLb: 223, age: 30, jersey: 4 },
-  { espnId: "4431452", name: "Drake Maye", team: "NE", depth: 1, heightIn: 76, weightLb: 225, age: 23, jersey: 10 },
+  { espnId: "4431452", name: "Drake Maye", team: "NE", depth: 1, heightIn: 76, weightLb: 225, age: 24, jersey: 10 },
   { espnId: "15864", name: "Geno Smith", team: "NYJ", depth: 1, heightIn: 74, weightLb: 221, age: 35, jersey: 7 },
   { espnId: "2578570", name: "Jacoby Brissett", team: "ARI", depth: 1, heightIn: 76, weightLb: 235, age: 33, jersey: 7 },
   { espnId: "4040715", name: "Jalen Hurts", team: "PHI", depth: 1, heightIn: 73, weightLb: 223, age: 28, jersey: 1 },
