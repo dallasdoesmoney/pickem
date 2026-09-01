@@ -350,40 +350,67 @@ function SpineLayout({ state, format }: LayoutProps) {
     );
   };
 
+  const budget = (who: number) => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        gap: 10,
+        flexDirection: who === 0 ? "row" : "row-reverse",
+        opacity: toAct(state, format) === who ? 1 : 0.8,
+      }}
+    >
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
+        {state.players[who].name.toUpperCase()}
+      </span>
+      {/* Green, while the price above is a player colour. Green is what
+          you have; a colour is what is being bid right now. */}
+      <Money amount={state.players[who].budget} size={34} />
+    </div>
+  );
+
   return (
-    <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "0 24px" }}>
-      {/* THE LOT: one big logo, with the price sitting ON it.
-          
-          No team name beside it. The mark IS the name - putting
-          "PITTSBURGH STEELERS" next to the Steelers logo says the same
-          thing twice and costs the logo half its size to do it. And with
-          the price overlaid rather than stacked above, the number can be
-          smaller and the whole block is still the loudest thing here. */}
-      <div style={{ position: "relative", width: LOT_SIZE, height: LOT_SIZE, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <Lot state={state} format={format} size={LOT_SIZE} />
-        {showPrice && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Money amount={head.amount ?? 0} size={126} color={head.live ? MONEY : "rgba(255,255,255,0.62)"} />
-          </div>
-        )}
+    <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "0 24px" }}>
+      {/* THE LOT, sitting directly on top of the first position.
+      
+          The budgets moved out to the edges of this same line rather than
+          taking a row of their own between the logo and the spine, which
+          is what was holding the logo away from it.
+
+          There is no "NOAH BIDS" line any more either. The price is in
+          the bidding player's colour, so the line was captioning
+          something already on screen - and the colour says it in a glance
+          rather than a read. Before anyone opens, the $0 carries the
+          colour of whoever is on the clock. */}
+      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+        {budget(0)}
+        <div
+          style={{
+            position: "relative",
+            width: LOT_SIZE,
+            height: LOT_SIZE,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Lot state={state} format={format} size={LOT_SIZE} />
+          {showPrice && (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Money amount={head.amount ?? 0} size={104} color={head.color} />
+            </div>
+          )}
+        </div>
+        {budget(1)}
       </div>
 
-      <div style={{ fontFamily: "var(--font-display)", fontSize: 28, letterSpacing: 4, color: head.color, marginTop: -4, ...outlined(28) }}>
-        {head.text}
-      </div>
-
-      {/* Who is spending what. Straddles the spine, so each budget sits
-          over the column its picks land in. */}
-      <div style={{ width: "100%", display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 10 }}>
-        {[0, 1].map((who) => (
-          <div key={who} style={{ display: "flex", alignItems: "baseline", gap: 10, flexDirection: who === 0 ? "row" : "row-reverse", opacity: toAct(state, format) === who ? 1 : 0.8 }}>
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
-              {state.players[who].name.toUpperCase()}
-            </span>
-            <Money amount={state.players[who].budget} size={34} />
-          </div>
-        ))}
-      </div>
+      {/* The one thing the colour cannot say on its own. */}
+      {state.phase === "done" && (
+        <div style={{ fontFamily: "var(--font-display)", fontSize: 40, letterSpacing: 4, color: "#ffffff", ...outlined(40) }}>
+          DRAFT COMPLETE
+        </div>
+      )}
 
       {/* THE SPINE. One line per position, both picks on it. */}
       <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 3 }}>
