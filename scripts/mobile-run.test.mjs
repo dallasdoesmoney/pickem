@@ -104,7 +104,7 @@ const freshContext = async (viewport = PHONE) => {
 const ctx = await freshContext();
 
 const page = await ctx.newPage();
-await page.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+await page.goto(`${APP}/nfl-nameplate`, { waitUntil: "domcontentloaded" });
 // THE GUESS FIELD, not just any input in main. There is a second one
 // now - a one-pixel keep-alive that PLAY AGAIN focuses to hold the tap
 // gesture open while the real field mounts. It sits earlier in the DOM,
@@ -435,7 +435,7 @@ await big.addInitScript(() => {
     requestAnimationFrame(tick);
   });
 });
-await big.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+await big.goto(`${APP}/nfl-nameplate`, { waitUntil: "domcontentloaded" });
 await big.waitForSelector("main input:not([data-keyboard-keepalive])", { timeout: 20000 });
 await big.waitForTimeout(900);
 await big.locator("main input:not([data-keyboard-keepalive])").first().click();

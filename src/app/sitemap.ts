@@ -28,7 +28,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // is the thing worth finding, so it sits above the rest.
   const fixed: MetadataRoute.Sitemap = [
     { url: SITE, lastModified: now, changeFrequency: "daily", priority: 1 },
-    { url: `${SITE}/daily`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
+    // /nfl-nameplate, not /daily. /daily is a permanent redirect now and
+    // a redirect has no business in a sitemap - it costs a crawl to
+    // learn something the redirect would have told the crawler anyway,
+    // and listing a URL that is not the canonical one is the single
+    // easiest way to keep two addresses alive for one page.
+    { url: `${SITE}/nfl-nameplate`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE}/tier-lists`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
     { url: `${SITE}/weekly`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE}/predictor`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },

@@ -19,7 +19,11 @@ import { DailyPuzzle } from "@/components/DailyPuzzle";
 // Re-measure this whenever a column is added or removed: the chips are
 // 1fr tracks, so the right page width is a function of how many of them
 // there are.
-export default function DailyPage() {
+// `below` is the page's prose, passed in from the route rather than
+// imported here: this file is "use client", and the whole value of that
+// section is that it renders on the server. Handed in as a child it
+// stays a server component and arrives in the first HTML response.
+export function NameplateGame({ below }: { below?: React.ReactNode }) {
   const { loading } = useAuth();
 
   // Built here and handed to the game, because where it belongs depends
@@ -78,13 +82,26 @@ export default function DailyPage() {
               already says what kind of thing this is, and the card on the
               home page is captioned DAILY GAME too, so it was the third
               time in two screens. */}
+          {/* "NFL NAMEPLATE", not "NAMEPLATE". The share text has said
+              the full name for a while on the reasoning that the name
+              alone tells a stranger nothing - and a search engine is the
+              biggest stranger there is. This is the one heading on the
+              page, so it is the line that decides what the page is
+              ABOUT, and half the phrase people type was missing from it.
+
+              INLINE rather than stacked: a second line would cost most
+              of a guess row, and this header has already been cut twice.
+              The small NFL sits on the same baseline, so the lockup is
+              exactly as tall as the word was on its own - the big word
+              just comes down a size to pay for the width. */}
           <h1
-            className="text-[clamp(1.75rem,7vw,3.1rem)] leading-none tracking-wide"
+            className="whitespace-nowrap leading-none tracking-wide"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            NAMEPLATE
+            <span className="text-[clamp(0.95rem,3.1vw,1.55rem)] text-white/70">NFL </span>
+            <span className="text-[clamp(1.5rem,5.6vw,2.8rem)]">NAMEPLATE</span>
           </h1>
-          <p className="mt-1 truncate text-xs leading-tight text-white/45 sm:text-[15px]">NFL Guessing Game</p>
+          <p className="mt-1 truncate text-xs leading-tight text-white/45 sm:text-[15px]">The daily NFL player guessing game</p>
         </div>
       </div>
     </>
@@ -107,6 +124,7 @@ export default function DailyPage() {
         // most expensive thing on this page.
         <DailyPuzzle header={header} />
       )}
+      {below}
     </main>
   );
 }

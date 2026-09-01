@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   // under on the home page: Nameplate is one of the daily games, not the
   // category, and the page's own title is where it says which one. A
   // second game lands here without the nav needing to be renamed.
-  { href: "/daily", label: "Daily Games", icon: NameplateIcon, matchPrefix: "/daily" },
+  { href: "/nfl-nameplate", label: "Daily Games", icon: NameplateIcon, matchPrefix: "/nfl-nameplate" },
   { href: "/weekly", label: "Pick’em", icon: PicksIcon, matchPrefix: "/weekly" },
   { href: "/predictor", label: "Record Predictor", icon: TeamIcon, matchPrefix: "/predictor" },
   { href: "/tier-lists", label: "Tier Lists", icon: TierListIcon, matchPrefix: "/tier-lists" },

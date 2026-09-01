@@ -44,7 +44,18 @@ const SITE = "https://sidelinebrew.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
-  title: "Sideline Brew",
+  // A template rather than a bare string, so a page that sets its own
+  // title gets the brand appended without every route remembering to.
+  // `default` is what the home page and anything untitled falls back to.
+  //
+  // The page's own name comes FIRST and the brand second, because a
+  // title is truncated from the right and a phone shows about the first
+  // sixty characters: leading with "Sideline Brew" spends the visible
+  // half of every result on the one word the searcher already has.
+  title: {
+    default: "Sideline Brew - NFL Pick'em, Tier Lists and the NFL Nameplate Daily Game",
+    template: "%s | Sideline Brew",
+  },
   description: "Picks, tier lists and a daily game. Pick the winner of every NFL game, every week.",
   openGraph: {
     type: "website",
@@ -62,6 +73,42 @@ export const metadata: Metadata = {
   },
 };
 
+// WHO THIS SITE IS, said once, on every page.
+//
+// The site had no structured data at all, which means every search
+// engine has been inferring "Sideline Brew" is a brand from the words on
+// the page and nothing else. This is the machine-readable version:
+// Organization for the name and the logo, WebSite so the name attaches
+// to the domain, and `hasPart` so the daily game is a named entity in
+// its own right rather than one of forty URLs. The game's own page says
+// far more about itself; this is what makes it findable from the root.
+const siteJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE}#org`,
+      name: "Sideline Brew",
+      url: SITE,
+      logo: `${SITE}/press-logo.png`,
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE}#website`,
+      name: "Sideline Brew",
+      url: SITE,
+      inLanguage: "en-US",
+      publisher: { "@id": `${SITE}#org` },
+      hasPart: {
+        "@type": "Game",
+        "@id": `${SITE}/nfl-nameplate#game`,
+        name: "NFL Nameplate",
+        url: `${SITE}/nfl-nameplate`,
+      },
+    },
+  ],
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -69,6 +116,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${bungee.variable} ${fredoka.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
         <svg aria-hidden="true" className="fixed inset-0 -z-10 h-full w-full opacity-20">
           {/*
             Brick-style stagger: each pattern tile holds two logos, one at

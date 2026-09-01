@@ -11,7 +11,9 @@ import type { Metadata } from "next";
 // Take this out when the game ships and gets a nav entry, along with the
 // sitemap line that will replace it.
 export const metadata: Metadata = {
-  title: "Versus - Sideline Brew",
+  // Bare, because the root layout appends "| Sideline Brew" now. Left as
+  // it was this would read "Versus - Sideline Brew | Sideline Brew".
+  title: "Versus",
   robots: { index: false, follow: false },
 };
 

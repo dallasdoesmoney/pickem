@@ -324,18 +324,22 @@ function DailyHero({ state }: { state: PuzzleState | null }) {
   // Every branch now names the game, because the card above it no longer
   // does: "DAILY GAMES" is the category, and this is the line that says
   // which one is behind it today.
+  // "NFL NAMEPLATE" rather than "NAMEPLATE". The caption above stays
+  // DAILY GAMES - the category outlives the one game in it - so this is
+  // the only line in the biggest link on the home page that names the
+  // game, and the words people search are the full two.
   const meta = !state
-    ? "NAMEPLATE \u00b7 TODAY \u00b7 8 GUESSES"
+    ? "NFL NAMEPLATE \u00b7 TODAY \u00b7 8 GUESSES"
     : state.solved
-      ? `NAMEPLATE \u00b7 SOLVED IN ${state.guessesUsed}`
+      ? `NFL NAMEPLATE \u00b7 SOLVED IN ${state.guessesUsed}`
       : state.finished
-        ? "NAMEPLATE \u00b7 OUT OF GUESSES TODAY"
+        ? "NFL NAMEPLATE \u00b7 OUT OF GUESSES TODAY"
         : state.guessesUsed > 0
-          ? `NAMEPLATE \u00b7 ${state.guessesUsed} OF ${state.maxGuesses} USED`
-          : `NAMEPLATE \u00b7 TODAY \u00b7 ${state.maxGuesses} GUESSES`;
+          ? `NFL NAMEPLATE \u00b7 ${state.guessesUsed} OF ${state.maxGuesses} USED`
+          : `NFL NAMEPLATE \u00b7 TODAY \u00b7 ${state.maxGuesses} GUESSES`;
 
   return (
-    <Link href="/daily" className={CARD}>
+    <Link href="/nfl-nameplate" className={CARD}>
       {/* Full width. It used to be capped at 580 and centred, because the
           art was six featureless bars and letting them fill a 992px card
           made each one seven times wider than it was tall - a stack of

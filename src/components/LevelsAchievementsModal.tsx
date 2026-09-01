@@ -283,7 +283,7 @@ export function LevelsAchievementsModal({
                                 the last &mdash; 300 down to 125.
                               </p>
                               <Link
-                                href="/daily"
+                                href="/nfl-nameplate"
                                 onClick={onClose}
                                 className="rounded-full px-4 py-2 text-xs text-center active:scale-95 transition-transform duration-150"
                                 style={{

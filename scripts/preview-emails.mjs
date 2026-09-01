@@ -83,7 +83,7 @@ for (const file of readdirSync(campaignDir).filter((f) => f.endsWith(".mjs"))) {
   const slug = file.replace(/\.mjs$/, "");
   const c = await import(`./campaigns/${file}`);
   const view = {
-    playUrl: `https://sidelinebrew.com/daily?from=announcement&utm_source=email&utm_medium=announcement&utm_campaign=${slug}`,
+    playUrl: `https://sidelinebrew.com/nfl-nameplate?from=announcement&utm_source=email&utm_medium=announcement&utm_campaign=${slug}`,
     unsubUrl: UNSUB,
     addr: process.env.EMAIL_POSTAL_ADDRESS,
     logo: LOGO_DATA,

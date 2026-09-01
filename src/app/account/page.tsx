@@ -181,7 +181,7 @@ function SignedInAccount({
               <div className="text-sm" style={{ fontFamily: "var(--font-display)" }}>
                 NAMEPLATE
               </div>
-              <Link href="/daily" className="text-[11px] text-white/50 transition-colors hover:text-white/80">
+              <Link href="/nfl-nameplate" className="text-[11px] text-white/50 transition-colors hover:text-white/80">
                 {nameplate.solvedToday ? "Today\u2019s board \u2192" : "Play today\u2019s \u2192"}
               </Link>
             </div>

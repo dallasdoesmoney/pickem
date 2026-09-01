@@ -103,7 +103,7 @@ for (const shape of [
       true,
     );
   });
-  await page.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${APP}/nfl-nameplate`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("main input:not([data-keyboard-keepalive])", { timeout: 20000 });
   await page.waitForTimeout(900);
 

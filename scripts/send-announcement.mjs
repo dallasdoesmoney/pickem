@@ -269,7 +269,7 @@ async function main() {
     // /unsubscribe page already handles an unknown token gracefully - it
     // says the link did not match anything, which is true.
     const view = {
-      playUrl: `${SITE}/daily?from=announcement&utm_source=email&utm_medium=announcement&utm_campaign=${CAMPAIGN}`,
+      playUrl: `${SITE}/nfl-nameplate?from=announcement&utm_source=email&utm_medium=announcement&utm_campaign=${CAMPAIGN}`,
       unsubUrl: `${SITE}/unsubscribe?t=00000000-0000-0000-0000-000000000000`,
       addr: EMAIL_POSTAL_ADDRESS,
       logo: `${SITE}/email-logo.png`,
@@ -300,7 +300,7 @@ async function main() {
     // compare a launch blast against a deadline nudge rather than
     // lumping both under "email".
     const playUrl =
-      `${SITE}/daily?from=announcement` +
+      `${SITE}/nfl-nameplate?from=announcement` +
       `&utm_source=email&utm_medium=announcement&utm_campaign=${CAMPAIGN}`;
     const view = { playUrl, unsubUrl, addr: EMAIL_POSTAL_ADDRESS, logo: `${SITE}/email-logo.png` };
 

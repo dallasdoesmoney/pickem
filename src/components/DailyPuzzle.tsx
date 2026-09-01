@@ -915,10 +915,10 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   async function share() {
     if (!state) return;
     // Absolute, and carrying the sharer's referral code when there is one
-    // to carry - buildReferralLinkTo returns origin + /daily, plus
+    // to carry - buildReferralLinkTo returns origin + the game path, plus
     // ?ref=username for anybody signed in. A signed-out player shares the
     // same link without the code, because there is no account to credit.
-    const dailyLink = buildReferralLinkTo("/daily", profile?.username);
+    const dailyLink = buildReferralLinkTo("/nfl-nameplate", profile?.username);
     // ONE STRING, with the link as its last line.
     //
     // This used to hand the sheet `url` as its own field, on the reasoning

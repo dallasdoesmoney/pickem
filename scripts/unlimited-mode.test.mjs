@@ -106,7 +106,7 @@ await ctx.route(`${SB}/**`, async (route) => {
 });
 
 const page = await ctx.newPage();
-await page.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+await page.goto(`${APP}/nfl-nameplate`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector('input[placeholder]', { timeout: 20000 });
 await page.waitForTimeout(1200);
 
@@ -307,7 +307,7 @@ if (finished) {
     return j([]);
   });
   const gp = await guest.newPage();
-  await gp.goto(`${APP}/daily`, { waitUntil: "domcontentloaded" });
+  await gp.goto(`${APP}/nfl-nameplate`, { waitUntil: "domcontentloaded" });
   // THE GUESS FIELD, not just any input in main. There is a second one
   // now - a one-pixel keep-alive that PLAY AGAIN focuses to hold the tap
   // gesture open while the real field mounts. It sits earlier in the DOM,
