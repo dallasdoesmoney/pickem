@@ -95,7 +95,7 @@ assert.deepEqual(await depthChartAt(2026, "T", WR.slots, 2), [
 // 3a. A SPECIAL TEAMS SLOT MUST NOT REACH THE WR ORDER.
 //
 //     This one has already gone wrong once, off the field rather than
-//     out of this function: the WR Duo on the overlay was ordered from
+//     out of this function: the receiver pair on the overlay was ordered from
 //     all.ts's `depthRank`, which is the best rank a player holds
 //     ANYWHERE on the chart - returner rows included. A team's punt
 //     returner is rank 1 at punt returner, so he tied with the actual

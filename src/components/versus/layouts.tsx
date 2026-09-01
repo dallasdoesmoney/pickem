@@ -58,9 +58,9 @@ function Badge({ url, size }: { url?: string; size: number }) {
   );
 }
 
-// A WR Duo is two surnames - "EVANS + SAMUEL SR." - where every other
+// The receiver slot holds TWO surnames - "EVANS + SAMUEL SR." - where every other
 // slot is one. Sized for the common case it overflowed; sized for the
-// duo, every single-name pick was needlessly small. So it shrinks only
+// pair, every single-name pick was needlessly small. So it shrinks only
 // as far as the long one needs, and only when it is long.
 function fitSize(text: string, base: number, comfortable: number): number {
   if (text.length <= comfortable) return base;

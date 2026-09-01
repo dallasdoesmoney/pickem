@@ -118,11 +118,15 @@ const NFL_TEAMS: AuctionFormat = {
   tagline: "Bid on a team, then decide what you took it for",
   budget: 20,
   slots: [
+    // The keys never change - they are in saved state - but the labels
+    // are just what goes on the graphic. Short ones, because the spine
+    // draws them at 42px between two rosters and every character is
+    // width the picks do not get.
     { key: "qb", label: "QB" },
     { key: "rb", label: "RB" },
-    { key: "rec", label: "WR Duo" },
+    { key: "rec", label: "WR" },
     { key: "te", label: "TE" },
-    { key: "def", label: "Defense" },
+    { key: "def", label: "Def" },
   ],
   items: TEAMS_SORTED.map((t) => teamItem(t.abbr)).filter((i): i is AuctionItem => i !== null),
 };

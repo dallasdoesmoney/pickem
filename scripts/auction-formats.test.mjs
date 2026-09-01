@@ -137,7 +137,7 @@ for (const format of formats) {
       if (duo.some((n) => !mine.includes(n))) strays.push(`${item.id}: ${item.fills.rec}`);
       if (duo.length && duo.length !== Math.min(2, mine.length)) strays.push(`${item.id}: ${duo.length} names`);
     }
-    ok("every WR Duo comes from that team's receivers", strays.length === 0, strays.slice(0, 3).join(" | "));
+    ok("every receiver pair comes from that team's receivers", strays.length === 0, strays.slice(0, 3).join(" | "));
 
     const duo = (id) => teams.items.find((i) => i.id === id)?.fills.rec ?? "no item";
     ok("Washington is McLaurin and Diggs", duo("WAS") === "Terry McLaurin + Stefon Diggs", duo("WAS"));
@@ -149,7 +149,11 @@ for (const format of formats) {
     // overlay silently falls back to the full name and overflows.
     const missingShort = teams.items.filter((i) => Object.keys(i.fills).some((k) => !i.fillsShort?.[k]));
     ok("every fill has a short form too", missingShort.length === 0, missingShort.slice(0, 3).map((i) => i.id).join(", "));
-    ok("the slot is called WR Duo", teams.slots.some((s) => s.key === "rec" && s.label === "WR Duo"), "");
+    // The keys are in saved state and must not move; the labels are only
+    // what goes on the graphic.
+    ok("the receiver slot is labelled WR", teams.slots.some((s) => s.key === "rec" && s.label === "WR"), "");
+    ok("and the defense slot Def", teams.slots.some((s) => s.key === "def" && s.label === "Def"), "");
+    ok("the keys are untouched", teams.slots.map((s) => s.key).join(",") === "qb,rb,rec,te,def", teams.slots.map((s) => s.key).join(","));
   }
 }
 
