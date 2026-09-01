@@ -1,6 +1,4 @@
 import { TEAMS, TEAMS_SORTED } from "@/data/teams";
-import type { TeamAbbr } from "@/data/teams";
-import { WR_ORDER } from "@/data/rosters/wrOrder";
 import { QUARTERBACKS } from "@/data/rosters/qbs";
 import { RUNNING_BACKS } from "@/data/rosters/rbs";
 import { WIDE_RECEIVERS } from "@/data/rosters/wrs";
@@ -34,33 +32,16 @@ import type { AuctionFormat, AuctionItem } from "./format";
 // queue, which keeps an unsynced or partial file merely wrong-ish
 // instead of confidently wrong.
 //
-// The `depth` currently in the files was REBUILT from a field that turned
-// out to mean something else, and is unreliable for nine teams - see
-// src/data/rosters/wrOrder.ts, which overrules it by hand until the next
-// sync writes the real thing.
+// `depth` is written by the sync straight off ESPN's chart, in the order
+// the chart lists them. It was briefly rebuilt from all.ts's depthRank
+// instead, which is the best rank a player holds ANYWHERE on the chart -
+// returners included - so a punt returner tied with a real WR1 and an
+// alphabetical tiebreak decided between them. Nine teams were wrong.
+// scripts/sync-players.test.mjs has a case for it now.
 type Roster = { team: string; name: string; depth?: number };
 
 function byDepth<T extends Roster>(rows: T[], abbr: string): T[] {
-  const mine = rows.filter((r) => r.team === abbr);
-  const named = WR_ORDER[abbr as TeamAbbr];
-  // IT RETIRES ITSELF. A hand-written order is a patch over a chart that
-  // was wrong, and the moment the chart moves on it is a patch over
-  // nothing - so it only applies while every player it names is still
-  // one of that team's receivers. When the sync drops one of them, this
-  // stops applying and the real depth takes over, with no window in
-  // between where either source is the wrong one.
-  const current = new Set(mine.map((r) => r.name));
-  if (named && named.every((n) => current.has(n))) {
-    // Anyone it does not mention keeps their place behind the ones it
-    // does, so a partial list is still an improvement rather than a way
-    // to lose a player.
-    const rank = (r: T) => {
-      const at = named.indexOf(r.name);
-      return at === -1 ? named.length + (r.depth ?? 99) : at;
-    };
-    return mine.slice().sort((a, b) => rank(a) - rank(b));
-  }
-  return mine.sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99));
+  return rows.filter((r) => r.team === abbr).sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99));
 }
 
 function firstFor<T extends Roster>(rows: T[], abbr: string): T | undefined {
