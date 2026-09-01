@@ -1221,3 +1221,36 @@ body {
   }
 }
 
+
+/* LOCK OF THE WEEK, asking to be pressed.
+   A slow breath rather than a bounce: the badge sits on a card people
+   are already clicking, and a hard motion next to a tap target reads as
+   an error state. It only ever runs on a pick with no lock set - the
+   moment one is chosen every one of these stops. */
+@keyframes lock-beckon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.lock-badge-beckon {
+  animation: lock-beckon 2.2s ease-in-out infinite;
+}
+
+/* The same breath for a control that is not the badge - the KPI pill and
+   the prompt bar - where scaling the whole thing would shove its
+   neighbours around, so only the glow moves. */
+@keyframes lock-halo {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
+  70% { box-shadow: 0 0 0 12px rgba(245, 158, 11, 0); }
+}
+
+.lock-halo {
+  animation: lock-halo 2.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lock-badge-beckon,
+  .lock-halo {
+    animation: none;
+  }
+}

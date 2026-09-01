@@ -35,26 +35,41 @@ function TagBadge({ side, tag, scale = 1 }: { side: "left" | "right"; tag: PickT
 }
 
 // Bottom corner (TagBadge already owns the top corner) so an underdog/
-// boldest-pick sticker and a lock can both show on the same pick. Ghost
-// (dim + grayscale) on any pick that isn't locked yet - same spot every
-// time, so it's a discoverable, always-visible tap target rather than
-// something that only appears once you've already used it. Filled in
-// with a green glow once it is the lock.
+// boldest-pick sticker and a lock can both show on the same pick. Filled
+// in with a glow once it IS the lock.
+//
+// How hard the badge argues for itself before a lock has been set.
+//
+//   "ghost"  grey and half transparent - what shipped, and the reason
+//            almost nobody sets a lock: at 45% on a coloured pill it
+//            reads as a decoration on the sticker above it.
+//   "loud"   full colour, bigger, gently breathing, with a LOCK? tag.
+//   "hidden" not drawn at all - for the variants that move the choice
+//            off the board entirely.
+//
+// Once a lock IS set the badge looks the same in every mode: this only
+// governs the invitation, not the result.
+export type LockPrompt = "ghost" | "loud" | "hidden";
+
 function LockBadge({
   side,
   isLocked,
   onToggle,
   disabled,
   scale = 1,
+  prompt = "ghost",
 }: {
   side: "left" | "right";
   isLocked: boolean;
   onToggle: () => void;
   disabled?: boolean;
   scale?: number;
+  prompt?: LockPrompt;
 }) {
+  if (!isLocked && prompt === "hidden") return null;
+  const loud = !isLocked && prompt === "loud";
   const offset = 10 * scale;
-  const size = 40 * scale;
+  const size = (loud ? 52 : 40) * scale;
   const positionStyle = { [side === "left" ? "left" : "right"]: `-${offset}px` } as const;
   return (
     <button
@@ -69,14 +84,34 @@ function LockBadge({
       <img
         src="/lock-of-week.png"
         alt=""
-        className="h-full w-full object-contain"
+        className={`h-full w-full object-contain ${loud ? "lock-badge-beckon" : ""}`}
         style={{
           filter: isLocked
             ? "drop-shadow(0 0 7px rgba(245,158,11,0.9)) drop-shadow(0 2px 3px rgba(0,0,0,0.6))"
-            : "grayscale(1) drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
-          opacity: isLocked ? 1 : 0.45,
+            : loud
+              ? "drop-shadow(0 0 6px rgba(245,158,11,0.55)) drop-shadow(0 2px 3px rgba(0,0,0,0.6))"
+              : "grayscale(1) drop-shadow(0 2px 3px rgba(0,0,0,0.6))",
+          opacity: isLocked || loud ? 1 : 0.45,
         }}
       />
+      {loud && (
+        // Counter-rotated, so the word is level while the padlock keeps
+        // its tilt - a tilted three-letter label reads as a mistake.
+        <span
+          className="pointer-events-none absolute left-1/2 top-full whitespace-nowrap rounded-full px-1.5 py-px"
+          style={{
+            transform: `translateX(-50%) rotate(${side === "left" ? "18deg" : "-18deg"})`,
+            fontFamily: "var(--font-display)",
+            fontSize: 9 * scale,
+            letterSpacing: "0.08em",
+            color: "#0e1b33",
+            background: "#f59e0b",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.5)",
+          }}
+        >
+          LOCK?
+        </span>
+      )}
     </button>
   );
 }
@@ -91,6 +126,7 @@ export function GameCard({
   isLockPick,
   hasLock,
   onToggleLock,
+  lockPrompt,
   scale = 1,
   compact = false,
 }: {
@@ -111,6 +147,9 @@ export function GameCard({
   // lock is cleared.
   hasLock?: boolean;
   onToggleLock?: () => void;
+  // How loudly the not-yet-set badge asks to be pressed. Defaults to
+  // what shipped, so every existing caller is untouched.
+  lockPrompt?: LockPrompt;
   // Uniform shrink for the two-column grid, which now runs at every
   // viewport width (not just desktop) - the grid computes this from the
   // actual available column width so two cards always fit side by side,
@@ -181,7 +220,7 @@ export function GameCard({
           picked === away.abbr ? (
             <>
               {tag && <TagBadge side="left" tag={tag} scale={scale} />}
-              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="left" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} scale={scale} />}
+              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="left" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} scale={scale} prompt={lockPrompt} />}
             </>
           ) : undefined
         }
@@ -210,7 +249,7 @@ export function GameCard({
           picked === home.abbr ? (
             <>
               {tag && <TagBadge side="right" tag={tag} scale={scale} />}
-              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="right" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} scale={scale} />}
+              {onToggleLock && (isLockPick || !hasLock) && <LockBadge side="right" isLocked={!!isLockPick} onToggle={onToggleLock} disabled={locked} scale={scale} prompt={lockPrompt} />}
             </>
           ) : undefined
         }
