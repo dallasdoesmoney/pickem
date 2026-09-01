@@ -61,14 +61,50 @@ export function NameplateAbout() {
         every guess hands back six clues instead of five letters.
       </p>
 
-      <dl className="mt-8 flex flex-col gap-6">
+      {/* FOLDED AWAY, and it costs nothing to fold it.
+          Laid out flat this was six paragraphs under a game that takes a
+          minute to play - a wall of text nobody who came here to play
+          wants, sitting where they scroll. Five closed rows read as a
+          contents page instead, and the one question somebody actually
+          has is one tap away.
+
+          <details>, not a toggle in React. The answers are in the HTML
+          whether the row is open or shut - which is the entire reason
+          this section exists - so hiding them costs no indexing, and the
+          thing works with JavaScript off and on a keyboard for free. A
+          state hook would have taken all three away.
+
+          Plain divs rather than a dl, too: a definition list wants dt and
+          dd as siblings, and the answer has to live INSIDE the details or
+          it stays on screen with the row shut. The FAQPage JSON-LD is
+          what tells a machine these are questions and answers; the markup
+          only has to be valid and operable. */}
+      <div className="mt-7 flex flex-col">
         {FAQ.map(({ q, a }) => (
-          <div key={q}>
-            <dt className="text-[15px] font-semibold leading-snug text-white/85">{q}</dt>
-            <dd className="mt-1.5 text-sm leading-relaxed">{a}</dd>
-          </div>
+          <details key={q} className="group border-t border-white/10 last:border-b">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-3.5 text-[15px] font-semibold leading-snug text-white/80 transition-colors marker:content-none hover:text-white [&::-webkit-details-marker]:hidden">
+              {q}
+              {/* Points right when shut, down when open. 200ms, and
+                  nothing else moves - the rows below are already
+                  shifting, and two things easing at once on a five-row
+                  stack reads as jelly. */}
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                className="h-4 w-4 shrink-0 text-white/40 transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m9 5 7 7-7 7" />
+              </svg>
+            </summary>
+            <p className="pb-4 pr-7 text-sm leading-relaxed">{a}</p>
+          </details>
         ))}
-      </dl>
+      </div>
 
       {/* Links out, because a page with nothing leaving it is a dead end
           to a crawler as well as to a person - and these are the three
