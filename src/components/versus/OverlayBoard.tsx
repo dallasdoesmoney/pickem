@@ -2,7 +2,7 @@
 
 import type { AuctionFormat } from "@/lib/auction/format";
 import { AuctionState } from "@/lib/auction/engine";
-import { PLAYER_COLORS, outlined } from "./style";
+import { PLAYER_COLORS } from "./style";
 import { LAYOUTS, type LayoutKey } from "./layouts";
 
 export { PLAYER_COLORS };
@@ -24,8 +24,8 @@ export { PLAYER_COLORS };
 // graphic: a layout that rearranges itself mid-stream is worse than one
 // that is the wrong size once, at setup.
 //
-// This file is now only the frame - the title, and the band the graphic
-// lives in between the two cameras. The arrangement inside that band is
+// This file is now only the frame - the band the graphic lives in
+// between the two cameras. The arrangement inside that band is
 // one of the five in layouts.tsx.
 
 export const STAGE_W = 1080;
@@ -74,19 +74,6 @@ export function OverlayBoard({
           gap: 16,
         }}
       >
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 34,
-            lineHeight: 1,
-            color: "rgba(255,255,255,0.85)",
-            letterSpacing: 4,
-            ...outlined(34),
-          }}
-        >
-          {format.title.toUpperCase()}
-        </div>
-
         <Layout state={state} format={format} />
       </div>
     </div>

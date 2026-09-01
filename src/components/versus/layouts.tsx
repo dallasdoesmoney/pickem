@@ -223,7 +223,6 @@ function makeSplit(opts: Split) {
           display: "flex",
           flexDirection: "column",
           gap: opts.tabs ? 0 : 6,
-          opacity: toAct(state, format) === who ? 1 : 0.78,
         }}
       >
         <div
@@ -357,16 +356,26 @@ function SpineLayout({ state, format }: LayoutProps) {
     );
   };
 
+  // EQUAL WIDTH, both sides. With the two blocks sized to their own text
+  // ("NOAH $9" against "$14 BEN") space-between put the logo wherever the
+  // difference left it, which is to say never quite over the positions.
+  // Equal flex basis and the logo is centred whatever the names are.
+  //
+  // Nothing is dimmed. Who holds what has to be readable at every moment,
+  // not just on your turn - the rosters are the thing viewers are
+  // comparing, and fading one of them hides the comparison.
   const budget = (who: number) => (
     <div
       data-budget={who}
       data-amount={state.players[who].budget}
       style={{
+        flex: "1 1 0",
+        minWidth: 0,
         display: "flex",
         alignItems: "baseline",
+        justifyContent: who === 0 ? "flex-start" : "flex-end",
         gap: 10,
         flexDirection: who === 0 ? "row" : "row-reverse",
-        opacity: toAct(state, format) === who ? 1 : 0.8,
       }}
     >
       <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
@@ -391,7 +400,7 @@ function SpineLayout({ state, format }: LayoutProps) {
           something already on screen - and the colour says it in a glance
           rather than a read. Before anyone opens, the $0 carries the
           colour of whoever is on the clock. */}
-      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", gap: 12 }}>
         {budget(0)}
         <div
           style={{

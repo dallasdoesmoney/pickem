@@ -3,7 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AUCTION_FORMATS } from "@/lib/auction/formats";
-import { startAuction, openLot, reduce, AuctionState } from "@/lib/auction/engine";
+import { startAuction, openLot, reduce, toAct, AuctionState } from "@/lib/auction/engine";
 import type { AuctionFormat } from "@/lib/auction/format";
 import { isRoomCode } from "@/lib/auction/room";
 import { useRoomState } from "@/components/versus/useRoom";
@@ -38,7 +38,9 @@ function demoState(format: AuctionFormat, names: string[], seed: string, lots: n
   for (let i = 0; i < lots && state.phase !== "done"; i++) {
     const who = state.opener;
     state = openLot(state, format);
-    state = reduce(state, { type: "bid", by: who, amount: (i * 3) % 7 }, format);
+    // At least a dollar: the floor belongs to whoever is on the clock,
+    // so $0 is not a legal opening bid any more.
+    state = reduce(state, { type: "bid", by: who, amount: 1 + ((i * 3) % 6) }, format);
     if (state.phase === "bidding") state = reduce(state, { type: "pass", by: (who + 1) % 2 }, format);
     if (state.phase === "assigning") {
       const open = format.slots.filter((s) => state.players[state.won!.by].roster[s.key] === null);
@@ -55,7 +57,7 @@ function demoState(format: AuctionFormat, names: string[], seed: string, lots: n
   if (phase === "spinning") return state;
   state = reduce(state, { type: "reveal" }, format);
   // Stop one action short so the "X BIDS $n" line has something in it.
-  if (state.phase === "bidding") state = reduce(state, { type: "bid", by: state.opener, amount: 4 }, format);
+  if (state.phase === "bidding") state = reduce(state, { type: "bid", by: toAct(state, format) ?? state.opener, amount: 4 }, format);
   return state;
 }
 

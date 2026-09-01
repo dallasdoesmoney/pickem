@@ -64,27 +64,50 @@ const play = (state, ...actions) =>
   ok("the format itself is legal", formatProblems(FORMAT, 2).length === 0, "");
 }
 
-// --- rule 2: a bid can be zero ---------------------------------------
+// --- rule 2: the floor is zero, and somebody is on the hook for it ---
+//
+// Bidding opens at $0 and that $0 already belongs to whoever is on the
+// clock. So they bid a DOLLAR or they pass; passing hands the free one
+// across; if both pass it comes back to the first of them, wanted or not.
 {
   const s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
-  ok("an opening bid may be zero", bidRange(s, FORMAT, 0).min === 0, "");
-  const afterZero = play(s, { type: "bid", by: 0, amount: 0 });
-  ok("zero opens the auction rather than ending it", afterZero.phase === "bidding", "P2 still gets to answer");
-  ok("and P2 has to beat it, not match it", bidRange(afterZero, FORMAT, 1).min === 1, "");
-  const free = play(afterZero, { type: "pass", by: 1 });
-  ok("passing on a zero bid gives it away free", free.phase === "assigning" && free.won.price === 0, "");
-  const done = play(free, { type: "assign", slotKey: "a" });
-  ok("and the winner still has every dollar", done.players[0].budget === 20, "");
-  ok("but one fewer slot", openSlots(done.players[0]).length === 1, "");
+  ok("the cheapest opening move is a dollar", bidRange(s, FORMAT, 0).min === 1, "$0 is already theirs");
+  ok("and bidding zero is refused", play(s, { type: "bid", by: 0, amount: 0 }) === s, "that would be bidding against yourself");
+  ok("the other player cannot act first", play(s, { type: "bid", by: 1, amount: 5 }) === s, "");
+
+  // P1 passes: the free one crosses the table.
+  const offered = play(s, { type: "pass", by: 0 });
+  ok("a pass at the floor does not end the lot", offered.phase === "bidding", "it offers it to the other player");
+  ok("and it is now the other player's turn", toAct(offered, FORMAT) === 1, "");
+  ok("who may take it for nothing", bidRange(offered, FORMAT, 1).min === 0, "");
+  ok("and P1 does not get another turn", bidRange(offered, FORMAT, 0) === null, "a pass is final for the lot");
+
+  const taken = play(offered, { type: "bid", by: 1, amount: 0 });
+  ok("taking it at zero wins it outright", taken.phase === "assigning" && taken.won.by === 1 && taken.won.price === 0, "");
+  const free = play(taken, { type: "assign", slotKey: "a" });
+  ok("and costs nothing", free.players[1].budget === 20, "");
+  ok("but fills a slot", openSlots(free.players[1]).length === 1, "");
 }
 
-// --- the opener must bid ---------------------------------------------
+// --- both pass, and the first one on the clock is stuck with it -------
 {
   const s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
-  const passed = play(s, { type: "pass", by: 0 });
-  ok("the opener cannot pass without bidding", passed === s, "the action is ignored");
-  const outOfTurn = play(s, { type: "bid", by: 1, amount: 5 });
-  ok("and the other player cannot bid first", outOfTurn === s, "");
+  const stuck = play(s, { type: "pass", by: 0 }, { type: "pass", by: 1 });
+  ok("if nobody wants it, it is not skipped", stuck.phase === "assigning", "rule 1");
+  ok("it goes to whoever was on the clock first", stuck.won.by === 0, "P1 opened, so P1 eats it");
+  ok("at nothing", stuck.won.price === 0, "");
+  const done = play(stuck, { type: "assign", slotKey: "a" });
+  ok("and it really did cost nothing", done.players[0].budget === 20, "");
+}
+
+// --- a dollar, then it is a normal auction ---------------------------
+{
+  const s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
+  const opened = play(s, { type: "bid", by: 0, amount: 1 });
+  ok("a dollar puts it in play", opened.phase === "bidding" && opened.bid.amount === 1, "");
+  ok("and the answer has to beat it", bidRange(opened, FORMAT, 1).min === 2, "");
+  const sold = play(opened, { type: "pass", by: 1 });
+  ok("passing on a real bid ends it", sold.phase === "assigning" && sold.won.by === 0 && sold.won.price === 1, "");
 }
 
 // --- bidding back and forth ------------------------------------------
@@ -107,18 +130,20 @@ const play = (state, ...actions) =>
   s = play(s, { type: "bid", by: 0, amount: 20 }, { type: "pass", by: 1 }, { type: "assign", slotKey: "a" });
   ok("a player can spend everything", s.players[0].budget === 0, "");
 
-  // Item two: the right to open has passed to P2, so a broke P1 cannot
-  // answer a $0 opening - beating it costs a dollar they do not have.
-  const opened = play(s, { type: "bid", by: 1, amount: 0 });
-  ok("a broke player cannot answer even a zero bid", bidRange(opened, FORMAT, 0) === null, "a reply has to beat it, not match it");
+  // Item two: the right to open has passed to P2. A broke P1 cannot
+  // answer a $1 bid - beating it costs a dollar they do not have.
+  const opened = play(s, { type: "bid", by: 1, amount: 1 });
+  ok("a broke player cannot answer a dollar", bidRange(opened, FORMAT, 0) === null, "a reply has to beat it");
   ok("so the auction resolves instead of waiting on them", opened.phase === "assigning", "no dead pass button on stream");
   s = play(opened, { type: "assign", slotKey: "a" });
 
-  // Item three: it is P1's turn to open again, and rule 2 is what keeps
-  // them in the game with nothing left.
-  const range = bidRange(s, FORMAT, 0);
-  ok("but they can still OPEN at zero", range !== null && range.min === 0 && range.max === 0, "rule 2");
-  ok("and cannot open above what they hold", play(s, { type: "bid", by: 0, amount: 1 }) === s, "");
+  // Item three: P1 is on the clock again with nothing. They cannot bid a
+  // dollar, but rule 2 still keeps them in the game - the $0 is theirs
+  // unless the other player takes it off them.
+  ok("a broke opener cannot bid at all", bidRange(s, FORMAT, 0) === null, "a dollar is a dollar");
+  ok("but they are still the one on the clock", toAct(s, FORMAT) === 0, "so passing still means something");
+  const bothPass = play(s, { type: "pass", by: 0 }, { type: "pass", by: 1 });
+  ok("and with nothing left they still get the slot", bothPass.won.by === 0 && bothPass.won.price === 0, "rule 2");
 }
 
 // --- rule 1 + 3: nothing is skipped, and a full roster is out --------
@@ -131,7 +156,7 @@ const play = (state, ...actions) =>
     if (s.phase === "bidding") {
       const who = toAct(s, FORMAT);
       openerFirst.push(who);
-      s = play(s, { type: "bid", by: who, amount: 0 });
+      s = play(s, { type: "bid", by: who, amount: 1 });
       const answering = toAct(s, FORMAT);
       if (answering !== null) s = play(s, { type: "pass", by: answering });
     } else if (s.phase === "ready" || s.phase === "spinning") {
@@ -156,13 +181,17 @@ const play = (state, ...actions) =>
   // Two slots, so two wins fills P1 up.
   let s = begun(startAuction(FORMAT, ["P1", "P2"], "seed"));
   s = play(s, { type: "bid", by: 0, amount: 1 }, { type: "pass", by: 1 }, { type: "assign", slotKey: "a" });
-  s = play(s, { type: "bid", by: 1, amount: 0 }, { type: "pass", by: 0 }, { type: "assign", slotKey: "a" });
+  s = play(s, { type: "bid", by: 1, amount: 1 }, { type: "pass", by: 0 }, { type: "assign", slotKey: "a" });
   s = play(s, { type: "bid", by: 0, amount: 1 }, { type: "pass", by: 1 }, { type: "assign", slotKey: "b" });
   ok("P1 is full", openSlots(s.players[0]).length === 0, "");
   ok("and can no longer bid", !canBid(s, FORMAT, 0), "rule 3");
   ok("so the last item is P2's to open", toAct(s, FORMAT) === 1, "");
-  const last = play(s, { type: "bid", by: 1, amount: 0 });
+  const last = play(s, { type: "bid", by: 1, amount: 1 });
   ok("and resolves the moment they bid", last.phase === "assigning", "nobody left to answer");
+  // The other half of rule 3 at the floor: with only one player eligible,
+  // passing cannot hand it anywhere, so it comes straight back to them.
+  const alone = play(s, { type: "pass", by: 1 });
+  ok("and passing alone still lands it on them", alone.phase === "assigning" && alone.won.by === 1 && alone.won.price === 0, "");
 }
 
 // --- restricted fills -------------------------------------------------
@@ -194,7 +223,7 @@ const play = (state, ...actions) =>
   ok("the player with an open A can bid", canBid(state, RESTRICTED, 1), "");
   ok("the player who filled A cannot bid it up", !canBid(state, RESTRICTED, 0), "no risk-free money-burning");
   ok("so it is theirs to open regardless of whose turn it was", toAct(state, RESTRICTED) === 1, "");
-  const sold = reduce(state, { type: "bid", by: 1, amount: 0 }, RESTRICTED);
+  const sold = reduce(state, { type: "bid", by: 1, amount: 1 }, RESTRICTED);
   ok("and it resolves at once, with nobody able to answer", sold.phase === "assigning", "");
   ok("it can only be assigned to A", slotsItemCanFill(currentItem(sold, RESTRICTED), openSlots(sold.players[1])).join() === "a", "");
   const wrongSlot = reduce(sold, { type: "assign", slotKey: "b" }, RESTRICTED);
@@ -244,7 +273,7 @@ const play = (state, ...actions) =>
   ok("revealing a lot nobody started is ignored", reduce(fresh, { type: "reveal" }, FORMAT) === fresh, "");
 
   // And the next lot goes back to waiting, rather than opening itself.
-  const sold = play(open, { type: "bid", by: open.opener, amount: 0 }, { type: "pass", by: (open.opener + 1) % 2 });
+  const sold = play(open, { type: "bid", by: open.opener, amount: 1 }, { type: "pass", by: (open.opener + 1) % 2 });
   ok("the winner is choosing a slot", sold.phase === "assigning", "");
   const next = reduce(sold, { type: "assign", slotKey: slotsItemCanFill(currentItem(sold, FORMAT), openSlots(sold.players[sold.won.by]))[0] }, FORMAT);
   ok("the next lot waits to be started too", next.phase === "ready", "every lot gets its own spin");

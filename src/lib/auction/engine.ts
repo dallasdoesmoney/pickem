@@ -30,11 +30,19 @@ export function fillLabel(item: AuctionItem, slotKey: string): string {
 //    exception is an item NOBODY can use, which is passed over rather
 //    than allowed to stall the draft; see advance().
 //
-// 2. A BID CAN BE ZERO. Whoever opens has to bid, but they may bid
-//    nothing, and if the other player passes they get it free. This is
-//    what makes the game safe: nobody can ever be priced out of filling
-//    their roster, so there is no need for the "hold back a dollar per
-//    empty slot" rule these games usually need.
+// 2. THE FLOOR IS ZERO, AND SOMEBODY IS ALWAYS ON THE HOOK FOR IT.
+//    Bidding opens at $0. Whoever is on the clock either bids a dollar or
+//    passes - they cannot bid nothing, because nothing is already theirs.
+//    Passing hands that free claim to the other player, who may take it
+//    at $0 or pass it back; if BOTH pass, it returns to whoever was on
+//    the clock first and they take it at $0 whether they want it or not.
+//
+//    A pass is final for that lot - having declined at nothing, you do
+//    not get to come back over the top at a dollar.
+//
+//    This is what makes the game safe: nobody can ever be priced out of
+//    filling their roster, so there is no need for the "hold back a
+//    dollar per empty slot" rule these games usually need.
 //
 // 3. YOU CAN ONLY BID IF YOU HAVE A SLOT FOR IT. Once your roster is
 //    full you are out, and everything left goes to whoever is still
@@ -87,8 +95,14 @@ export type AuctionState = {
   // Who has to open the bidding on the current item. Alternates, so the
   // advantage of opening is shared.
   opener: PlayerIndex;
-  // The standing bid. Null means nobody has opened yet.
+  // The standing bid. Null means nobody has put a dollar on it yet - the
+  // lot is still sitting at the $0 floor.
   bid: Bid | null;
+  // Who has passed on this lot. A pass is final for the lot, so this is
+  // also the list of people who can no longer take it. When everybody
+  // eligible is in here, the item goes at $0 to whoever was on the clock
+  // first - see settle().
+  passed: PlayerIndex[];
   // Set while phase is "assigning": who won, and what they paid.
   won: { by: PlayerIndex; price: number } | null;
   // Every sale, oldest first. What the overlay draws as the ticker.
@@ -169,6 +183,7 @@ export function startAuction(format: AuctionFormat, names: string[], seed: strin
     phase: "bidding",
     opener: 0,
     bid: null,
+    passed: [],
     won: null,
     history: [],
   };
@@ -183,16 +198,16 @@ export function startAuction(format: AuctionFormat, names: string[], seed: strin
 export function advance(state: AuctionState, format: AuctionFormat): AuctionState {
   let s = state;
   for (;;) {
-    if (s.players.every((p) => openSlots(p).length === 0)) return { ...s, phase: "done", bid: null, won: null };
+    if (s.players.every((p) => openSlots(p).length === 0)) return { ...s, phase: "done", bid: null, passed: [], won: null };
     // Ran out of pool with slots still open. formatProblems is what stops
     // this reaching a stream; ending cleanly is what stops it hanging if
     // it ever does.
-    if (s.index >= s.order.length) return { ...s, phase: "done", bid: null, won: null };
+    if (s.index >= s.order.length) return { ...s, phase: "done", bid: null, passed: [], won: null };
     if (s.players.some((_, i) => couldUse(s, format, i))) {
       // Held at "ready" rather than opening straight into bidding: the
       // host starts each lot, so there is a beat to talk over before the
       // reel runs.
-      return { ...s, phase: "ready", bid: null, won: null };
+      return { ...s, phase: "ready", bid: null, passed: [], won: null };
     }
     s = { ...s, index: s.index + 1 };
   }
@@ -238,17 +253,46 @@ export function canBid(state: AuctionState, format: AuctionFormat, who: PlayerIn
 // The opener is exempt, because an opening bid may be zero and everybody
 // can afford that. That is rule 2 doing its job: being broke can cost you
 // a contested item, never a slot.
+// Everybody who could take this item, opener first. The order matters:
+// it decides who is on the clock, and therefore who ends up holding the
+// $0 if nobody wants it.
+function eligibleOrder(state: AuctionState, format: AuctionFormat): PlayerIndex[] {
+  return state.players
+    .map((_, i) => i)
+    .filter((i) => couldUse(state, format, i))
+    .sort((a, b) => (a === state.opener ? -1 : b === state.opener ? 1 : a - b));
+}
+
+// Whose action the game is waiting for. Null in "assigning" (the winner
+// is choosing a slot), during a reel, and at the end.
+//
+// A PASS IS FINAL. Somebody who declined the item at nothing does not get
+// handed the turn again at a dollar, which is what makes "pass, and the
+// other player may have it for free" a real decision rather than a feint.
+//
+// AFFORDABILITY IS PART OF THIS once there is a standing bid. Somebody
+// who has spent everything still has slots to fill, so canBid is true for
+// them - but they cannot beat a standing bid of anything, including zero,
+// because a reply has to BEAT it. Handing them the turn anyway left them
+// a single dead button on a live stream: pass, which was the only legal
+// move. Now the auction just resolves.
+//
+// At the $0 floor there is no such thing as unaffordable, so everybody
+// eligible gets their turn there however broke they are. That is rule 2
+// doing its job: being broke can cost you a contested item, never a slot.
 export function toAct(state: AuctionState, format: AuctionFormat): PlayerIndex | null {
   if (state.phase !== "bidding") return null;
-  const eligible = state.players.map((_, i) => i).filter((i) => canBid(state, format, i));
-  if (eligible.length === 0) return null;
-  // Nobody has opened: the opener acts, unless they cannot, in which case
-  // the only other eligible player does.
-  if (!state.bid) return eligible.includes(state.opener) ? state.opener : eligible[0];
-  // Somebody has bid: everyone else who could actually outbid them gets
-  // the chance to answer.
+  // `?? []` because a state broadcast by an older board has no `passed`
+  // at all. OBS caches a browser source hard, so the two ends can sit a
+  // deploy apart - and an overlay that throws is a black hole on a live
+  // stream. Treating it as "nobody has passed" degrades to the old
+  // behaviour instead of crashing.
+  const passed = state.passed ?? [];
+  const live = eligibleOrder(state, format).filter((i) => !passed.includes(i));
+  if (live.length === 0) return null;
+  if (!state.bid) return live[0];
   const standing = state.bid;
-  const answering = eligible.filter((i) => i !== standing.by && state.players[i].budget >= standing.amount + 1);
+  const answering = live.filter((i) => i !== standing.by && state.players[i].budget >= standing.amount + 1);
   return answering.length > 0 ? answering[0] : null;
 }
 
@@ -262,21 +306,29 @@ export function highestAffordable(state: AuctionState, who: PlayerIndex): number
 export function bidRange(state: AuctionState, format: AuctionFormat, who: PlayerIndex): { min: number; max: number } | null {
   if (!canBid(state, format, who)) return null;
   if (toAct(state, format) !== who) return null;
-  // Rule 2: an opening bid may be zero. A reply has to beat the standing
-  // bid, which is what ends the auction rather than letting it loop.
-  const min = state.bid ? state.bid.amount + 1 : 0;
+  // Rule 2. Sitting at the floor with nobody having passed, the cheapest
+  // thing you can do is a DOLLAR - $0 is already yours if nobody wants
+  // it, so bidding it would be bidding against yourself. Once somebody
+  // has passed, the free one is genuinely on the table and the next
+  // player may take it at $0. A reply to a real bid has to beat it,
+  // which is what ends the auction rather than letting it loop.
+  const min = state.bid ? state.bid.amount + 1 : (state.passed ?? []).length > 0 ? 0 : 1;
   const max = highestAffordable(state, who);
   return min > max ? null : { min, max };
 }
 
 function settle(state: AuctionState, format: AuctionFormat): AuctionState {
-  const winner = state.bid?.by ?? toAct(state, format);
-  // Nobody bid and nobody can - advance() has already guaranteed somebody
-  // could, so this is unreachable in practice. It skips the item rather
-  // than throwing, because the one thing a live draft must never do is
-  // stop with no way forward.
-  if (winner === null || winner === undefined) return advance({ ...state, index: state.index + 1 }, format);
-  return { ...state, phase: "assigning", won: { by: winner, price: state.bid?.amount ?? 0 } };
+  if (state.bid) return { ...state, phase: "assigning", won: { by: state.bid.by, price: state.bid.amount } };
+
+  // Nobody put a dollar on it and everybody passed. It goes at $0 to
+  // whoever was on the clock first, wanted or not - rule 2. They are not
+  // asked, because there is nobody left to ask.
+  const order = eligibleOrder(state, format);
+  // Unreachable in practice: advance() has already guaranteed somebody
+  // could use this item. It steps over rather than throwing, because the
+  // one thing a live draft must never do is stop with no way forward.
+  if (order.length === 0) return advance({ ...state, index: state.index + 1 }, format);
+  return { ...state, phase: "assigning", won: { by: order[0], price: 0 } };
 }
 
 export function reduce(state: AuctionState, action: AuctionAction, format: AuctionFormat): AuctionState {
@@ -305,10 +357,12 @@ export function reduce(state: AuctionState, action: AuctionAction, format: Aucti
 
   if (action.type === "pass") {
     if (toAct(state, format) !== action.by) return state;
-    // Passing before anyone has opened is not a thing: the opener must
-    // bid, even if it is nothing. Rule 2.
-    if (!state.bid) return state;
-    return settle(state, format);
+    // Final for this lot, whether there is a standing bid or not. With a
+    // bid on the table that ends the auction; at the floor it hands the
+    // free one to the other player, and if they pass too it comes back
+    // to whoever was on the clock first at $0.
+    const next: AuctionState = { ...state, passed: [...(state.passed ?? []), action.by] };
+    return toAct(next, format) === null ? settle(next, format) : next;
   }
 
   if (action.type === "assign") {
@@ -344,6 +398,7 @@ export function reduce(state: AuctionState, action: AuctionAction, format: Aucti
         // an item does not also cost you the opening bid on the next one.
         opener: (state.opener + 1) % state.players.length,
         bid: null,
+        passed: [],
         won: null,
       },
       format

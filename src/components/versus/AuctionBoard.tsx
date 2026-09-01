@@ -85,6 +85,12 @@ export function AuctionBoard({
   const item = currentItem(state, format);
   const acting = toAct(state, format);
   const range = acting === null ? null : bidRange(state, format, acting);
+  // Somebody has already declined at the floor, so the item really is
+  // going for nothing and the player on the clock may simply take it.
+  const freeOnTheTable = state.phase === "bidding" && !state.bid && (state.passed ?? []).length > 0;
+  // Who ends up with it if everybody passes - the first player who was on
+  // the clock for this lot.
+  const firstOnTheClock = (state.passed ?? []).length > 0 ? state.passed[0] : (acting ?? state.opener);
 
   // Pre-filled to the smallest legal bid, and held per-turn so typing a
   // number does not survive into somebody else's turn.
@@ -136,58 +142,78 @@ export function AuctionBoard({
           </div>
         )}
 
-        {state.phase === "bidding" && acting !== null && range && (
+        {state.phase === "bidding" && acting !== null && (
           <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between gap-3">
               <span style={{ ...display(20, { color: PLAYER_COLORS[acting], letterSpacing: 1 }), ...outlined(20, "soft") }}>
-                {state.players[acting].name.toUpperCase()} TO {state.bid ? "ANSWER" : "OPEN"}
+                {state.players[acting].name.toUpperCase()} TO {state.bid ? "ANSWER" : freeOnTheTable ? "DECIDE" : "OPEN"}
               </span>
               <span className="text-[12px] text-white/40">
-                {state.bid ? `beat $${state.bid.amount}` : "an opening bid can be $0"}
+                {state.bid
+                  ? `beat $${state.bid.amount}`
+                  : freeOnTheTable
+                    ? "take it for nothing, or pass it back"
+                    : "a dollar, or pass it across"}
               </span>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setTyped(Math.max(range.min, amount - 1))}
-                disabled={amount <= range.min}
-                className="h-14 w-14 rounded-xl text-xl text-white/80 transition-colors hover:bg-white/10 disabled:opacity-30"
-                style={{ border: `2px solid ${RULE}` }}
-              >
-                &minus;
-              </button>
-              <div
-                className="flex h-14 min-w-[6rem] items-center justify-center rounded-xl px-3"
-                style={{ ...display(26, { color: MONEY, fontVariantNumeric: "tabular-nums" }), border: `2px solid ${RULE}` }}
-              >
-                ${amount}
-              </div>
-              <button
-                onClick={() => setTyped(Math.min(range.max, amount + 1))}
-                disabled={amount >= range.max}
-                className="h-14 w-14 rounded-xl text-xl text-white/80 transition-colors hover:bg-white/10 disabled:opacity-30"
-                style={{ border: `2px solid ${RULE}` }}
-              >
-                +
-              </button>
-
-              <ActionButton onClick={() => bid(amount)} grow>
-                BID ${amount}
-              </ActionButton>
-
-              {/* Only once somebody has opened - the opener has to bid,
-                  even if it is nothing. Rule 2. */}
-              {state.bid && (
-                <ActionButton onClick={() => act({ type: "pass", by: acting })} tone="ghost">
-                  PASS
+              {/* THE FREE ONE. Only ever offered to somebody the other
+                  player has already passed to - before that, $0 is
+                  already theirs and bidding it would be bidding against
+                  themselves. */}
+              {freeOnTheTable && (
+                <ActionButton onClick={() => bid(0)} grow>
+                  TAKE FOR $0
                 </ActionButton>
               )}
+
+              {!freeOnTheTable && range && (
+                <>
+                  <button
+                    onClick={() => setTyped(Math.max(range.min, amount - 1))}
+                    disabled={amount <= range.min}
+                    className="h-14 w-14 rounded-xl text-xl text-white/80 transition-colors hover:bg-white/10 disabled:opacity-30"
+                    style={{ border: `2px solid ${RULE}` }}
+                  >
+                    &minus;
+                  </button>
+                  <div
+                    className="flex h-14 min-w-[6rem] items-center justify-center rounded-xl px-3"
+                    style={{ ...display(26, { color: MONEY, fontVariantNumeric: "tabular-nums" }), border: `2px solid ${RULE}` }}
+                  >
+                    ${amount}
+                  </div>
+                  <button
+                    onClick={() => setTyped(Math.min(range.max, amount + 1))}
+                    disabled={amount >= range.max}
+                    className="h-14 w-14 rounded-xl text-xl text-white/80 transition-colors hover:bg-white/10 disabled:opacity-30"
+                    style={{ border: `2px solid ${RULE}` }}
+                  >
+                    +
+                  </button>
+                  <ActionButton onClick={() => bid(amount)} grow>
+                    BID ${amount}
+                  </ActionButton>
+                </>
+              )}
+
+              {/* Always available, and always meaningful now: with a bid
+                  on the table it ends the auction, at the floor it hands
+                  the free one across. */}
+              <ActionButton onClick={() => act({ type: "pass", by: acting })} tone="ghost" grow={!range && !freeOnTheTable}>
+                PASS
+              </ActionButton>
             </div>
 
             <p className="text-[11.5px] text-white/30">
-              {range.max === 0
-                ? "Out of money — can still open at $0 and win anything nobody wants."
-                : `Anything from $${range.min} to $${range.max}.`}
+              {state.bid
+                ? `Anything from $${range ? range.min : state.bid.amount + 1} to $${state.players[acting].budget}.`
+                : freeOnTheTable
+                  ? `${state.players[acting].name} can have it for nothing — or pass, and it goes back to ${state.players[firstOnTheClock].name} at $0.`
+                  : range
+                    ? `A dollar claims it. Pass and ${state.players[(acting + 1) % 2].name} can take it for nothing — if they pass too, it is ${state.players[acting].name}'s at $0.`
+                    : `No money left, so no dollar to bid — pass, and it comes back at $0 if nobody else wants it.`}
             </p>
           </div>
         )}

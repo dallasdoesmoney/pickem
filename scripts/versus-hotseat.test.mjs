@@ -61,11 +61,21 @@ try {
   await page.getByRole("button", { name: /^START$/ }).click();
   await page.waitForTimeout(SPIN_MS + 400);
 
-  // The opener has to bid, even if it is nothing - so there is no PASS
-  // until somebody has opened. Rule 2, as seen from the screen.
+  // Rule 2 from the screen: the floor is $0 and it belongs to whoever is
+  // on the clock, so the cheapest thing they can do is a DOLLAR - and
+  // passing is offered from the start, because passing is what hands the
+  // free one across.
   const labels0 = await page.locator("main button").allInnerTexts();
-  ok("the opener cannot pass", !labels0.includes("PASS"), "no PASS button before an opening bid");
-  ok("and is offered a $0 bid", labels0.some((t) => t === "BID $0"), "");
+  ok("the cheapest bid is a dollar", labels0.some((t) => t === "BID $1"), "$0 is already theirs");
+  ok("and nothing offers $0", !labels0.some((t) => t === "BID $0"), "");
+  ok("passing is offered at the floor", labels0.includes("PASS"), "it hands the free one across");
+
+  // Pass, and the other player is offered it for nothing.
+  await page.getByRole("button", { name: /^PASS$/ }).click();
+  await page.waitForTimeout(120);
+  const offered = await page.locator("main button").allInnerTexts();
+  ok("passing offers it to the other player", offered.includes("TAKE FOR $0"), "");
+  ok("and the free one replaces the bid stepper", !offered.some((t) => t.startsWith("BID $")), "");
 
   let lots = 0;
   let steps = 0;
@@ -78,6 +88,12 @@ try {
     if (labels.includes("START")) {
       await page.getByRole("button", { name: /^START$/ }).click();
       await page.waitForTimeout(SPIN_MS + 400);
+      continue;
+    }
+    // Offered it for nothing: take it, and the draft moves on.
+    if (labels.includes("TAKE FOR $0")) {
+      await page.getByRole("button", { name: /^TAKE FOR \$0$/ }).click();
+      await page.waitForTimeout(60);
       continue;
     }
     // An assign button is the only one carrying two lines: the slot, then

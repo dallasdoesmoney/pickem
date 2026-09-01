@@ -14,7 +14,7 @@
 import { AUCTION_FORMATS } from "../src/lib/auction/formats.ts";
 import { WIDE_RECEIVERS } from "../src/data/rosters/wrs.ts";
 import { formatProblems } from "../src/lib/auction/format.ts";
-import { startAuction, openLot, reduce, toAct, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
+import { startAuction, openLot, reduce, toAct, bidRange, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
 
 let failed = 0;
 function ok(name, cond, detail = "") {
@@ -65,17 +65,20 @@ for (const format of formats) {
           stuck = true;
           break;
         }
-        const min = s.bid ? s.bid.amount + 1 : 0;
-        const max = s.players[who].budget;
-        if (min > max) {
-          stuck = true;
-          break;
-        }
-        // Sometimes pass, sometimes raise by a random legal amount.
+        // Rule 2: the floor is $0 and it belongs to whoever is on the
+        // clock, so the cheapest bid is a dollar until somebody passes.
+        const range = bidRange(s, format, who);
+        // Passing is ALWAYS legal and always means something now - at
+        // the floor it offers the item across, and if the bot cannot
+        // afford a dollar it is the only move it has.
         const next =
-          s.bid && Math.random() < 0.45
+          !range || Math.random() < 0.45
             ? reduce(s, { type: "pass", by: who }, format)
-            : reduce(s, { type: "bid", by: who, amount: min + Math.floor(Math.random() * Math.min(4, max - min + 1)) }, format);
+            : reduce(s, {
+                type: "bid",
+                by: who,
+                amount: range.min + Math.floor(Math.random() * Math.min(4, range.max - range.min + 1)),
+              }, format);
         if (next === s) {
           stuck = true;
           break;

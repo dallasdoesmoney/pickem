@@ -84,7 +84,8 @@ while (state.phase !== "done" && steps < 500) {
   const range = bidRange(state, format, who);
   // Bid sometimes, pass sometimes - so the history, the rosters and both
   // budgets all end up non-trivial rather than every lot going for $0.
-  state = state.bid && steps % 3 === 0
+  // A player who cannot afford the floor's dollar can only pass.
+  state = !range || steps % 3 === 0
     ? reduce(state, { type: "pass", by: who }, format)
     : reduce(state, { type: "bid", by: who, amount: Math.min(range.max, range.min + (steps % 4)) }, format);
 }
