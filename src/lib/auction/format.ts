@@ -39,6 +39,16 @@ export type AuctionItem = {
   // So: present means "only these slots, and here is what each gives
   // you". Absent means "any open slot, worth its own label".
   fills?: Record<string, string>;
+
+  // The same thing, short enough to sit BESIDE a position label rather
+  // than under it - "Prescott" where fills says "Dak Prescott".
+  //
+  // The overlay is a band between two cameras, so vertical space is the
+  // scarce one and a name on its own line costs more than it is worth.
+  // The item's own imageUrl rides along as the badge next to it, which is
+  // what makes a surname on its own readable: "Prescott" plus a Cowboys
+  // logo is unambiguous in a way that "Prescott" alone is not.
+  fillsShort?: Record<string, string>;
 };
 
 export type AuctionFormat = {

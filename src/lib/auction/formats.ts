@@ -20,12 +20,38 @@ import type { AuctionFormat, AuctionItem } from "./format";
 // is one of those two shapes with different data, which is why the engine
 // never learns what any of it is.
 
-function firstFor<T extends { team: string; name: string }>(rows: T[], abbr: string): T | undefined {
-  return rows.find((r) => r.team === abbr);
+// THE ROSTER FILES ARE SORTED BY NAME, not by depth.
+//
+// That is fine for a tier list, where all three receivers are on screen
+// at once, and wrong here, where only the top two go on a graphic: taking
+// the first two rows for Minnesota gave Jauan Jennings and Jordan
+// Addison, and left Justin Jefferson out of the Vikings entirely.
+//
+// The chart position each row was chosen at is now kept on the row, so
+// this asks for it. Rows with no depth sort last rather than jumping the
+// queue, which keeps an unsynced or partial file merely wrong-ish
+// instead of confidently wrong.
+type Roster = { team: string; name: string; depth?: number };
+
+function byDepth<T extends Roster>(rows: T[], abbr: string): T[] {
+  return rows.filter((r) => r.team === abbr).sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99));
 }
 
-function twoFor<T extends { team: string; name: string }>(rows: T[], abbr: string): T[] {
-  return rows.filter((r) => r.team === abbr).slice(0, 2);
+function firstFor<T extends Roster>(rows: T[], abbr: string): T | undefined {
+  return byDepth(rows, abbr)[0];
+}
+
+function twoFor<T extends Roster>(rows: T[], abbr: string): T[] {
+  return byDepth(rows, abbr).slice(0, 2);
+}
+
+// "Justin Jefferson" -> "Jefferson", "Brian Thomas Jr." -> "Thomas Jr.",
+// "Amon-Ra St. Brown" -> "St. Brown". Everything after the first name,
+// which keeps the suffixes and the two-word surnames that a naive "last
+// word" would cut in half.
+function surname(name: string): string {
+  const cut = name.indexOf(" ");
+  return cut === -1 ? name : name.slice(cut + 1);
 }
 
 // A whole team as one lot. What it is worth depends entirely on where you
@@ -42,13 +68,27 @@ function teamItem(abbr: string): AuctionItem | null {
   const te = firstFor(TIGHT_ENDS, abbr);
 
   const fills: Record<string, string> = {};
-  if (qb) fills.qb = qb.name;
-  if (rb) fills.rb = rb.name;
-  if (wrs.length > 0) fills.rec = wrs.map((w) => w.name).join(" + ");
-  if (te) fills.te = te.name;
+  const fillsShort: Record<string, string> = {};
+  if (qb) {
+    fills.qb = qb.name;
+    fillsShort.qb = surname(qb.name);
+  }
+  if (rb) {
+    fills.rb = rb.name;
+    fillsShort.rb = surname(rb.name);
+  }
+  if (wrs.length > 0) {
+    fills.rec = wrs.map((w) => w.name).join(" + ");
+    fillsShort.rec = wrs.map((w) => surname(w.name)).join(" + ");
+  }
+  if (te) {
+    fills.te = te.name;
+    fillsShort.te = surname(te.name);
+  }
   // Every team has a defense, so this one never depends on a synced
   // roster - which also means a fresh clone can still deal a legal game.
   fills.def = `${team.name} defense`;
+  fillsShort.def = team.name;
 
   // A team that cannot fill anything would come up and be unwinnable.
   // Only possible in a checkout where the rosters have never been synced.
@@ -61,6 +101,7 @@ function teamItem(abbr: string): AuctionItem | null {
     imageUrl: team.logo,
     accent: team.color,
     fills,
+    fillsShort,
   };
 }
 
@@ -72,7 +113,7 @@ const NFL_TEAMS: AuctionFormat = {
   slots: [
     { key: "qb", label: "QB" },
     { key: "rb", label: "RB" },
-    { key: "rec", label: "Receiving" },
+    { key: "rec", label: "WR Duo" },
     { key: "te", label: "TE" },
     { key: "def", label: "Defense" },
   ],

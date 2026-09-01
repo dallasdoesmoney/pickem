@@ -7,7 +7,8 @@ import { startAuction, openLot, reduce, AuctionState } from "@/lib/auction/engin
 import type { AuctionFormat } from "@/lib/auction/format";
 import { isRoomCode } from "@/lib/auction/room";
 import { useRoomState } from "@/components/versus/useRoom";
-import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/versus/OverlayBoard";
+import { OverlayBoard, STAGE_W, STAGE_H, DEFAULT_LAYOUT } from "@/components/versus/OverlayBoard";
+import { isLayoutKey } from "@/components/versus/layouts";
 
 // THE OBS BROWSER SOURCE.
 //
@@ -21,6 +22,7 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/versus/OverlayBoard
 //   ?preview=1        look at it WITHOUT OBS - see below
 //   ?format=nfl-teams which mode the DEMO draws (ignored in a room)
 //   ?phase=ready|spinning  which moment of a lot the DEMO holds on
+//   ?layout=a..e      which arrangement - see /versus/layouts
 //   ?p1=Noah&p2=Ben   names on the DEMO rails (ignored in a room)
 //
 // The cam bands are query parameters rather than constants because they
@@ -113,6 +115,8 @@ function OverlayInner() {
   // flat dark, which looked exactly like a graphic with a dark background
   // - the opposite of what the preview exists to show.
   const preview = params.get("preview") === "1";
+  const layoutParam = params.get("layout");
+  const layout = isLayoutKey(layoutParam) ? layoutParam : DEFAULT_LAYOUT;
 
   const demoFormat = AUCTION_FORMATS[params.get("format") ?? "nfl-teams"] ?? Object.values(AUCTION_FORMATS)[0];
   const format = message ? AUCTION_FORMATS[message.slug] : demoFormat;
@@ -189,7 +193,7 @@ function OverlayInner() {
         )}
 
         {format && state ? (
-          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} />
+          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} layout={layout} />
         ) : room ? (
           // Small and dim on purpose. If this ever does appear on a live
           // stream it should read as a status light, not an error page.

@@ -12,6 +12,7 @@
 // That is a mid-stream failure with no way forward, so it is worth a
 // thousand simulated drafts to know it cannot happen.
 import { AUCTION_FORMATS } from "../src/lib/auction/formats.ts";
+import { WIDE_RECEIVERS } from "../src/data/rosters/wrs.ts";
 import { formatProblems } from "../src/lib/auction/format.ts";
 import { startAuction, openLot, reduce, toAct, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
 
@@ -105,6 +106,48 @@ for (const format of formats) {
   ok(`${format.slug}: everybody filled every slot`, everyoneFull === DRAFTS, `${everyoneFull}/${DRAFTS}`);
   ok(`${format.slug}: nobody went overdrawn`, solvent === DRAFTS, `${solvent}/${DRAFTS}`);
   console.log(`   items stepped over across ${DRAFTS} drafts: ${skipped} (longest single step ${worstStep})`);
+}
+
+// --- the right players, not the alphabetically first ones ------------
+//
+// The roster files are sorted by NAME. A graphic that shows only the top
+// two receivers therefore had to be told which two, and before `depth`
+// existed it was not: taking the first two rows for Minnesota gave Jauan
+// Jennings and Jordan Addison, and left Justin Jefferson off the Vikings
+// altogether. On a stream that is not a subtle bug.
+{
+  const teams = AUCTION_FORMATS["nfl-teams"];
+  if (!teams) {
+    ok("nfl-teams is registered", false, "rosters not synced in this checkout");
+  } else {
+    let wrong = [];
+    let unranked = 0;
+    for (const item of teams.items) {
+      const mine = WIDE_RECEIVERS.filter((w) => w.team === item.id);
+      if (mine.some((w) => w.depth === undefined)) unranked++;
+      const want = mine
+        .slice()
+        .sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99))
+        .slice(0, 2)
+        .map((w) => w.name)
+        .join(" + ");
+      if (want && item.fills.rec !== want) wrong.push(`${item.id}: ${item.fills.rec} != ${want}`);
+    }
+    ok("every WR Duo is the top two by depth", wrong.length === 0, wrong.slice(0, 3).join(" | "));
+    ok("every receiver row carries a depth", unranked === 0, `${unranked} teams with an unranked receiver`);
+
+    const min = teams.items.find((i) => i.id === "MIN");
+    ok("Justin Jefferson is on the Vikings", !!min && min.fills.rec.includes("Justin Jefferson"), min?.fills.rec ?? "no MIN item");
+    const dal = teams.items.find((i) => i.id === "DAL");
+    ok("the Cowboys are Lamb and Pickens", !!dal && dal.fills.rec === "CeeDee Lamb + George Pickens", dal?.fills.rec ?? "no DAL item");
+
+    // Short forms exist for everything the long form covers, or the
+    // overlay silently falls back to the full name and overflows.
+    const missingShort = teams.items.filter((i) => Object.keys(i.fills).some((k) => !i.fillsShort?.[k]));
+    ok("every fill has a short form too", missingShort.length === 0, missingShort.slice(0, 3).map((i) => i.id).join(", "));
+    ok("the short form really is shorter", min?.fillsShort.rec === "Jefferson + Addison", min?.fillsShort?.rec ?? "");
+    ok("the slot is called WR Duo", teams.slots.some((s) => s.key === "rec" && s.label === "WR Duo"), "");
+  }
 }
 
 console.log(failed === 0 ? "\nall checks pass" : `\n${failed} check(s) failed`);

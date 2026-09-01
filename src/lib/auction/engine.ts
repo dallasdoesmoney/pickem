@@ -50,6 +50,12 @@ export type RosterEntry = {
   // Bengals" - resolved at assignment time so the board does not have to
   // reach back into the format to draw itself.
   label: string;
+  // The same thing at graphic size: a surname, and the badge that makes a
+  // surname legible on its own. Resolved here for the same reason as
+  // `label` - the overlay draws from state alone, so an overlay that
+  // reconnects mid-draft needs no second lookup to fill its rails.
+  short?: string;
+  badge?: string;
 };
 
 export type PlayerState = {
@@ -314,12 +320,14 @@ export function reduce(state: AuctionState, action: AuctionAction, format: Aucti
     if (!slotsItemCanFill(item, openSlots(player)).includes(action.slotKey)) return state;
 
     const label = item.fills?.[action.slotKey] ?? item.label;
+    const short = item.fillsShort?.[action.slotKey] ?? label;
+    const entry: RosterEntry = { itemId: item.id, price: state.won!.price, label, short, badge: item.imageUrl };
     const players = state.players.map((p, i) =>
       i === who
         ? {
             ...p,
             budget: p.budget - state.won!.price,
-            roster: { ...p.roster, [action.slotKey]: { itemId: item.id, price: state.won!.price, label } },
+            roster: { ...p.roster, [action.slotKey]: entry },
           }
         : p
     );

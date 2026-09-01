@@ -17,6 +17,12 @@ export type RunningBack = {
   espnId: string;
   name: string;
   team: TeamAbbr;
+  // Where this player sits on their own team's chart: 1 is the starter,
+  // 2 the next one down. The rows below are sorted by NAME, so without
+  // this the only way to pick "the top two receivers on the Vikings" was
+  // to take the first two alphabetically - which is how Justin Jefferson
+  // came to be left off a graphic on a live stream.
+  depth?: number;
   // Hint columns for the daily player puzzle. Optional because ESPN does
   // not publish all of them for everyone; the puzzle hides a column it
   // has no values for rather than showing a row of "?".
@@ -28,36 +34,36 @@ export type RunningBack = {
 };
 
 export const RUNNING_BACKS: RunningBack[] = [
-  { espnId: "3042519", name: "Aaron Jones Sr.", team: "MIN", heightIn: 70, weightLb: 208, age: 31, jersey: 33 },
-  { espnId: "4890973", name: "Ashton Jeanty", team: "LV", heightIn: 68, weightLb: 208, age: 22, jersey: 2 },
-  { espnId: "4882093", name: "Bhayshul Tuten", team: "JAX", heightIn: 69, weightLb: 209, age: 23, jersey: 33 },
-  { espnId: "4430807", name: "Bijan Robinson", team: "ATL", heightIn: 71, weightLb: 215, age: 24, jersey: 7 },
-  { espnId: "4427366", name: "Breece Hall", team: "NYJ", heightIn: 71, weightLb: 217, age: 25, jersey: 20 },
-  { espnId: "4596448", name: "Bucky Irving", team: "TB", heightIn: 70, weightLb: 195, age: 24, jersey: 7 },
-  { espnId: "4696981", name: "Cam Skattebo", team: "NYG", heightIn: 71, weightLb: 215, age: 24, jersey: 44 },
-  { espnId: "4362238", name: "Chase Brown", team: "CIN", heightIn: 70, weightLb: 210, age: 26, jersey: 30 },
-  { espnId: "3117251", name: "Christian McCaffrey", team: "SF", heightIn: 71, weightLb: 210, age: 30, jersey: 23 },
-  { espnId: "4241416", name: "Chuba Hubbard", team: "CAR", heightIn: 73, weightLb: 210, age: 27, jersey: 30 },
-  { espnId: "4259545", name: "D'Andre Swift", team: "CHI", heightIn: 68, weightLb: 204, age: 27, jersey: 4 },
-  { espnId: "4035538", name: "David Montgomery", team: "HOU", heightIn: 71, weightLb: 230, age: 29, jersey: 32 },
-  { espnId: "4429160", name: "De'Von Achane", team: "MIA", heightIn: 69, weightLb: 191, age: 24, jersey: 28 },
-  { espnId: "3043078", name: "Derrick Henry", team: "BAL", heightIn: 74, weightLb: 252, age: 32, jersey: 22 },
-  { espnId: "4241985", name: "J.K. Dobbins", team: "DEN", heightIn: 70, weightLb: 212, age: 27, jersey: 27 },
-  { espnId: "4575131", name: "Jacory Croskey-Merritt", team: "WAS", heightIn: 71, weightLb: 208, age: 25, jersey: 22 },
-  { espnId: "4685512", name: "Jadarian Price", team: "SEA", heightIn: 71, weightLb: 209, age: 22, jersey: 8, college: "Notre Dame" },
-  { espnId: "4429795", name: "Jahmyr Gibbs", team: "DET", heightIn: 69, weightLb: 202, age: 24, jersey: 0 },
-  { espnId: "4379399", name: "James Cook III", team: "BUF", heightIn: 71, weightLb: 190, age: 26, jersey: 4 },
-  { espnId: "4361579", name: "Javonte Williams", team: "DAL", heightIn: 70, weightLb: 222, age: 26, jersey: 33 },
-  { espnId: "4569987", name: "Jaylen Warren", team: "PIT", heightIn: 68, weightLb: 215, age: 27, jersey: 30 },
-  { espnId: "4870808", name: "Jeremiyah Love", team: "ARI", heightIn: 72, weightLb: 212, age: 21, jersey: 4 },
-  { espnId: "4242335", name: "Jonathan Taylor", team: "IND", heightIn: 70, weightLb: 226, age: 27, jersey: 28 },
-  { espnId: "4047365", name: "Josh Jacobs", team: "GB", heightIn: 70, weightLb: 223, age: 28, jersey: 8 },
-  { espnId: "4567048", name: "Kenneth Walker III", team: "KC", heightIn: 69, weightLb: 211, age: 25, jersey: 9 },
-  { espnId: "4430737", name: "Kyren Williams", team: "LAR", heightIn: 69, weightLb: 207, age: 26, jersey: 23 },
-  { espnId: "4685382", name: "Omarion Hampton", team: "LAC", heightIn: 72, weightLb: 220, age: 23, jersey: 8 },
-  { espnId: "4685702", name: "Quinshon Judkins", team: "CLE", heightIn: 72, weightLb: 221, age: 22, jersey: 10 },
-  { espnId: "4569173", name: "Rhamondre Stevenson", team: "NE", heightIn: 72, weightLb: 227, age: 28, jersey: 38 },
-  { espnId: "3929630", name: "Saquon Barkley", team: "PHI", heightIn: 72, weightLb: 233, age: 29, jersey: 26 },
-  { espnId: "3916148", name: "Tony Pollard", team: "TEN", heightIn: 72, weightLb: 209, age: 29, jersey: 20 },
-  { espnId: "4239996", name: "Travis Etienne Jr.", team: "NO", heightIn: 70, weightLb: 215, age: 27, jersey: 3 },
+  { espnId: "3042519", name: "Aaron Jones Sr.", team: "MIN", depth: 1, heightIn: 70, weightLb: 208, age: 31, jersey: 33 },
+  { espnId: "4890973", name: "Ashton Jeanty", team: "LV", depth: 1, heightIn: 68, weightLb: 208, age: 22, jersey: 2 },
+  { espnId: "4882093", name: "Bhayshul Tuten", team: "JAX", depth: 1, heightIn: 69, weightLb: 209, age: 23, jersey: 33 },
+  { espnId: "4430807", name: "Bijan Robinson", team: "ATL", depth: 1, heightIn: 71, weightLb: 215, age: 24, jersey: 7 },
+  { espnId: "4427366", name: "Breece Hall", team: "NYJ", depth: 1, heightIn: 71, weightLb: 217, age: 25, jersey: 20 },
+  { espnId: "4596448", name: "Bucky Irving", team: "TB", depth: 1, heightIn: 70, weightLb: 195, age: 24, jersey: 7 },
+  { espnId: "4696981", name: "Cam Skattebo", team: "NYG", depth: 1, heightIn: 71, weightLb: 215, age: 24, jersey: 44 },
+  { espnId: "4362238", name: "Chase Brown", team: "CIN", depth: 1, heightIn: 70, weightLb: 210, age: 26, jersey: 30 },
+  { espnId: "3117251", name: "Christian McCaffrey", team: "SF", depth: 1, heightIn: 71, weightLb: 210, age: 30, jersey: 23 },
+  { espnId: "4241416", name: "Chuba Hubbard", team: "CAR", depth: 1, heightIn: 73, weightLb: 210, age: 27, jersey: 30 },
+  { espnId: "4259545", name: "D'Andre Swift", team: "CHI", depth: 1, heightIn: 68, weightLb: 204, age: 27, jersey: 4 },
+  { espnId: "4035538", name: "David Montgomery", team: "HOU", depth: 1, heightIn: 71, weightLb: 230, age: 29, jersey: 32 },
+  { espnId: "4429160", name: "De'Von Achane", team: "MIA", depth: 1, heightIn: 69, weightLb: 191, age: 24, jersey: 28 },
+  { espnId: "3043078", name: "Derrick Henry", team: "BAL", depth: 1, heightIn: 74, weightLb: 252, age: 32, jersey: 22 },
+  { espnId: "4241985", name: "J.K. Dobbins", team: "DEN", depth: 1, heightIn: 70, weightLb: 212, age: 27, jersey: 27 },
+  { espnId: "4575131", name: "Jacory Croskey-Merritt", team: "WAS", depth: 1, heightIn: 71, weightLb: 208, age: 25, jersey: 22 },
+  { espnId: "4685512", name: "Jadarian Price", team: "SEA", depth: 1, heightIn: 71, weightLb: 209, age: 22, jersey: 8, college: "Notre Dame" },
+  { espnId: "4429795", name: "Jahmyr Gibbs", team: "DET", depth: 1, heightIn: 69, weightLb: 202, age: 24, jersey: 0 },
+  { espnId: "4379399", name: "James Cook III", team: "BUF", depth: 1, heightIn: 71, weightLb: 190, age: 26, jersey: 4 },
+  { espnId: "4361579", name: "Javonte Williams", team: "DAL", depth: 1, heightIn: 70, weightLb: 222, age: 26, jersey: 33 },
+  { espnId: "4569987", name: "Jaylen Warren", team: "PIT", depth: 1, heightIn: 68, weightLb: 215, age: 27, jersey: 30 },
+  { espnId: "4870808", name: "Jeremiyah Love", team: "ARI", depth: 1, heightIn: 72, weightLb: 212, age: 21, jersey: 4 },
+  { espnId: "4242335", name: "Jonathan Taylor", team: "IND", depth: 1, heightIn: 70, weightLb: 226, age: 27, jersey: 28 },
+  { espnId: "4047365", name: "Josh Jacobs", team: "GB", depth: 1, heightIn: 70, weightLb: 223, age: 28, jersey: 8 },
+  { espnId: "4567048", name: "Kenneth Walker III", team: "KC", depth: 1, heightIn: 69, weightLb: 211, age: 25, jersey: 9 },
+  { espnId: "4430737", name: "Kyren Williams", team: "LAR", depth: 1, heightIn: 69, weightLb: 207, age: 26, jersey: 23 },
+  { espnId: "4685382", name: "Omarion Hampton", team: "LAC", depth: 1, heightIn: 72, weightLb: 220, age: 23, jersey: 8 },
+  { espnId: "4685702", name: "Quinshon Judkins", team: "CLE", depth: 1, heightIn: 72, weightLb: 221, age: 22, jersey: 10 },
+  { espnId: "4569173", name: "Rhamondre Stevenson", team: "NE", depth: 1, heightIn: 72, weightLb: 227, age: 28, jersey: 38 },
+  { espnId: "3929630", name: "Saquon Barkley", team: "PHI", depth: 1, heightIn: 72, weightLb: 233, age: 29, jersey: 26 },
+  { espnId: "3916148", name: "Tony Pollard", team: "TEN", depth: 1, heightIn: 72, weightLb: 209, age: 29, jersey: 20 },
+  { espnId: "4239996", name: "Travis Etienne Jr.", team: "NO", depth: 1, heightIn: 70, weightLb: 215, age: 27, jersey: 3 },
 ];

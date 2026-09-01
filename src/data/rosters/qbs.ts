@@ -17,6 +17,12 @@ export type Quarterback = {
   espnId: string;
   name: string;
   team: TeamAbbr;
+  // Where this player sits on their own team's chart: 1 is the starter,
+  // 2 the next one down. The rows below are sorted by NAME, so without
+  // this the only way to pick "the top two receivers on the Vikings" was
+  // to take the first two alphabetically - which is how Justin Jefferson
+  // came to be left off a graphic on a live stream.
+  depth?: number;
   // Hint columns for the daily player puzzle. Optional because ESPN does
   // not publish all of them for everyone; the puzzle hides a column it
   // has no values for rather than showing a row of "?".
@@ -28,36 +34,36 @@ export type Quarterback = {
 };
 
 export const QUARTERBACKS: Quarterback[] = [
-  { espnId: "8439", name: "Aaron Rodgers", team: "PIT", heightIn: 74, weightLb: 223, age: 42, jersey: 8 },
-  { espnId: "3052587", name: "Baker Mayfield", team: "TB", heightIn: 73, weightLb: 215, age: 31, jersey: 6 },
-  { espnId: "4426338", name: "Bo Nix", team: "DEN", heightIn: 74, weightLb: 217, age: 26, jersey: 10 },
-  { espnId: "4361741", name: "Brock Purdy", team: "SF", heightIn: 73, weightLb: 220, age: 26, jersey: 13 },
-  { espnId: "4685720", name: "Bryce Young", team: "CAR", heightIn: 70, weightLb: 204, age: 25, jersey: 9 },
-  { espnId: "4432577", name: "C.J. Stroud", team: "HOU", heightIn: 75, weightLb: 218, age: 24, jersey: 7 },
-  { espnId: "4431611", name: "Caleb Williams", team: "CHI", heightIn: 73, weightLb: 226, age: 24, jersey: 18 },
-  { espnId: "4688380", name: "Cam Ward", team: "TEN", heightIn: 74, weightLb: 219, age: 24, jersey: 1 },
-  { espnId: "2577417", name: "Dak Prescott", team: "DAL", heightIn: 74, weightLb: 230, age: 33, jersey: 4 },
-  { espnId: "3917792", name: "Daniel Jones", team: "IND", heightIn: 77, weightLb: 230, age: 29, jersey: 17 },
-  { espnId: "3122840", name: "Deshaun Watson", team: "CLE", heightIn: 75, weightLb: 223, age: 30, jersey: 4 },
-  { espnId: "4431452", name: "Drake Maye", team: "NE", heightIn: 76, weightLb: 225, age: 23, jersey: 10 },
-  { espnId: "15864", name: "Geno Smith", team: "NYJ", heightIn: 74, weightLb: 221, age: 35, jersey: 7 },
-  { espnId: "2578570", name: "Jacoby Brissett", team: "ARI", heightIn: 76, weightLb: 235, age: 33, jersey: 7 },
-  { espnId: "4040715", name: "Jalen Hurts", team: "PHI", heightIn: 73, weightLb: 223, age: 28, jersey: 1 },
-  { espnId: "3046779", name: "Jared Goff", team: "DET", heightIn: 76, weightLb: 217, age: 31, jersey: 16 },
-  { espnId: "4689114", name: "Jaxson Dart", team: "NYG", heightIn: 74, weightLb: 223, age: 23, jersey: 6 },
-  { espnId: "4426348", name: "Jayden Daniels", team: "WAS", heightIn: 76, weightLb: 210, age: 25, jersey: 5 },
-  { espnId: "3915511", name: "Joe Burrow", team: "CIN", heightIn: 76, weightLb: 215, age: 29, jersey: 9 },
-  { espnId: "4036378", name: "Jordan Love", team: "GB", heightIn: 76, weightLb: 219, age: 27, jersey: 10 },
-  { espnId: "3918298", name: "Josh Allen", team: "BUF", heightIn: 77, weightLb: 237, age: 30, jersey: 17 },
-  { espnId: "4038941", name: "Justin Herbert", team: "LAC", heightIn: 78, weightLb: 236, age: 28, jersey: 10 },
-  { espnId: "14880", name: "Kirk Cousins", team: "LV", heightIn: 75, weightLb: 209, age: 38, jersey: 8 },
-  { espnId: "3917315", name: "Kyler Murray", team: "MIN", heightIn: 70, weightLb: 207, age: 29, jersey: 1 },
-  { espnId: "3916387", name: "Lamar Jackson", team: "BAL", heightIn: 74, weightLb: 205, age: 29, jersey: 8 },
-  { espnId: "4242512", name: "Malik Willis", team: "MIA", heightIn: 73, weightLb: 225, age: 27, jersey: 2 },
-  { espnId: "12483", name: "Matthew Stafford", team: "LAR", heightIn: 75, weightLb: 214, age: 38, jersey: 9 },
-  { espnId: "3139477", name: "Patrick Mahomes", team: "KC", heightIn: 74, weightLb: 225, age: 30, jersey: 15 },
-  { espnId: "3912547", name: "Sam Darnold", team: "SEA", heightIn: 75, weightLb: 225, age: 29, jersey: 14 },
-  { espnId: "4360310", name: "Trevor Lawrence", team: "JAX", heightIn: 78, weightLb: 220, age: 26, jersey: 16 },
-  { espnId: "4241479", name: "Tua Tagovailoa", team: "ATL", heightIn: 73, weightLb: 225, age: 28, jersey: 1 },
-  { espnId: "4360689", name: "Tyler Shough", team: "NO", heightIn: 77, weightLb: 219, age: 26, jersey: 6 },
+  { espnId: "8439", name: "Aaron Rodgers", team: "PIT", depth: 1, heightIn: 74, weightLb: 223, age: 42, jersey: 8 },
+  { espnId: "3052587", name: "Baker Mayfield", team: "TB", depth: 1, heightIn: 73, weightLb: 215, age: 31, jersey: 6 },
+  { espnId: "4426338", name: "Bo Nix", team: "DEN", depth: 1, heightIn: 74, weightLb: 217, age: 26, jersey: 10 },
+  { espnId: "4361741", name: "Brock Purdy", team: "SF", depth: 1, heightIn: 73, weightLb: 220, age: 26, jersey: 13 },
+  { espnId: "4685720", name: "Bryce Young", team: "CAR", depth: 1, heightIn: 70, weightLb: 204, age: 25, jersey: 9 },
+  { espnId: "4432577", name: "C.J. Stroud", team: "HOU", depth: 1, heightIn: 75, weightLb: 218, age: 24, jersey: 7 },
+  { espnId: "4431611", name: "Caleb Williams", team: "CHI", depth: 1, heightIn: 73, weightLb: 226, age: 24, jersey: 18 },
+  { espnId: "4688380", name: "Cam Ward", team: "TEN", depth: 1, heightIn: 74, weightLb: 219, age: 24, jersey: 1 },
+  { espnId: "2577417", name: "Dak Prescott", team: "DAL", depth: 1, heightIn: 74, weightLb: 230, age: 33, jersey: 4 },
+  { espnId: "3917792", name: "Daniel Jones", team: "IND", depth: 1, heightIn: 77, weightLb: 230, age: 29, jersey: 17 },
+  { espnId: "3122840", name: "Deshaun Watson", team: "CLE", depth: 1, heightIn: 75, weightLb: 223, age: 30, jersey: 4 },
+  { espnId: "4431452", name: "Drake Maye", team: "NE", depth: 1, heightIn: 76, weightLb: 225, age: 23, jersey: 10 },
+  { espnId: "15864", name: "Geno Smith", team: "NYJ", depth: 1, heightIn: 74, weightLb: 221, age: 35, jersey: 7 },
+  { espnId: "2578570", name: "Jacoby Brissett", team: "ARI", depth: 1, heightIn: 76, weightLb: 235, age: 33, jersey: 7 },
+  { espnId: "4040715", name: "Jalen Hurts", team: "PHI", depth: 1, heightIn: 73, weightLb: 223, age: 28, jersey: 1 },
+  { espnId: "3046779", name: "Jared Goff", team: "DET", depth: 1, heightIn: 76, weightLb: 217, age: 31, jersey: 16 },
+  { espnId: "4689114", name: "Jaxson Dart", team: "NYG", depth: 1, heightIn: 74, weightLb: 223, age: 23, jersey: 6 },
+  { espnId: "4426348", name: "Jayden Daniels", team: "WAS", depth: 1, heightIn: 76, weightLb: 210, age: 25, jersey: 5 },
+  { espnId: "3915511", name: "Joe Burrow", team: "CIN", depth: 1, heightIn: 76, weightLb: 215, age: 29, jersey: 9 },
+  { espnId: "4036378", name: "Jordan Love", team: "GB", depth: 1, heightIn: 76, weightLb: 219, age: 27, jersey: 10 },
+  { espnId: "3918298", name: "Josh Allen", team: "BUF", depth: 1, heightIn: 77, weightLb: 237, age: 30, jersey: 17 },
+  { espnId: "4038941", name: "Justin Herbert", team: "LAC", depth: 1, heightIn: 78, weightLb: 236, age: 28, jersey: 10 },
+  { espnId: "14880", name: "Kirk Cousins", team: "LV", depth: 1, heightIn: 75, weightLb: 209, age: 38, jersey: 8 },
+  { espnId: "3917315", name: "Kyler Murray", team: "MIN", depth: 1, heightIn: 70, weightLb: 207, age: 29, jersey: 1 },
+  { espnId: "3916387", name: "Lamar Jackson", team: "BAL", depth: 1, heightIn: 74, weightLb: 205, age: 29, jersey: 8 },
+  { espnId: "4242512", name: "Malik Willis", team: "MIA", depth: 1, heightIn: 73, weightLb: 225, age: 27, jersey: 2 },
+  { espnId: "12483", name: "Matthew Stafford", team: "LAR", depth: 1, heightIn: 75, weightLb: 214, age: 38, jersey: 9 },
+  { espnId: "3139477", name: "Patrick Mahomes", team: "KC", depth: 1, heightIn: 74, weightLb: 225, age: 30, jersey: 15 },
+  { espnId: "3912547", name: "Sam Darnold", team: "SEA", depth: 1, heightIn: 75, weightLb: 225, age: 29, jersey: 14 },
+  { espnId: "4360310", name: "Trevor Lawrence", team: "JAX", depth: 1, heightIn: 78, weightLb: 220, age: 26, jersey: 16 },
+  { espnId: "4241479", name: "Tua Tagovailoa", team: "ATL", depth: 1, heightIn: 73, weightLb: 225, age: 28, jersey: 1 },
+  { espnId: "4360689", name: "Tyler Shough", team: "NO", depth: 1, heightIn: 77, weightLb: 219, age: 26, jersey: 6 },
 ];

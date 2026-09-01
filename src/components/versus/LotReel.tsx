@@ -3,75 +3,49 @@
 import { useEffect, useState } from "react";
 import type { AuctionFormat, AuctionItem } from "@/lib/auction/format";
 import { shuffled, seedFrom } from "@/lib/auction/engine";
-import { outlined, LOT_CELL_H, REEL_MS } from "./style";
+import { REEL_MS } from "./style";
 
-// THE SLOT MACHINE.
+// THE SLOT MACHINE - logos only.
 //
-// Every lot is drawn through LotCell, at a fixed height, in all four
-// states - not yet started, spinning, landed, being bid on. That is the
-// whole trick behind the reel stopping cleanly: the cell that flies past
-// during the spin is the same cell, at the same size, in the same place,
-// as the one sitting there afterwards. Nothing swaps out at the end, the
-// strip just stops moving.
+// The first version drew a whole card per cell and masked the strip top
+// and bottom with a dark gradient, which put a visible black box on a
+// layer whose entire job is to be transparent. Over a face cam that reads
+// as a bug. There is no box now and no mask: logos fly past on nothing,
+// and the strip is clipped by an overflow window that paints nothing at
+// all.
 
 const STRIP = 34;
 
-export function LotCell({ item, dim = false }: { item: AuctionItem | null; dim?: boolean }) {
+export function LotLogo({ item, size }: { item: AuctionItem | null; size: number }) {
+  if (!item?.imageUrl) return <div style={{ width: size, height: size }} />;
   return (
-    <div
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={item.imageUrl}
+      alt=""
+      width={size}
+      height={size}
       style={{
-        height: LOT_CELL_H,
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 10,
-        opacity: dim ? 0.45 : 1,
+        width: size,
+        height: size,
+        objectFit: "contain",
+        // The drop shadow is what separates a logo from whatever is
+        // behind it. It replaces the box the reel used to sit in: it
+        // follows the shape of the mark instead of boxing it.
+        filter: `drop-shadow(0 5px 0 rgba(5,7,13,0.75)) drop-shadow(0 0 22px ${item.accent ?? "#ffffff"}99)`,
       }}
-    >
-      {item?.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={item.imageUrl}
-          alt=""
-          width={180}
-          height={180}
-          style={{
-            width: 180,
-            height: 180,
-            objectFit: "contain",
-            filter: `drop-shadow(0 6px 0 rgba(5,7,13,0.8)) drop-shadow(0 0 26px ${item.accent ?? "#ffffff"}88)`,
-          }}
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
-      ) : (
-        <div style={{ width: 180, height: 180 }} />
-      )}
-      <div
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: item && item.label.length > 17 ? 32 : 42,
-          lineHeight: 1.02,
-          color: "#ffffff",
-          textAlign: "center",
-          maxWidth: "100%",
-          ...outlined(38),
-        }}
-      >
-        {(item?.label ?? "").toUpperCase()}
-      </div>
-    </div>
+      onError={(e) => {
+        e.currentTarget.style.display = "none";
+      }}
+    />
   );
 }
 
-export function LotReel({ format, targetId }: { format: AuctionFormat; targetId: string }) {
+export function LogoReel({ format, targetId, size }: { format: AuctionFormat; targetId: string; size: number }) {
   // SEEDED FROM THE LOT, so the control board and the OBS overlay run the
   // identical reel. They animate independently - a frame-by-frame
   // broadcast would be absurd - and this is what keeps them showing the
-  // same teams flying past rather than two different ones.
+  // same logos flying past rather than two different sets.
   const [strip] = useState(() => {
     const others = format.items.filter((i) => i.id !== targetId);
     const pool = shuffled(others, seedFrom(targetId));
@@ -92,10 +66,10 @@ export function LotReel({ format, targetId }: { format: AuctionFormat; targetId:
   }, []);
 
   return (
-    <div style={{ height: LOT_CELL_H, width: "100%", overflow: "hidden", position: "relative" }}>
+    <div style={{ height: size, width: size, overflow: "hidden" }}>
       <div
         style={{
-          transform: `translateY(${rolling ? -(strip.length - 1) * LOT_CELL_H : 0}px)`,
+          transform: `translateY(${rolling ? -(strip.length - 1) * size : 0}px)`,
           // Fast out of the gate and a long, slow settle - the part that
           // reads as a slot machine rather than a list scrolling by.
           transition: `transform ${REEL_MS}ms cubic-bezier(0.08, 0.82, 0.14, 1)`,
@@ -103,69 +77,35 @@ export function LotReel({ format, targetId }: { format: AuctionFormat; targetId:
         }}
       >
         {strip.map((item, i) => (
-          <LotCell key={`${item.id}-${i}`} item={item} />
+          <div key={`${item.id}-${i}`} style={{ height: size, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <LotLogo item={item} size={size} />
+          </div>
         ))}
       </div>
-
-      {/* A little shading top and bottom so the strip runs off into the
-          dark instead of ending on a hard edge. Pointer-events off; it is
-          over the top of the reel. */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          background: "linear-gradient(180deg, rgba(5,7,13,0.85) 0%, rgba(5,7,13,0) 22%, rgba(5,7,13,0) 78%, rgba(5,7,13,0.85) 100%)",
-        }}
-      />
     </div>
   );
 }
 
 // A lot that is drawn but not yet started. Deliberately says nothing
-// about what it is.
-export function LotWaiting() {
+// about what it is, and - like the reel - sits on nothing.
+export function LotWaiting({ size }: { size: number }) {
   return (
     <div
       style={{
-        height: LOT_CELL_H,
-        width: "100%",
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        border: `${Math.max(4, Math.round(size * 0.035))}px dashed rgba(255,255,255,0.28)`,
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 14,
+        fontFamily: "var(--font-display)",
+        fontSize: size * 0.5,
+        color: "rgba(255,255,255,0.32)",
+        textShadow: "0 4px 0 rgba(5,7,13,0.7)",
       }}
     >
-      <div
-        style={{
-          width: 180,
-          height: 180,
-          borderRadius: "50%",
-          border: "6px dashed rgba(255,255,255,0.22)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "var(--font-display)",
-          fontSize: 92,
-          color: "rgba(255,255,255,0.3)",
-          ...outlined(92, "soft"),
-        }}
-      >
-        ?
-      </div>
-      <div
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 34,
-          letterSpacing: 6,
-          color: "rgba(255,255,255,0.45)",
-          ...outlined(34),
-        }}
-      >
-        NEXT LOT
-      </div>
+      ?
     </div>
   );
 }

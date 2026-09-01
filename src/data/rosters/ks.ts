@@ -17,6 +17,12 @@ export type Kicker = {
   espnId: string;
   name: string;
   team: TeamAbbr;
+  // Where this player sits on their own team's chart: 1 is the starter,
+  // 2 the next one down. The rows below are sorted by NAME, so without
+  // this the only way to pick "the top two receivers on the Vikings" was
+  // to take the first two alphabetically - which is how Justin Jefferson
+  // came to be left off a graphic on a live stream.
+  depth?: number;
   // Hint columns for the daily player puzzle. Optional because ESPN does
   // not publish all of them for everyone; the puzzle hides a column it
   // has no values for rather than showing a row of "?".
@@ -28,36 +34,36 @@ export type Kicker = {
 };
 
 export const KICKERS: Kicker[] = [
-  { espnId: "4258620", name: "Andre Szmyt", team: "CLE", heightIn: 72, weightLb: 200, age: 27, jersey: 25 },
-  { espnId: "4569923", name: "Andy Borregales", team: "NE", heightIn: 71, weightLb: 202, age: 23, jersey: 36 },
-  { espnId: "4566158", name: "Ben Sauls", team: "NYG", heightIn: 70, weightLb: 185, age: 25, jersey: 30 },
-  { espnId: "4259619", name: "Blake Grupe", team: "IND", heightIn: 67, weightLb: 156, age: 27, jersey: 10 },
-  { espnId: "3953687", name: "Brandon Aubrey", team: "DAL", heightIn: 75, weightLb: 218, age: 31, jersey: 17 },
-  { espnId: "17427", name: "Cairo Santos", team: "CHI", heightIn: 68, weightLb: 173, age: 34, jersey: 8 },
-  { espnId: "4686361", name: "Cam Little", team: "JAX", heightIn: 73, weightLb: 172, age: 23, jersey: 39 },
-  { espnId: "4362081", name: "Cameron Dicker", team: "LAC", heightIn: 73, weightLb: 216, age: 26, jersey: 11 },
-  { espnId: "4363538", name: "Chad Ryland", team: "ARI", heightIn: 72, weightLb: 195, age: 26, jersey: 38 },
-  { espnId: "5208518", name: "Charlie Smyth", team: "NO", heightIn: 76, weightLb: 210, age: 25, jersey: 39 },
-  { espnId: "3150744", name: "Chase McLaughlin", team: "TB", heightIn: 72, weightLb: 190, age: 30, jersey: 4 },
-  { espnId: "17372", name: "Chris Boswell", team: "PIT", heightIn: 74, weightLb: 185, age: 35, jersey: 9 },
-  { espnId: "5081335", name: "Drew Stevens", team: "WAS", heightIn: 73, weightLb: 213, age: 22, jersey: 19 },
-  { espnId: "4034949", name: "Eddy Pineiro", team: "SF", heightIn: 71, weightLb: 190, age: 30, jersey: 18 },
-  { espnId: "4360234", name: "Evan McPherson", team: "CIN", heightIn: 71, weightLb: 185, age: 27, jersey: 2 },
-  { espnId: "3055899", name: "Harrison Butker", team: "KC", heightIn: 76, weightLb: 205, age: 31, jersey: 7 },
-  { espnId: "4574716", name: "Harrison Mevis", team: "LAR", heightIn: 72, weightLb: 245, age: 24, jersey: 92 },
-  { espnId: "4689936", name: "Jake Bates", team: "DET", heightIn: 70, weightLb: 205, age: 27, jersey: 39 },
-  { espnId: "3050478", name: "Jake Elliott", team: "PHI", heightIn: 69, weightLb: 167, age: 31, jersey: 4 },
-  { espnId: "2473037", name: "Jason Myers", team: "SEA", heightIn: 70, weightLb: 190, age: 35, jersey: 5 },
-  { espnId: "3124679", name: "Jason Sanders", team: "NYJ", heightIn: 71, weightLb: 186, age: 30, jersey: 19 },
-  { espnId: "3124084", name: "Joey Slye", team: "TEN", heightIn: 71, weightLb: 213, age: 30, jersey: 6 },
-  { espnId: "2971573", name: "Ka'imi Fairbairn", team: "HOU", heightIn: 72, weightLb: 183, age: 32, jersey: 15 },
-  { espnId: "4249087", name: "Matt Gay", team: "LV", heightIn: 72, weightLb: 232, age: 32, jersey: 14 },
-  { espnId: "10621", name: "Nick Folk", team: "ATL", heightIn: 73, weightLb: 225, age: 41, jersey: 6 },
-  { espnId: "4243371", name: "Riley Patterson", team: "MIA", heightIn: 72, weightLb: 190, age: 26, jersey: 47 },
-  { espnId: "4568263", name: "Ryan Fitzgerald", team: "CAR", heightIn: 71, weightLb: 193, age: 26, jersey: 10 },
-  { espnId: "4869461", name: "Trey Smack", team: "GB", heightIn: 73, weightLb: 188, age: 23, jersey: 28 },
-  { espnId: "3917232", name: "Tyler Bass", team: "BUF", heightIn: 70, weightLb: 183, age: 29, jersey: 16 },
-  { espnId: "4697745", name: "Tyler Loop", team: "BAL", heightIn: 71, weightLb: 191, age: 25, jersey: 33 },
-  { espnId: "2985659", name: "Wil Lutz", team: "DEN", heightIn: 71, weightLb: 184, age: 32, jersey: 3 },
-  { espnId: "4567104", name: "Will Reichard", team: "MIN", heightIn: 73, weightLb: 190, age: 25, jersey: 16 },
+  { espnId: "4258620", name: "Andre Szmyt", team: "CLE", depth: 1, heightIn: 72, weightLb: 200, age: 27, jersey: 25 },
+  { espnId: "4569923", name: "Andy Borregales", team: "NE", depth: 1, heightIn: 71, weightLb: 202, age: 23, jersey: 36 },
+  { espnId: "4566158", name: "Ben Sauls", team: "NYG", depth: 1, heightIn: 70, weightLb: 185, age: 25, jersey: 30 },
+  { espnId: "4259619", name: "Blake Grupe", team: "IND", depth: 1, heightIn: 67, weightLb: 156, age: 27, jersey: 10 },
+  { espnId: "3953687", name: "Brandon Aubrey", team: "DAL", depth: 1, heightIn: 75, weightLb: 218, age: 31, jersey: 17 },
+  { espnId: "17427", name: "Cairo Santos", team: "CHI", depth: 1, heightIn: 68, weightLb: 173, age: 34, jersey: 8 },
+  { espnId: "4686361", name: "Cam Little", team: "JAX", depth: 1, heightIn: 73, weightLb: 172, age: 23, jersey: 39 },
+  { espnId: "4362081", name: "Cameron Dicker", team: "LAC", depth: 1, heightIn: 73, weightLb: 216, age: 26, jersey: 11 },
+  { espnId: "4363538", name: "Chad Ryland", team: "ARI", depth: 1, heightIn: 72, weightLb: 195, age: 26, jersey: 38 },
+  { espnId: "5208518", name: "Charlie Smyth", team: "NO", depth: 1, heightIn: 76, weightLb: 210, age: 25, jersey: 39 },
+  { espnId: "3150744", name: "Chase McLaughlin", team: "TB", depth: 1, heightIn: 72, weightLb: 190, age: 30, jersey: 4 },
+  { espnId: "17372", name: "Chris Boswell", team: "PIT", depth: 1, heightIn: 74, weightLb: 185, age: 35, jersey: 9 },
+  { espnId: "5081335", name: "Drew Stevens", team: "WAS", depth: 1, heightIn: 73, weightLb: 213, age: 22, jersey: 19 },
+  { espnId: "4034949", name: "Eddy Pineiro", team: "SF", depth: 1, heightIn: 71, weightLb: 190, age: 30, jersey: 18 },
+  { espnId: "4360234", name: "Evan McPherson", team: "CIN", depth: 1, heightIn: 71, weightLb: 185, age: 27, jersey: 2 },
+  { espnId: "3055899", name: "Harrison Butker", team: "KC", depth: 1, heightIn: 76, weightLb: 205, age: 31, jersey: 7 },
+  { espnId: "4574716", name: "Harrison Mevis", team: "LAR", depth: 1, heightIn: 72, weightLb: 245, age: 24, jersey: 92 },
+  { espnId: "4689936", name: "Jake Bates", team: "DET", depth: 1, heightIn: 70, weightLb: 205, age: 27, jersey: 39 },
+  { espnId: "3050478", name: "Jake Elliott", team: "PHI", depth: 1, heightIn: 69, weightLb: 167, age: 31, jersey: 4 },
+  { espnId: "2473037", name: "Jason Myers", team: "SEA", depth: 1, heightIn: 70, weightLb: 190, age: 35, jersey: 5 },
+  { espnId: "3124679", name: "Jason Sanders", team: "NYJ", depth: 1, heightIn: 71, weightLb: 186, age: 30, jersey: 19 },
+  { espnId: "3124084", name: "Joey Slye", team: "TEN", depth: 1, heightIn: 71, weightLb: 213, age: 30, jersey: 6 },
+  { espnId: "2971573", name: "Ka'imi Fairbairn", team: "HOU", depth: 1, heightIn: 72, weightLb: 183, age: 32, jersey: 15 },
+  { espnId: "4249087", name: "Matt Gay", team: "LV", depth: 1, heightIn: 72, weightLb: 232, age: 32, jersey: 14 },
+  { espnId: "10621", name: "Nick Folk", team: "ATL", depth: 1, heightIn: 73, weightLb: 225, age: 41, jersey: 6 },
+  { espnId: "4243371", name: "Riley Patterson", team: "MIA", depth: 1, heightIn: 72, weightLb: 190, age: 26, jersey: 47 },
+  { espnId: "4568263", name: "Ryan Fitzgerald", team: "CAR", depth: 1, heightIn: 71, weightLb: 193, age: 26, jersey: 10 },
+  { espnId: "4869461", name: "Trey Smack", team: "GB", depth: 1, heightIn: 73, weightLb: 188, age: 23, jersey: 28 },
+  { espnId: "3917232", name: "Tyler Bass", team: "BUF", depth: 1, heightIn: 70, weightLb: 183, age: 29, jersey: 16 },
+  { espnId: "4697745", name: "Tyler Loop", team: "BAL", depth: 1, heightIn: 71, weightLb: 191, age: 25, jersey: 33 },
+  { espnId: "2985659", name: "Wil Lutz", team: "DEN", depth: 1, heightIn: 71, weightLb: 184, age: 32, jersey: 3 },
+  { espnId: "4567104", name: "Will Reichard", team: "MIN", depth: 1, heightIn: 73, weightLb: 190, age: 25, jersey: 16 },
 ];

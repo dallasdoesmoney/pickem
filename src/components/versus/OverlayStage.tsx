@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { AuctionFormat } from "@/lib/auction/format";
 import type { AuctionState } from "@/lib/auction/engine";
-import { OverlayBoard, STAGE_W, STAGE_H } from "./OverlayBoard";
+import { OverlayBoard, STAGE_W, STAGE_H, DEFAULT_LAYOUT } from "./OverlayBoard";
+import type { LayoutKey } from "./layouts";
 
 // THE MIRROR. The exact graphic OBS is drawing, shrunk to fit on the page
 // you are playing on.
@@ -20,12 +21,14 @@ export function OverlayStage({
   camTop = 560,
   camBottom = 560,
   showCamBands = true,
+  layout = DEFAULT_LAYOUT,
 }: {
   state: AuctionState;
   format: AuctionFormat;
   camTop?: number;
   camBottom?: number;
   showCamBands?: boolean;
+  layout?: LayoutKey;
 }) {
   // Measured rather than assumed, so this is right on a phone and on a
   // desktop without a breakpoint deciding for it.
@@ -58,7 +61,7 @@ export function OverlayStage({
               <div style={{ position: "absolute", top: STAGE_H - camBottom, left: 0, width: STAGE_W, height: camBottom, background: "rgba(255,255,255,0.035)" }} />
             </div>
           )}
-          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} />
+          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} layout={layout} />
         </div>
       )}
     </div>

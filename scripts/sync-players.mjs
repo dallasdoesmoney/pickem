@@ -421,6 +421,12 @@ export type ${position.typeName} = {
   espnId: string;
   name: string;
   team: TeamAbbr;
+  // Where this player sits on their own team's chart: 1 is the starter,
+  // 2 the next one down. The rows below are sorted by NAME, so without
+  // this the only way to pick "the top two receivers on the Vikings" was
+  // to take the first two alphabetically - which is how Justin Jefferson
+  // came to be left off a graphic on a live stream.
+  depth?: number;
   // Hint columns for the daily player puzzle. Optional because ESPN does
   // not publish all of them for everyone; the puzzle hides a column it
   // has no values for rather than showing a row of "?".
@@ -437,6 +443,7 @@ export const ${position.exportName}: ${position.typeName}[] = [
   // player ESPN says nothing about stays a short line.
   const extra = (r) =>
     [
+      r.depth ? `, depth: ${r.depth}` : "",
       r.heightIn ? `, heightIn: ${r.heightIn}` : "",
       r.weightLb ? `, weightLb: ${r.weightLb}` : "",
       r.age ? `, age: ${r.age}` : "",
@@ -544,7 +551,12 @@ async function syncPosition(season, teams, position) {
       `${abbr.padEnd(4)} ${picks.map((p) => `${p.espnId} ${p.name}`).join(" | ").padEnd(46)} ` +
         `[${source}]${others.length ? `  behind: ${others.join(", ")}` : ""}`,
     );
-    for (const pick of picks) rows.push({ ...pick, team: abbr });
+    // depthChartAt returns its picks in chart order (rank first, then the
+    // slot the chart lists them under); the override and roster-fallback
+    // paths are likewise in the order they were chosen. So position in
+    // `picks` IS the depth on all three paths, and setting it in one
+    // place keeps them in step rather than in three.
+    picks.forEach((pick, i) => rows.push({ ...pick, team: abbr, depth: i + 1 }));
   }
 
   // A partial file is worse than none: a category quietly missing five
