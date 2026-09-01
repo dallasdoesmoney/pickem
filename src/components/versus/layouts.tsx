@@ -375,7 +375,7 @@ function makeSplit(opts: Split) {
 // the word QB between them. Nobody has to be told what to compare.
 // Big enough that the mark is legible across a room, and big enough to
 // carry a number inside it without the two fighting.
-const LOT_SIZE = 250;
+const LOT_SIZE = 180;
 // The centre column, and the gap the two names straddle above it.
 const SPINE_W = 250;
 
@@ -454,7 +454,6 @@ function SpineLayout({ state, format }: LayoutProps) {
   const budget = (who: number) => (
     <div
       style={{
-        position: "relative",
         flex: "1 1 0",
         minWidth: 0,
         display: "flex",
@@ -462,26 +461,33 @@ function SpineLayout({ state, format }: LayoutProps) {
         alignItems: who === 0 ? "flex-end" : "flex-start",
       }}
     >
-      {/* THE WINNING BID, parked over the winner's name until they say
-          where it goes. ABSOLUTE, so it takes no layout space: reserving
-          a band for it left 54 empty pixels between the logo and the
-          names for the entire time nobody had won anything, which was
-          the gap that made the logo look stranded up there. */}
-      {wonBy === who && (
-        <div style={{ position: "absolute", bottom: "100%", marginBottom: 4, [who === 0 ? "right" : "left"]: 0 }}>
-          <FlyingPrice amount={state.won?.price ?? 0} color={PLAYER_COLORS[who]} from={logoRef} />
-        </div>
-      )}
       <div
         data-budget={who}
         data-amount={state.players[who].budget}
         style={{
+          position: "relative",
           display: "flex",
           alignItems: "baseline",
           gap: 10,
           flexDirection: who === 0 ? "row" : "row-reverse",
         }}
       >
+        {/* THE WINNING BID, parked over the winner's name until they say
+            where it goes.
+            
+            ABSOLUTE, so it takes no layout space - reserving a band for
+            it left 54 empty pixels between the logo and the names for the
+            whole time nobody had won anything.
+            
+            Anchored to the NAME, not to the column, and to the name's
+            OUTER end. Anchored to the column it sat against the spine,
+            which was clear space until the logo moved down onto that
+            line and started sharing it. */}
+        {wonBy === who && (
+          <div style={{ position: "absolute", bottom: "100%", marginBottom: 2, [who === 0 ? "left" : "right"]: 0 }}>
+            <FlyingPrice amount={state.won?.price ?? 0} color={PLAYER_COLORS[who]} from={logoRef} />
+          </div>
+        )}
         <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
           {state.players[who].name.toUpperCase()}
         </span>
@@ -505,56 +511,46 @@ function SpineLayout({ state, format }: LayoutProps) {
         .versus-pick-in { animation: versusPickIn 780ms cubic-bezier(0.34, 0.02, 0.18, 1) both; }
       `}</style>
 
-      {/* THE LOGO ON ITS OWN LINE. Beside the names it had to share the
-          bottom of its box with the price, and the two ran into each
-          other. A line each, and the names still sit over their own
-          column because the gap between them is exactly the spine. */}
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <div
-          ref={logoRef}
-          style={{
-            position: "relative",
-            width: LOT_SIZE,
-            height: LOT_SIZE,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {state.phase === "ready" ? (
-            held ? <LotLogo item={held} size={LOT_SIZE} /> : <LotWaiting size={LOT_SIZE} />
-          ) : state.phase === "spinning" && item ? (
-            <LogoReel key={item.id} format={format} targetId={item.id} size={LOT_SIZE} />
-          ) : (
-            <LotLogo item={item} size={LOT_SIZE} />
-          )}
-
-          {/* Bottom of the logo, not the middle of it. Centred, it sat on
-              the mark; down here it reads as a price tag on the thing
-              rather than a hole punched through it. */}
-          {state.phase === "bidding" && head.amount !== null && (
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: -6,
-                display: "flex",
-                justifyContent: "center",
-              }}
-            >
-              <Money amount={head.amount} size={78} color={head.color} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* The names, one over each column, separated by exactly the width
-          of the spine so they land above their own picks. */}
-      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", marginTop: 2, marginBottom: 12 }}>
+      {/* THE LOGO SITS BETWEEN THE TWO NAMES, on their line.
+      
+          It used to have a row of its own, which cost its full height on
+          a graphic whose whole problem is height. In the centre column -
+          the same 250 the spine below it occupies - it costs nothing
+          extra, and the names bottom-align to it so the three read as one
+          band. Smaller than it was, because it no longer needs to carry
+          the layout on its own. */}
+      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", marginBottom: 12 }}>
         {budget(0)}
-        <div style={{ width: SPINE_W, flexShrink: 0 }} />
+        <div style={{ width: SPINE_W, flexShrink: 0, display: "flex", justifyContent: "center" }}>
+          <div
+            ref={logoRef}
+            style={{
+              position: "relative",
+              width: LOT_SIZE,
+              height: LOT_SIZE,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {state.phase === "ready" ? (
+              held ? <LotLogo item={held} size={LOT_SIZE} /> : <LotWaiting size={LOT_SIZE} />
+            ) : state.phase === "spinning" && item ? (
+              <LogoReel key={item.id} format={format} targetId={item.id} size={LOT_SIZE} />
+            ) : (
+              <LotLogo item={item} size={LOT_SIZE} />
+            )}
+
+            {/* INSIDE the logo now, not hanging off its chin - hanging
+                below put it on the same line as the names the moment the
+                two shared a row. */}
+            {state.phase === "bidding" && head.amount !== null && (
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 2, display: "flex", justifyContent: "center" }}>
+                <Money amount={head.amount} size={60} color={head.color} />
+              </div>
+            )}
+          </div>
+        </div>
         {budget(1)}
       </div>
 
