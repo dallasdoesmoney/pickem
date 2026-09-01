@@ -312,9 +312,16 @@ function makeSplit(opts: Split) {
 // rosters side by side and leaves the viewer to work out who has the
 // better quarterback; here the two quarterbacks are on the same line with
 // the word QB between them. Nobody has to be told what to compare.
+// Big enough that the mark is legible across a room, and big enough to
+// carry a number inside it without the two fighting.
+const LOT_SIZE = 300;
+
 function SpineLayout({ state, format }: LayoutProps) {
   const head = headline(state, format);
-  const name = lotName(state, format);
+  // Held back until the reel lands. A price over a spinning reel is two
+  // things moving in the same square inch, and there is nothing to say
+  // yet anyway - bidding has not opened.
+  const showPrice = head.amount !== null && state.phase !== "ready" && state.phase !== "spinning";
 
   // The badge sits INSIDE, next to the label, on both sides - so the
   // badges form two columns flanking the spine and the eye runs
@@ -345,16 +352,24 @@ function SpineLayout({ state, format }: LayoutProps) {
 
   return (
     <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "0 24px" }}>
-      {/* THE PRICE, on top and biggest. It is the number that moves. */}
-      {head.amount !== null && <Money amount={head.amount} size={150} color={head.live ? MONEY : "rgba(255,255,255,0.45)"} />}
-      <div style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: 4, color: head.color, marginTop: -6, ...outlined(26) }}>
-        {head.text}
+      {/* THE LOT: one big logo, with the price sitting ON it.
+          
+          No team name beside it. The mark IS the name - putting
+          "PITTSBURGH STEELERS" next to the Steelers logo says the same
+          thing twice and costs the logo half its size to do it. And with
+          the price overlaid rather than stacked above, the number can be
+          smaller and the whole block is still the loudest thing here. */}
+      <div style={{ position: "relative", width: LOT_SIZE, height: LOT_SIZE, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Lot state={state} format={format} size={LOT_SIZE} />
+        {showPrice && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Money amount={head.amount ?? 0} size={126} color={head.live ? MONEY : "rgba(255,255,255,0.62)"} />
+          </div>
+        )}
       </div>
 
-      {/* THE TEAM on the block, under the price. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 2 }}>
-        <Lot state={state} format={format} size={128} />
-        <div style={nameStyle(name, 38)}>{name}</div>
+      <div style={{ fontFamily: "var(--font-display)", fontSize: 28, letterSpacing: 4, color: head.color, marginTop: -4, ...outlined(28) }}>
+        {head.text}
       </div>
 
       {/* Who is spending what. Straddles the spine, so each budget sits
@@ -433,7 +448,7 @@ type Entry = { name: string; note: string; Component: (p: LayoutProps) => React.
 export const LAYOUTS: Record<LayoutKey, Entry> = {
   s1: {
     name: "Spine",
-    note: "Positions down the middle, big. Each pick sits on the side of the player who won it, so the two quarterbacks are on the same line with the word QB between them. Price on top, team under it.",
+    note: "Positions down the middle, big. Each pick sits on the side of the player who won it, so the two quarterbacks are on the same line with the word QB between them. One big logo up top with the price sitting on it.",
     Component: SpineLayout,
   },
   ...(Object.fromEntries(
