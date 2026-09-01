@@ -197,16 +197,6 @@ type LayoutProps = { state: AuctionState; format: AuctionFormat; pick?: PickKey 
 //
 // `side` is which player owns it: 0 reads outwards to the left, 1 to the
 // right, and every card mirrors rather than being drawn twice.
-type PickCard = {
-  name: string;
-  note: string;
-  // Ledger pins its price to the outer edge, which only lines the five up
-  // in a column if the card actually spans the column. Every other card
-  // shrinks to its contents and sits against the spine.
-  fullWidth?: boolean;
-  Component: (p: { entry: RosterEntry; who: number }) => React.ReactElement;
-};
-
 const NAME_SIZE = 42;
 
 // `comfortable` is how many characters fit before it starts shrinking,
@@ -219,132 +209,148 @@ function pickName(entry: RosterEntry, size = NAME_SIZE, comfortable = 12) {
   return { text, size: fitSize(text, size, comfortable) };
 }
 
-// 1. BADGE - what is there now. Logo, then surname. No price.
-function BadgeCard({ entry, who }: { entry: RosterEntry; who: number }) {
-  const { text, size } = pickName(entry);
-  return (
-    <div style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
-      <Badge url={entry.badge} size={44} />
-      <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: PLAYER_COLORS[who], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
-        {text}
-      </span>
-    </div>
-  );
-}
+// FIVE VARIATIONS ON THE CHIP.
+//
+// The shape is settled: a pill holding the team badge, the surname and
+// what the pick cost. What is left is how the pill is FILLED, which is
+// the part that decides whether it reads as a label or as an object, and
+// how hard it works over a moving camera.
+//
+// A factory, not five copies. They agree on nine tenths of their markup
+// and the point of comparing them is that only the named difference
+// differs - the same reason the layouts were built this way.
+type Chip = {
+  name: string;
+  note: string;
+  // Background and border, given the team's colour.
+  fill: (accent: string) => string;
+  border: (accent: string) => string;
+  radius: number;
+  // A solid block of team colour behind the badge only.
+  cap?: boolean;
+  // A thick bar of team colour on the OUTER edge, away from the spine.
+  edgeBar?: boolean;
+  // White reads as "a thing on the board"; the player's colour reads as
+  // "mine". Which is right depends on how loud the fill already is.
+  nameColor: "white" | "player";
+};
 
-// 2. CHIP - a pill in the team's colour holding badge, name and price.
-//    Reads as an object you own rather than a line of text, and the tint
-//    is a second, faster way to tell two picks apart.
-function ChipCard({ entry, who }: { entry: RosterEntry; who: number }) {
-  // Smaller than the badge card's 42: the pill spends room on padding
-  // and on the price, and the name has to give it back.
-  const { text, size } = pickName(entry, 30, 9);
-  const accent = entry.accent ?? "#8899aa";
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: who === 0 ? "row-reverse" : "row",
-        alignItems: "center",
-        gap: 9,
-        padding: "5px 14px",
-        borderRadius: 999,
-        background: `${accent}33`,
-        border: `2px solid ${accent}bb`,
-      }}
-    >
-      <Badge url={entry.badge} size={32} />
-      <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: "#ffffff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
-        {text}
-      </span>
-      <span style={{ fontFamily: "var(--font-display)", fontSize: 26, lineHeight: 1, color: MONEY, fontVariantNumeric: "tabular-nums", ...outlined(26) }}>
-        ${entry.price}
-      </span>
-    </div>
-  );
-}
+function makeChip(chip: Chip) {
+  return function ChipCard({ entry, who }: { entry: RosterEntry; who: number }) {
+    const { text, size } = pickName(entry, 30, 9);
+    const accent = entry.accent ?? "#8899aa";
+    const outer = who === 0 ? "left" : "right";
+    return (
+      <div
+        style={{
+          position: "relative",
+          display: "flex",
+          flexDirection: who === 0 ? "row-reverse" : "row",
+          alignItems: "center",
+          gap: 9,
+          padding: chip.edgeBar ? (who === 0 ? "5px 14px 5px 22px" : "5px 22px 5px 14px") : "5px 14px",
+          borderRadius: chip.radius,
+          background: chip.fill(accent),
+          border: chip.border(accent),
+          overflow: "hidden",
+        }}
+      >
+        {chip.cap && (
+          // Behind the badge only, and it has to sit on the badge's side
+          // of the pill - which flips with the player.
+          <span style={{ position: "absolute", top: 0, bottom: 0, [who === 0 ? "right" : "left"]: 0, width: 54, background: accent }} />
+        )}
+        {chip.edgeBar && <span style={{ position: "absolute", top: 0, bottom: 0, [outer]: 0, width: 9, background: accent }} />}
 
-// 3. PLATE - no logo at all. A bar in the team's colour does the job the
-//    badge was doing, in four pixels instead of forty-four, and the room
-//    that frees goes to the name.
-function PlateCard({ entry, who }: { entry: RosterEntry; who: number }) {
-  const { text, size } = pickName(entry, 36, 10);
-  const accent = entry.accent ?? "#8899aa";
-  return (
-    <div style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
-      <span style={{ width: 6, height: size * 0.95, background: accent, borderRadius: 3, flexShrink: 0 }} />
-      <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: PLAYER_COLORS[who], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
-        {text}
-      </span>
-      <span style={{ fontFamily: "var(--font-display)", fontSize: 24, lineHeight: 1, color: MONEY, fontVariantNumeric: "tabular-nums", ...outlined(24) }}>
-        ${entry.price}
-      </span>
-    </div>
-  );
-}
-
-// 4. STACKED - surname over the price, badge alongside. Two lines, so it
-//    is the tallest, and the narrowest by some way - which is the trade
-//    when a name is long.
-function StackedCard({ entry, who }: { entry: RosterEntry; who: number }) {
-  const { text, size } = pickName(entry, 34, 11);
-  return (
-    <div style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 9 }}>
-      <Badge url={entry.badge} size={40} />
-      <div style={{ display: "flex", flexDirection: "column", alignItems: who === 0 ? "flex-end" : "flex-start", gap: 1 }}>
-        <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: PLAYER_COLORS[who], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
+        <span style={{ position: "relative", display: "flex" }}>
+          <Badge url={entry.badge} size={32} />
+        </span>
+        <span
+          style={{
+            position: "relative",
+            fontFamily: "var(--font-display)",
+            fontSize: size,
+            lineHeight: 1,
+            color: chip.nameColor === "white" ? "#ffffff" : PLAYER_COLORS[who],
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            minWidth: 0,
+            ...outlined(size),
+          }}
+        >
           {text}
         </span>
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 22, lineHeight: 1, color: MONEY, ...outlined(22) }}>
+        <span
+          style={{
+            position: "relative",
+            fontFamily: "var(--font-display)",
+            fontSize: 26,
+            lineHeight: 1,
+            color: MONEY,
+            fontVariantNumeric: "tabular-nums",
+            ...outlined(26),
+          }}
+        >
           ${entry.price}
         </span>
       </div>
-    </div>
-  );
+    );
+  };
 }
 
-// 5. LEDGER - price pinned to the OUTER edge, so all five line up in a
-//    column down each side of the screen and a viewer can read what a
-//    roster cost without adding anything up.
-function LedgerCard({ entry, who }: { entry: RosterEntry; who: number }) {
-  const { text, size } = pickName(entry, 34, 10);
-  return (
-    <div style={{ display: "flex", flexDirection: who === 0 ? "row" : "row-reverse", alignItems: "center", gap: 12, width: "100%" }}>
-      <span
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 26,
-          lineHeight: 1,
-          color: MONEY,
-          fontVariantNumeric: "tabular-nums",
-          width: 62,
-          textAlign: who === 0 ? "left" : "right",
-          flexShrink: 0,
-          ...outlined(26),
-        }}
-      >
-        ${entry.price}
-      </span>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 9, justifyContent: "flex-start" }}>
-        <Badge url={entry.badge} size={38} />
-        <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: PLAYER_COLORS[who], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
-          {text}
-        </span>
-      </div>
-    </div>
-  );
-}
+export type PickKey = "tint" | "solid" | "capped" | "outline" | "slab";
+export const DEFAULT_PICK: PickKey = "tint";
 
-export type PickKey = "badge" | "chip" | "plate" | "stacked" | "ledger";
-export const DEFAULT_PICK: PickKey = "badge";
-
-export const PICK_CARDS: Record<PickKey, PickCard> = {
-  badge: { name: "Badge", note: "What is there now: logo, then surname. The only one that does not say what the pick cost.", Component: BadgeCard },
-  chip: { name: "Chip", note: "A pill tinted with the team's colour, holding logo, name and price. Reads as an object you own rather than a line of text.", Component: ChipCard },
-  plate: { name: "Plate", note: "No logo. A bar in the team's colour does that job in six pixels instead of forty-four, and the name gets the room.", Component: PlateCard },
-  stacked: { name: "Stacked", note: "Surname over the price, badge alongside. Tallest, and much the narrowest - which is the trade when a name is long.", Component: StackedCard },
-  ledger: { fullWidth: true, name: "Ledger", note: "Price pinned to the outer edge, so all five line up in a column and you can read what a roster cost at a glance.", Component: LedgerCard },
+const CHIPS: Record<PickKey, Chip> = {
+  tint: {
+    name: "Tint",
+    note: "The one you liked. A wash of the team's colour inside, the same colour as the border. Quietest of the five and the least likely to fight a busy camera behind it.",
+    fill: (a) => `${a}33`,
+    border: (a) => `2px solid ${a}bb`,
+    radius: 999,
+    nameColor: "white",
+  },
+  solid: {
+    name: "Solid",
+    note: "The team's colour at full strength. Loudest, and the only one where the team reads before the name does - which is either the point or the problem.",
+    fill: (a) => a,
+    border: () => "2px solid rgba(5,7,13,0.55)",
+    radius: 999,
+    nameColor: "white",
+  },
+  capped: {
+    name: "Capped",
+    note: "Dark body, with a solid block of team colour behind the badge only. The colour is there to be found rather than shouted, and the name sits on a flat ground at every team.",
+    fill: () => "rgba(5,7,13,0.62)",
+    border: (a) => `2px solid ${a}88`,
+    radius: 999,
+    cap: true,
+    nameColor: "white",
+  },
+  outline: {
+    name: "Outline",
+    note: "No fill at all - the camera shows through. Lightest over a face, and the name keeps the player's colour because nothing else on the chip is carrying it.",
+    fill: () => "transparent",
+    border: (a) => `3px solid ${a}`,
+    radius: 999,
+    nameColor: "player",
+  },
+  slab: {
+    name: "Slab",
+    note: "Square corners and a thick bar of team colour down the outer edge. Reads as a nameplate rather than a token, and the bars line up in a column down each side.",
+    fill: () => "rgba(5,7,13,0.62)",
+    border: () => "2px solid rgba(255,255,255,0.14)",
+    radius: 8,
+    edgeBar: true,
+    nameColor: "white",
+  },
 };
+
+export const PICK_CARDS: Record<PickKey, { name: string; note: string; fullWidth?: boolean; Component: (p: { entry: RosterEntry; who: number }) => React.ReactElement }> =
+  Object.fromEntries(
+    (Object.keys(CHIPS) as PickKey[]).map((key) => [key, { name: CHIPS[key].name, note: CHIPS[key].note, Component: makeChip(CHIPS[key]) }]),
+  ) as Record<PickKey, { name: string; note: string; fullWidth?: boolean; Component: (p: { entry: RosterEntry; who: number }) => React.ReactElement }>;
 
 export function isPickKey(value: string | null): value is PickKey {
   return value !== null && value in PICK_CARDS;

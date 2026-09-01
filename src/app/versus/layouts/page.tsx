@@ -74,8 +74,8 @@ export default function LayoutsPage() {
         PLAYER CARDS
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-white/50">
-        Five ways to draw a pick, in the layout you picked. Same moment of the same draft in each. Four of the
-        five show what the pick cost &mdash; that number is invisible today the moment a lot is sold.
+        Five versions of the chip, in the layout you picked. Same moment of the same draft in each. Same
+        shape, same size, same price on the end &mdash; the only thing that changes is how the pill is filled.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">

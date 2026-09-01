@@ -23,7 +23,7 @@ import { isLayoutKey, isPickKey, DEFAULT_PICK } from "@/components/versus/layout
 //   ?format=nfl-teams which mode the DEMO draws (ignored in a room)
 //   ?phase=ready|spinning  which moment of a lot the DEMO holds on
 //   ?layout=a..e      which arrangement - see /versus/layouts
-//   ?pick=badge|chip|plate|stacked|ledger   how a pick is drawn
+//   ?pick=tint|solid|capped|outline|slab   how a pick is drawn
 //   ?p1=Noah&p2=Ben   names on the DEMO rails (ignored in a room)
 //
 // The cam bands are query parameters rather than constants because they
