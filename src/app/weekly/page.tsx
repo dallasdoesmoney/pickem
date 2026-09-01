@@ -25,6 +25,7 @@ import { kpiFraction, kpiSizer } from "@/lib/kpiScale";
 import { useBoardView } from "@/hooks/useBoardView";
 import { StreamerSettings } from "@/components/StreamerSettings";
 import { SavePicksPrompt } from "@/components/SavePicksPrompt";
+import { ChoosingBar, lockPromptFor, fitPillText } from "@/components/weekly/LockChooser";
 
 const PENDING_SAVE_KEY = "pickem:pending-save-intent";
 
@@ -57,10 +58,18 @@ function StatPills({
   stats,
   lockedTeam,
   kpi,
+  choosingLock,
+  onToggleChoosing,
+  canChoose,
 }: {
   stats: PickStats;
   lockedTeam: (typeof TEAMS)[TeamAbbr] | null;
   kpi: (phone: number, desktop: number) => number;
+  // Lock mode. Absent on the predictor and anywhere else that reuses
+  // these pills without a board to choose from.
+  choosingLock?: boolean;
+  onToggleChoosing?: () => void;
+  canChoose?: boolean;
 }) {
   const labelStyle = { fontSize: kpi(8, 11), marginTop: kpi(2, 2) };
   return (
@@ -84,32 +93,76 @@ function StatPills({
       {/* Center slot - the most prominent pill (widest, emerald border),
           previously Boldest Pick. Lock of the Week took over this spot
           since it's the more important tag; Boldest Pick moved to the
-          slot Chalk used to occupy below. */}
-      <div
-        className="relative shrink-0 rounded-full border-2 text-center flex flex-col items-center justify-center"
-        style={{
-          ...PILL_STYLE,
-          borderColor: LOCK_COLOR,
-          background: lockedTeam ? lockedTeam.color : PILL_STYLE.background,
-          width: kpi(144, 250),
-          height: kpi(56, 88),
-        }}
-      >
-        <PillTexture />
-        <img
-          src="/lock-of-week.png"
-          alt=""
-          className="absolute w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
-          style={{ top: -kpi(8, 12), left: -kpi(4, 6), height: kpi(32, 64) }}
-        />
-        <div
-          className="relative z-10 flex items-center justify-center"
-          style={{ fontFamily: "var(--font-display)", color: "#4ade80", fontSize: kpi(16, 24), gap: kpi(4, 6) }}
-        >
-          {lockedTeam ? <img src={lockedTeam.logo} alt="" crossOrigin="anonymous" className="w-auto" style={{ height: kpi(32, 64) }} /> : "-"}
-        </div>
-        <div className="relative z-10 text-white/55" style={labelStyle}>LOCK OF THE WEEK</div>
-      </div>
+          slot Chalk used to occupy below.
+
+          AND, when there is no lock yet, it is the button that sets one.
+          It used to show a dash, which reported the problem and offered
+          nothing - the fix for "you have no lock" now lives in the one
+          place that says so. See LockChooser.tsx. */}
+      {(() => {
+        const pillWidth = kpi(144, 250);
+        // How far the padlock actually reaches into the pill: it is
+        // drawn at height kpi(32,64) starting at left -kpi(4,6), so it
+        // covers that much of the left edge and the text has to start
+        // after it. The right side only needs breathing room, not a
+        // mirror of it - mirroring cost the type two sizes for nothing.
+        const lockIntrusion = kpi(30, 60);
+        const rightMargin = kpi(14, 22);
+        const label = choosingLock ? "CANCEL" : "SET YOUR LOCK";
+        // Solved, not guessed: whichever is smaller, the size the row
+        // height allows or the size this many characters allows in the
+        // width they actually have.
+        const actionSize = fitPillText(label, pillWidth, lockIntrusion, rightMargin, kpi(15, 22));
+        const asButton = !lockedTeam && !!onToggleChoosing;
+        const Tag = asButton ? "button" : "div";
+        return (
+          <Tag
+            type={asButton ? "button" : undefined}
+            onClick={asButton ? onToggleChoosing : undefined}
+            aria-pressed={asButton ? !!choosingLock : undefined}
+            className={`relative shrink-0 rounded-full border-2 text-center flex flex-col items-center justify-center ${
+              asButton ? `cursor-pointer transition-transform active:scale-95 ${choosingLock || !canChoose ? "" : "lock-halo"}` : ""
+            }`}
+            style={{
+              ...PILL_STYLE,
+              borderColor: LOCK_COLOR,
+              background: lockedTeam ? lockedTeam.color : PILL_STYLE.background,
+              width: pillWidth,
+              height: kpi(56, 88),
+            }}
+          >
+            <PillTexture />
+            <img
+              src="/lock-of-week.png"
+              alt=""
+              className="absolute w-auto rotate-[-18deg] drop-shadow-[0_3px_4px_rgba(0,0,0,0.6)] z-10"
+              style={{ top: -kpi(8, 12), left: -kpi(4, 6), height: kpi(32, 64) }}
+            />
+            <div
+              className="relative z-10 flex items-center justify-center whitespace-nowrap"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: lockedTeam ? "#4ade80" : LOCK_COLOR,
+                fontSize: lockedTeam ? kpi(16, 24) : actionSize,
+                gap: kpi(4, 6),
+                // Only the TEXT needs to dodge the padlock. A logo is
+                // centred under it and has always looked right there.
+                paddingLeft: lockedTeam ? 0 : lockIntrusion,
+                paddingRight: lockedTeam ? 0 : rightMargin,
+              }}
+            >
+              {lockedTeam ? (
+                <img src={lockedTeam.logo} alt="" crossOrigin="anonymous" className="w-auto" style={{ height: kpi(32, 64) }} />
+              ) : asButton ? (
+                label
+              ) : (
+                "-"
+              )}
+            </div>
+            <div className="relative z-10 text-white/55" style={labelStyle}>LOCK OF THE WEEK</div>
+          </Tag>
+        );
+      })()}
       <div
         className="relative shrink-0 rounded-full border-2 border-white text-center flex flex-col items-center justify-center"
         style={{ ...PILL_STYLE, width: kpi(88, 172), height: kpi(56, 88) }}
@@ -371,6 +424,10 @@ export default function Home() {
   // - the hook cannot see the save calls, and the save calls cannot see
   // local storage.
   const { picks, setPick, resetPicks, loaded, lockedGameId, toggleLock } = usePicks(activeWeek, view.streamerMode);
+  // Lock mode - see LockChooser.tsx. Not in usePicks because it is not
+  // part of a saved week: it is a thing the screen is doing, and it dies
+  // with the render rather than with the draft.
+  const [choosingLock, setChoosingLock] = useState(false);
   const { confirm, dialog } = useConfirmDialog();
   const { user, profile, loading: authLoading } = useAuth();
   const { requestSignIn, signInModal } = useSignInModal();
@@ -717,8 +774,17 @@ export default function Home() {
     const tabFontPx = Math.max(7.5, 10.6 * gridScale);
     const tabTextHeight = tabFontPx * 1.15;
     const tabPadSlack = Math.max(1, tabVisibleHeight - tabTextHeight);
+    // In lock mode a game you have not picked is not a candidate, so it
+    // steps back rather than sitting there looking tappable. Picking is
+    // still allowed - somebody who realises mid-choose that they never
+    // picked the game they are sure about can just pick it.
+    const dim = choosingLock && lockedGameId === null && !picks[game.id];
     return (
-      <div key={key} className="relative">
+      <div
+        key={key}
+        className="relative"
+        style={{ opacity: dim ? 0.3 : 1, filter: dim ? "grayscale(1)" : undefined, transition: "opacity 180ms, filter 180ms" }}
+      >
         {showTab && (
         <div
           className="absolute left-1/2 -translate-x-1/2 rounded-t-md border border-b-0 border-white/15 bg-[#1b2947] tracking-wide text-white/55 whitespace-nowrap"
@@ -744,7 +810,15 @@ export default function Home() {
           locked={!isEditable}
           isLockPick={lockedGameId === game.id}
           hasLock={lockedGameId !== null}
-          onToggleLock={() => toggleLock(game.id)}
+          onToggleLock={() => {
+            toggleLock(game.id);
+            // Choosing is over the moment a lock lands, otherwise the
+            // board stays dimmed behind a finished job. Clearing one
+            // (tapping the lock you already set) leaves the mode off
+            // too - the pill is right there to start it again.
+            setChoosingLock(false);
+          }}
+          lockPrompt={lockPromptFor(choosingLock, lockedGameId !== null)}
           scale={gridScale}
           compact={view.compact}
         />
@@ -914,6 +988,9 @@ export default function Home() {
                 the column hugs the card at any screen size, mobile
                 included - this same grid now runs everywhere, there's no
                 separate single-column mobile layout anymore. */}
+            {/* Above the grid, because the grid is what it is talking
+                about. Only up while the mode is. */}
+            {choosingLock && lockedGameId === null && <ChoosingBar hasPicks={pickedCount > 0} scale={gridScale} />}
             <div
               className="grid items-stretch justify-center"
               style={{
@@ -935,7 +1012,21 @@ export default function Home() {
             </div>
 
             <div style={{ marginTop: 20 * view.zoom }}>
-              {hasResults ? <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} /> : <StatPills stats={stats} lockedTeam={lockedTeam} kpi={kpi} />}
+              {hasResults ? (
+                <ResultsPill correct={correctCount} total={gradedCount} avatarUrl={profile?.avatar_url} />
+              ) : (
+                <StatPills
+                  stats={stats}
+                  lockedTeam={lockedTeam}
+                  kpi={kpi}
+                  choosingLock={choosingLock}
+                  canChoose={pickedCount > 0}
+                  // A closed week has nothing to set, so the pill goes
+                  // back to being a pill rather than a button that
+                  // cannot do anything.
+                  onToggleChoosing={isEditable ? () => setChoosingLock((v) => !v) : undefined}
+                />
+              )}
             </div>
 
             <div className="flex justify-center" style={{ marginTop: 20 * view.zoom }}>
