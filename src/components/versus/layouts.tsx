@@ -313,14 +313,26 @@ function makeSplit(opts: Split) {
 // the word QB between them. Nobody has to be told what to compare.
 // Big enough that the mark is legible across a room, and big enough to
 // carry a number inside it without the two fighting.
-const LOT_SIZE = 300;
+const LOT_SIZE = 250;
+// The centre column, and the gap the two names straddle above it.
+const SPINE_W = 250;
 
 function SpineLayout({ state, format }: LayoutProps) {
   const head = headline(state, format);
-  // Held back until the reel lands. A price over a spinning reel is two
-  // things moving in the same square inch, and there is nothing to say
-  // yet anyway - bidding has not opened.
-  const showPrice = head.amount !== null && state.phase !== "ready" && state.phase !== "spinning";
+  const item = currentItem(state, format);
+
+  // WHILE WAITING, THE LAST TEAM STAYS UP. A lot ends, the pick lands on
+  // a roster, and the logo used to blink back to a dashed question mark
+  // immediately - throwing away the thing everyone is still looking at.
+  // It holds until START spins the next one.
+  const last = state.history[state.history.length - 1];
+  const held = last ? (format.items.find((i) => i.id === last.itemId) ?? null) : null;
+
+  // The price lives in one of two places and never both. While bidding it
+  // sits ON the logo; the moment somebody wins it moves to their side and
+  // waits above their name until the pick is placed, which is what makes
+  // "who just got that, and for how much" a single glance.
+  const wonBy = state.phase === "assigning" && state.won ? state.won.by : null;
 
   // The badge sits INSIDE, next to the label, on both sides - so the
   // badges form two columns flanking the spine and the eye runs
@@ -336,10 +348,19 @@ function SpineLayout({ state, format }: LayoutProps) {
       return <span data-pick={who} data-filled="0" style={{ width: 46, height: 4, background: "rgba(255,255,255,0.14)", borderRadius: 2 }} />;
     }
     const text = (entry.short ?? entry.label).toUpperCase();
-    const size = fitSize(text, 30, 11);
+    const size = fitSize(text, 42, 12);
     return (
-      <div data-pick={who} data-filled="1" style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 9, minWidth: 0 }}>
-        <Badge url={entry.badge} size={34} />
+      <div
+        data-pick={who}
+        data-filled="1"
+        // Keyed on what is in the slot, so a pick that has just arrived
+        // mounts fresh and plays the animation once. Re-renders for
+        // anything else reuse it and it stays still.
+        key={entry.itemId}
+        className="versus-pick-in"
+        style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 10, minWidth: 0 }}
+      >
+        <Badge url={entry.badge} size={44} />
         <span
           style={{
             fontFamily: "var(--font-display)",
@@ -356,52 +377,67 @@ function SpineLayout({ state, format }: LayoutProps) {
     );
   };
 
-  // EQUAL WIDTH, both sides. With the two blocks sized to their own text
-  // ("NOAH $9" against "$14 BEN") space-between put the logo wherever the
-  // difference left it, which is to say never quite over the positions.
-  // Equal flex basis and the logo is centred whatever the names are.
+  // BOTH SIDES THE SAME DISTANCE FROM THE SPINE, and that distance is
+  // small. They used to be pushed out to the far edges of the stage while
+  // every pick below them hugged the middle, so the two rows did not read
+  // as belonging to the same player. Now the name sits over its own
+  // column, mirrored, and the equal flex basis keeps the logo centred
+  // whatever the names are.
   //
   // Nothing is dimmed. Who holds what has to be readable at every moment,
   // not just on your turn - the rosters are the thing viewers are
   // comparing, and fading one of them hides the comparison.
   const budget = (who: number) => (
     <div
-      data-budget={who}
-      data-amount={state.players[who].budget}
       style={{
         flex: "1 1 0",
         minWidth: 0,
         display: "flex",
-        alignItems: "baseline",
-        justifyContent: who === 0 ? "flex-start" : "flex-end",
-        gap: 10,
-        flexDirection: who === 0 ? "row" : "row-reverse",
+        flexDirection: "column",
+        alignItems: who === 0 ? "flex-end" : "flex-start",
+        gap: 4,
       }}
     >
-      <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
-        {state.players[who].name.toUpperCase()}
-      </span>
-      {/* Green, while the price above is a player colour. Green is what
-          you have; a colour is what is being bid right now. */}
-      <Money amount={state.players[who].budget} size={34} />
+      {/* THE WINNING BID, parked over the winner's name until they say
+          where it goes. */}
+      <div style={{ height: 54, display: "flex", alignItems: "flex-end" }}>
+        {wonBy === who && <Money amount={state.won?.price ?? 0} size={52} color={PLAYER_COLORS[who]} />}
+      </div>
+      <div
+        data-budget={who}
+        data-amount={state.players[who].budget}
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 10,
+          flexDirection: who === 0 ? "row" : "row-reverse",
+        }}
+      >
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
+          {state.players[who].name.toUpperCase()}
+        </span>
+        {/* Green, while the bid is a player colour. Green is what you
+            have; a colour is what is being bid right now. */}
+        <Money amount={state.players[who].budget} size={34} />
+      </div>
     </div>
   );
 
   return (
     <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "0 24px" }}>
-      {/* THE LOT, sitting directly on top of the first position.
-      
-          The budgets moved out to the edges of this same line rather than
-          taking a row of their own between the logo and the spine, which
-          is what was holding the logo away from it.
+      <style>{`
+        @keyframes versusPickIn {
+          from { opacity: 0; transform: translateY(-14px) scale(0.94); }
+          to   { opacity: 1; transform: none; }
+        }
+        .versus-pick-in { animation: versusPickIn 340ms cubic-bezier(0.16, 0.9, 0.24, 1) both; }
+      `}</style>
 
-          There is no "NOAH BIDS" line any more either. The price is in
-          the bidding player's colour, so the line was captioning
-          something already on screen - and the colour says it in a glance
-          rather than a read. Before anyone opens, the $0 carries the
-          colour of whoever is on the clock. */}
-      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", gap: 12 }}>
-        {budget(0)}
+      {/* THE LOGO ON ITS OWN LINE. Beside the names it had to share the
+          bottom of its box with the price, and the two ran into each
+          other. A line each, and the names still sit over their own
+          column because the gap between them is exactly the spine. */}
+      <div style={{ display: "flex", justifyContent: "center" }}>
         <div
           style={{
             position: "relative",
@@ -413,13 +449,39 @@ function SpineLayout({ state, format }: LayoutProps) {
             justifyContent: "center",
           }}
         >
-          <Lot state={state} format={format} size={LOT_SIZE} />
-          {showPrice && (
-            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Money amount={head.amount ?? 0} size={104} color={head.color} />
+          {state.phase === "ready" ? (
+            held ? <LotLogo item={held} size={LOT_SIZE} /> : <LotWaiting size={LOT_SIZE} />
+          ) : state.phase === "spinning" && item ? (
+            <LogoReel key={item.id} format={format} targetId={item.id} size={LOT_SIZE} />
+          ) : (
+            <LotLogo item={item} size={LOT_SIZE} />
+          )}
+
+          {/* Bottom of the logo, not the middle of it. Centred, it sat on
+              the mark; down here it reads as a price tag on the thing
+              rather than a hole punched through it. */}
+          {state.phase === "bidding" && head.amount !== null && (
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: -6,
+                display: "flex",
+                justifyContent: "center",
+              }}
+            >
+              <Money amount={head.amount} size={78} color={head.color} />
             </div>
           )}
         </div>
+      </div>
+
+      {/* The names, one over each column, separated by exactly the width
+          of the spine so they land above their own picks. */}
+      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", marginTop: 10, marginBottom: 14 }}>
+        {budget(0)}
+        <div style={{ width: SPINE_W, flexShrink: 0 }} />
         {budget(1)}
       </div>
 
@@ -437,7 +499,7 @@ function SpineLayout({ state, format }: LayoutProps) {
             <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-end" }}>{pick(0, slot.key)}</div>
             <div
               style={{
-                width: 250,
+                width: SPINE_W,
                 flexShrink: 0,
                 textAlign: "center",
                 fontFamily: "var(--font-display)",
