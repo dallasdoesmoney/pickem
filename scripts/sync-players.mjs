@@ -210,8 +210,35 @@ function attrsOf(a) {
 // Everyone on the roster at a position, in the order ESPN returns them.
 // Used as the fallback, and as the "behind:" column that makes a wrong
 // pick obvious in the pull request rather than on the site.
+// THE ROSTER, however ESPN is serving it today.
+//
+// teams/{id}/roster started returning 404 for every team - the run died
+// on Arizona, which is only notable because ARI sorts first, so there was
+// never any evidence the rest would have worked. It is an undocumented
+// endpoint on an undocumented API; it has moved before.
+//
+// The team endpoint carries the same roster inline when asked, and the
+// two payloads are shaped the same way underneath, so the fallback costs
+// one extra request per team and only when the first one refuses.
+async function rosterPayload(teamId) {
+  try {
+    return await json(`${SITE}/teams/${teamId}/roster`, { mustExist: true });
+  } catch (primary) {
+    let alt;
+    try {
+      alt = await json(`${SITE}/teams/${teamId}?enable=roster`, { mustExist: true });
+    } catch {
+      // Report the endpoint that is SUPPOSED to work, not the fallback.
+      throw primary;
+    }
+    const inline = alt?.team ?? alt;
+    if (inline?.athletes) return inline;
+    throw primary;
+  }
+}
+
 async function rosterAt(teamId, matches) {
-  const roster = await json(`${SITE}/teams/${teamId}/roster`, { mustExist: true });
+  const roster = await rosterPayload(teamId);
   return (roster.athletes ?? [])
     .flatMap((g) => g.items ?? g.athletes ?? [g])
     .filter(Boolean)
@@ -318,7 +345,7 @@ async function depthRanksAt(season, teamId) {
 // Everyone on a team's roster, at every position, with their real
 // position abbreviation rather than one of our five buckets.
 async function fullRosterAt(teamId) {
-  const roster = await json(`${SITE}/teams/${teamId}/roster`, { mustExist: true });
+  const roster = await rosterPayload(teamId);
   return (roster.athletes ?? [])
     .flatMap((g) => g.items ?? g.athletes ?? [g])
     .filter(Boolean)
@@ -847,4 +874,4 @@ if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {
   });
 }
 
-export { json, depthChartAt, rosterAt, fullRosterAt, depthRanksAt, syncPosition, syncAllPlayers, readOverrides, POSITIONS, OVERRIDES, main };
+export { json, rosterPayload, depthChartAt, rosterAt, fullRosterAt, depthRanksAt, syncPosition, syncAllPlayers, readOverrides, POSITIONS, OVERRIDES, main };

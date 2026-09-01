@@ -10,7 +10,7 @@
 // http, a receiver occupying two slots, and a team with no chart at all.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { coachFrom, depthChartAt, json, POSITIONS, readOverrides, OVERRIDES } from "./sync-players.mjs";
+import { coachFrom, depthChartAt, json, rosterPayload, rosterAt, POSITIONS, readOverrides, OVERRIDES } from "./sync-players.mjs";
 
 const QB = POSITIONS.find((p) => p.exportName === "QUARTERBACKS");
 const WR = POSITIONS.find((p) => p.exportName === "WIDE_RECEIVERS");
@@ -343,6 +343,44 @@ assert.equal("jersey" in zero[0], true);
   };
   await assert.rejects(() => json("https://example.test/y", { mustExist: true, attempts: 4 }));
   assert.equal(calls, 1, "a 403 is an answer");
+}
+
+// --- the roster endpoint, when ESPN has moved it ----------------------
+//
+// teams/{id}/roster began 404ing for every team. The run died on Arizona,
+// which is only notable because ARI sorts first - there was never any
+// evidence the other 31 would have worked. The team endpoint carries the
+// same roster inline when asked for it.
+{
+  const GROUPED = { athletes: [{ position: "offense", items: [{ id: 9, fullName: "Fallback Nine", position: { abbreviation: "QB" } }] }] };
+
+  // Primary gone, fallback answers.
+  globalThis.fetch = async (url) => {
+    if (url.endsWith("/roster")) return { ok: false, status: 404, statusText: "Not Found" };
+    if (url.includes("enable=roster")) return { ok: true, json: async () => ({ team: { id: 22, ...GROUPED } }) };
+    return { ok: false, status: 404, statusText: "Not Found" };
+  };
+  const payload = await rosterPayload(22);
+  assert.deepEqual(payload.athletes, GROUPED.athletes, "the inline roster is used when the roster endpoint is gone");
+  // And it parses the same way through the caller that matters.
+  assert.deepEqual(await rosterAt(22, (abbr) => abbr === "QB"), [{ espnId: "9", name: "Fallback Nine" }]);
+
+  // Both gone: the error names the endpoint that is SUPPOSED to work,
+  // not the fallback, or the log sends the next person to the wrong URL.
+  globalThis.fetch = async () => ({ ok: false, status: 404, statusText: "Not Found" });
+  await assert.rejects(
+    () => rosterPayload(22),
+    (err) => err.message.includes("/teams/22/roster") && !err.message.includes("enable=roster"),
+  );
+
+  // Primary fine: the fallback is never asked for.
+  let calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(url);
+    return { ok: true, json: async () => GROUPED };
+  };
+  await rosterPayload(22);
+  assert.equal(calls.length, 1, "no extra request when the roster endpoint works");
 }
 
 console.log("all depth chart cases pass");

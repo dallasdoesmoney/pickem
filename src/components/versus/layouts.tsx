@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { useLayoutEffect, useRef } from "react";
 import type { AuctionFormat, SlotDef } from "@/lib/auction/format";
 import { AuctionState, RosterEntry, toAct, currentItem } from "@/lib/auction/engine";
 import { PLAYER_COLORS, MONEY, outlined } from "./style";
@@ -184,6 +185,67 @@ function nameStyle(text: string, base: number): CSSProperties {
 
 type LayoutProps = { state: AuctionState; format: AuctionFormat };
 
+// THE WINNING BID, FLYING TO THE WINNER.
+//
+// It used to simply appear on their side, which is information without a
+// moment. Now it starts where it was - on the logo's chin - and travels.
+//
+// Measured rather than hardcoded, because the whole stage is CSS-scaled
+// and the two positions depend on the names either side of it. The catch
+// is that getBoundingClientRect reports SCALED pixels while a transform
+// applied inside the stage is scaled again, so the measured delta has to
+// be divided by the scale first - which the logo box gives up by
+// comparing its own rect against its offsetWidth.
+function FlyingPrice({
+  amount,
+  color,
+  from,
+}: {
+  amount: number;
+  color: string;
+  from: React.RefObject<HTMLDivElement | null>;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const src = from.current;
+    if (!el || !src) return;
+    // CANCEL BEFORE MEASURING. Effects can run twice - React does exactly
+    // that in development - and getBoundingClientRect includes the
+    // transform, so a second run measuring an element already sitting at
+    // the START of the flight computes a delta of zero and replaces the
+    // real animation with one that goes nowhere. Cancelling first puts it
+    // back at rest, so the measurement is the same both times.
+    for (const running of el.getAnimations()) running.cancel();
+    const a = el.getBoundingClientRect();
+    const b = src.getBoundingClientRect();
+    const scale = src.offsetWidth > 0 ? b.width / src.offsetWidth : 1;
+    if (!scale) return;
+    const dx = (b.left + b.width / 2 - (a.left + a.width / 2)) / scale;
+    // The chin of the logo, which is where the number was sitting.
+    const dy = (b.bottom - (a.top + a.height / 2)) / scale;
+    el.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(1.4)`, opacity: 0.9 },
+        { transform: "none", opacity: 1 },
+      ],
+      // Evenly paced rather than front-loaded: the first curve had it
+      // most of the way across inside 120ms, which is a jump with a tail
+      // rather than a move you can follow.
+      { duration: 900, easing: "cubic-bezier(0.45, 0.02, 0.18, 1)" },
+    );
+  }, [from]);
+
+  return (
+    <div ref={ref} style={{ willChange: "transform" }}>
+      <Money amount={amount} size={52} color={color} />
+    </div>
+  );
+}
+
+
+
 
 // ------------------------------------------------------------ the shape
 //
@@ -333,6 +395,8 @@ function SpineLayout({ state, format }: LayoutProps) {
   // waits above their name until the pick is placed, which is what makes
   // "who just got that, and for how much" a single glance.
   const wonBy = state.phase === "assigning" && state.won ? state.won.by : null;
+  // Where the price flies from.
+  const logoRef = useRef<HTMLDivElement>(null);
 
   // The badge sits INSIDE, next to the label, on both sides - so the
   // badges form two columns flanking the spine and the eye runs
@@ -390,19 +454,24 @@ function SpineLayout({ state, format }: LayoutProps) {
   const budget = (who: number) => (
     <div
       style={{
+        position: "relative",
         flex: "1 1 0",
         minWidth: 0,
         display: "flex",
         flexDirection: "column",
         alignItems: who === 0 ? "flex-end" : "flex-start",
-        gap: 4,
       }}
     >
       {/* THE WINNING BID, parked over the winner's name until they say
-          where it goes. */}
-      <div style={{ height: 54, display: "flex", alignItems: "flex-end" }}>
-        {wonBy === who && <Money amount={state.won?.price ?? 0} size={52} color={PLAYER_COLORS[who]} />}
-      </div>
+          where it goes. ABSOLUTE, so it takes no layout space: reserving
+          a band for it left 54 empty pixels between the logo and the
+          names for the entire time nobody had won anything, which was
+          the gap that made the logo look stranded up there. */}
+      {wonBy === who && (
+        <div style={{ position: "absolute", bottom: "100%", marginBottom: 4, [who === 0 ? "right" : "left"]: 0 }}>
+          <FlyingPrice amount={state.won?.price ?? 0} color={PLAYER_COLORS[who]} from={logoRef} />
+        </div>
+      )}
       <div
         data-budget={who}
         data-amount={state.players[who].budget}
@@ -427,10 +496,13 @@ function SpineLayout({ state, format }: LayoutProps) {
     <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "0 24px" }}>
       <style>{`
         @keyframes versusPickIn {
-          from { opacity: 0; transform: translateY(-14px) scale(0.94); }
-          to   { opacity: 1; transform: none; }
+          0%   { opacity: 0; transform: translateY(-26px) scale(0.9); }
+          55%  { opacity: 1; }
+          100% { opacity: 1; transform: none; }
         }
-        .versus-pick-in { animation: versusPickIn 340ms cubic-bezier(0.16, 0.9, 0.24, 1) both; }
+        /* Slower, and it settles rather than snapping - the old 340ms
+           with a hard curve read as a flicker at stream framerates. */
+        .versus-pick-in { animation: versusPickIn 780ms cubic-bezier(0.34, 0.02, 0.18, 1) both; }
       `}</style>
 
       {/* THE LOGO ON ITS OWN LINE. Beside the names it had to share the
@@ -439,6 +511,7 @@ function SpineLayout({ state, format }: LayoutProps) {
           column because the gap between them is exactly the spine. */}
       <div style={{ display: "flex", justifyContent: "center" }}>
         <div
+          ref={logoRef}
           style={{
             position: "relative",
             width: LOT_SIZE,
@@ -479,7 +552,7 @@ function SpineLayout({ state, format }: LayoutProps) {
 
       {/* The names, one over each column, separated by exactly the width
           of the spine so they land above their own picks. */}
-      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", marginTop: 10, marginBottom: 14 }}>
+      <div style={{ width: "100%", display: "flex", alignItems: "flex-end", marginTop: 2, marginBottom: 12 }}>
         {budget(0)}
         <div style={{ width: SPINE_W, flexShrink: 0 }} />
         {budget(1)}
