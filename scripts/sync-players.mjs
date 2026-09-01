@@ -124,10 +124,37 @@ const SITE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl";
 // they do for the logos in teams.ts.
 const ESPN_TO_OURS = { WSH: "WAS" };
 
-async function json(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
-  return res.json();
+// ONE BLIP MUST NOT KILL TWO HUNDRED REQUESTS.
+//
+// This run makes roughly six calls per team and throws on the first
+// failure, on purpose: a partial roster file is worse than none. But that
+// makes it as reliable as the single flakiest response in the whole
+// sequence, and ESPN is an undocumented API being read by a robot - the
+// run that prompted this died five seconds in, on a 404 for a roster
+// endpoint that ESPN's own teams list had just named.
+//
+// So: retry, with a backoff. A 404 is only retried when the caller says
+// the thing must exist, which is true of a roster ESPN just told us about
+// and false of a depth chart a team may genuinely not have published -
+// those fall back to roster order and should not cost four attempts each
+// to find that out.
+async function json(url, { mustExist = false, attempts = 4 } = {}) {
+  let last = null;
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 500 * 2 ** (i - 1)));
+    try {
+      const res = await fetch(url);
+      if (res.ok) return await res.json();
+      last = new Error(`${res.status} ${res.statusText} for ${url}`);
+      // A refusal is an answer. Only a 404 we were told to expect, and
+      // the 5xx family, are worth asking again about.
+      if (res.status < 500 && !(res.status === 404 && mustExist)) break;
+    } catch (err) {
+      // Reset, DNS, socket hang up: the ones most worth retrying.
+      last = err;
+    }
+  }
+  throw new Error(`${last.message}${attempts > 1 ? ` (gave up after ${attempts} attempts)` : ""}`);
 }
 
 // The attributes the daily puzzle grades a guess against. Every one is
@@ -184,7 +211,7 @@ function attrsOf(a) {
 // Used as the fallback, and as the "behind:" column that makes a wrong
 // pick obvious in the pull request rather than on the site.
 async function rosterAt(teamId, matches) {
-  const roster = await json(`${SITE}/teams/${teamId}/roster`);
+  const roster = await json(`${SITE}/teams/${teamId}/roster`, { mustExist: true });
   return (roster.athletes ?? [])
     .flatMap((g) => g.items ?? g.athletes ?? [g])
     .filter(Boolean)
@@ -291,7 +318,7 @@ async function depthRanksAt(season, teamId) {
 // Everyone on a team's roster, at every position, with their real
 // position abbreviation rather than one of our five buckets.
 async function fullRosterAt(teamId) {
-  const roster = await json(`${SITE}/teams/${teamId}/roster`);
+  const roster = await json(`${SITE}/teams/${teamId}/roster`, { mustExist: true });
   return (roster.athletes ?? [])
     .flatMap((g) => g.items ?? g.athletes ?? [g])
     .filter(Boolean)
@@ -497,7 +524,15 @@ async function syncPosition(season, teams, position) {
 
   for (const team of teams) {
     const abbr = (ESPN_TO_OURS[team.abbreviation] ?? team.abbreviation).toUpperCase();
-    const roster = await rosterAt(team.id, position.slots);
+    // Named, because the URL that comes back carries an ESPN team id and
+    // nothing else - the run that died on "teams/22/roster" took a lookup
+    // to find out it meant Arizona.
+    let roster;
+    try {
+      roster = await rosterAt(team.id, position.slots);
+    } catch (err) {
+      throw new Error(`${abbr} (ESPN team ${team.id}): ${err.message}`);
+    }
     let picks = await depthChartAt(season, team.id, position.slots, position.perTeam);
     let source = "depth chart";
 
@@ -812,4 +847,4 @@ if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) {
   });
 }
 
-export { depthChartAt, rosterAt, fullRosterAt, depthRanksAt, syncPosition, syncAllPlayers, readOverrides, POSITIONS, OVERRIDES, main };
+export { json, depthChartAt, rosterAt, fullRosterAt, depthRanksAt, syncPosition, syncAllPlayers, readOverrides, POSITIONS, OVERRIDES, main };

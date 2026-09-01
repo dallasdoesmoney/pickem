@@ -10,7 +10,7 @@
 // http, a receiver occupying two slots, and a team with no chart at all.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { coachFrom, depthChartAt, POSITIONS, readOverrides, OVERRIDES } from "./sync-players.mjs";
+import { coachFrom, depthChartAt, json, POSITIONS, readOverrides, OVERRIDES } from "./sync-players.mjs";
 
 const QB = POSITIONS.find((p) => p.exportName === "QUARTERBACKS");
 const WR = POSITIONS.find((p) => p.exportName === "WIDE_RECEIVERS");
@@ -297,6 +297,53 @@ assert.deepEqual(zero[0], {
 // the seed writes it straight into SQL.
 assert.equal(zero[0].jersey, 0);
 assert.equal("jersey" in zero[0], true);
+
+// --- one blip must not kill two hundred requests ----------------------
+//
+// The whole run throws on the first failure, deliberately: a partial
+// roster file is worse than none. That made it as reliable as the single
+// flakiest response in the sequence, and a live run died five seconds in
+// on a 404 for a roster endpoint ESPN's own teams list had just named.
+{
+  // Fails twice, then answers. A transient blip.
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls < 3) return { ok: false, status: 404, statusText: "Not Found" };
+    return { ok: true, json: async () => ({ ok: calls }) };
+  };
+  const got = await json("https://example.test/roster", { mustExist: true, attempts: 4 });
+  assert.deepEqual(got, { ok: 3 }, "a roster that ESPN named is asked for again");
+
+  // A 404 nobody promised is an answer, not a blip - a team with no
+  // published depth chart falls back to roster order, and finding that
+  // out must not cost four attempts per team.
+  calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return { ok: false, status: 404, statusText: "Not Found" };
+  };
+  await assert.rejects(() => json("https://example.test/depthcharts", { attempts: 4 }));
+  assert.equal(calls, 1, "an unpromised 404 is asked once");
+
+  // A network error is the other thing worth retrying.
+  calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls < 2) throw new Error("socket hang up");
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  assert.deepEqual(await json("https://example.test/x", { attempts: 3 }), { ok: true });
+
+  // And a refusal that is not going to change stops immediately.
+  calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return { ok: false, status: 403, statusText: "Forbidden" };
+  };
+  await assert.rejects(() => json("https://example.test/y", { mustExist: true, attempts: 4 }));
+  assert.equal(calls, 1, "a 403 is an answer");
+}
 
 console.log("all depth chart cases pass");
 
