@@ -64,6 +64,10 @@ export type RosterEntry = {
   // reconnects mid-draft needs no second lookup to fill its rails.
   short?: string;
   badge?: string;
+  // The team's colour, carried for the same reason as the badge: a pick
+  // can then say which team it came from without spending 44 pixels on a
+  // logo to do it.
+  accent?: string;
 };
 
 export type PlayerState = {
@@ -375,7 +379,7 @@ export function reduce(state: AuctionState, action: AuctionAction, format: Aucti
 
     const label = item.fills?.[action.slotKey] ?? item.label;
     const short = item.fillsShort?.[action.slotKey] ?? label;
-    const entry: RosterEntry = { itemId: item.id, price: state.won!.price, label, short, badge: item.imageUrl };
+    const entry: RosterEntry = { itemId: item.id, price: state.won!.price, label, short, badge: item.imageUrl, accent: item.accent };
     const players = state.players.map((p, i) =>
       i === who
         ? {

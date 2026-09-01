@@ -3,7 +3,7 @@
 import type { AuctionFormat } from "@/lib/auction/format";
 import { AuctionState } from "@/lib/auction/engine";
 import { PLAYER_COLORS } from "./style";
-import { LAYOUTS, type LayoutKey } from "./layouts";
+import { LAYOUTS, DEFAULT_PICK, type LayoutKey, type PickKey } from "./layouts";
 
 export { PLAYER_COLORS };
 
@@ -38,12 +38,14 @@ export function OverlayBoard({
   camTop,
   camBottom,
   layout = DEFAULT_LAYOUT,
+  pick = DEFAULT_PICK,
 }: {
   state: AuctionState;
   format: AuctionFormat;
   camTop: number;
   camBottom: number;
   layout?: LayoutKey;
+  pick?: PickKey;
 }) {
   const bandHeight = STAGE_H - camTop - camBottom;
   const Layout = (LAYOUTS[layout] ?? LAYOUTS[DEFAULT_LAYOUT]).Component;
@@ -74,7 +76,7 @@ export function OverlayBoard({
           gap: 16,
         }}
       >
-        <Layout state={state} format={format} />
+        <Layout state={state} format={format} pick={pick} />
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ import type { AuctionFormat } from "@/lib/auction/format";
 import { isRoomCode } from "@/lib/auction/room";
 import { useRoomState } from "@/components/versus/useRoom";
 import { OverlayBoard, STAGE_W, STAGE_H, DEFAULT_LAYOUT } from "@/components/versus/OverlayBoard";
-import { isLayoutKey } from "@/components/versus/layouts";
+import { isLayoutKey, isPickKey, DEFAULT_PICK } from "@/components/versus/layouts";
 
 // THE OBS BROWSER SOURCE.
 //
@@ -23,6 +23,7 @@ import { isLayoutKey } from "@/components/versus/layouts";
 //   ?format=nfl-teams which mode the DEMO draws (ignored in a room)
 //   ?phase=ready|spinning  which moment of a lot the DEMO holds on
 //   ?layout=a..e      which arrangement - see /versus/layouts
+//   ?pick=badge|chip|plate|stacked|ledger   how a pick is drawn
 //   ?p1=Noah&p2=Ben   names on the DEMO rails (ignored in a room)
 //
 // The cam bands are query parameters rather than constants because they
@@ -119,6 +120,8 @@ function OverlayInner() {
   const preview = params.get("preview") === "1";
   const layoutParam = params.get("layout");
   const layout = isLayoutKey(layoutParam) ? layoutParam : DEFAULT_LAYOUT;
+  const pickParam = params.get("pick");
+  const pick = isPickKey(pickParam) ? pickParam : DEFAULT_PICK;
 
   const demoFormat = AUCTION_FORMATS[params.get("format") ?? "nfl-teams"] ?? Object.values(AUCTION_FORMATS)[0];
   const format = message ? AUCTION_FORMATS[message.slug] : demoFormat;
@@ -195,7 +198,7 @@ function OverlayInner() {
         )}
 
         {format && state ? (
-          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} layout={layout} />
+          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} layout={layout} pick={pick} />
         ) : room ? (
           // Small and dim on purpose. If this ever does appear on a live
           // stream it should read as a status light, not an error page.

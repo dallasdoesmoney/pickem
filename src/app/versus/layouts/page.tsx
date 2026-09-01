@@ -5,18 +5,18 @@ import { AUCTION_FORMATS } from "@/lib/auction/formats";
 import { startAuction, openLot, reduce, toAct, AuctionState } from "@/lib/auction/engine";
 import type { AuctionFormat } from "@/lib/auction/format";
 import { OverlayStage } from "@/components/versus/OverlayStage";
-import { LAYOUTS, type LayoutKey } from "@/components/versus/layouts";
-import { DEFAULT_LAYOUT } from "@/components/versus/OverlayBoard";
+import { PICK_CARDS, DEFAULT_PICK, type PickKey } from "@/components/versus/layouts";
 
-// FIVE LAYOUTS, SIDE BY SIDE, with real teams in them.
+// FIVE WAYS TO DRAW A PICK, side by side, with real teams in them.
 //
-// Choosing between arrangements out of a description does not work - the
-// question is always "how much room does it actually take, and can you
-// read it", and both are answers you can only get by looking. So this
-// draws all five from the same position of the same draft, at the same
-// scale, with the cameras marked.
+// Choosing out of a description does not work - the question is always
+// "how much room does it actually take, and can you read it", and both
+// are answers you can only get by looking. So this draws all five from
+// the same position of the same draft, at the same scale.
 //
-// It is a scratch page for picking one. It goes when one is picked.
+// The layout question is settled (the spine), so this compares the thing
+// that is repeated ten times inside it instead. Scratch page: it goes
+// when one is picked.
 
 const MOMENTS = [
   { key: "bidding", label: "Mid-auction", lots: 6 },
@@ -71,11 +71,11 @@ export default function LayoutsPage() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-20 pt-8">
       <h1 className="text-[clamp(1.5rem,6vw,2.2rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
-        OVERLAY LAYOUTS
+        PLAYER CARDS
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-white/50">
-        S1 is the new idea: positions down the middle, picks fanning left or right by who won them. C1&ndash;C5
-        are the earlier shape. Same moment of the same draft in each &mdash; grey bands are where the cameras sit.
+        Five ways to draw a pick, in the layout you picked. Same moment of the same draft in each. Four of the
+        five show what the pick cost &mdash; that number is invisible today the moment a lot is sold.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -111,19 +111,19 @@ export default function LayoutsPage() {
       {!format || !state ? (
         <p className="mt-10 text-sm text-white/45">No formats available &mdash; rosters have not been synced in this checkout.</p>
       ) : (
-        <div className="mt-6 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(230px,1fr))]">
-          {(Object.keys(LAYOUTS) as LayoutKey[]).map((key) => (
+        <div className="mt-6 grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">
+          {(Object.keys(PICK_CARDS) as PickKey[]).map((key) => (
             <div key={key} className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[13px] tracking-[0.14em]" style={{ fontFamily: "var(--font-display)" }}>
-                  {key.toUpperCase()} &middot; {LAYOUTS[key].name.toUpperCase()}
+                  {PICK_CARDS[key].name.toUpperCase()}
                 </span>
-                {key === DEFAULT_LAYOUT && <span className="text-[9px] tracking-[0.14em] text-[#00e35f]">CURRENT</span>}
+                {key === DEFAULT_PICK && <span className="text-[9px] tracking-[0.14em] text-[#00e35f]">CURRENT</span>}
               </div>
-              <OverlayStage state={state} format={format} camTop={camTop} camBottom={camBottom} layout={key} />
-              <p className="text-[11.5px] leading-relaxed text-white/40">{LAYOUTS[key].note}</p>
+              <OverlayStage state={state} format={format} camTop={camTop} camBottom={camBottom} pick={key} />
+              <p className="text-[11.5px] leading-relaxed text-white/40">{PICK_CARDS[key].note}</p>
               <a
-                href={`/versus/overlay?preview=1&layout=${key}&lots=${chosen.lots}&top=${camTop}&bottom=${camBottom}&p1=Noah&p2=Ben&seed=${seed}`}
+                href={`/versus/overlay?preview=1&pick=${key}&lots=${chosen.lots}&top=${camTop}&bottom=${camBottom}&p1=Noah&p2=Ben&seed=${seed}`}
                 target="_blank"
                 rel="noreferrer"
                 className="text-[11px] text-white/45 underline underline-offset-2 hover:text-white/75"

@@ -183,7 +183,174 @@ function nameStyle(text: string, base: number): CSSProperties {
   return { fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: "#ffffff", ...outlined(size) };
 }
 
-type LayoutProps = { state: AuctionState; format: AuctionFormat };
+type LayoutProps = { state: AuctionState; format: AuctionFormat; pick?: PickKey };
+// FIVE WAYS TO DRAW A PICK.
+//
+// A pick is the most repeated object on the graphic - ten of them once
+// both rosters fill - so a few pixels either way is worth more here than
+// anywhere else, and so is anything it can be made to say for free.
+//
+// What every one of them has to hand: the surname, the team badge, the
+// team COLOUR, and THE PRICE. The price is the one worth noticing - it is
+// the most interesting number in the game and the current card throws it
+// away the instant the lot is sold, so four of the five put it back.
+//
+// `side` is which player owns it: 0 reads outwards to the left, 1 to the
+// right, and every card mirrors rather than being drawn twice.
+type PickCard = {
+  name: string;
+  note: string;
+  // Ledger pins its price to the outer edge, which only lines the five up
+  // in a column if the card actually spans the column. Every other card
+  // shrinks to its contents and sits against the spine.
+  fullWidth?: boolean;
+  Component: (p: { entry: RosterEntry; who: number }) => React.ReactElement;
+};
+
+const NAME_SIZE = 42;
+
+// `comfortable` is how many characters fit before it starts shrinking,
+// and it is per CARD rather than shared: a card that also carries a
+// price and a pill's padding has less room for the name than one that is
+// a logo and a word, and using one number for both ran "SUTTON + WADDLE"
+// off the side of the screen.
+function pickName(entry: RosterEntry, size = NAME_SIZE, comfortable = 12) {
+  const text = (entry.short ?? entry.label).toUpperCase();
+  return { text, size: fitSize(text, size, comfortable) };
+}
+
+// 1. BADGE - what is there now. Logo, then surname. No price.
+function BadgeCard({ entry, who }: { entry: RosterEntry; who: number }) {
+  const { text, size } = pickName(entry);
+  return (
+    <div style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+      <Badge url={entry.badge} size={44} />
+      <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: PLAYER_COLORS[who], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
+        {text}
+      </span>
+    </div>
+  );
+}
+
+// 2. CHIP - a pill in the team's colour holding badge, name and price.
+//    Reads as an object you own rather than a line of text, and the tint
+//    is a second, faster way to tell two picks apart.
+function ChipCard({ entry, who }: { entry: RosterEntry; who: number }) {
+  // Smaller than the badge card's 42: the pill spends room on padding
+  // and on the price, and the name has to give it back.
+  const { text, size } = pickName(entry, 30, 9);
+  const accent = entry.accent ?? "#8899aa";
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: who === 0 ? "row-reverse" : "row",
+        alignItems: "center",
+        gap: 9,
+        padding: "5px 14px",
+        borderRadius: 999,
+        background: `${accent}33`,
+        border: `2px solid ${accent}bb`,
+      }}
+    >
+      <Badge url={entry.badge} size={32} />
+      <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: "#ffffff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
+        {text}
+      </span>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 26, lineHeight: 1, color: MONEY, fontVariantNumeric: "tabular-nums", ...outlined(26) }}>
+        ${entry.price}
+      </span>
+    </div>
+  );
+}
+
+// 3. PLATE - no logo at all. A bar in the team's colour does the job the
+//    badge was doing, in four pixels instead of forty-four, and the room
+//    that frees goes to the name.
+function PlateCard({ entry, who }: { entry: RosterEntry; who: number }) {
+  const { text, size } = pickName(entry, 36, 10);
+  const accent = entry.accent ?? "#8899aa";
+  return (
+    <div style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+      <span style={{ width: 6, height: size * 0.95, background: accent, borderRadius: 3, flexShrink: 0 }} />
+      <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: PLAYER_COLORS[who], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
+        {text}
+      </span>
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 24, lineHeight: 1, color: MONEY, fontVariantNumeric: "tabular-nums", ...outlined(24) }}>
+        ${entry.price}
+      </span>
+    </div>
+  );
+}
+
+// 4. STACKED - surname over the price, badge alongside. Two lines, so it
+//    is the tallest, and the narrowest by some way - which is the trade
+//    when a name is long.
+function StackedCard({ entry, who }: { entry: RosterEntry; who: number }) {
+  const { text, size } = pickName(entry, 34, 11);
+  return (
+    <div style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 9 }}>
+      <Badge url={entry.badge} size={40} />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: who === 0 ? "flex-end" : "flex-start", gap: 1 }}>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: PLAYER_COLORS[who], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
+          {text}
+        </span>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 22, lineHeight: 1, color: MONEY, ...outlined(22) }}>
+          ${entry.price}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// 5. LEDGER - price pinned to the OUTER edge, so all five line up in a
+//    column down each side of the screen and a viewer can read what a
+//    roster cost without adding anything up.
+function LedgerCard({ entry, who }: { entry: RosterEntry; who: number }) {
+  const { text, size } = pickName(entry, 34, 10);
+  return (
+    <div style={{ display: "flex", flexDirection: who === 0 ? "row" : "row-reverse", alignItems: "center", gap: 12, width: "100%" }}>
+      <span
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 26,
+          lineHeight: 1,
+          color: MONEY,
+          fontVariantNumeric: "tabular-nums",
+          width: 62,
+          textAlign: who === 0 ? "left" : "right",
+          flexShrink: 0,
+          ...outlined(26),
+        }}
+      >
+        ${entry.price}
+      </span>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 9, justifyContent: "flex-start" }}>
+        <Badge url={entry.badge} size={38} />
+        <span style={{ fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: PLAYER_COLORS[who], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, ...outlined(size) }}>
+          {text}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export type PickKey = "badge" | "chip" | "plate" | "stacked" | "ledger";
+export const DEFAULT_PICK: PickKey = "badge";
+
+export const PICK_CARDS: Record<PickKey, PickCard> = {
+  badge: { name: "Badge", note: "What is there now: logo, then surname. The only one that does not say what the pick cost.", Component: BadgeCard },
+  chip: { name: "Chip", note: "A pill tinted with the team's colour, holding logo, name and price. Reads as an object you own rather than a line of text.", Component: ChipCard },
+  plate: { name: "Plate", note: "No logo. A bar in the team's colour does that job in six pixels instead of forty-four, and the name gets the room.", Component: PlateCard },
+  stacked: { name: "Stacked", note: "Surname over the price, badge alongside. Tallest, and much the narrowest - which is the trade when a name is long.", Component: StackedCard },
+  ledger: { fullWidth: true, name: "Ledger", note: "Price pinned to the outer edge, so all five line up in a column and you can read what a roster cost at a glance.", Component: LedgerCard },
+};
+
+export function isPickKey(value: string | null): value is PickKey {
+  return value !== null && value in PICK_CARDS;
+}
+
+
 
 // THE WINNING BID, FLYING TO THE WINNER.
 //
@@ -379,7 +546,8 @@ const LOT_SIZE = 180;
 // The centre column, and the gap the two names straddle above it.
 const SPINE_W = 250;
 
-function SpineLayout({ state, format }: LayoutProps) {
+function SpineLayout({ state, format, pick }: LayoutProps) {
+  const pickStyle: PickKey = pick ?? DEFAULT_PICK;
   const head = headline(state, format);
   const item = currentItem(state, format);
 
@@ -406,13 +574,17 @@ function SpineLayout({ state, format }: LayoutProps) {
   // graphic and the test read those; now that the graphic is the only
   // copy, the test reads the graphic - which is the copy that has to be
   // right regardless.
-  const pick = (who: number, slotKey: string) => {
+  // data-pick / data-filled are read by scripts/versus-hotseat.test.mjs.
+  // The board used to print both rosters a second time underneath the
+  // graphic and the test read those; now that the graphic is the only
+  // copy, the test reads the graphic - which is the copy that has to be
+  // right regardless.
+  const Card = PICK_CARDS[pickStyle].Component;
+  const drawPick = (who: number, slotKey: string) => {
     const entry = state.players[who].roster[slotKey];
     if (!entry) {
       return <span data-pick={who} data-filled="0" style={{ width: 46, height: 4, background: "rgba(255,255,255,0.14)", borderRadius: 2 }} />;
     }
-    const text = (entry.short ?? entry.label).toUpperCase();
-    const size = fitSize(text, 42, 12);
     return (
       <div
         data-pick={who}
@@ -422,21 +594,14 @@ function SpineLayout({ state, format }: LayoutProps) {
         // anything else reuse it and it stays still.
         key={entry.itemId}
         className="versus-pick-in"
-        style={{ display: "flex", flexDirection: who === 0 ? "row-reverse" : "row", alignItems: "center", gap: 10, minWidth: 0 }}
+        style={{
+          minWidth: 0,
+          width: PICK_CARDS[pickStyle].fullWidth ? "100%" : undefined,
+          display: "flex",
+          justifyContent: who === 0 ? "flex-end" : "flex-start",
+        }}
       >
-        <Badge url={entry.badge} size={44} />
-        <span
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: size,
-            lineHeight: 1,
-            color: PLAYER_COLORS[who],
-            whiteSpace: "nowrap",
-            ...outlined(size),
-          }}
-        >
-          {text}
-        </span>
+        <Card entry={entry} who={who} />
       </div>
     );
   };
@@ -565,7 +730,7 @@ function SpineLayout({ state, format }: LayoutProps) {
       <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 3 }}>
         {format.slots.map((slot) => (
           <div key={slot.key} style={{ display: "flex", alignItems: "center", width: "100%" }}>
-            <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-end" }}>{pick(0, slot.key)}</div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-end" }}>{drawPick(0, slot.key)}</div>
             <div
               style={{
                 width: SPINE_W,
@@ -581,7 +746,7 @@ function SpineLayout({ state, format }: LayoutProps) {
             >
               {slot.label.toUpperCase()}
             </div>
-            <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-start" }}>{pick(1, slot.key)}</div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-start" }}>{drawPick(1, slot.key)}</div>
           </div>
         ))}
       </div>
