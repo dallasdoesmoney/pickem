@@ -140,14 +140,23 @@ for (const format of formats) {
     }
     ok("every WR Duo comes from that team's receivers", strays.length === 0, strays.slice(0, 3).join(" | "));
 
-    // A hand-written order that names somebody who is not on the team is
-    // a typo, and would be silently ignored without this.
-    const bad = [];
+    // A hand-written order patches a chart that was wrong. Once the chart
+    // moves on it is patching nothing, so it applies only while every
+    // name in it is still on that team - which is what lets the file be
+    // deleted on its own schedule instead of exactly at a merge.
+    const stale = [];
     for (const [abbr, names] of Object.entries(WR_ORDER)) {
       const mine = WIDE_RECEIVERS.filter((w) => w.team === abbr).map((w) => w.name);
-      for (const n of names) if (!mine.includes(n)) bad.push(`${abbr}: "${n}"`);
+      const gone = names.filter((n) => !mine.includes(n));
+      if (gone.length) stale.push(`${abbr} no longer lists ${gone.join(", ")} - entry is inert, delete it`);
+      else if (names.length) {
+        // Live entries have to actually be doing something.
+        const duo = (teams.items.find((i) => i.id === abbr)?.fills.rec ?? "").split(" + ");
+        if (duo.join(" + ") !== names.slice(0, 2).join(" + ")) stale.push(`${abbr}: override not applied`);
+      }
     }
-    ok("every hand-written name is really on that team", bad.length === 0, bad.join(" | "));
+    if (stale.length) console.log(`   note: ${stale.join(" | ")}`);
+    ok("every live override is the order in use", !stale.some((s) => s.includes("not applied")), stale.join(" | "));
 
     const duo = (id) => teams.items.find((i) => i.id === id)?.fills.rec ?? "no item";
     ok("Washington is McLaurin and Diggs", duo("WAS") === "Terry McLaurin + Stefon Diggs", duo("WAS"));

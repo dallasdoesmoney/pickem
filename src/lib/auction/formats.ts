@@ -43,10 +43,17 @@ type Roster = { team: string; name: string; depth?: number };
 function byDepth<T extends Roster>(rows: T[], abbr: string): T[] {
   const mine = rows.filter((r) => r.team === abbr);
   const named = WR_ORDER[abbr as TeamAbbr];
-  if (named) {
-    // A hand-written order wins outright. Anyone it does not mention
-    // keeps their place behind the ones it does, so a partial list is
-    // still an improvement rather than a way to lose a player.
+  // IT RETIRES ITSELF. A hand-written order is a patch over a chart that
+  // was wrong, and the moment the chart moves on it is a patch over
+  // nothing - so it only applies while every player it names is still
+  // one of that team's receivers. When the sync drops one of them, this
+  // stops applying and the real depth takes over, with no window in
+  // between where either source is the wrong one.
+  const current = new Set(mine.map((r) => r.name));
+  if (named && named.every((n) => current.has(n))) {
+    // Anyone it does not mention keeps their place behind the ones it
+    // does, so a partial list is still an improvement rather than a way
+    // to lose a player.
     const rank = (r: T) => {
       const at = named.indexOf(r.name);
       return at === -1 ? named.length + (r.depth ?? 99) : at;
