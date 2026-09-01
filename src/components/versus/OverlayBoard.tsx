@@ -3,7 +3,7 @@
 import type { AuctionFormat } from "@/lib/auction/format";
 import { AuctionState } from "@/lib/auction/engine";
 import { PLAYER_COLORS } from "./style";
-import { LAYOUTS, DEFAULT_PICK, type LayoutKey, type PickKey } from "./layouts";
+import { LAYOUTS, type LayoutKey } from "./layouts";
 
 export { PLAYER_COLORS };
 
@@ -25,8 +25,8 @@ export { PLAYER_COLORS };
 // that is the wrong size once, at setup.
 //
 // This file is now only the frame - the band the graphic lives in
-// between the two cameras. The arrangement inside that band is
-// one of the five in layouts.tsx.
+// between the two cameras. The arrangement inside that band lives in
+// layouts.tsx.
 
 export const STAGE_W = 1080;
 export const STAGE_H = 1920;
@@ -38,14 +38,12 @@ export function OverlayBoard({
   camTop,
   camBottom,
   layout = DEFAULT_LAYOUT,
-  pick = DEFAULT_PICK,
 }: {
   state: AuctionState;
   format: AuctionFormat;
   camTop: number;
   camBottom: number;
   layout?: LayoutKey;
-  pick?: PickKey;
 }) {
   const bandHeight = STAGE_H - camTop - camBottom;
   const Layout = (LAYOUTS[layout] ?? LAYOUTS[DEFAULT_LAYOUT]).Component;
@@ -76,7 +74,7 @@ export function OverlayBoard({
           gap: 16,
         }}
       >
-        <Layout state={state} format={format} pick={pick} />
+        <Layout state={state} format={format} />
       </div>
     </div>
   );
