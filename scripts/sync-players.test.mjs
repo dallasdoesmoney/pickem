@@ -92,12 +92,54 @@ assert.deepEqual(await depthChartAt(2026, "T", WR.slots, 2), [
   { espnId: "4", name: "Receiver Four" },
 ]);
 
+// 3a. A SPECIAL TEAMS SLOT MUST NOT REACH THE WR ORDER.
+//
+//     This one has already gone wrong once, off the field rather than
+//     out of this function: the WR Duo on the overlay was ordered from
+//     all.ts's `depthRank`, which is the best rank a player holds
+//     ANYWHERE on the chart - returner rows included. A team's punt
+//     returner is rank 1 at punt returner, so he tied with the actual
+//     WR1 and an alphabetical tiebreak put him ahead. Washington's duo
+//     came out Luke McCaffrey and Terry McLaurin, with Stefon Diggs
+//     nowhere.
+//
+//     depthChartAt filters by position, so it cannot happen here. That
+//     is worth a test precisely because the bug lived in the field that
+//     looked like it meant the same thing.
+stubFetch({
+  [CHART]: {
+    items: [{ positions: {
+      lwr: { position: { abbreviation: "LWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(3) } }] },
+      rwr: { position: { abbreviation: "RWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(4) } }] },
+      pr: { position: { abbreviation: "PR" }, athletes: [{ rank: 1, athlete: { $ref: ref(5) } }] },
+      kr: { position: { abbreviation: "KR" }, athletes: [{ rank: 1, athlete: { $ref: ref(6) } }] },
+    } }],
+  },
+});
+assert.deepEqual(await depthChartAt(2026, "T", WR.slots, 3), [
+  { espnId: "3", name: "Receiver Three" },
+  { espnId: "4", name: "Receiver Four" },
+], "a returner is not a receiver, however highly the chart ranks him");
+
 // 3b. THE ONE THE ANSWER POOL RELIES ON. A team's three WR rows each
 //     have their own STARTER, and all three are answers - so asking for
 //     three has to return all three rank-1 receivers and stop, rather
 //     than reaching into anybody's second string. This is what
 //     `perTeam: 3` is buying, and the ordering is slot order because
 //     every rank is 1.
+//
+//     Its own stub, deliberately. It used to lean on whichever chart the
+//     case above happened to leave installed, so adding a case in between
+//     silently changed what this one was testing.
+stubFetch({
+  [CHART]: {
+    items: [{ positions: {
+      lwr: { position: { abbreviation: "LWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(3) } }] },
+      rwr: { position: { abbreviation: "RWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(4) } }] },
+      swr: { position: { abbreviation: "SWR" }, athletes: [{ rank: 1, athlete: { $ref: ref(5) } }] },
+    } }],
+  },
+});
 assert.deepEqual(await depthChartAt(2026, "T", WR.slots, WR.perTeam), [
   { espnId: "3", name: "Receiver Three" },
   { espnId: "4", name: "Receiver Four" },

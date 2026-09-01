@@ -1,4 +1,6 @@
 import { TEAMS, TEAMS_SORTED } from "@/data/teams";
+import type { TeamAbbr } from "@/data/teams";
+import { WR_ORDER } from "@/data/rosters/wrOrder";
 import { QUARTERBACKS } from "@/data/rosters/qbs";
 import { RUNNING_BACKS } from "@/data/rosters/rbs";
 import { WIDE_RECEIVERS } from "@/data/rosters/wrs";
@@ -31,10 +33,27 @@ import type { AuctionFormat, AuctionItem } from "./format";
 // this asks for it. Rows with no depth sort last rather than jumping the
 // queue, which keeps an unsynced or partial file merely wrong-ish
 // instead of confidently wrong.
+//
+// The `depth` currently in the files was REBUILT from a field that turned
+// out to mean something else, and is unreliable for nine teams - see
+// src/data/rosters/wrOrder.ts, which overrules it by hand until the next
+// sync writes the real thing.
 type Roster = { team: string; name: string; depth?: number };
 
 function byDepth<T extends Roster>(rows: T[], abbr: string): T[] {
-  return rows.filter((r) => r.team === abbr).sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99));
+  const mine = rows.filter((r) => r.team === abbr);
+  const named = WR_ORDER[abbr as TeamAbbr];
+  if (named) {
+    // A hand-written order wins outright. Anyone it does not mention
+    // keeps their place behind the ones it does, so a partial list is
+    // still an improvement rather than a way to lose a player.
+    const rank = (r: T) => {
+      const at = named.indexOf(r.name);
+      return at === -1 ? named.length + (r.depth ?? 99) : at;
+    };
+    return mine.slice().sort((a, b) => rank(a) - rank(b));
+  }
+  return mine.sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99));
 }
 
 function firstFor<T extends Roster>(rows: T[], abbr: string): T | undefined {

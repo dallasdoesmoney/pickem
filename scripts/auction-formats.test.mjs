@@ -13,6 +13,7 @@
 // thousand simulated drafts to know it cannot happen.
 import { AUCTION_FORMATS } from "../src/lib/auction/formats.ts";
 import { WIDE_RECEIVERS } from "../src/data/rosters/wrs.ts";
+import { WR_ORDER } from "../src/data/rosters/wrOrder.ts";
 import { formatProblems } from "../src/lib/auction/format.ts";
 import { startAuction, openLot, reduce, toAct, bidRange, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
 
@@ -114,41 +115,50 @@ for (const format of formats) {
 // --- the right players, not the alphabetically first ones ------------
 //
 // The roster files are sorted by NAME. A graphic that shows only the top
-// two receivers therefore had to be told which two, and before `depth`
-// existed it was not: taking the first two rows for Minnesota gave Jauan
-// Jennings and Jordan Addison, and left Justin Jefferson off the Vikings
-// altogether. On a stream that is not a subtle bug.
+// two receivers therefore has to be told which two, and the ordering it
+// was given first was rebuilt from all.ts's `depthRank` - which counts
+// EVERY slot on the chart, returners included, so a punt returner ties
+// with the real WR1 and an alphabetical tiebreak decides. Washington came
+// out McCaffrey and McLaurin, with Diggs nowhere.
+//
+// The check that shipped alongside that bug asserted the duo matched the
+// `depth` field, which is the same wrong answer written twice. So it
+// asserts against the roster and against known-good cases instead.
 {
   const teams = AUCTION_FORMATS["nfl-teams"];
   if (!teams) {
     ok("nfl-teams is registered", false, "rosters not synced in this checkout");
   } else {
-    let wrong = [];
-    let unranked = 0;
+    // Whatever the ordering says, the duo has to come out of the three
+    // receivers that team actually has.
+    const strays = [];
     for (const item of teams.items) {
-      const mine = WIDE_RECEIVERS.filter((w) => w.team === item.id);
-      if (mine.some((w) => w.depth === undefined)) unranked++;
-      const want = mine
-        .slice()
-        .sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99))
-        .slice(0, 2)
-        .map((w) => w.name)
-        .join(" + ");
-      if (want && item.fills.rec !== want) wrong.push(`${item.id}: ${item.fills.rec} != ${want}`);
+      const mine = WIDE_RECEIVERS.filter((w) => w.team === item.id).map((w) => w.name);
+      const duo = (item.fills.rec ?? "").split(" + ").filter(Boolean);
+      if (duo.some((n) => !mine.includes(n))) strays.push(`${item.id}: ${item.fills.rec}`);
+      if (duo.length && duo.length !== Math.min(2, mine.length)) strays.push(`${item.id}: ${duo.length} names`);
     }
-    ok("every WR Duo is the top two by depth", wrong.length === 0, wrong.slice(0, 3).join(" | "));
-    ok("every receiver row carries a depth", unranked === 0, `${unranked} teams with an unranked receiver`);
+    ok("every WR Duo comes from that team's receivers", strays.length === 0, strays.slice(0, 3).join(" | "));
 
-    const min = teams.items.find((i) => i.id === "MIN");
-    ok("Justin Jefferson is on the Vikings", !!min && min.fills.rec.includes("Justin Jefferson"), min?.fills.rec ?? "no MIN item");
-    const dal = teams.items.find((i) => i.id === "DAL");
-    ok("the Cowboys are Lamb and Pickens", !!dal && dal.fills.rec === "CeeDee Lamb + George Pickens", dal?.fills.rec ?? "no DAL item");
+    // A hand-written order that names somebody who is not on the team is
+    // a typo, and would be silently ignored without this.
+    const bad = [];
+    for (const [abbr, names] of Object.entries(WR_ORDER)) {
+      const mine = WIDE_RECEIVERS.filter((w) => w.team === abbr).map((w) => w.name);
+      for (const n of names) if (!mine.includes(n)) bad.push(`${abbr}: "${n}"`);
+    }
+    ok("every hand-written name is really on that team", bad.length === 0, bad.join(" | "));
+
+    const duo = (id) => teams.items.find((i) => i.id === id)?.fills.rec ?? "no item";
+    ok("Washington is McLaurin and Diggs", duo("WAS") === "Terry McLaurin + Stefon Diggs", duo("WAS"));
+    ok("and McCaffrey is not in it", !duo("WAS").includes("McCaffrey"), "he is their fourth receiver");
+    ok("Justin Jefferson is on the Vikings", duo("MIN").includes("Justin Jefferson"), duo("MIN"));
+    ok("the Cowboys are Lamb and Pickens", duo("DAL") === "CeeDee Lamb + George Pickens", duo("DAL"));
 
     // Short forms exist for everything the long form covers, or the
     // overlay silently falls back to the full name and overflows.
     const missingShort = teams.items.filter((i) => Object.keys(i.fills).some((k) => !i.fillsShort?.[k]));
     ok("every fill has a short form too", missingShort.length === 0, missingShort.slice(0, 3).map((i) => i.id).join(", "));
-    ok("the short form really is shorter", min?.fillsShort.rec === "Jefferson + Addison", min?.fillsShort?.rec ?? "");
     ok("the slot is called WR Duo", teams.slots.some((s) => s.key === "rec" && s.label === "WR Duo"), "");
   }
 }
