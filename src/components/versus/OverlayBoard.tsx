@@ -30,7 +30,7 @@ export { PLAYER_COLORS };
 
 export const STAGE_W = 1080;
 export const STAGE_H = 1920;
-export const DEFAULT_LAYOUT: LayoutKey = "b";
+export const DEFAULT_LAYOUT: LayoutKey = "c1";
 
 export function OverlayBoard({
   state,

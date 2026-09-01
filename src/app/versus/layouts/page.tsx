@@ -72,8 +72,8 @@ export default function LayoutsPage() {
         OVERLAY LAYOUTS
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-white/50">
-        The same moment of the same draft, five ways. Grey bands are where the cameras sit &mdash; on the
-        stream those are transparent. Pick one and the rest get deleted.
+        Lot and money big in the middle, positions down both outside edges &mdash; five ways. Same moment of
+        the same draft in each. Grey bands are where the cameras sit; on the stream those are transparent.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
