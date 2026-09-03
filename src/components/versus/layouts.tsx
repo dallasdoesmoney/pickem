@@ -4,9 +4,9 @@ import type { CSSProperties } from "react";
 import { useLayoutEffect, useRef } from "react";
 import type { AuctionFormat, SlotDef } from "@/lib/auction/format";
 import { AuctionState, RosterEntry, toAct, currentItem } from "@/lib/auction/engine";
-import { PLAYER_COLORS, MONEY, INK, outlined } from "./style";
+import { PLAYER_COLORS, MONEY, MONEY_ON_LIGHT, outlined } from "./style";
 import { LogoReel, LotLogo, LotWaiting } from "./LotReel";
-import { onTheClock, TurnStyles, TurnNameMark, TurnLogoRing, turnNameClass, DEFAULT_TURN, type TurnKey } from "./turnIdeas";
+import { onTheClock, TurnNameMark } from "./turnIdeas";
 
 // ONE SHAPE, FIVE WAYS.
 //
@@ -63,9 +63,16 @@ function Badge({ url, size }: { url?: string; size: number }) {
 // slot is one. Sized for the common case it overflowed; sized for the
 // pair, every single-name pick was needlessly small. So it shrinks only
 // as far as the long one needs, and only when it is long.
-function fitSize(text: string, base: number, comfortable: number): number {
+// `floor` is in PIXELS, not in fractions of the base, and the difference
+// is not academic: it used to be base * 0.5, so raising the base raised
+// the floor with it - and taking the pick name from 30 to 36 pushed the
+// floor from 15px to 18px, at which "THOMAS JR. + WASHINGTON" stopped
+// fitting its column and got quietly ellipsed. How small a name may get
+// before a viewer cannot read it across a room is a fact about the
+// stream, not about whatever the base happens to be this week.
+function fitSize(text: string, base: number, comfortable: number, floor = base * 0.5): number {
   if (text.length <= comfortable) return base;
-  return Math.max(base * 0.5, (base * comfortable) / text.length);
+  return Math.max(Math.min(base, floor), (base * comfortable) / text.length);
 }
 
 // One roster line: POSITION, then who is in it, on ONE line.
@@ -184,7 +191,7 @@ function nameStyle(text: string, base: number): CSSProperties {
   return { fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: "#ffffff", ...outlined(size) };
 }
 
-type LayoutProps = { state: AuctionState; format: AuctionFormat; turn?: TurnKey };
+type LayoutProps = { state: AuctionState; format: AuctionFormat };
 // A pick is the most repeated object on the graphic - ten of them once
 // both rosters fill - so a few pixels either way is worth more here than
 // anywhere else, and so is anything it can be made to say for free.
@@ -203,9 +210,9 @@ const NAME_SIZE = 42;
 // price and a pill's padding has less room for the name than one that is
 // a logo and a word, and using one number for both ran "SUTTON + WADDLE"
 // off the side of the screen.
-function pickName(entry: RosterEntry, size = NAME_SIZE, comfortable = 12) {
+function pickName(entry: RosterEntry, size = NAME_SIZE, comfortable = 12, floor?: number) {
   const text = (entry.short ?? entry.label).toUpperCase();
-  return { text, size: fitSize(text, size, comfortable) };
+  return { text, size: fitSize(text, size, comfortable, floor) };
 }
 
 // THE CHIP.
@@ -223,14 +230,20 @@ function pickName(entry: RosterEntry, size = NAME_SIZE, comfortable = 12) {
 // Measured against every team in the league: Pittsburgh's yellow scores
 // 1.02:1, which is not "low contrast", it is invisible; New Orleans'
 // gold 1.07, Tennessee 1.89, Cincinnati and Denver 1.95. So the price
-// gets its own near-black capsule and stops depending on the fill at
-// all - one pair, 12:1, the same on all 32.
+// gets its own capsule and stops depending on the fill at all - one
+// pair, the same on all 32.
+//
+// The capsule is WHITE, and the digits are the dark reading of the
+// board's green rather than the bright one: #00e35f is built to glow on
+// a dark stage and scores 1.73 on white, which would have reintroduced
+// the exact fault the capsule exists to remove. MONEY_ON_LIGHT is the
+// same hue at 5.5:1.
 //
 // The name does not need the same treatment: it is white with a black
 // stroke around it (see outlined), and a stroke is what makes white hold
 // on a light fill where flat white would not.
 function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
-  const { text, size } = pickName(entry, 30, 9);
+  const { text, size } = pickName(entry, 36, 9, 15);
   const accent = entry.accent ?? "#8899aa";
   return (
     <div
@@ -283,13 +296,17 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
           position: "relative",
           display: "flex",
           alignItems: "center",
-          padding: "2px 8px",
+          padding: "2px 9px",
           borderRadius: 999,
-          background: INK,
+          background: "#ffffff",
+          // A thin dark rim, because white on a WHITE-ish team - the
+          // Saints' gold, the Titans' light blue - needs an edge or the
+          // capsule has no shape to be read as.
+          boxShadow: "0 0 0 2px rgba(5,7,13,0.5)",
           fontFamily: "var(--font-display)",
-          fontSize: 24,
+          fontSize: 26,
           lineHeight: 1,
-          color: MONEY,
+          color: MONEY_ON_LIGHT,
           fontVariantNumeric: "tabular-nums",
         }}
       >
@@ -495,7 +512,7 @@ const LOT_SIZE = 180;
 // The centre column, and the gap the two names straddle above it.
 const SPINE_W = 250;
 
-function SpineLayout({ state, format, turn = DEFAULT_TURN }: LayoutProps) {
+function SpineLayout({ state, format }: LayoutProps) {
   const head = headline(state, format);
   // Whose move it is, and only while it is still the opening one - see
   // turnIdeas.tsx. Null the rest of the time, which is most of the time.
@@ -597,11 +614,8 @@ function SpineLayout({ state, format, turn = DEFAULT_TURN }: LayoutProps) {
             <FlyingPrice amount={state.won?.price ?? 0} color={PLAYER_COLORS[who]} from={logoRef} />
           </div>
         )}
-        {clock === who && <TurnNameMark kind={turn} who={who} />}
-        <span
-          className={turnNameClass(turn, clock === who)}
-          style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}
-        >
+        {clock === who && <TurnNameMark who={who} />}
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
           {state.players[who].name.toUpperCase()}
         </span>
         {/* Green, while the bid is a player colour. Green is what you
@@ -623,7 +637,6 @@ function SpineLayout({ state, format, turn = DEFAULT_TURN }: LayoutProps) {
            with a hard curve read as a flicker at stream framerates. */
         .versus-pick-in { animation: versusPickIn 780ms cubic-bezier(0.34, 0.02, 0.18, 1) both; }
       `}</style>
-      <TurnStyles />
 
       {/* THE LOGO SITS BETWEEN THE TWO NAMES, on their line.
       
@@ -647,7 +660,6 @@ function SpineLayout({ state, format, turn = DEFAULT_TURN }: LayoutProps) {
               justifyContent: "center",
             }}
           >
-            {clock !== null && <TurnLogoRing kind={turn} who={clock} size={LOT_SIZE} />}
             {state.phase === "ready" ? (
               held ? <LotLogo item={held} size={LOT_SIZE} /> : <LotWaiting size={LOT_SIZE} />
             ) : state.phase === "spinning" && item ? (

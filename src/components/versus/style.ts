@@ -17,6 +17,12 @@ import type { CSSProperties } from "react";
 // first ten seconds and never has to read a label again.
 export const PLAYER_COLORS = ["#3aa8ff", "#ffd23a"];
 export const MONEY = "#00e35f";
+// The same money, on a light ground. #00e35f is built to glow on a dark
+// stage and scores 1.73:1 on white - worse than the green-on-team-colour
+// problem the price capsule exists to fix. This is the darkest reading
+// of the same hue: 5.5:1 on white, and still unmistakably the board's
+// green rather than a second colour.
+export const MONEY_ON_LIGHT = "#007a32";
 export const INK = "#05070d";
 
 // A black outline heavy enough to hold up over a moving camera feed.

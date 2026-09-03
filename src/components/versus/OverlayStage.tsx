@@ -5,7 +5,6 @@ import type { AuctionFormat } from "@/lib/auction/format";
 import type { AuctionState } from "@/lib/auction/engine";
 import { OverlayBoard, STAGE_W, STAGE_H, DEFAULT_LAYOUT } from "./OverlayBoard";
 import { type LayoutKey } from "./layouts";
-import { DEFAULT_TURN, type TurnKey } from "./turnIdeas";
 
 // THE MIRROR. The exact graphic OBS is drawing, on the page you play on.
 //
@@ -37,7 +36,6 @@ export function OverlayStage({
   mode = "stage",
   showCamBands = true,
   layout = DEFAULT_LAYOUT,
-  turn = DEFAULT_TURN,
 }: {
   state: AuctionState;
   format: AuctionFormat;
@@ -46,7 +44,6 @@ export function OverlayStage({
   mode?: StageMode;
   showCamBands?: boolean;
   layout?: LayoutKey;
-  turn?: TurnKey;
 }) {
   // Measured rather than assumed, so this is right on a phone and on a
   // desktop without a breakpoint deciding for it.
@@ -141,7 +138,7 @@ export function OverlayStage({
               <div style={{ position: "absolute", top: STAGE_H - camBottom, left: 0, width: STAGE_W, height: camBottom, background: "rgba(255,255,255,0.035)" }} />
             </div>
           )}
-          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} layout={layout} turn={turn} />
+          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} layout={layout} />
         </div>
       )}
       </div>
