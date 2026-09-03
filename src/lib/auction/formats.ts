@@ -23,9 +23,9 @@ import type { AuctionFormat, AuctionItem } from "./format";
 // THE ROSTER FILES ARE SORTED BY NAME, not by depth.
 //
 // That is fine for a tier list, where all three receivers are on screen
-// at once, and wrong here, where only the top two go on a graphic: taking
-// the first two rows for Minnesota gave Jauan Jennings and Jordan
-// Addison, and left Justin Jefferson out of the Vikings entirely.
+// at once, and wrong here, where one receiver goes on a graphic: taking
+// the first row for Minnesota gave Jauan Jennings and left Justin
+// Jefferson out of the Vikings entirely.
 //
 // The chart position each row was chosen at is now kept on the row, so
 // this asks for it. Rows with no depth sort last rather than jumping the
@@ -48,10 +48,6 @@ function firstFor<T extends Roster>(rows: T[], abbr: string): T | undefined {
   return byDepth(rows, abbr)[0];
 }
 
-function twoFor<T extends Roster>(rows: T[], abbr: string): T[] {
-  return byDepth(rows, abbr).slice(0, 2);
-}
-
 // "Justin Jefferson" -> "Jefferson", "Brian Thomas Jr." -> "Thomas Jr.",
 // "Amon-Ra St. Brown" -> "St. Brown". Everything after the first name,
 // which keeps the suffixes and the two-word surnames that a naive "last
@@ -71,7 +67,7 @@ function teamItem(abbr: string): AuctionItem | null {
 
   const qb = firstFor(QUARTERBACKS, abbr);
   const rb = firstFor(RUNNING_BACKS, abbr);
-  const wrs = twoFor(WIDE_RECEIVERS, abbr);
+  const wr = firstFor(WIDE_RECEIVERS, abbr);
   const te = firstFor(TIGHT_ENDS, abbr);
 
   const fills: Record<string, string> = {};
@@ -84,9 +80,15 @@ function teamItem(abbr: string): AuctionItem | null {
     fills.rb = rb.name;
     fillsShort.rb = surname(rb.name);
   }
-  if (wrs.length > 0) {
-    fills.rec = wrs.map((w) => w.name).join(" + ");
-    fillsShort.rec = wrs.map((w) => surname(w.name)).join(" + ");
+  // ONE receiver, not two. A pair was the only slot on the board holding
+  // two names, so it was the only slot whose chip could not be read at a
+  // glance - "SUTTON + WADDLE" at the size a pair forces is a smaller
+  // name than every other pick on the graphic, for a slot that is not
+  // more important than they are. The WR1 is the receiver anybody names
+  // when you say the team.
+  if (wr) {
+    fills.rec = wr.name;
+    fillsShort.rec = surname(wr.name);
   }
   if (te) {
     fills.te = te.name;

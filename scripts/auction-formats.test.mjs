@@ -111,39 +111,53 @@ for (const format of formats) {
   console.log(`   items stepped over across ${DRAFTS} drafts: ${skipped} (longest single step ${worstStep})`);
 }
 
-// --- the right players, not the alphabetically first ones ------------
+// --- the right player, not the alphabetically first one --------------
 //
-// The roster files are sorted by NAME. A graphic that shows only the top
-// two receivers therefore has to be told which two, and the ordering it
-// was given first was rebuilt from all.ts's `depthRank` - which counts
-// EVERY slot on the chart, returners included, so a punt returner ties
-// with the real WR1 and an alphabetical tiebreak decides. Washington came
-// out McCaffrey and McLaurin, with Diggs nowhere.
+// The roster files are sorted by NAME. A graphic that shows ONE receiver
+// per team therefore has to be told which one, and the ordering it was
+// given first was rebuilt from all.ts's `depthRank` - which counts EVERY
+// slot on the chart, returners included, so a punt returner ties with the
+// real WR1 and an alphabetical tiebreak decides. Washington came out
+// McCaffrey and McLaurin, with Diggs nowhere.
 //
-// The check that shipped alongside that bug asserted the duo matched the
-// `depth` field, which is the same wrong answer written twice. So it
-// asserts against the roster and against known-good cases instead.
+// The check that shipped alongside that bug asserted the pick matched the
+// `depth` field, which is the same wrong answer written twice. So this
+// asserts against the ROSTER - the receiver has to be one this team
+// actually has, and specifically the one ESPN's chart lists first - and
+// against known-good cases.
 {
   const teams = AUCTION_FORMATS["nfl-teams"];
   if (!teams) {
     ok("nfl-teams is registered", false, "rosters not synced in this checkout");
   } else {
-    // Whatever the ordering says, the duo has to come out of the three
-    // receivers that team actually has.
     const strays = [];
+    const notFirst = [];
     for (const item of teams.items) {
-      const mine = WIDE_RECEIVERS.filter((w) => w.team === item.id).map((w) => w.name);
-      const duo = (item.fills.rec ?? "").split(" + ").filter(Boolean);
-      if (duo.some((n) => !mine.includes(n))) strays.push(`${item.id}: ${item.fills.rec}`);
-      if (duo.length && duo.length !== Math.min(2, mine.length)) strays.push(`${item.id}: ${duo.length} names`);
+      const mine = WIDE_RECEIVERS.filter((w) => w.team === item.id);
+      const pick = item.fills.rec ?? "";
+      if (!pick) continue;
+      // ONE name. The slot used to hold a pair, and "+" is how that read.
+      if (pick.includes(" + ")) strays.push(`${item.id}: two names, "${pick}"`);
+      if (!mine.some((w) => w.name === pick)) strays.push(`${item.id}: "${pick}" is not one of theirs`);
+      // And the one the chart puts first, by depth - not by name order,
+      // which is the bug this whole block exists for.
+      const top = [...mine].sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99))[0];
+      if (top && top.name !== pick) notFirst.push(`${item.id}: got "${pick}", chart says "${top.name}"`);
     }
-    ok("every receiver pair comes from that team's receivers", strays.length === 0, strays.slice(0, 3).join(" | "));
+    ok("every receiver comes from that team's receivers", strays.length === 0, strays.slice(0, 3).join(" | "));
+    ok("and is the one the depth chart lists first", notFirst.length === 0, notFirst.slice(0, 3).join(" | "));
 
-    const duo = (id) => teams.items.find((i) => i.id === id)?.fills.rec ?? "no item";
-    ok("Washington is McLaurin and Diggs", duo("WAS") === "Terry McLaurin + Stefon Diggs", duo("WAS"));
-    ok("and McCaffrey is not in it", !duo("WAS").includes("McCaffrey"), "he is their fourth receiver");
-    ok("Justin Jefferson is on the Vikings", duo("MIN").includes("Justin Jefferson"), duo("MIN"));
-    ok("the Cowboys are Lamb and Pickens", duo("DAL") === "CeeDee Lamb + George Pickens", duo("DAL"));
+    const wr = (id) => teams.items.find((i) => i.id === id)?.fills.rec ?? "no item";
+    ok("Washington is McLaurin", wr("WAS") === "Terry McLaurin", wr("WAS"));
+    ok("and not McCaffrey", !wr("WAS").includes("McCaffrey"), "he is their fourth receiver");
+    ok("Minnesota is Justin Jefferson", wr("MIN") === "Justin Jefferson", wr("MIN"));
+    ok("Dallas is CeeDee Lamb", wr("DAL") === "CeeDee Lamb", wr("DAL"));
+    ok("Cincinnati is Ja'Marr Chase", wr("CIN") === "Ja'Marr Chase", wr("CIN"));
+
+    // Every team fields one. A team with no receiver at all would come up
+    // with a slot nobody can fill.
+    const noWr = teams.items.filter((i) => !i.fills.rec);
+    ok("every team has a receiver", noWr.length === 0, noWr.map((i) => i.id).join(", "));
 
     // Short forms exist for everything the long form covers, or the
     // overlay silently falls back to the full name and overflows.
