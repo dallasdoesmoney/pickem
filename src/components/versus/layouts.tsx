@@ -6,6 +6,7 @@ import type { AuctionFormat, SlotDef } from "@/lib/auction/format";
 import { AuctionState, RosterEntry, toAct, currentItem } from "@/lib/auction/engine";
 import { PLAYER_COLORS, MONEY, INK, outlined } from "./style";
 import { LogoReel, LotLogo, LotWaiting } from "./LotReel";
+import { onTheClock, TurnStyles, TurnNameMark, TurnLogoRing, turnNameClass, DEFAULT_TURN, type TurnKey } from "./turnIdeas";
 
 // ONE SHAPE, FIVE WAYS.
 //
@@ -183,7 +184,7 @@ function nameStyle(text: string, base: number): CSSProperties {
   return { fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: "#ffffff", ...outlined(size) };
 }
 
-type LayoutProps = { state: AuctionState; format: AuctionFormat };
+type LayoutProps = { state: AuctionState; format: AuctionFormat; turn?: TurnKey };
 // A pick is the most repeated object on the graphic - ten of them once
 // both rosters fill - so a few pixels either way is worth more here than
 // anywhere else, and so is anything it can be made to say for free.
@@ -494,8 +495,11 @@ const LOT_SIZE = 180;
 // The centre column, and the gap the two names straddle above it.
 const SPINE_W = 250;
 
-function SpineLayout({ state, format }: LayoutProps) {
+function SpineLayout({ state, format, turn = DEFAULT_TURN }: LayoutProps) {
   const head = headline(state, format);
+  // Whose move it is, and only while it is still the opening one - see
+  // turnIdeas.tsx. Null the rest of the time, which is most of the time.
+  const clock = onTheClock(state, format);
   const item = currentItem(state, format);
 
   // WHILE WAITING, THE LAST TEAM STAYS UP. A lot ends, the pick lands on
@@ -593,7 +597,11 @@ function SpineLayout({ state, format }: LayoutProps) {
             <FlyingPrice amount={state.won?.price ?? 0} color={PLAYER_COLORS[who]} from={logoRef} />
           </div>
         )}
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
+        {clock === who && <TurnNameMark kind={turn} who={who} />}
+        <span
+          className={turnNameClass(turn, clock === who)}
+          style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}
+        >
           {state.players[who].name.toUpperCase()}
         </span>
         {/* Green, while the bid is a player colour. Green is what you
@@ -615,6 +623,7 @@ function SpineLayout({ state, format }: LayoutProps) {
            with a hard curve read as a flicker at stream framerates. */
         .versus-pick-in { animation: versusPickIn 780ms cubic-bezier(0.34, 0.02, 0.18, 1) both; }
       `}</style>
+      <TurnStyles />
 
       {/* THE LOGO SITS BETWEEN THE TWO NAMES, on their line.
       
@@ -638,6 +647,7 @@ function SpineLayout({ state, format }: LayoutProps) {
               justifyContent: "center",
             }}
           >
+            {clock !== null && <TurnLogoRing kind={turn} who={clock} size={LOT_SIZE} />}
             {state.phase === "ready" ? (
               held ? <LotLogo item={held} size={LOT_SIZE} /> : <LotWaiting size={LOT_SIZE} />
             ) : state.phase === "spinning" && item ? (
