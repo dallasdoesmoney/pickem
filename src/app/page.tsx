@@ -684,22 +684,6 @@ export default function HomePage() {
         <h1 className="text-[clamp(1.7rem,7vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
           PLAY. PICK. PREDICT. RANK.
         </h1>
-        {/* ONE LINE OF ACTUAL SENTENCES, and it earns its place twice.
-            
-            For a reader: four cards follow and none of them says what
-            this site IS until you have read all four.
-            
-            For a search engine: this is the strongest page on the site -
-            it is what ranks for "Sideline Brew" - and until now the only
-            place it said "NFL Nameplate" was a nine-pixel meta line
-            inside a card. A page cannot rank for words it does not
-            contain, and every other page borrows its standing from this
-            one. */}
-        <p className="mt-3 max-w-xl text-[13.5px] leading-relaxed text-white/55 sm:text-sm">
-          <strong className="font-semibold text-white/75">NFL Nameplate</strong> is our free daily NFL player
-          guessing game &mdash; one mystery player, eight guesses, the same player for everybody. Then pick
-          every game of the week, predict all 32 records, and build your tier lists.
-        </p>
       </div>
 
       <DailyHero state={daily} />
