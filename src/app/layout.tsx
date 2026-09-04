@@ -56,19 +56,19 @@ export const metadata: Metadata = {
     default: "Sideline Brew - NFL Pick'em, Tier Lists and the NFL Nameplate Daily Game",
     template: "%s | Sideline Brew",
   },
-  description: "Picks, tier lists and a daily game. Pick the winner of every NFL game, every week.",
+  description: "Play NFL Nameplate, the free daily NFL player guessing game. Plus weekly NFL pick'em, record predictions for all 32 teams, and NFL tier lists.",
   openGraph: {
     type: "website",
     siteName: "Sideline Brew",
     title: "Sideline Brew",
-    description: "Picks, tier lists and a daily game.",
+    description: "NFL Nameplate, the daily player guessing game. Plus weekly pick'em, record predictions and tier lists.",
     url: SITE,
     images: [{ url: "/og-default.png", width: 1200, height: 630, alt: "Sideline Brew" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Sideline Brew",
-    description: "Picks, tier lists and a daily game.",
+    description: "NFL Nameplate, the daily player guessing game. Plus weekly pick'em, record predictions and tier lists.",
     images: ["/og-default.png"],
   },
 };

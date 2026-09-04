@@ -37,6 +37,15 @@ export const FAQ = [
     a: "A new player unlocks every day at midnight Eastern. Your streak survives as long as you solve each day's board before the next one lands.",
   },
   {
+    // The phrase people actually type. "NFL Wordle" and "guess the NFL
+    // player" have real search volume where "NFL Nameplate" is a name
+    // only we use, and this is the honest answer to it rather than a
+    // keyword wedged into a sentence - it is genuinely the first thing
+    // anybody asks.
+    q: "Is NFL Nameplate like Wordle?",
+    a: "Same idea, football instead of letters. NFL Nameplate is an NFL Wordle: one puzzle a day, everybody gets the same one, and you share your result as a grid of coloured squares. The difference is that a guess is a whole player rather than a word, so every guess comes back with six clues about who the answer is instead of telling you which letters were right.",
+  },
+  {
     q: "Can I play more than one NFL Nameplate a day?",
     a: "Yes. The daily board is one player a day and is the one everybody shares, but there is an unlimited mode on the same page that deals you a fresh random player as often as you like. Unlimited rounds do not count towards your streak.",
   },

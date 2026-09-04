@@ -324,19 +324,17 @@ function DailyHero({ state }: { state: PuzzleState | null }) {
   // Every branch now names the game, because the card above it no longer
   // does: "DAILY GAMES" is the category, and this is the line that says
   // which one is behind it today.
-  // "NFL NAMEPLATE" rather than "NAMEPLATE". The caption above stays
-  // DAILY GAMES - the category outlives the one game in it - so this is
-  // the only line in the biggest link on the home page that names the
-  // game, and the words people search are the full two.
+  // The caption above now names the game, so this says what STATE it is
+  // in rather than repeating the name directly under itself.
   const meta = !state
-    ? "NFL NAMEPLATE \u00b7 TODAY \u00b7 8 GUESSES"
+    ? "TODAY \u00b7 8 GUESSES"
     : state.solved
-      ? `NFL NAMEPLATE \u00b7 SOLVED IN ${state.guessesUsed}`
+      ? `SOLVED IN ${state.guessesUsed}`
       : state.finished
-        ? "NFL NAMEPLATE \u00b7 OUT OF GUESSES TODAY"
+        ? "OUT OF GUESSES TODAY"
         : state.guessesUsed > 0
-          ? `NFL NAMEPLATE \u00b7 ${state.guessesUsed} OF ${state.maxGuesses} USED`
-          : `NFL NAMEPLATE \u00b7 TODAY \u00b7 ${state.maxGuesses} GUESSES`;
+          ? `${state.guessesUsed} OF ${state.maxGuesses} USED`
+          : `TODAY \u00b7 ${state.maxGuesses} GUESSES`;
 
   return (
     <Link href="/nfl-nameplate" className={CARD}>
@@ -405,11 +403,11 @@ function DailyHero({ state }: { state: PuzzleState | null }) {
           ))}
         </div>
       </div>
-      {/* DAILY GAMES, not NAMEPLATE. Nameplate is one of the daily games
-          rather than the name of the category - the meta line underneath
-          is where it says which one - so the card can hold tomorrow's
-          second game without being renamed. */}
-      <Caption name={"DAILY GAMES"} color="#fb923c" meta={meta} />
+      {/* NFL NAMEPLATE, not DAILY GAMES. This is the largest link on the
+          most-visited page, and it was describing the category rather
+          than naming the game - so the strongest page on the site never
+          said the words anybody searches. */}
+      <Caption name={"NFL NAMEPLATE"} color="#fb923c" meta={meta} />
     </Link>
   );
 }
@@ -686,6 +684,22 @@ export default function HomePage() {
         <h1 className="text-[clamp(1.7rem,7vw,2.75rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
           PLAY. PICK. PREDICT. RANK.
         </h1>
+        {/* ONE LINE OF ACTUAL SENTENCES, and it earns its place twice.
+            
+            For a reader: four cards follow and none of them says what
+            this site IS until you have read all four.
+            
+            For a search engine: this is the strongest page on the site -
+            it is what ranks for "Sideline Brew" - and until now the only
+            place it said "NFL Nameplate" was a nine-pixel meta line
+            inside a card. A page cannot rank for words it does not
+            contain, and every other page borrows its standing from this
+            one. */}
+        <p className="mt-3 max-w-xl text-[13.5px] leading-relaxed text-white/55 sm:text-sm">
+          <strong className="font-semibold text-white/75">NFL Nameplate</strong> is our free daily NFL player
+          guessing game &mdash; one mystery player, eight guesses, the same player for everybody. Then pick
+          every game of the week, predict all 32 records, and build your tier lists.
+        </p>
       </div>
 
       <DailyHero state={daily} />
