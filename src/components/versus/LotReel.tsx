@@ -86,26 +86,49 @@ export function LogoReel({ format, targetId, size }: { format: AuctionFormat; ta
   );
 }
 
-// A lot that is drawn but not yet started. Deliberately says nothing
-// about what it is, and - like the reel - sits on nothing.
 export function LotWaiting({ size }: { size: number }) {
   return (
-    <div
+    // THE MARK, IN THE ONE SLOT THAT IS EMPTY ANYWAY.
+    //
+    // This is the lot's box before the first spin - and it only ever
+    // shows then, because once a lot has been drawn the PREVIOUS team's
+    // badge holds this spot until the next START. So it is the one place
+    // on the graphic where nothing is competing for attention and
+    // nothing has to move over to make room.
+    //
+    // It replaces a dashed ring with a question mark in it, which said
+    // "a thing goes here" to somebody who could already see that the
+    // draft had not started - the START button is on the board and the
+    // rails are empty.
+    //
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/press-logo.png"
+      alt="Sideline Brew"
+      width={size}
+      height={size}
       style={{
         width: size,
         height: size,
-        borderRadius: "50%",
-        border: `${Math.max(4, Math.round(size * 0.035))}px dashed rgba(255,255,255,0.28)`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "var(--font-display)",
-        fontSize: size * 0.5,
-        color: "rgba(255,255,255,0.32)",
-        textShadow: "0 4px 0 rgba(5,7,13,0.7)",
+        objectFit: "contain",
+        // The same shadow the team badges get. On a transparent layer
+        // over a moving camera, an unshadowed mark has no edge and the
+        // wordmark is the first part to disappear.
+        filter: "drop-shadow(0 5px 0 rgba(5,7,13,0.75)) drop-shadow(0 0 22px rgba(255,255,255,0.35))",
+        // A hair under full, so it reads as the board at rest rather
+        // than as this lot being a team called Sideline Brew.
+        opacity: 0.92,
+        // LIFTED, and this is the one thing a team badge does not need.
+        // The lot's box is bottom-aligned with the two player names, and
+        // a crest is a circle - its bottom edge is a curve that reads as
+        // clearance. This mark ends in a hard band of WORDMARK at the
+        // very bottom of its own box, which landed on the same line as
+        // "NOAH $20" and read as a third label wedged between them.
+        transform: "translateY(-18px)",
       }}
-    >
-      ?
-    </div>
+      onError={(e) => {
+        e.currentTarget.style.display = "none";
+      }}
+    />
   );
 }
