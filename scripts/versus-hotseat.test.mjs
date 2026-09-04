@@ -56,6 +56,28 @@ try {
     (await page.locator("main h2").first().textContent())?.trim(),
   );
 
+  // THE CARD AND ITS TILE ARE THE SAME THREE. The hero used to walk a
+  // spread of the pool from wherever the stride began, so a tile saying
+  // Kansas City / Dallas / Philly opened a card saying Arizona - one
+  // mode wearing two faces on one screen. Read off a fresh load, so
+  // this is the opening frame and not wherever the cycle got to.
+  {
+    const shown = await page.evaluate(() => {
+      const src = (sel) => document.querySelector(`main ${sel} img`)?.getAttribute("src") ?? null;
+      const hero = [src(".gs-left"), src(".gs-front"), src(".gs-right")];
+      const tile = [...document.querySelectorAll("main button[title]")[0].querySelectorAll("img")].map((e) =>
+        e.getAttribute("src"),
+      );
+      return { hero, tile };
+    });
+    const short = (u) => (u ?? "").split("/").pop();
+    ok(
+      "the card opens on its own tile's three",
+      JSON.stringify(shown.hero) === JSON.stringify(shown.tile),
+      `card ${shown.hero.map(short).join(",")} / tile ${shown.tile.map(short).join(",")}`,
+    );
+  }
+
   await page.getByRole("button", { name: /PICK THIS DRAFT/i }).click();
   await page.getByRole("button", { name: /START THE DRAFT/i }).waitFor({ timeout: 10000 });
   ok("the setup screen restates the draft", (await page.getByRole("button", { name: /^CHANGE$/ }).count()) === 1, "");

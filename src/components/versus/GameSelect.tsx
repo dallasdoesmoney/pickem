@@ -56,10 +56,10 @@ function useReduced(): boolean {
 }
 
 // The Hero is keyed on its mode, so switching modes remounts this at
-// zero rather than picking up wherever the last one had got to - a hero
-// that opens mid-shuffle reads as a glitch.
-function useCycle(len: number): number {
-  const [i, setI] = useState(0);
+// the start rather than picking up wherever the last one had got to - a
+// hero that opens mid-shuffle reads as a glitch.
+function useCycle(len: number, start = 0): number {
+  const [i, setI] = useState(start);
   const reduced = useReduced();
   useEffect(() => {
     if (reduced || len < 2) return;
@@ -140,9 +140,28 @@ function ground(accent: string | undefined): string {
   return `radial-gradient(120% 90% at 50% 18%, ${a}ee, ${a}55 46%, #070e1c 100%)`;
 }
 
+// THE CARD OPENS ON WHAT ITS TILE SHOWS.
+//
+// The hero used to walk a spread of the pool from wherever the stride
+// began, so the Full Roster tile said Kansas City / Dallas / Philly and
+// the card it opened said Arizona - the same mode wearing two different
+// faces on one screen. The headliners go first, then the rest of the
+// pool behind them.
+//
+// Index 1, not 0, because the fan draws pool[i-1], pool[i], pool[i+1]
+// left to right: the middle headliner has to sit at index 1 for the
+// first frame to BE the tile.
+const OPENS_AT = 1;
+
+function heroOrder(format: AuctionFormat): AuctionItem[] {
+  const three = faces(format);
+  const seen = new Set(three.map((it) => it.id));
+  return [...three, ...walk(format).filter((it) => !seen.has(it.id))];
+}
+
 function Hero({ format, onConfirm }: { format: AuctionFormat; onConfirm: () => void }) {
-  const pool = walk(format);
-  const i = useCycle(pool.length);
+  const pool = heroOrder(format);
+  const i = useCycle(pool.length, OPENS_AT);
   const cur = pool[i];
   const prev = pool[(i - 1 + pool.length) % pool.length];
   const next = pool[(i + 1) % pool.length];
