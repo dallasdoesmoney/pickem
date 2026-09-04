@@ -323,29 +323,73 @@ if (finished) {
   }
   await gp.waitForTimeout(3000);
 
+  // THE ASK IS IN THE RESULT NOW, not in a second dialog behind it.
+  //
+  // It used to be two: the reveal, then - only once you closed it - the
+  // sign-up. Which assumed people close things; anybody who screenshotted
+  // their grid and left never saw it. So the whole point of this block is
+  // that the ask is on screen at the same moment the win is.
   const solvedIn = await gp.locator("text=/Solved in/").count();
-  const keepEarly = await gp.locator("text=/KEEP THIS RESULT/").count();
-  check("a guest win shows the reveal first", solvedIn > 0 && keepEarly === 0, `reveal ${solvedIn > 0}, ask up ${keepEarly > 0}`);
+  const askInReveal = await gp.locator("text=/SIGN IN TO START TRACKING/i").count();
+  const saveBtn = await gp.getByRole("button", { name: /SAVE MY RESULT/ }).count();
+  check(
+    "a guest win shows the reveal",
+    solvedIn > 0,
+    `reveal ${solvedIn > 0}`,
+  );
+  check(
+    "and the ask is inside it, not behind it",
+    askInReveal > 0 && saveBtn > 0,
+    `locked panel ${askInReveal > 0}, save button ${saveBtn > 0}`,
+  );
 
-  await gp.getByRole("button", { name: "Close result" }).click();
-  await gp.waitForTimeout(600);
-  const keepAfter = await gp.locator("text=/KEEP THIS RESULT/").count();
-  const dialogUp = await gp.getByRole("dialog", { name: "Result" }).isVisible().catch(() => false);
-  check("closing it brings the ask, as a dialog", keepAfter > 0 && dialogUp, `ask ${keepAfter > 0}, in a dialog ${dialogUp}`);
+  // Both buttons have to be REACHABLE without scrolling, or the ask has
+  // simply moved from one place nobody sees to another. The share button
+  // matters just as much: shares are how people find the game.
+  //
+  // MEASURED AT PHONE SIZE, not at whatever this page happens to be.
+  // Checked at the tab's own height this passes on any layout at all -
+  // there is 1100px of room and the dialog is 750 - which makes it a
+  // test that cannot fail. 390x730 is roughly an iPhone with Safari's
+  // chrome taken off, and it is the size the whole change is for.
+  const PHONE = { width: 390, height: 730 };
+  const wasSize = gp.viewportSize();
+  await gp.setViewportSize(PHONE);
+  await gp.waitForTimeout(400);
+  const box = await gp.locator(".puzzle-reveal").first().boundingBox();
+  const endOf = async (name) => {
+    const b = await gp.getByRole("button", { name }).first().boundingBox().catch(() => null);
+    return b ? Math.round(b.y + b.height - box.y) : null;
+  };
+  const vh = PHONE.height;
+  const shareEnd = await endOf(/SHARE RESULT/);
+  const joinEnd = await endOf(/SAVE MY RESULT/);
+  check(
+    "both buttons fit above the fold",
+    shareEnd !== null && joinEnd !== null && shareEnd <= vh && joinEnd <= vh,
+    `share ends ${shareEnd}px in, join ${joinEnd}px, screen ${vh}px`,
+  );
+  await gp.setViewportSize(wasSize);
+  await gp.waitForTimeout(300);
 
+  // ONE dialog. Closing it leaves a clean board rather than handing over
+  // to a second one.
   await gp.getByRole("button", { name: "Close result" }).click();
   await gp.waitForTimeout(600);
   const anyDialog = await gp.getByRole("dialog", { name: "Result" }).isVisible().catch(() => false);
-  const askInline = await gp.locator("text=/KEEP THIS RESULT/").count();
-  check("closing that leaves a clean board", !anyDialog && askInline === 0, `dialog ${anyDialog}, inline ask ${askInline > 0}`);
+  const oldAsk = await gp.locator("text=/KEEP THIS RESULT/").count();
+  check(
+    "closing it leaves a clean board",
+    !anyDialog && oldAsk === 0,
+    `dialog ${anyDialog}, second ask ${oldAsk > 0}`,
+  );
 
-  // And it does not nag: reopening the reveal must not queue the ask again.
+  // And reopening the result brings the ask back with it, because it is
+  // part of the result now rather than a thing that fires once.
   await gp.getByRole("button", { name: "SEE RESULT" }).click();
-  await gp.waitForTimeout(500);
-  await gp.getByRole("button", { name: "Close result" }).click();
   await gp.waitForTimeout(600);
-  const nagged = await gp.locator("text=/KEEP THIS RESULT/").count();
-  check("and it only asks once", nagged === 0, nagged ? "asked again on reopen" : "");
+  const askAgain = await gp.locator("text=/SIGN IN TO START TRACKING/i").count();
+  check("reopening the result still shows the ask", askAgain > 0, "it is part of the result, not a one-shot");
   await guest.close();
 }
 

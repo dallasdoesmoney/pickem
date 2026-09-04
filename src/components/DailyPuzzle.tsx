@@ -28,6 +28,7 @@ import { fetchNameplateStats, type NameplateStats } from "@/lib/supabase/namepla
 import { fetchPuzzleNumber } from "@/lib/supabase/dailyPuzzle";
 import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
+import { JoinPitch } from "@/components/daily/JoinPitch";
 import { recordDailyPlay } from "@/lib/supabase/dailyPlayers";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
@@ -260,10 +261,11 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   // WHICH dialog is up, not whether one is - a signed-out win has two
   // things to say and they are not the same thing.
   //
-  //   "reveal"  who it was, how many guesses, and the share.
-  //   "join"    keep this result. Follows the reveal for a guest, and
-  //             stands alone for one who ran out, because being told to
-  //             sign in IS their result.
+  //   "reveal"  who it was, how many guesses, the share - and, for a
+  //             signed-out solve, the ask, in the same dialog.
+  //   "join"    only for a guest who RAN OUT. Their board never learns
+  //             the answer, so there is no reveal for the ask to sit
+  //             under: being told to sign in IS their result.
   //
   // Opened when a round ENDS and never on load: a finished board that
   // pops a modal every time you come back to it is a modal people learn
@@ -271,11 +273,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
   const [kb, setKb] = useState({ inset: 0, top: 0, visible: 0 });
   const [outgrown, setOutgrown] = useState(false);
   const [stage, setStage] = useState<null | "reveal" | "join">(null);
-  // The ask follows the reveal ONCE. Offered again on every dismissal it
-  // would stop being an offer and start being a thing in the way -
-  // somebody reopening their result to screenshot it does not want to
-  // close two dialogs each time.
-  const [joinOffered, setJoinOffered] = useState(false);
 
   // A guest's board is built in the browser, so it has no number in it -
   // that is the one fact about the day only the database holds. Asked
@@ -338,7 +335,6 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     setQuery("");
     setCelebrating(false);
     setStage(null);
-    setJoinOffered(false);
     setOutgrown(false);
   }, []);
 
@@ -1023,17 +1019,7 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
           player who it was needs an endpoint that hands today's player to
           anybody who asks. */}
       {stage === "reveal" && state.finished && state.answer && !celebrating && (
-        <ResultDialog
-          onClose={() => {
-            // The hand-off. Only for a guest who solved the DAILY - there
-            // is no result to keep in practice - and only the first time,
-            // so reopening a result to screenshot it does not mean
-            // closing two dialogs every time.
-            const ask = mode === "daily" && !user && state.solved && !joinOffered;
-            setStage(ask ? "join" : null);
-            if (ask) setJoinOffered(true);
-          }}
-        >
+        <ResultDialog onClose={() => setStage(null)}>
           <Reveal
             state={state}
             answer={answer}
@@ -1043,6 +1029,19 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
             practiceRound={mode === "unlimited" ? (practice?.round ?? 1) : null}
             stats={shownStats}
             onPlayAgain={playAgain}
+            // THE ASK, IN THE RESULT, for a guest who just solved the
+            // daily. It used to be a second dialog that only arrived
+            // once they closed this one - which assumed people close
+            // things. Anybody who screenshotted their grid and left
+            // never saw it, and the moment they were most pleased with
+            // themselves was the moment it was not on screen.
+            //
+            // Only the daily: a practice round has no result to keep.
+            footer={
+              mode === "daily" && !user && state.solved ? (
+                <JoinPitch state={state} onJoin={() => void requestSignIn()} />
+              ) : undefined
+            }
           />
         </ResultDialog>
       )}
