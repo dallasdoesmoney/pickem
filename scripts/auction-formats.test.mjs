@@ -87,6 +87,7 @@ for (const format of formats) {
   let solvent = 0;
   let skipped = 0;
   let worstStep = 0;
+  const picks = [];
 
   for (let n = 0; n < DRAFTS; n++) {
     let s = startAuction(format, ["A", "B"], `seed-${n}`);
@@ -141,7 +142,25 @@ for (const format of formats) {
     finished++;
     if (s.players.every((p) => openSlots(p).length === 0)) everyoneFull++;
     if (s.players.every((p) => p.budget >= 0)) solvent++;
+    for (const p of s.players) for (const e of Object.values(p.roster)) if (e) picks.push(e);
   }
+
+  // WHAT THE GRAPHIC ACTUALLY DRAWS is `short`, and it is resolved once
+  // at assignment so the overlay never reaches back into the format.
+  // The Quarterback Room had no per-slot short form and no item-level
+  // one either, so it fell through to `label` and put PATRICK MAHOMES
+  // on a board where every other mode puts a surname.
+  //
+  // Checked off real assignments rather than off the format, because
+  // that fallback chain lives in the engine, not in the data.
+  ok(`${format.slug}: every pick has a short form`, picks.length > 0 && picks.every((e) => e.short), `${picks.length} picks`);
+  const fullNames = picks.filter((e) => e.short === e.label && e.label.trim().includes(" "));
+  ok(
+    `${format.slug}: none fell back to the full name`,
+    fullNames.length === 0,
+    [...new Set(fullNames.map((e) => e.short))].slice(0, 3).join(" | "),
+  );
+  console.log(`   e.g. ${[...new Set(picks.slice(0, 60).map((e) => `${e.label} -> ${e.short}`))].slice(0, 3).join("   ")}`);
 
   ok(`${format.slug}: every draft finished`, finished === DRAFTS, `${finished}/${DRAFTS}`);
   ok(`${format.slug}: everybody filled every slot`, everyoneFull === DRAFTS, `${everyoneFull}/${DRAFTS}`);

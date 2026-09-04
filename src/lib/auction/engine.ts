@@ -378,7 +378,14 @@ export function reduce(state: AuctionState, action: AuctionAction, format: Aucti
     if (!slotsItemCanFill(item, openSlots(player)).includes(action.slotKey)) return state;
 
     const label = item.fills?.[action.slotKey] ?? item.label;
-    const short = item.fillsShort?.[action.slotKey] ?? label;
+    // THE SHORT FORM, IN THE ORDER THE FORMATS CAN SUPPLY IT.
+    //
+    // Per-slot first, because a team is a different person in every
+    // slot. Then the item's own, which is what a mode whose items ARE
+    // the thing has - the Quarterback Room had neither, so it fell all
+    // the way through to the full name and put "PATRICK MAHOMES" on a
+    // graphic where every other mode puts a surname.
+    const short = item.fillsShort?.[action.slotKey] ?? item.short ?? label;
     const entry: RosterEntry = { itemId: item.id, price: state.won!.price, label, short, badge: item.imageUrl, accent: item.accent };
     const players = state.players.map((p, i) =>
       i === who

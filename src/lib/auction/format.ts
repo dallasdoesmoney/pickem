@@ -40,6 +40,16 @@ export type AuctionItem = {
   // you". Absent means "any open slot, worth its own label".
   fills?: Record<string, string>;
 
+  // FOR THE OTHER SHAPE: an item that fills any slot and is worth
+  // itself, so there is nothing to key a short form on. "Mahomes" where
+  // label says "Patrick Mahomes".
+  //
+  // Written by the format rather than derived, because there is no rule
+  // that works on both shapes: cutting the first word off a player's
+  // name gives a surname, and off "Kansas City Chiefs" gives "City
+  // Chiefs". Only the file that built the item knows which it is.
+  short?: string;
+
   // The same thing, short enough to sit BESIDE a position label rather
   // than under it - "Prescott" where fills says "Dak Prescott".
   //

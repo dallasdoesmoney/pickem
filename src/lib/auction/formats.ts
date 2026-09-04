@@ -168,6 +168,9 @@ const NFL_TEAMS: AuctionFormat = {
 const QB_ITEMS: AuctionItem[] = QUARTERBACKS.map((q) => ({
   id: q.espnId,
   label: q.name,
+  // The board draws surnames, so every mode has to hand it one. This
+  // shape has no `fills` to key a short form on, so it carries its own.
+  short: surname(q.name),
   subtitle: TEAMS[q.team] ? `${TEAMS[q.team].city} ${TEAMS[q.team].name}` : q.team,
   imageUrl: espnHeadshot(q.espnId),
   accent: TEAMS[q.team]?.color,
