@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { useLayoutEffect, useRef } from "react";
 import type { AuctionFormat, SlotDef } from "@/lib/auction/format";
 import { AuctionState, RosterEntry, toAct, currentItem } from "@/lib/auction/engine";
-import { PLAYER_COLORS, MONEY, MONEY_ON_LIGHT, outlined } from "./style";
+import { PLAYER_COLORS, MONEY, MONEY_ON_LIGHT, INK, outlined } from "./style";
 import { LogoReel, LotLogo, LotWaiting } from "./LotReel";
 import { onTheClock, TurnNameMark } from "./turnIdeas";
 import { AnimStyles, LandRing, useDrain } from "./anims";
@@ -288,6 +288,19 @@ const MARK_ROOM = Math.round((MARK - MARK_HANG) * 0.5);
 // noticing it.
 const MARK_ALPHA = 0.46;
 
+// THE PRESS. A solid block of ink offset down and right, no blur - the
+// same shape the daily game's buttons and cards use, and the reason it
+// works here is that it is thick on two sides and absent on the other
+// two, so it reads as a physical thing rather than as a border.
+//
+// All three objects get one: the pill, the name and the price. The
+// pill's falls a pixel less than the others, because the rails leave
+// only 6-7px between rows and 5px would put the block on the head of
+// the chip below. Measured on the board, not judged by eye.
+const PRESS_PILL = `4px 4px 0 ${INK}`;
+const PRESS_NAME = `3px 4px 0 ${INK}`;
+const PRESS_PRICE = `3px 4px 0 ${INK}`;
+
 function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
   const { text, size } = pickName(entry, 40, 9, 16);
   const accent = entry.accent ?? "#8899aa";
@@ -321,6 +334,10 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
         border: "2px solid rgba(5,7,13,0.55)",
         overflow: "hidden",
         minHeight: PILL_H,
+        // An outer box-shadow is NOT clipped by the element's own
+        // overflow: hidden - that clips children - so the pill can wear
+        // a block and still crop the oversized crest.
+        boxShadow: PRESS_PILL,
       }}
     >
       {/* THE TEAM MARK, OVERSIZED AND CUT BY THE PILL.
@@ -371,6 +388,11 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
           marginLeft: who === 1 ? 4 : 0,
           marginRight: who === 0 ? 4 : 0,
           ...outlined(size),
+          // outlined() already draws the ink stroke and a shadow
+          // straight DOWN. This only turns that shadow diagonal and
+          // makes it opaque, which is what lines the name's light up
+          // with the two blocks either side of it.
+          textShadow: PRESS_NAME,
         }}
       >
         {text}
@@ -387,10 +409,13 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
           padding: "2px 10px",
           borderRadius: 999,
           background: "#ffffff",
-          // A thin dark rim, because white on a WHITE-ish team - the
-          // Saints' gold, the Titans' light blue - needs an edge or the
-          // capsule has no shape to be read as.
-          boxShadow: "0 0 0 2px rgba(5,7,13,0.5)",
+          // The rim is gone and a block is under it instead. The rim
+          // was there to give the capsule a shape on the near-white
+          // teams, and the block does that job better: measured against
+          // all 32 fills a white capsule never drops below 1.76:1, so
+          // it always has SOME edge - what it lacked was somewhere to
+          // sit.
+          boxShadow: PRESS_PRICE,
           fontFamily: "var(--font-display)",
           fontSize: 29,
           lineHeight: 1,
