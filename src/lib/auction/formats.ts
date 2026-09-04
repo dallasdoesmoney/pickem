@@ -10,8 +10,9 @@ import type { AuctionFormat, AuctionItem } from "./format";
 // SHAPES rather than two of the same thing:
 //
 //   nfl-teams   one item, different value per slot. You bid on the
-//               Bengals; whether that is Joe Burrow or Chase and Higgins
-//               is your decision after you win.
+//               Bengals; whether that is Joe Burrow or Ja'Marr Chase is
+//               your decision after you win. Shown as "Full Roster" -
+//               the team is the lot, the roster is the prize.
 //
 //   qb-room     one item, one meaning. Four quarterbacks, four slots,
 //               and the only question is what each is worth.
@@ -115,8 +116,18 @@ function teamItem(abbr: string): AuctionItem | null {
 }
 
 const NFL_TEAMS: AuctionFormat = {
+  // THE SLUG STAYS. It is what a room broadcasts and what an OBS
+  // browser source carries in ?format=, so changing it would break
+  // every bookmarked overlay URL to rename a label. Only the title is
+  // the label.
   slug: "nfl-teams",
-  title: "NFL Teams",
+  // Named for what you END UP WITH, not for what comes up on the reel.
+  // The lot is a team; the thing being built is one whole roster - a
+  // quarterback, a back, a receiver, a tight end and a defense, each
+  // taken off a different team you won. "NFL Teams" described the pool
+  // and named a different game: ranking the thirty-two, which is what
+  // the tier list of that name actually is.
+  title: "Full Roster",
   tagline: "Bid on a team, then decide what you took it for",
   budget: 20,
   slots: [

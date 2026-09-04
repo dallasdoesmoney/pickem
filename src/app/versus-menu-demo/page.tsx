@@ -10,18 +10,19 @@
 // This is one idea in three arrangements. The idea:
 //
 //   ONE THING, BIG, AND IT MOVES. A mode's identity is not four little
-//   logos in a square. NFL Teams IS all thirty-two, so the hero shows
-//   them one at a time at 170px, cycling, with the ground taking each
-//   team's colour as it comes. Quarterback Room cycles faces. A themed
-//   draft cycles whatever its items are. Nothing is a collage and
-//   nothing needs a hand-made hero image - the art is the pool.
+//   logos in a square. Full Roster IS all thirty-two teams, so the hero
+//   shows them one at a time at 168px, cycling, with the ground taking
+//   each team's colour as it comes. Quarterback Room cycles faces. A
+//   themed draft cycles whatever its items are. Nothing is a collage
+//   and nothing needs a hand-made hero image - the art is the pool.
 //
 //   THE PICKER IS A ROSTER. Small tiles underneath, one per mode, the
 //   way a fighting game lays out its characters. The name lives on the
 //   hero, not on thirty tiles.
 //
-// Three arrangements of that, A/B/C below. Delete this route, and the
-// noindex beside it, once one is chosen.
+// The roster arrangement is chosen. What is left on this page is the
+// two ways the hero can move between items. Delete this route, and the
+// noindex beside it, once one of those is chosen.
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { AUCTION_FORMATS } from "@/lib/auction/formats";
@@ -40,9 +41,9 @@ type MenuItem = { id: string; label: string; imageUrl?: string; glyph?: string; 
 type MenuFormat = {
   slug: string;
   title: string;
-  // Two or three characters for the tile. A tile is 60px and four of
-  // these modes are a photograph of a man's face - without a label,
-  // Running Backs and Tight Ends are the same tile.
+  // A word for the tile's label bar. Four of these modes are
+  // photographs of men's faces at 30px - without a label, Running Backs
+  // and Tight Ends are the same tile.
   short: string;
   tagline: string;
   budget: number;
@@ -105,7 +106,7 @@ function themed(slug: string, title: string, short: string, tagline: string, gly
 const REAL: MenuFormat[] = Object.values(AUCTION_FORMATS).map((f) => ({
   slug: f.slug,
   title: f.title,
-  short: f.slug === "nfl-teams" ? "NFL" : "QB",
+  short: f.slug === "nfl-teams" ? "ROSTER" : "QB",
   tagline: f.tagline,
   budget: f.budget,
   category: "NFL",
@@ -165,7 +166,7 @@ function useCycle(len: number): number {
   return len > 0 ? i % len : 0;
 }
 
-// A SPREAD of the pool, not the top of it. Walking NFL Teams in order
+// A SPREAD of the pool, not the top of it. Walking the teams in order
 // is Arizona, Atlanta, Baltimore, Buffalo - four red-ish birds in a
 // row, so the hero looks stuck. Stepping by a stride that shares no
 // factor with 32 walks the whole pool and never repeats a colour twice
@@ -387,10 +388,51 @@ function Badge({ text }: { text: string }) {
   );
 }
 
-// A roster tile. One static mark on the mode's colour, its short label
-// under it. Dim until it is the one you are looking at.
-function Tile({ format, on, onPick, size = 62 }: { format: MenuFormat; on: boolean; onPick: () => void; size?: number }) {
-  const first = walk(format)[0];
+// WHO IS ON THE THUMBNAIL.
+//
+// The tile used to take walk()[0] - whoever the stride happened to land
+// on - which is how the Wide Receivers tile ended up being Jauan
+// Jennings. At 30px a face you do not know is not a face at all, and
+// with five NFL rooms in a row it made five tiles of a generic man.
+//
+// A pool has no ranking in it. `depth` is per team, so it says Chase is
+// Cincinnati's first receiver and nothing about whether he is better
+// than Jefferson - there is no column that would answer that. So the
+// three headliners are hand-kept, which is the honest way to hold an
+// opinion: it is three names per mode, in one place, and swapping one
+// is editing this list.
+const HEADLINERS: Record<string, string[]> = {
+  // Teams are ids, players are names.
+  "nfl-teams": ["KC", "DAL", "PHI"],
+  "qb-room": ["Josh Allen", "Patrick Mahomes", "Lamar Jackson"],
+  "rb-room": ["Derrick Henry", "Saquon Barkley", "Jahmyr Gibbs"],
+  "wr-room": ["Justin Jefferson", "Ja'Marr Chase", "CeeDee Lamb"],
+  "te-room": ["Travis Kelce", "Brock Bowers", "Trey McBride"],
+};
+
+// The middle one is the face of the mode, so the list is written with
+// the biggest name in the CENTRE rather than first.
+function faces(format: MenuFormat): MenuItem[] {
+  const want = HEADLINERS[format.slug];
+  if (want) {
+    const found = want
+      .map((w) => format.items.find((it) => it.id === w || it.label === w))
+      .filter((it): it is MenuItem => Boolean(it));
+    // All three or none. Two headliners and a stranger is worse than
+    // three strangers - it looks like something failed to load.
+    if (found.length === want.length) return found;
+  }
+  return walk(format).slice(0, 3);
+}
+
+// A roster tile: the same three-up as the hero, small. One face at this
+// size says nothing; three say "this is a room of players", and the
+// mode's own colour behind them says which room.
+function Tile({ format, on, onPick }: { format: MenuFormat; on: boolean; onPick: () => void }) {
+  const three = faces(format);
+  const mid = three[1] ?? three[0];
+  const W = 82;
+  const H = 64;
   return (
     <button
       type="button"
@@ -398,20 +440,37 @@ function Tile({ format, on, onPick, size = 62 }: { format: MenuFormat; on: boole
       title={format.title}
       className="relative shrink-0 overflow-hidden rounded-xl transition-all"
       style={{
-        width: size,
-        height: size,
-        background: `linear-gradient(160deg, ${first?.accent ?? "#1b2c52"}dd, #0b1424)`,
+        width: W,
+        height: H,
+        background: `linear-gradient(160deg, ${mid?.accent ?? "#1b2c52"}dd, #0b1424)`,
         opacity: on ? 1 : 0.5,
         boxShadow: on ? "0 0 0 2px #3ecb78, 0 0 16px rgba(62,203,120,0.35)" : "0 0 0 1px rgba(255,255,255,0.12)",
         transform: on ? "translateY(-2px)" : undefined,
       }}
     >
-      <span className="absolute inset-x-0 top-1 grid place-items-center">
-        <Mark item={first} size={size * 0.56} />
+      {/* A HEIGHT, or there is nothing to centre in. This wrapper used
+          to be top-1 with no height, so it was a zero-tall line and its
+          absolutely-centred children straddled it - every mark hung 15px
+          out of the top of the tile and got clipped by overflow-hidden.
+          Same class of mistake as the hero's collapsed art box. */}
+      <span className="absolute inset-x-0 top-0 grid place-items-center" style={{ height: 44 }}>
+        {three.map((item, k) => (
+          <span
+            key={`${item?.id}-${k}`}
+            className="absolute"
+            style={{
+              transform: `translateX(${(k - 1) * 22}px)`,
+              opacity: k === 1 ? 1 : 0.5,
+              zIndex: k === 1 ? 2 : 1,
+            }}
+          >
+            <Mark item={item} size={k === 1 ? 38 : 30} />
+          </span>
+        ))}
       </span>
       <span
         className="absolute inset-x-0 bottom-0 block pb-0.5 pt-2 text-center text-[8.5px] tracking-[0.1em]"
-        style={{ fontFamily: "var(--font-display)", background: "linear-gradient(to top, rgba(4,8,16,0.9), transparent)" }}
+        style={{ fontFamily: "var(--font-display)", background: "linear-gradient(to top, rgba(4,8,16,0.92), transparent)" }}
       >
         {format.short}
       </span>
