@@ -7,6 +7,7 @@ import { AuctionState, RosterEntry, toAct, currentItem } from "@/lib/auction/eng
 import { PLAYER_COLORS, MONEY, MONEY_ON_LIGHT, outlined } from "./style";
 import { LogoReel, LotLogo, LotWaiting } from "./LotReel";
 import { onTheClock, TurnNameMark } from "./turnIdeas";
+import { AnimStyles, LandRing, SoldStamp, has, useDrain, type AnimKey } from "./anims";
 
 // ONE SHAPE, FIVE WAYS.
 //
@@ -191,7 +192,15 @@ function nameStyle(text: string, base: number): CSSProperties {
   return { fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: "#ffffff", ...outlined(size) };
 }
 
-type LayoutProps = { state: AuctionState; format: AuctionFormat };
+type LayoutProps = { state: AuctionState; format: AuctionFormat; anims?: AnimKey[] };
+
+// The budget, counting down rather than snapping. Its own component so
+// the hook is never called conditionally - the animation is a prop, and
+// a hook behind an if is how that becomes a crash on the render where
+// somebody turns it off.
+function DrainingMoney({ amount, size }: { amount: number; size: number }) {
+  return <Money amount={useDrain(amount)} size={size} />;
+}
 // A pick is the most repeated object on the graphic - ten of them once
 // both rosters fill - so a few pixels either way is worth more here than
 // anywhere else, and so is anything it can be made to say for free.
@@ -529,7 +538,7 @@ const LOT_SIZE = 180;
 const SPINE_W = 200;
 const LABEL_W = 160;
 
-function SpineLayout({ state, format }: LayoutProps) {
+function SpineLayout({ state, format, anims }: LayoutProps) {
   const head = headline(state, format);
   // Whose move it is, and only while it is still the opening one - see
   // turnIdeas.tsx. Null the rest of the time, which is most of the time.
@@ -637,7 +646,11 @@ function SpineLayout({ state, format }: LayoutProps) {
         </span>
         {/* Green, while the bid is a player colour. Green is what you
             have; a colour is what is being bid right now. */}
-        <Money amount={state.players[who].budget} size={38} />
+        {has(anims, "drain") ? (
+          <DrainingMoney amount={state.players[who].budget} size={38} />
+        ) : (
+          <Money amount={state.players[who].budget} size={38} />
+        )}
       </div>
     </div>
   );
@@ -654,6 +667,7 @@ function SpineLayout({ state, format }: LayoutProps) {
            with a hard curve read as a flicker at stream framerates. */
         .versus-pick-in { animation: versusPickIn 780ms cubic-bezier(0.34, 0.02, 0.18, 1) both; }
       `}</style>
+      <AnimStyles />
 
       {/* THE LOGO SITS BETWEEN THE TWO NAMES, on their line.
       
@@ -682,7 +696,22 @@ function SpineLayout({ state, format }: LayoutProps) {
             ) : state.phase === "spinning" && item ? (
               <LogoReel key={item.id} format={format} targetId={item.id} size={LOT_SIZE} />
             ) : (
-              <LotLogo item={item} size={LOT_SIZE} />
+              // Keyed on the lot, so it mounts fresh when the reel stops
+              // on a new one and settles once. A re-render for anything
+              // else reuses it and it stays still.
+              <span
+                key={has(anims, "land") ? `land:${item?.id ?? "none"}` : undefined}
+                className={has(anims, "land") && state.phase === "bidding" ? "versus-land" : undefined}
+                style={{ display: "inline-flex" }}
+              >
+                <LotLogo item={item} size={LOT_SIZE} />
+              </span>
+            )}
+            {has(anims, "land") && state.phase === "bidding" && item && (
+              <LandRing key={`ring:${item.id}`} size={LOT_SIZE} color={item.accent ?? "#ffffff"} />
+            )}
+            {has(anims, "sold") && wonBy !== null && state.won && (
+              <SoldStamp key={`sold:${item?.id ?? state.index}`} who={wonBy} size={LOT_SIZE} />
             )}
 
             {/* INSIDE the logo now, not hanging off its chin - hanging
@@ -690,7 +719,18 @@ function SpineLayout({ state, format }: LayoutProps) {
                 two shared a row. */}
             {state.phase === "bidding" && head.amount !== null && (
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 2, display: "flex", justifyContent: "center" }}>
-                <Money amount={head.amount} size={60} color={head.color} />
+                {/* KEYED ON THE VALUE, not fired by an event. The overlay
+                    is handed whole states over a broadcast, so the only
+                    way it knows a bid moved is that the number is
+                    different - and a re-broadcast of the SAME state has
+                    to be silent. Same key, same element, no replay. */}
+                <span
+                  key={has(anims, "bump") ? `${state.bid?.by ?? "x"}:${head.amount}` : undefined}
+                  className={has(anims, "bump") ? "versus-bump" : undefined}
+                  style={{ display: "inline-flex" }}
+                >
+                  <Money amount={head.amount} size={60} color={head.color} />
+                </span>
               </div>
             )}
           </div>

@@ -9,6 +9,7 @@ import { isRoomCode } from "@/lib/auction/room";
 import { useRoomState } from "@/components/versus/useRoom";
 import { OverlayBoard, STAGE_W, STAGE_H, DEFAULT_LAYOUT } from "@/components/versus/OverlayBoard";
 import { isLayoutKey } from "@/components/versus/layouts";
+import type { AnimKey } from "@/components/versus/anims";
 
 // THE OBS BROWSER SOURCE.
 //
@@ -23,6 +24,7 @@ import { isLayoutKey } from "@/components/versus/layouts";
 //   ?format=nfl-teams which mode the DEMO draws (ignored in a room)
 //   ?phase=ready|spinning|open  which moment of a lot the DEMO holds on
 //   ?layout=a..e      which arrangement - see layouts.tsx
+//   ?anims=bump,sold,land,drain   which of the new beats to play
 //   ?p1=Noah&p2=Ben   names on the DEMO rails (ignored in a room)
 //
 // The cam bands are query parameters rather than constants because they
@@ -122,6 +124,10 @@ function OverlayInner() {
   const preview = params.get("preview") === "1";
   const layoutParam = params.get("layout");
   const layout = isLayoutKey(layoutParam) ? layoutParam : DEFAULT_LAYOUT;
+  // Off unless asked for, so the live browser source is untouched while
+  // these are being chosen between.
+  const ANIM_KEYS: AnimKey[] = ["bump", "sold", "land", "drain"];
+  const anims = (params.get("anims") ?? "").split(",").filter((k): k is AnimKey => (ANIM_KEYS as string[]).includes(k));
 
   const demoFormat = AUCTION_FORMATS[params.get("format") ?? "nfl-teams"] ?? Object.values(AUCTION_FORMATS)[0];
   const format = message ? AUCTION_FORMATS[message.slug] : demoFormat;
@@ -198,7 +204,7 @@ function OverlayInner() {
         )}
 
         {format && state ? (
-          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} layout={layout} />
+          <OverlayBoard state={state} format={format} camTop={camTop} camBottom={camBottom} layout={layout} anims={anims} />
         ) : room ? (
           // Small and dim on purpose. If this ever does appear on a live
           // stream it should read as a status light, not an error page.
