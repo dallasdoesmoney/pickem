@@ -86,6 +86,8 @@ try {
   await page.getByText(/LOT 1/).waitFor({ timeout: 10000 });
   ok("the first lot comes up", true, "");
 
+  ok("nothing to undo yet", await page.getByRole("button", { name: /UNDO LAST MOVE/i }).isDisabled(), "");
+
   // Every lot is started by the host and lands off a reel. Until it does,
   // nobody can bid - the engine keeps toAct null through both phases, and
   // this is that guarantee seen from the screen, which is where it

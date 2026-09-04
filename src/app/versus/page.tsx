@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AUCTION_FORMATS } from "@/lib/auction/formats";
 import { startAuction, reduce, AuctionState, AuctionAction } from "@/lib/auction/engine";
 import { AuctionBoard } from "@/components/versus/AuctionBoard";
@@ -21,18 +22,117 @@ import { SPIN_MS } from "@/components/versus/style";
 // Deliberately unlinked - see layout.tsx.
 const formats = Object.values(AUCTION_FORMATS);
 
-export default function VersusPage() {
-  const [slug, setSlug] = useState(formats[0]?.slug ?? "");
-  const [names, setNames] = useState(["Player 1", "Player 2"]);
-  const [game, setGame] = useState<{ slug: string; state: AuctionState } | null>(null);
-  // TWO STEPS, because this screen used to be three decisions at once -
-  // which mode, both names, and the OBS link - all on screen before you
-  // had made any of them. Picking the draft is the only one you cannot
-  // skip, and it is the one that wants the whole screen.
-  const [step, setStep] = useState<"pick" | "setup">("pick");
+// WHICH DRAFT, IN THE URL. Without it every refresh dumped you back on
+// the picker to choose the mode you were already playing - and a refresh
+// is the normal way to start a draft over.
+//
+// A query parameter rather than a path segment, because /versus/overlay
+// is a real route and a dynamic segment beside it would collide with any
+// format ever slugged "overlay". The names ride along in localStorage so
+// a reload comes back ready to press START rather than ready to retype
+// two names.
+const DRAFT_PARAM = "draft";
+const NAMES_KEY = "pickem:versus-names";
+
+// The two names as an EXTERNAL STORE rather than React state restored in
+// an effect. localStorage does not exist on the server, so a plain
+// useState initialiser reading it hands React markup that disagrees with
+// the HTML it is hydrating - and restoring it in an effect afterwards is
+// a cascading render that the lint rule is right to refuse.
+//
+// useSyncExternalStore is the shape this actually is: a value that lives
+// outside React, with a separate answer for the server. Editing writes
+// through, so the names are saved as they are typed rather than at the
+// moment somebody presses START.
+const DEFAULT_NAMES = ["Player 1", "Player 2"];
+const nameListeners = new Set<() => void>();
+// The snapshot has to be REFERENTIALLY STABLE between reads or
+// useSyncExternalStore re-renders forever, so it is cached and only
+// replaced when something writes.
+let namesCache: string[] | null = null;
+
+function readNames(): string[] {
+  try {
+    const raw = localStorage.getItem(NAMES_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length === 2 && parsed.every((n) => typeof n === "string")) {
+      return parsed.map((n) => n.slice(0, 18));
+    }
+  } catch {
+    // Private mode, blocked storage, someone's corrupted value. The
+    // defaults are perfectly usable; nothing here is worth an error.
+  }
+  return DEFAULT_NAMES;
+}
+
+function subscribeNames(cb: () => void): () => void {
+  nameListeners.add(cb);
+  return () => {
+    nameListeners.delete(cb);
+  };
+}
+
+function namesSnapshot(): string[] {
+  if (namesCache === null) namesCache = readNames();
+  return namesCache;
+}
+
+function serverNames(): string[] {
+  return DEFAULT_NAMES;
+}
+
+function writeNames(next: string[]) {
+  namesCache = next;
+  try {
+    localStorage.setItem(NAMES_KEY, JSON.stringify(next));
+  } catch {
+    // Same as reading: not worth failing a draft over.
+  }
+  for (const cb of nameListeners) cb();
+}
+
+// How many moves back UNDO can reach. Deep enough to cover a whole lot
+// gone wrong - a bad bid, a pass, an assignment - without holding every
+// state of a long draft in memory forever.
+const UNDO_DEPTH = 40;
+
+type Game = { slug: string; state: AuctionState; past: AuctionState[] };
+
+function VersusInner() {
+  const params = useSearchParams();
+  const router = useRouter();
+
+  // The URL is the source of truth for which draft, so the back button
+  // and a reload agree with the screen.
+  const urlDraft = params.get(DRAFT_PARAM);
+  const picked = urlDraft && AUCTION_FORMATS[urlDraft] ? urlDraft : null;
+  const [slug, setSlug] = useState(picked ?? formats[0]?.slug ?? "");
+
+  const names = useSyncExternalStore(subscribeNames, namesSnapshot, serverNames);
+  // THE UNDO STACK LIVES INSIDE THE GAME, not beside it. The engine is a
+  // pure reducer, so an undo is just going back to a state it already
+  // produced - no inverse of "pass" to write and nothing to keep in
+  // step. But it has to be the SAME piece of state as the game: pushing
+  // to a second useState from inside setGame's updater would be a side
+  // effect in a function React is allowed to call twice, and in
+  // StrictMode it does, so every move would push two entries.
+  const [game, setGame] = useState<Game | null>(null);
 
   const format = AUCTION_FORMATS[slug];
   const { code, rotate } = useRoomCode();
+
+  // TWO STEPS, because this screen used to be three decisions at once -
+  // which mode, both names, and the OBS link - all on screen before you
+  // had made any of them. Picking the draft is the only one you cannot
+  // skip, and it is the one that wants the whole screen. Which step you
+  // are on is read off the URL rather than held beside it, so there is
+  // one answer rather than two that can disagree.
+  const step: "pick" | "setup" = picked ? "setup" : "pick";
+
+  function choose(next: string) {
+    setSlug(next);
+    router.push(`/versus?${DRAFT_PARAM}=${next}`);
+  }
 
   // Joined before a draft starts, not after. The overlay can then be set
   // up in OBS and confirmed working while the setup screen is still up -
@@ -46,13 +146,35 @@ export default function VersusPage() {
     // deliberately NOT the room code - the code outlives the draft, so
     // seeding from it would deal the same cards every single time.
     const seed = Math.random().toString(36).slice(2, 10);
-    setGame({ slug, state: startAuction(format, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed) });
+    setGame({ slug, state: startAuction(format, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed), past: [] });
   }
 
-  const act = useCallback((action: AuctionAction) => {
+  // `record` is what separates a move somebody MADE from one the board
+  // made on its own. The reveal at the end of a spin is the board's, and
+  // recording it would make the first undo of a lot appear to do nothing
+  // at all: it would land on "spinning", whose timer immediately reveals
+  // again. Skipping it means one undo goes back past the whole reel, to
+  // the moment before START - which is the step a person took.
+  const act = useCallback((action: AuctionAction, record = true) => {
     setGame((g) => {
       const f = g && AUCTION_FORMATS[g.slug];
-      return g && f ? { ...g, state: reduce(g.state, action, f) } : g;
+      if (!g || !f) return g;
+      const next = reduce(g.state, action, f);
+      // A rejected action returns the same state. Pushing it would make
+      // UNDO burn a press doing nothing.
+      if (next === g.state) return g;
+      return {
+        ...g,
+        state: next,
+        past: record ? [...g.past, g.state].slice(-UNDO_DEPTH) : g.past,
+      };
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    setGame((g) => {
+      if (!g || g.past.length === 0) return g;
+      return { ...g, state: g.past[g.past.length - 1], past: g.past.slice(0, -1) };
     });
   }, []);
 
@@ -67,7 +189,7 @@ export default function VersusPage() {
   const lot = liveGame?.state.index;
   useEffect(() => {
     if (phase !== "spinning") return;
-    const id = setTimeout(() => act({ type: "reveal" }), SPIN_MS);
+    const id = setTimeout(() => act({ type: "reveal" }, false), SPIN_MS);
     return () => clearTimeout(id);
   }, [phase, lot, act]);
 
@@ -79,13 +201,12 @@ export default function VersusPage() {
           format={AUCTION_FORMATS[liveGame.slug]}
           state={liveGame.state}
           onAction={act}
+          onUndo={undo}
+          canUndo={liveGame.past.length > 0}
           // Back to the setup screen, not the picker: the overwhelming
           // next move after a draft is the same two people going again,
           // and CHANGE is right there for the time it is not.
-          onRestart={() => {
-            setGame(null);
-            setStep("setup");
-          }}
+          onRestart={() => setGame(null)}
         />
         <OverlayLink code={code} live={live} viewers={viewers} onRotate={rotate} />
       </main>
@@ -107,13 +228,13 @@ export default function VersusPage() {
         </p>
       ) : step === "pick" ? (
         <div className="mt-6">
-          <GameSelect formats={formats} slug={slug} onPick={setSlug} onConfirm={() => setStep("setup")} />
+          <GameSelect formats={formats} slug={slug} onPick={setSlug} onConfirm={() => choose(slug)} />
         </div>
       ) : (
         <>
           {format && (
             <div className="mt-6">
-              <ChosenDraft format={format} onChange={() => setStep("pick")} />
+              <ChosenDraft format={format} onChange={() => router.push("/versus")} />
             </div>
           )}
 
@@ -125,7 +246,7 @@ export default function VersusPage() {
                 </span>
                 <input
                   value={name}
-                  onChange={(e) => setNames((prev) => prev.map((n, j) => (j === i ? e.target.value : n)))}
+                  onChange={(e) => writeNames(names.map((n, j) => (j === i ? e.target.value : n)))}
                   maxLength={18}
                   className="rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2 text-[14px] outline-none transition-colors focus:border-white/45"
                 />
@@ -150,5 +271,14 @@ export default function VersusPage() {
         </>
       )}
     </main>
+  );
+}
+
+export default function VersusPage() {
+  // useSearchParams needs a boundary for this route to stay prerenderable.
+  return (
+    <Suspense fallback={null}>
+      <VersusInner />
+    </Suspense>
   );
 }

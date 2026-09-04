@@ -75,11 +75,20 @@ export function AuctionBoard({
   state,
   onAction,
   onRestart,
+  onUndo,
+  canUndo,
 }: {
   format: AuctionFormat;
   state: AuctionState;
   onAction: (action: AuctionAction) => void;
   onRestart: () => void;
+  // UNDO, because this is one screen two people are both reaching for.
+  // A pass is final for the lot and an assignment is final for the
+  // draft, so a mis-tap is not a small thing - it puts the wrong player
+  // on the wrong roster for the rest of the stream, in front of an
+  // audience, with no way back except starting again.
+  onUndo: () => void;
+  canUndo: boolean;
 }) {
   const act = onAction;
   const item = currentItem(state, format);
@@ -251,6 +260,22 @@ export function AuctionBoard({
             </div>
           </div>
         )}
+      </div>
+
+      {/* UNDO, kept away from the buttons it exists to reverse.
+          Deliberately not a big primary button and deliberately not in
+          the row with BID and PASS: it is pressed once a draft at most,
+          and putting it beside PASS would make the mis-tap it fixes
+          more likely rather than less. */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={onUndo}
+          disabled={!canUndo}
+          className="rounded-lg px-4 py-2.5 transition-colors disabled:opacity-30"
+          style={{ ...display(11, { letterSpacing: 2, color: "rgba(255,255,255,0.6)" }), border: `2px solid ${RULE}` }}
+        >
+          ↶ UNDO LAST MOVE
+        </button>
       </div>
 
       {state.history.length > 0 && state.phase !== "done" && (
