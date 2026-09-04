@@ -243,7 +243,7 @@ function pickName(entry: RosterEntry, size = NAME_SIZE, comfortable = 12, floor?
 // stroke around it (see outlined), and a stroke is what makes white hold
 // on a light fill where flat white would not.
 function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
-  const { text, size } = pickName(entry, 36, 9, 15);
+  const { text, size } = pickName(entry, 40, 9, 16);
   const accent = entry.accent ?? "#8899aa";
   return (
     <div
@@ -296,7 +296,7 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
           position: "relative",
           display: "flex",
           alignItems: "center",
-          padding: "2px 9px",
+          padding: "2px 10px",
           borderRadius: 999,
           background: "#ffffff",
           // A thin dark rim, because white on a WHITE-ish team - the
@@ -304,7 +304,7 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
           // capsule has no shape to be read as.
           boxShadow: "0 0 0 2px rgba(5,7,13,0.5)",
           fontFamily: "var(--font-display)",
-          fontSize: 26,
+          fontSize: 29,
           lineHeight: 1,
           color: MONEY_ON_LIGHT,
           fontVariantNumeric: "tabular-nums",
@@ -509,8 +509,25 @@ function makeSplit(opts: Split) {
 // Big enough that the mark is legible across a room, and big enough to
 // carry a number inside it without the two fighting.
 const LOT_SIZE = 180;
-// The centre column, and the gap the two names straddle above it.
-const SPINE_W = 250;
+// TWO CENTRE COLUMNS, not one, and separating them is what actually
+// closed the gap.
+//
+// SPINE_W is the LOGO's column on the names row. Its floor is the logo
+// itself at LOT_SIZE, so it cannot go below 180 without the badge
+// overhanging the budgets either side of it.
+//
+// LABEL_W is the POSITION's column on the rows below. It was sharing
+// SPINE_W for no reason beyond both being "the middle", and a 250px
+// column around a 71px word is ninety pixels of dead space on each side
+// - which is exactly the gap between each roster and the spine. Sized to
+// the widest label instead ("DEF", 99px of ink) plus room to breathe, it
+// is about thirty-five.
+//
+// They do not need to match. Both rows centre their middle column on the
+// stage's centre line, so the labels sit under the logo whatever the two
+// widths are - and every pixel taken off LABEL_W goes to the picks.
+const SPINE_W = 200;
+const LABEL_W = 160;
 
 function SpineLayout({ state, format }: LayoutProps) {
   const head = headline(state, format);
@@ -615,12 +632,12 @@ function SpineLayout({ state, format }: LayoutProps) {
           </div>
         )}
         {clock === who && <TurnNameMark who={who} />}
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 34, color: PLAYER_COLORS[who], ...outlined(34) }}>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 38, color: PLAYER_COLORS[who], ...outlined(38) }}>
           {state.players[who].name.toUpperCase()}
         </span>
         {/* Green, while the bid is a player colour. Green is what you
             have; a colour is what is being bid right now. */}
-        <Money amount={state.players[who].budget} size={34} />
+        <Money amount={state.players[who].budget} size={38} />
       </div>
     </div>
   );
@@ -695,15 +712,15 @@ function SpineLayout({ state, format }: LayoutProps) {
             <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "flex-end" }}>{drawPick(0, slot.key)}</div>
             <div
               style={{
-                width: SPINE_W,
+                width: LABEL_W,
                 flexShrink: 0,
                 textAlign: "center",
                 fontFamily: "var(--font-display)",
-                fontSize: slot.label.length > 6 ? 34 : 42,
+                fontSize: slot.label.length > 6 ? 38 : 46,
                 lineHeight: 1.25,
                 color: "#ffffff",
                 letterSpacing: 2,
-                ...outlined(42),
+                ...outlined(46),
               }}
             >
               {slot.label.toUpperCase()}
