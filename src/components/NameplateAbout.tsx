@@ -22,7 +22,7 @@ import Link from "next/link";
 export const FAQ = [
   {
     q: "What is NFL Nameplate?",
-    a: "NFL Nameplate is a free daily guessing game: one mystery NFL player a day, eight guesses to name him. Everybody in the world gets the same player on the same day, and a new one drops every morning.",
+    a: "NFL Nameplate is the free daily NFL player guessing game from Sideline Brew - think Wordle, but the answer is a football player and every guess hands back six clues instead of five letters. One mystery player a day, eight guesses to name him. Everybody in the world gets the same player on the same day, and a new one drops every morning.",
   },
   {
     q: "How do you play NFL Nameplate?",
@@ -55,18 +55,16 @@ export function NameplateAbout() {
       <h2 className="text-[clamp(1.15rem,4.4vw,1.6rem)] leading-tight tracking-wide text-white/85" style={{ fontFamily: "var(--font-display)" }}>
         ABOUT NFL NAMEPLATE
       </h2>
-      <p className="mt-3 text-sm leading-relaxed">
-        NFL Nameplate is the daily NFL player guessing game from Sideline Brew. One mystery player, eight
-        guesses, the same player for everybody &mdash; think Wordle, but the answer is a football player and
-        every guess hands back six clues instead of five letters.
-      </p>
-
-      {/* FOLDED AWAY, and it costs nothing to fold it.
+      {/* FOLDED AWAY, ALL OF IT, and it costs nothing to fold it.
           Laid out flat this was six paragraphs under a game that takes a
           minute to play - a wall of text nobody who came here to play
           wants, sitting where they scroll. Five closed rows read as a
           contents page instead, and the one question somebody actually
           has is one tap away.
+
+          The standing intro paragraph is gone into the first row rather
+          than deleted: it said the same thing that row already said, so
+          collapsing everything cost no content at all.
 
           <details>, not a toggle in React. The answers are in the HTML
           whether the row is open or shut - which is the entire reason
@@ -79,7 +77,7 @@ export function NameplateAbout() {
           it stays on screen with the row shut. The FAQPage JSON-LD is
           what tells a machine these are questions and answers; the markup
           only has to be valid and operable. */}
-      <div className="mt-7 flex flex-col">
+      <div className="mt-5 flex flex-col">
         {FAQ.map(({ q, a }) => (
           <details key={q} className="group border-t border-white/10 last:border-b">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-3.5 text-[15px] font-semibold leading-snug text-white/80 transition-colors marker:content-none hover:text-white [&::-webkit-details-marker]:hidden">
