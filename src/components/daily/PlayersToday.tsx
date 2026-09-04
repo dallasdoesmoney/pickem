@@ -13,8 +13,7 @@ import { fetchPlayersToday } from "@/lib/supabase/dailyPlayers";
 //
 // A COUNT OF PEOPLE SINCE MIDNIGHT EASTERN, not a running total: it
 // resets when the puzzle does, so at 00:05 it honestly says a small
-// number. Which is why it draws nothing at all below a floor - see
-// MIN_SHOWN. "3 played today" is worse than silence.
+// number and that is correct rather than broken.
 //
 // The unit is a browser rather than an account, so somebody who has
 // never signed in is counted. See 0061_daily_players.sql for what that
@@ -25,10 +24,14 @@ import { fetchPlayersToday } from "@/lib/supabase/dailyPlayers";
 // second to move a number by one.
 const POLL_MS = 30_000;
 
-// Below this it says nothing. A brand-new day, or a quiet hour, and the
-// honest number is "4" - which reads as "nobody plays this" rather than
-// as "the day just started". Silence says neither.
-const MIN_SHOWN = 25;
+// One person is enough to draw it. This started at 25, on the reasoning
+// that "4 played today" reads as "nobody plays this" - which was solving
+// a problem nobody had at the cost of one nobody could miss: on a site
+// this size the counter was invisible for most of most days, and an
+// invisible feature is worse than a small honest number. Zero still
+// draws nothing, because "0 played today" is the one number that really
+// does read as broken.
+const MIN_SHOWN = 1;
 
 export function usePlayersToday(): number | null {
   const [count, setCount] = useState<number | null>(null);
