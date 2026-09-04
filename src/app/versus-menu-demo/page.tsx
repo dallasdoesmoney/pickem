@@ -224,15 +224,34 @@ function ground(accent: string | undefined): string {
 }
 
 // ---------------------------------------------------------------------
-// THE HERO. Shared by all three arrangements - the arrangements differ
-// only in how you get to it.
+// THE HERO, in the two motions. Everything else about it is settled.
 // ---------------------------------------------------------------------
 
-function Hero({ format, height, bleed = false }: { format: MenuFormat; height: number; bleed?: boolean }) {
+type Motion = "slide" | "fan";
+
+// THE FAN's three slots, and the ONE place their numbers live - the
+// inline style below and the keyframes at the bottom of the file have
+// to agree exactly, or every tick jumps by the difference.
+const FAN_X = 62;
+const FAN_S = 0.72;
+const FAN_O = 0.34;
+
+function Hero({
+  format,
+  height,
+  motion,
+  bleed = false,
+}: {
+  format: MenuFormat;
+  height: number;
+  motion: Motion;
+  bleed?: boolean;
+}) {
   const pool = walk(format);
   const i = useCycle(pool.length);
   const cur = pool[i];
   const prev = pool[(i - 1 + pool.length) % pool.length];
+  const next = pool[(i + 1) % pool.length];
   const art = format.art ? 168 : 150;
 
   return (
@@ -248,13 +267,67 @@ function Hero({ format, height, bleed = false }: { format: MenuFormat; height: n
       <div key={`g${i}`} className="menu-fade absolute inset-0" style={{ background: ground(cur?.accent) }} />
 
       <div className="relative flex flex-col items-center px-5 pb-5 pt-6" style={{ minHeight: height }}>
-        <div className="relative grid flex-1 place-items-center" style={{ height: art + 16, width: art }}>
-          <span className="absolute">
-            <Mark item={prev} size={art} plate={!format.art} />
-          </span>
-          <span key={`m${i}`} className="menu-pop absolute">
-            <Mark item={cur} size={art} plate={!format.art} />
-          </span>
+        {/* NOTHING IS EVER DIRECTLY BEHIND ANYTHING.
+
+            This was a crossfade in position: the outgoing item and the
+            incoming one sat dead on top of each other and dissolved
+            into each other. Round team crests survived that; two
+            shoulder-up headshots at the same size in the same spot
+            read as one double-exposed face.
+
+            SLIDE fixes the overlap by removing it - the old one leaves
+            to the left, the new one arrives from the right 110ms later,
+            so they are barely on screen together at all.
+
+            FAN fixes it by staggering - three at once, the one you are
+            on big in the middle and its neighbours peeking out either
+            side, smaller and dimmed. Each tick everything shuffles one
+            place left. You always see three faces, and no two of them
+            are ever in the same place. */}
+        {/* shrink-0, NOT flex-1. In a flex column, flex-1 is
+            flex-basis: 0 - it throws the height away and gives the box
+            whatever is left over, which collapsed this to 86px and let
+            the 168px marks hang out of both ends of it. The mark's
+            shoulders were landing on the item's name and the top of
+            the title, on every mode, in both motions. */}
+        <div
+          className="relative grid shrink-0 place-items-center"
+          style={{ height: art + 16, width: motion === "fan" ? art + FAN_X * 2 : art }}
+        >
+          {motion === "slide" ? (
+            <>
+              <span key={`p${i}`} className="menu-out absolute">
+                <Mark item={prev} size={art} plate={!format.art} />
+              </span>
+              <span key={`m${i}`} className="menu-in absolute">
+                <Mark item={cur} size={art} plate={!format.art} />
+              </span>
+            </>
+          ) : (
+            <>
+              {/* The base style of each slot is the state its keyframe
+                  ends on, so a reduced-motion viewer - who gets no
+                  animation at all - still sees the fan sitting
+                  correctly rather than three marks in a pile. */}
+              <span
+                key={`l${i}`}
+                className="fan-left absolute"
+                style={{ zIndex: 1, transform: `translateX(${-FAN_X}px) scale(${FAN_S})`, opacity: FAN_O }}
+              >
+                <Mark item={prev} size={art} plate={!format.art} />
+              </span>
+              <span
+                key={`r${i}`}
+                className="fan-right absolute"
+                style={{ zIndex: 1, transform: `translateX(${FAN_X}px) scale(${FAN_S})`, opacity: FAN_O }}
+              >
+                <Mark item={next} size={art} plate={!format.art} />
+              </span>
+              <span key={`c${i}`} className="fan-front absolute" style={{ zIndex: 2 }}>
+                <Mark item={cur} size={art} plate={!format.art} />
+              </span>
+            </>
+          )}
         </div>
 
         {/* What is on screen right now, named. The line that turns a
@@ -347,16 +420,16 @@ function Tile({ format, on, onPick, size = 62 }: { format: MenuFormat; on: boole
 }
 
 // ---------------------------------------------------------------------
-// A - THE ROSTER. Hero on top, every mode laid out underneath in a grid
-// that wraps, split by category. Literally a character select screen:
-// nothing is hidden, and a new theme is one more tile.
+// THE ROSTER, chosen. Hero on top, every mode laid out underneath in a
+// grid that wraps, split by category. Literally a character select
+// screen: nothing is hidden, and a new theme is one more tile.
 // ---------------------------------------------------------------------
 
-function VariantA({ picked, onPick }: { picked: string; onPick: (s: string) => void }) {
+function Roster({ picked, onPick, motion }: { picked: string; onPick: (s: string) => void; motion: Motion }) {
   const format = MENU.find((f) => f.slug === picked) ?? MENU[0];
   return (
     <div className="flex flex-col gap-3">
-      <Hero key={format.slug} format={format} height={380} />
+      <Hero key={`${format.slug}-${motion}`} format={format} height={380} motion={motion} />
       <div className="flex flex-col gap-2.5">
         {CATEGORIES.map((cat) => (
           <div key={cat}>
@@ -376,98 +449,22 @@ function VariantA({ picked, onPick }: { picked: string; onPick: (s: string) => v
 }
 
 // ---------------------------------------------------------------------
-// B - THE STRIP. Hero on top, one row of tiles under it that scrolls
-// sideways. Tidier, and the row does not grow taller as modes are
-// added - it just gets longer.
-// ---------------------------------------------------------------------
 
-function VariantB({ picked, onPick }: { picked: string; onPick: (s: string) => void }) {
-  const format = MENU.find((f) => f.slug === picked) ?? MENU[0];
-  return (
-    <div className="flex flex-col gap-3">
-      <Hero key={format.slug} format={format} height={400} />
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-        {MENU.map((f) => (
-          <Tile key={f.slug} format={f} on={f.slug === picked} onPick={() => onPick(f.slug)} size={66} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------
-// C - FULL BLEED. No tiles at all: the hero is the entire screen and
-// you step through modes with the arrows. The biggest the art can
-// possibly be, and the only one where you cannot see what else exists.
-// ---------------------------------------------------------------------
-
-function VariantC({ picked, onPick }: { picked: string; onPick: (s: string) => void }) {
-  const at = Math.max(0, MENU.findIndex((f) => f.slug === picked));
-  const format = MENU[at];
-  const step = (d: number) => onPick(MENU[(at + d + MENU.length) % MENU.length].slug);
-
-  return (
-    <div className="relative overflow-hidden rounded-2xl" style={{ border: "1px solid rgba(255,255,255,0.12)" }}>
-      <Hero key={format.slug} format={format} height={440} bleed />
-      {[-1, 1].map((d) => (
-        <button
-          key={d}
-          type="button"
-          onClick={() => step(d)}
-          aria-label={d < 0 ? "Previous draft" : "Next draft"}
-          className="absolute grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-[18px] transition-colors"
-          style={{
-            // Level with the ART, not with the panel. At the panel's
-            // midpoint they landed on the item's name and the title,
-            // which put a button through the middle of the two lines
-            // the hero exists to show.
-            top: 116,
-            [d < 0 ? "left" : "right"]: 8,
-            background: "rgba(4,8,16,0.55)",
-            border: "1px solid rgba(255,255,255,0.18)",
-          }}
-        >
-          {d < 0 ? "‹" : "›"}
-        </button>
-      ))}
-      <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-        {MENU.map((f, i) => (
-          <span
-            key={f.slug}
-            style={{
-              width: i === at ? 16 : 6,
-              height: 6,
-              borderRadius: 3,
-              background: i === at ? "#3ecb78" : "rgba(255,255,255,0.3)",
-              transition: "width 180ms",
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------
-
-const VARIANTS = [
+// The roster is chosen. What is left to decide is how the hero gets
+// from one item to the next, which is the thing that fell apart on
+// headshots - so both answers are on screen at once rather than behind
+// a toggle, because the difference is in the movement and you cannot
+// compare two movements you have to switch between.
+const TREATMENTS: { key: Motion; name: string; note: string }[] = [
   {
-    key: "a",
-    name: "A — The roster",
-    note: "Every mode on screen at once under the hero, split by category. Nothing hidden, and a new theme is one more tile. The grid gets taller as modes are added.",
-    render: VariantA,
+    key: "slide",
+    name: "1 — Slide",
+    note: "One at a time, the way it is now, but the outgoing item leaves to the left and the next arrives from the right instead of dissolving in place. Biggest art, and the pool goes past like a reel.",
   },
   {
-    key: "b",
-    name: "B — The strip",
-    note: "One row that scrolls sideways instead of a grid that grows. Tidier and the hero gets more room; you can only see about five modes without scrolling.",
-    render: VariantB,
-  },
-  {
-    key: "c",
-    name: "C — Full bleed",
-    note: "No tiles at all — the hero is the whole screen and the arrows step through. Biggest art, and the only one where you cannot see what else is on offer.",
-    render: VariantC,
+    key: "fan",
+    name: "2 — Fan",
+    note: "Three at once: the one you are on big in the middle, its neighbours peeking out either side, smaller and dimmed. Everything shuffles one place left each tick. Nothing is ever behind anything, and you can see what is coming.",
   },
 ];
 
@@ -479,11 +476,45 @@ export default function VersusMenuDemo() {
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-6">
       <style>{`
         @keyframes menuFade { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes menuPop { from { opacity: 0; transform: scale(0.9) } to { opacity: 1; transform: scale(1) } }
+        @keyframes menuOut {
+          from { opacity: 1; transform: translateX(0) scale(1) }
+          to   { opacity: 0; transform: translateX(-52px) scale(0.86) }
+        }
+        @keyframes menuIn {
+          from { opacity: 0; transform: translateX(52px) scale(0.86) }
+          to   { opacity: 1; transform: translateX(0) scale(1) }
+        }
         .menu-fade { animation: menuFade 520ms ease both; }
-        .menu-pop  { animation: menuPop 520ms cubic-bezier(0.2,0.9,0.3,1) both; }
+        .menu-out  { animation: menuOut 380ms cubic-bezier(0.4,0,0.9,0.4) both; }
+        /* The delay is what stops the two from being on screen at the
+           same time. The both fill mode holds the from-state through
+           it, so the incoming mark waits off to the right rather than
+           flashing into place. */
+        .menu-in   { animation: menuIn 520ms cubic-bezier(0.16,1,0.3,1) 110ms both; }
+
+        /* THE FAN. Every slot moves one place left, so each mark
+           animates from the slot to its right. The numbers have to
+           match FAN_X / FAN_S / FAN_O in the component. */
+        @keyframes fanFront {
+          from { transform: translateX(62px) scale(0.72); opacity: 0.34 }
+          to   { transform: translateX(0) scale(1); opacity: 1 }
+        }
+        @keyframes fanLeft {
+          from { transform: translateX(0) scale(1); opacity: 1 }
+          to   { transform: translateX(-62px) scale(0.72); opacity: 0.34 }
+        }
+        @keyframes fanRight {
+          from { transform: translateX(124px) scale(0.56); opacity: 0 }
+          to   { transform: translateX(62px) scale(0.72); opacity: 0.34 }
+        }
+        .fan-front { animation: fanFront 560ms cubic-bezier(0.16,1,0.3,1) both; }
+        .fan-left  { animation: fanLeft  560ms cubic-bezier(0.16,1,0.3,1) both; }
+        .fan-right { animation: fanRight 560ms cubic-bezier(0.16,1,0.3,1) both; }
+
         @media (prefers-reduced-motion: reduce) {
-          .menu-fade, .menu-pop { animation: none; }
+          .menu-fade, .menu-out, .menu-in,
+          .fan-front, .fan-left, .fan-right { animation: none; }
+          .menu-out { opacity: 0; }
         }
       `}</style>
 
@@ -491,9 +522,9 @@ export default function VersusMenuDemo() {
         GAME SELECT
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-white/55">
-        One idea in three arrangements. The hero shows the pool <strong className="text-white/80">one item at a time, big</strong>,
-        cycling &mdash; NFL Teams is all thirty-two, so it walks them, and the ground takes each team&rsquo;s colour as it
-        comes. Nothing is a collage and no mode needs a hand-made hero image.
+The roster, twice, with the two answers to the marks landing on top of each other. Both keep everything else the
+        same: the hero walks the pool, the ground takes each item&rsquo;s colour, the tiles underneath are the roster.
+        <strong className="text-white/80"> Only the movement differs.</strong>
       </p>
       <p className="mt-2 text-[12.5px] leading-relaxed text-white/40">
         Seven modes instead of the two that exist. Three NFL rooms are marked NOT BUILT &mdash; their rosters are already
@@ -518,14 +549,14 @@ export default function VersusMenuDemo() {
       </div>
 
       <div className="mt-8 flex flex-col gap-12">
-        {VARIANTS.map((v) => (
-          <section key={v.key}>
+        {TREATMENTS.map((t) => (
+          <section key={t.key}>
             <h2 className="text-[13px] text-white" style={{ fontFamily: "var(--font-display)" }}>
-              {v.name}
+              {t.name}
             </h2>
-            <p className="mb-3 mt-1 max-w-lg text-[12.5px] leading-snug text-white/50">{v.note}</p>
+            <p className="mb-3 mt-1 max-w-lg text-[12.5px] leading-snug text-white/50">{t.note}</p>
             <div className="rounded-2xl bg-black/40 p-4" style={{ maxWidth: width, overflow: "hidden" }}>
-              <v.render picked={picked} onPick={setPicked} />
+              <Roster picked={picked} onPick={setPicked} motion={t.key} />
             </div>
           </section>
         ))}
