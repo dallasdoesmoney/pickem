@@ -259,15 +259,34 @@ function pickName(entry: RosterEntry, size = NAME_SIZE, comfortable = 12, floor?
 // size with the name. So the pill is 54 always, the two rails line up,
 // and every crest on the graphic is drawn at one size.
 const PILL_H = 54;
-// The mark, from the mock: 1.8x the pill, a third of itself hung past
-// the end. `overflow: hidden` on the pill is what does the cutting.
-const MARK = Math.round(PILL_H * 1.8);
-const MARK_HANG = Math.round(MARK * 0.33);
-// How much of the row the mark takes before the name starts. 68% of
-// what is visible of it, so the name crosses only its inner edge. At
-// 42% the name started almost on top of it and a 97px logo showed less
-// of itself than the 32px badge it replaced.
-const MARK_ROOM = Math.round((MARK - MARK_HANG) * 0.68);
+// THE MARK, AND THE TWO WAYS IT GETS CUT.
+//
+// The first version hung a third of itself past the pill's end. On the
+// left rail that end is the RIGHT one, and most NFL marks face right -
+// so the half being thrown away was the half with the beak, the horns,
+// the star point. The specific thing you look at to know the team.
+//
+// So it barely hangs at all now: 3px, enough that it still reads as
+// tucked into the end rather than floating in the middle of the pill,
+// and the rounded end cap trims its corners. Nothing that matters goes.
+//
+// The other cut is vertical, and it is the one with a hard ceiling: the
+// pill is 54 tall, so ANY mark taller than that loses the difference
+// top and bottom no matter where it sits horizontally. 1.8x meant 44%
+// of the crest's height gone. 1.3x is 23%, which keeps the whole body
+// of a mark and takes only the outermost edge of a helmet or a shield.
+// It is still more than twice the 32px badge this replaced.
+const MARK = Math.round(PILL_H * 1.3);
+const MARK_HANG = 3;
+// How much of the row the mark takes before the name starts. Half of
+// it, so the name crosses the inner half - which at this opacity is
+// what "sit behind the name a little" buys: the mark can move inwards,
+// away from the cut edge, without pushing the chip wider.
+const MARK_ROOM = Math.round((MARK - MARK_HANG) * 0.5);
+// A touch more ghosted than the mock, because more of the mark is now
+// under the name and it has further to fade before the lettering stops
+// noticing it.
+const MARK_ALPHA = 0.46;
 
 function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
   const { text, size } = pickName(entry, 40, 9, 16);
@@ -308,18 +327,16 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
 
           It was a 32px badge sitting in the row like a bullet point -
           the smallest thing on a graphic whose whole subject is which
-          team a pick came from. Now it is nearly twice the pill's
-          height, anchored to the spine-side end and hung a third of
-          itself past it, so the pill's own rounded edge crops the
-          outside and the name crosses the inside.
+          team a pick came from. It is more than twice that now, sat at
+          the spine-side end with the name crossing its inner half.
 
-          Absolutely positioned rather than in the flow, because a 97px
+          Absolutely positioned rather than in the flow, because a 70px
           image would set the height of a 54px pill if it were a flex
           child - the entire point is that it exceeds the pill and gets
           cut rather than opening it up.
 
           AND IT IS GHOSTED. Chosen over the same mark at full strength
-          with a dark wash under the name: at 55% the crest reads as
+          with a dark wash under the name: ghosted, the crest reads as
           texture in the team's own colour rather than as a second
           object arguing with the lettering, and the name needs nothing
           done to it to stay legible. */}
@@ -332,7 +349,7 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
           transform: "translateY(-50%)",
           width: MARK,
           height: MARK,
-          opacity: 0.55,
+          opacity: MARK_ALPHA,
           pointerEvents: "none",
         }}
       >
