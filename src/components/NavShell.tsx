@@ -34,16 +34,15 @@ const NAV_ITEMS: NavItem[] = [
   // you can finish in a minute, which makes it the cheapest reason to
   // come back tomorrow.
   //
-  // "NFL Nameplate", not "Daily Games", and the reason is search rather
-  // than taste. This is the SITEWIDE link to the game: every page on the
-  // site points at it with these words, and link text is one of the
-  // strongest things a site can say about what a page is. Naming the
-  // category here meant the whole site described its own game as "daily
-  // games" and never once, in any link, as the thing people type.
+  // "Daily Games", because there are going to be more than one and this
+  // is the category. The game's own NAME does the search work from the
+  // home page card, which links to this same route and is captioned
+  // "NFL NAMEPLATE" - a card for one game can name that game, where a
+  // nav entry standing in for a category cannot.
   //
-  // When a second daily game ships, this goes back to being a category
-  // and /daily becomes the menu it was named for.
-  { href: "/nfl-nameplate", label: "NFL Nameplate", icon: NameplateIcon, matchPrefix: "/nfl-nameplate" },
+  // When the second daily game ships this points at a /daily hub and the
+  // label is finally telling the truth.
+  { href: "/nfl-nameplate", label: "Daily Games", icon: NameplateIcon, matchPrefix: "/nfl-nameplate" },
   { href: "/weekly", label: "Pick’em", icon: PicksIcon, matchPrefix: "/weekly" },
   { href: "/predictor", label: "Record Predictor", icon: TeamIcon, matchPrefix: "/predictor" },
   { href: "/tier-lists", label: "Tier Lists", icon: TierListIcon, matchPrefix: "/tier-lists" },
