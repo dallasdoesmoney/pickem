@@ -250,6 +250,25 @@ function pickName(entry: RosterEntry, size = NAME_SIZE, comfortable = 12, floor?
 // The name does not need the same treatment: it is white with a black
 // stroke around it (see outlined), and a stroke is what makes white hold
 // on a light fill where flat white would not.
+// THE PILL'S HEIGHT, and now a fixed one.
+//
+// It used to be whatever the tallest child came to, which made it 47,
+// 50 or 54 depending on how long the name was - three heights in one
+// rail. That was survivable while the mark was a 32px badge; it is not
+// once the mark is sized off the pill, because the logo would change
+// size with the name. So the pill is 54 always, the two rails line up,
+// and every crest on the graphic is drawn at one size.
+const PILL_H = 54;
+// The mark, from the mock: 1.8x the pill, a third of itself hung past
+// the end. `overflow: hidden` on the pill is what does the cutting.
+const MARK = Math.round(PILL_H * 1.8);
+const MARK_HANG = Math.round(MARK * 0.33);
+// How much of the row the mark takes before the name starts. 68% of
+// what is visible of it, so the name crosses only its inner edge. At
+// 42% the name started almost on top of it and a 97px logo showed less
+// of itself than the 32px badge it replaced.
+const MARK_ROOM = Math.round((MARK - MARK_HANG) * 0.68);
+
 function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
   const { text, size } = pickName(entry, 40, 9, 16);
   const accent = entry.accent ?? "#8899aa";
@@ -258,18 +277,22 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
       style={{
         position: "relative",
         display: "flex",
-        // Mirrored, so the badge is always on the spine side and the
+        // Mirrored, so the mark is always on the spine side and the
         // price always on the outer edge - the two columns read as each
         // other's reflection rather than as two different designs.
         flexDirection: who === 0 ? "row-reverse" : "row",
         alignItems: "center",
-        gap: 9,
+        // Zero, and the gaps are margins on the two children that want
+        // them. A shared gap would also open one between the mark's
+        // spacer and the name, which is the one place there must not be
+        // a gap - the name is supposed to cross the mark.
+        gap: 0,
         // Mirrored too, and it has to be written out rather than left as
         // one shorthand: row-reverse flips the CHILDREN, not the box's
-        // own padding, so a single "14px left" ends up on the badge side
-        // in one column and the price side in the other. The badge is a
-        // circle and wants the room; the price capsule has its own and
-        // sits closer to the edge.
+        // own padding, so a single "14px left" ends up on the mark side
+        // in one column and the price side in the other. The mark hangs
+        // out of its end anyway; the price capsule has its own padding
+        // and sits closer to the edge.
         padding: who === 0 ? "5px 14px 5px 10px" : "5px 10px 5px 14px",
         borderRadius: 999,
         background: accent,
@@ -278,11 +301,45 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
         // thing that has to survive is the SHAPE.
         border: "2px solid rgba(5,7,13,0.55)",
         overflow: "hidden",
+        minHeight: PILL_H,
       }}
     >
-      <span style={{ position: "relative", display: "flex" }}>
-        <Badge url={entry.badge} size={32} />
+      {/* THE TEAM MARK, OVERSIZED AND CUT BY THE PILL.
+
+          It was a 32px badge sitting in the row like a bullet point -
+          the smallest thing on a graphic whose whole subject is which
+          team a pick came from. Now it is nearly twice the pill's
+          height, anchored to the spine-side end and hung a third of
+          itself past it, so the pill's own rounded edge crops the
+          outside and the name crosses the inside.
+
+          Absolutely positioned rather than in the flow, because a 97px
+          image would set the height of a 54px pill if it were a flex
+          child - the entire point is that it exceeds the pill and gets
+          cut rather than opening it up.
+
+          AND IT IS GHOSTED. Chosen over the same mark at full strength
+          with a dark wash under the name: at 55% the crest reads as
+          texture in the team's own colour rather than as a second
+          object arguing with the lettering, and the name needs nothing
+          done to it to stay legible. */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: "50%",
+          [who === 0 ? "right" : "left"]: -MARK_HANG,
+          transform: "translateY(-50%)",
+          width: MARK,
+          height: MARK,
+          opacity: 0.55,
+          pointerEvents: "none",
+        }}
+      >
+        <Badge url={entry.badge} size={MARK} />
       </span>
+      {/* The room the mark takes out of the row. */}
+      <span style={{ width: MARK_ROOM, flexShrink: 0 }} />
       <span
         style={{
           position: "relative",
@@ -294,6 +351,8 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
           overflow: "hidden",
           textOverflow: "ellipsis",
           minWidth: 0,
+          marginLeft: who === 1 ? 4 : 0,
+          marginRight: who === 0 ? 4 : 0,
           ...outlined(size),
         }}
       >
@@ -304,6 +363,10 @@ function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
           position: "relative",
           display: "flex",
           alignItems: "center",
+          // The gap the row's `gap: 0` gave up, put back on the one
+          // join that still wants one.
+          marginLeft: who === 0 ? 0 : 9,
+          marginRight: who === 0 ? 9 : 0,
           padding: "2px 10px",
           borderRadius: 999,
           background: "#ffffff",
