@@ -1765,7 +1765,7 @@ function Swatch({ bg }: { bg: string }) {
 // block for anything fixed inside it. This renders from the game's own
 // root, which has no filter above it, so `fixed` resolves to the
 // viewport as intended - verified in a browser rather than assumed.
-function ResultDialog({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+export function ResultDialog({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -1811,7 +1811,7 @@ function ResultDialog({ onClose, children }: { onClose: () => void; children: Re
   );
 }
 
-function Reveal({
+export function Reveal({
   state,
   answer,
   onShare,
@@ -1820,6 +1820,7 @@ function Reveal({
   practiceRound,
   onPlayAgain,
   stats,
+  footer,
 }: {
   state: PuzzleState;
   answer: PuzzlePlayer | undefined;
@@ -1837,6 +1838,11 @@ function Reveal({
   // Null for a guest, for a practice round, and for the moment before
   // the fetch lands - the panel simply is not drawn in any of them.
   stats: NameplateStats | null;
+  // Anything the caller wants UNDER the result, in the same dialog. It
+  // exists so a signed-out player gets the ask at the moment they are
+  // pleased with themselves rather than one dismissal later - see
+  // daily/JoinPitch.tsx.
+  footer?: React.ReactNode;
 }) {
   const team = (answer?.team ?? state.answer?.team) as TeamAbbr | undefined;
   const brand = team ? TEAMS[team]?.color : undefined;
@@ -2006,6 +2012,7 @@ function Reveal({
             </p>
           </>
         )}
+        {footer}
       </div>
     </div>
   );
@@ -2026,7 +2033,7 @@ function Reveal({
 //
 // No dismiss. There is nothing behind it for a loser - it IS the result
 // slot - and for a winner it sits under a reveal that is already theirs.
-function GuestFinish({ solved, onJoin }: { solved: boolean; onJoin: () => void }) {
+export function GuestFinish({ solved, onJoin }: { solved: boolean; onJoin: () => void }) {
   return (
     <div
       className="puzzle-reveal mb-3 overflow-hidden lg:mb-4"
