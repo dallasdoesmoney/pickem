@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/hooks/useAuth";
 import { DailyPuzzle } from "@/components/DailyPuzzle";
+import { CounterStyles, PlayersToday, usePlayersToday } from "@/components/daily/PlayersToday";
 
 // Widens in two steps rather than one. A phone stacks each guess into its
 // own card and wants the narrow column; a desktop lays the same guess out
@@ -25,6 +26,7 @@ import { DailyPuzzle } from "@/components/DailyPuzzle";
 // stays a server component and arrives in the first HTML response.
 export function NameplateGame({ below }: { below?: React.ReactNode }) {
   const { loading } = useAuth();
+  const playing = usePlayersToday();
 
   // Built here and handed to the game, because where it belongs depends
   // on something only the game knows: once there is a result, the result
@@ -102,6 +104,15 @@ export function NameplateGame({ below }: { below?: React.ReactNode }) {
             <span className="text-[clamp(1.5rem,5.6vw,2.8rem)]">NAMEPLATE</span>
           </h1>
           <p className="mt-1 truncate text-xs leading-tight text-white/45 sm:text-[15px]">The daily NFL player guessing game</p>
+          {/* Under the subtitle, which is the only line up here not
+              already spoken for. Renders nothing at all when there is no
+              count worth showing, so the header keeps its height on a
+              quiet morning - and this header has been cut twice. */}
+          {playing !== null && (
+            <div className="mt-1.5 text-white/55">
+              <PlayersToday count={playing} variant="strip" />
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -109,6 +120,7 @@ export function NameplateGame({ below }: { below?: React.ReactNode }) {
 
   return (
     <main className="flex-1 px-4 pb-16 pt-6 max-w-lg md:max-w-3xl lg:max-w-4xl w-full mx-auto">
+      <CounterStyles />
       {loading ? (
         <>
           {header}

@@ -28,6 +28,7 @@ import { fetchNameplateStats, type NameplateStats } from "@/lib/supabase/namepla
 import { fetchPuzzleNumber } from "@/lib/supabase/dailyPuzzle";
 import { NameplateStatsPanel } from "@/components/NameplateStats";
 import { buildReferralLinkTo } from "@/lib/referralStorage";
+import { recordDailyPlay } from "@/lib/supabase/dailyPlayers";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
 
@@ -731,6 +732,17 @@ export function DailyPuzzle({ header }: { header?: React.ReactNode }) {
     setQuery("");
     setActive(0);
     try {
+      // COUNTED HERE, on a real guess at the real board - not on page
+      // load, because opening the page is not playing and counting opens
+      // would fill the number with crawlers and link previews. Unlimited
+      // rounds are excluded below for the same reason they do not touch
+      // a streak: they are not today's game.
+      //
+      // Deliberately not awaited. It is a number on a card; it must
+      // never put a round trip between somebody and their guess, and it
+      // swallows its own errors.
+      if (mode !== "unlimited") void recordDailyPlay(state?.puzzleOn ?? puzzleToday());
+
       let next: PuzzleState;
       if (mode === "unlimited") {
         // Nothing to record and no limit to defend, so the round lives

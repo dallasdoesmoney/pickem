@@ -17,6 +17,7 @@ import { getTierTemplate } from "@/data/tierTemplates";
 import { BoardZoom, previewFor } from "@/components/tierList/BoardThumb";
 import { widestWordEm } from "@/components/tierList/bungee";
 import { useAuth } from "@/hooks/useAuth";
+import { CounterStyles, PlayersToday, showsCount, usePlayersToday } from "@/components/daily/PlayersToday";
 
 // Every card fronts a destination with a live picture of what is behind
 // it - the week's actual matchups, your actual predictor progress, the
@@ -58,7 +59,7 @@ const REACH = 90; // % of the card height
 // white edge of a matchup pill while the tiles reserved dead space. The
 // scrim is what still makes it read as one picture - it is absolute, so
 // it crosses the seam between the art and this band.
-function Caption({ name, color, meta }: { name: string; color: string; meta: React.ReactNode }) {
+function Caption({ name, color, meta, live }: { name: string; color: string; meta: React.ReactNode; live?: React.ReactNode }) {
   return (
     <>
       <span
@@ -92,8 +93,13 @@ function Caption({ name, color, meta }: { name: string; color: string; meta: Rea
         >
           {name}
         </div>
+        {/* The live counter REPLACES this line's static dot rather than
+            sitting next to it - two dots on one line is the tell that
+            something was bolted on. With no count to show (a quiet hour,
+            a failed read) the original line is untouched. */}
         <div className="mt-1.5 flex items-center gap-1.5 text-[10px] tracking-[0.09em] text-white/60">
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+          {live ?? <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />}
+          {live && <span className="text-white/30">&middot;</span>}
           {meta}
         </div>
       </div>
@@ -317,6 +323,7 @@ function MiniPlate({ guess }: { guess: (typeof DAILY_GUESSES)[number] }) {
 }
 
 function DailyHero({ state }: { state: PuzzleState | null }) {
+  const playing = usePlayersToday();
   // A count is all a result is allowed to say out here. "SOLVED IN 4"
   // gives away nothing about WHO, which is the one thing that would ruin
   // somebody else's day - the same rule the share grid follows.
@@ -326,15 +333,26 @@ function DailyHero({ state }: { state: PuzzleState | null }) {
   // which one is behind it today.
   // The caption above now names the game, so this says what STATE it is
   // in rather than repeating the name directly under itself.
+  //
+  // And it drops its own "TODAY" when the live counter is up, because
+  // the counter has already said it - "1,247 PLAYED TODAY - TODAY - 8
+  // GUESSES" is the line you get if nobody checks.
+  const live = showsCount(playing);
   const meta = !state
-    ? "TODAY \u00b7 8 GUESSES"
+    ? live
+      ? "8 GUESSES"
+      : "TODAY \u00b7 8 GUESSES"
     : state.solved
       ? `SOLVED IN ${state.guessesUsed}`
       : state.finished
-        ? "OUT OF GUESSES TODAY"
+        ? live
+          ? "OUT OF GUESSES"
+          : "OUT OF GUESSES TODAY"
         : state.guessesUsed > 0
           ? `${state.guessesUsed} OF ${state.maxGuesses} USED`
-          : `TODAY \u00b7 ${state.maxGuesses} GUESSES`;
+          : live
+            ? `${state.maxGuesses} GUESSES`
+            : `TODAY \u00b7 ${state.maxGuesses} GUESSES`;
 
   return (
     <Link href="/nfl-nameplate" className={CARD}>
@@ -407,7 +425,7 @@ function DailyHero({ state }: { state: PuzzleState | null }) {
           most-visited page, and it was describing the category rather
           than naming the game - so the strongest page on the site never
           said the words anybody searches. */}
-      <Caption name={"NFL NAMEPLATE"} color="#fb923c" meta={meta} />
+      <Caption name={"NFL NAMEPLATE"} color="#fb923c" meta={meta} live={live ? <PlayersToday count={playing} /> : undefined} />
     </Link>
   );
 }
@@ -668,6 +686,7 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-3.5 px-4 pt-10 pb-16">
+      <CounterStyles />
       <div className="text-center">
         <div className="mb-1 text-xs tracking-[0.25em] text-white/45">SIDELINE BREW</div>
         {/* Not "PICK'EM" any more. This page fronts four things and
