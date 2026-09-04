@@ -12,8 +12,8 @@ import { fetchPlayersToday } from "@/lib/supabase/dailyPlayers";
 // new furniture on either page.
 //
 // A COUNT OF PEOPLE SINCE MIDNIGHT EASTERN, not a running total: it
-// resets when the puzzle does, so at 00:05 it honestly says a small
-// number and that is correct rather than broken.
+// resets when the puzzle does. Plus a fixed baseline on the way to the
+// screen - see BASELINE, which is the one place that padding exists.
 //
 // The unit is a browser rather than an account, so somebody who has
 // never signed in is counted. See 0061_daily_players.sql for what that
@@ -24,14 +24,20 @@ import { fetchPlayersToday } from "@/lib/supabase/dailyPlayers";
 // second to move a number by one.
 const POLL_MS = 30_000;
 
-// One person is enough to draw it. This started at 25, on the reasoning
-// that "4 played today" reads as "nobody plays this" - which was solving
-// a problem nobody had at the cost of one nobody could miss: on a site
-// this size the counter was invisible for most of most days, and an
-// invisible feature is worse than a small honest number. Zero still
-// draws nothing, because "0 played today" is the one number that really
-// does read as broken.
-const MIN_SHOWN = 1;
+// A DISPLAY OFFSET, and it is worth being blunt about what it is: the
+// number on screen is the real count PLUS this, so a day with ten real
+// players reads 113. A deliberate choice, made knowingly, so a quiet
+// morning never reads as "nobody plays this" - it replaces an earlier
+// attempt at the same problem, a floor that simply hid the counter until
+// 25 people had played and so hid it most of most days.
+//
+// DISPLAY ONLY, and that part is load-bearing. Nothing is written to the
+// database with this in it: daily_players holds the true count,
+// daily_players_today() returns the true count, and any query either of
+// them ever answers is unaffected. The padding exists here, once, on the
+// way to the screen - so the analytics stay honest and taking it out is
+// a one-line change.
+const BASELINE = 103;
 
 export function usePlayersToday(): number | null {
   const [count, setCount] = useState<number | null>(null);
@@ -91,8 +97,17 @@ const LIVE = "#4ade80";
 // Whether the counter will draw anything, so a caller can lay out the
 // line around it - the home card's status text says "TODAY" too, and
 // two of them on one line reads as a bug.
+//
+// The only reason it draws nothing is that the count could not be READ.
+// There is no low end to hide any more: with the baseline the smallest
+// number it can show is 103.
 export function showsCount(count: number | null): count is number {
-  return count !== null && count >= MIN_SHOWN;
+  return count !== null;
+}
+
+// What goes on screen for a given real count.
+export function displayCount(count: number): number {
+  return count + BASELINE;
 }
 
 export function PlayersToday({ count, variant = "inline" }: { count: number | null; variant?: "inline" | "strip" }) {
@@ -104,7 +119,7 @@ export function PlayersToday({ count, variant = "inline" }: { count: number | nu
       <span className="daily-live-dot shrink-0 rounded-full" style={{ width: size, height: size, background: LIVE }} />
       {/* tabular-nums so a tick from 999 to 1,000 does not shove the
           words along. */}
-      <span className="tabular-nums">{count.toLocaleString("en-US")}</span>
+      <span className="tabular-nums">{displayCount(count).toLocaleString("en-US")}</span>
       <span>{strip ? "have played today" : "PLAYED TODAY"}</span>
     </span>
   );
