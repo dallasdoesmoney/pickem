@@ -44,8 +44,21 @@ await page.route("**/rest/v1/**", (r) => r.fulfill({ status: 200, contentType: "
 
 try {
   await page.goto(`${BASE}/versus`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: /START THE DRAFT/i }).waitFor({ timeout: 20000 });
-  ok("the setup screen offers a format", (await page.locator("main button").count()) >= 3, "");
+
+  // TWO STEPS NOW. The landing screen is the game select - a hero for
+  // the mode you are on and a tile per mode - and the names, the OBS
+  // link and START live on a second screen behind PICK THIS DRAFT.
+  await page.getByRole("button", { name: /PICK THIS DRAFT/i }).waitFor({ timeout: 20000 });
+  ok("the picker offers a tile per format", (await page.locator("main button[title]").count()) >= 2, "");
+  ok(
+    "and the hero names the one you are on",
+    (await page.locator("main h2").first().textContent())?.trim().length > 0,
+    (await page.locator("main h2").first().textContent())?.trim(),
+  );
+
+  await page.getByRole("button", { name: /PICK THIS DRAFT/i }).click();
+  await page.getByRole("button", { name: /START THE DRAFT/i }).waitFor({ timeout: 10000 });
+  ok("the setup screen restates the draft", (await page.getByRole("button", { name: /^CHANGE$/ }).count()) === 1, "");
 
   await page.getByRole("button", { name: /START THE DRAFT/i }).click();
   await page.getByText(/LOT 1/).waitFor({ timeout: 10000 });

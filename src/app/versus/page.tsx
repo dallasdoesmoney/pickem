@@ -5,6 +5,7 @@ import { AUCTION_FORMATS } from "@/lib/auction/formats";
 import { startAuction, reduce, AuctionState, AuctionAction } from "@/lib/auction/engine";
 import { AuctionBoard } from "@/components/versus/AuctionBoard";
 import { OverlayLink } from "@/components/versus/OverlayLink";
+import { GameSelect, ChosenDraft } from "@/components/versus/GameSelect";
 import { useRoomCode, useBroadcast } from "@/components/versus/useRoom";
 import { SPIN_MS } from "@/components/versus/style";
 
@@ -24,6 +25,11 @@ export default function VersusPage() {
   const [slug, setSlug] = useState(formats[0]?.slug ?? "");
   const [names, setNames] = useState(["Player 1", "Player 2"]);
   const [game, setGame] = useState<{ slug: string; state: AuctionState } | null>(null);
+  // TWO STEPS, because this screen used to be three decisions at once -
+  // which mode, both names, and the OBS link - all on screen before you
+  // had made any of them. Picking the draft is the only one you cannot
+  // skip, and it is the one that wants the whole screen.
+  const [step, setStep] = useState<"pick" | "setup">("pick");
 
   const format = AUCTION_FORMATS[slug];
   const { code, rotate } = useRoomCode();
@@ -73,7 +79,13 @@ export default function VersusPage() {
           format={AUCTION_FORMATS[liveGame.slug]}
           state={liveGame.state}
           onAction={act}
-          onRestart={() => setGame(null)}
+          // Back to the setup screen, not the picker: the overwhelming
+          // next move after a draft is the same two people going again,
+          // and CHANGE is right there for the time it is not.
+          onRestart={() => {
+            setGame(null);
+            setStep("setup");
+          }}
         />
         <OverlayLink code={code} live={live} viewers={viewers} onRotate={rotate} />
       </main>
@@ -93,31 +105,19 @@ export default function VersusPage() {
         <p className="mt-10 text-center text-sm text-white/45">
           No formats available &mdash; the rosters have not been synced in this checkout.
         </p>
+      ) : step === "pick" ? (
+        <div className="mt-6">
+          <GameSelect formats={formats} slug={slug} onPick={setSlug} onConfirm={() => setStep("setup")} />
+        </div>
       ) : (
         <>
-          <div className="mt-8 flex flex-col gap-2">
-            {formats.map((f) => (
-              <button
-                key={f.slug}
-                onClick={() => setSlug(f.slug)}
-                className="rounded-2xl border px-4 py-3 text-left transition-colors"
-                style={{
-                  background: "#101d38",
-                  borderColor: f.slug === slug ? "rgba(62,203,120,0.55)" : "rgba(255,255,255,0.12)",
-                }}
-              >
-                <div className="text-[14px] tracking-[0.1em]" style={{ fontFamily: "var(--font-display)" }}>
-                  {f.title.toUpperCase()}
-                </div>
-                <div className="mt-1 text-[12.5px] text-white/50">{f.tagline}</div>
-                <div className="mt-1.5 text-[11px] text-white/30">
-                  {f.slots.map((s) => s.label).join(" · ")} &mdash; ${f.budget} each
-                </div>
-              </button>
-            ))}
-          </div>
+          {format && (
+            <div className="mt-6">
+              <ChosenDraft format={format} onChange={() => setStep("pick")} />
+            </div>
+          )}
 
-          <div className="mt-6 grid grid-cols-2 gap-3">
+          <div className="mt-5 grid grid-cols-2 gap-3">
             {names.map((name, i) => (
               <label key={i} className="flex flex-col gap-1.5">
                 <span className="text-[10px] tracking-[0.16em] text-white/35" style={{ fontFamily: "var(--font-display)" }}>
@@ -135,12 +135,15 @@ export default function VersusPage() {
 
           <button
             onClick={start}
-            className="mt-6 rounded-xl px-5 py-3 text-[13px] tracking-[0.16em] text-[#08111f] transition-transform active:scale-[0.99]"
+            className="mt-5 rounded-xl px-5 py-3 text-[13px] tracking-[0.16em] text-[#08111f] transition-transform active:scale-[0.99]"
             style={{ fontFamily: "var(--font-display)", background: "#3ecb78" }}
           >
             START THE DRAFT
           </button>
 
+          {/* Still BEFORE the draft, which is the point of it being on
+              this screen: the overlay can be set up in OBS and confirmed
+              working while there is still time to fix it. */}
           <div className="mt-6">
             <OverlayLink code={code} live={live} viewers={viewers} onRotate={rotate} />
           </div>

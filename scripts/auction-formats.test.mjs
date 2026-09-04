@@ -27,6 +27,44 @@ const formats = Object.values(AUCTION_FORMATS);
 
 ok("there are formats to play", formats.length > 0, formats.map((f) => f.slug).join(", "));
 
+// WHAT THE PICKER NEEDS.
+//
+// The game select screen draws every mode from its own pool, so these
+// are not decoration - a mode with no `short` is an unlabelled tile
+// among several rooms of headshots, which are the same 30px photograph
+// of a man as each other.
+//
+// The headliners are the fragile half: three hand-typed names against a
+// pool a script rewrites every week. They are resolved by name in
+// formats.ts and drop to undefined if any one of them is missing, which
+// is a silent, graceful fallback to a stranger - so the fact that they
+// resolved has to be asserted somewhere, and this is it. A player who
+// retires fails this line rather than quietly changing who fronts the
+// mode.
+{
+  const noShort = formats.filter((f) => !f.short);
+  ok("every format has a tile label", noShort.length === 0, noShort.map((f) => f.slug).join(", "));
+
+  const noFaces = formats.filter((f) => !f.headliners);
+  ok(
+    "every format has its three headliners",
+    noFaces.length === 0,
+    noFaces.length ? `${noFaces.map((f) => f.slug).join(", ")} - a name in formats.ts is not in the pool any more` : "",
+  );
+
+  for (const f of formats) {
+    if (!f.headliners) continue;
+    const resolved = f.headliners.map((id) => f.items.find((it) => it.id === id));
+    ok(
+      `${f.slug} headliners are all in the pool`,
+      resolved.every(Boolean) && resolved.length === 3,
+      resolved.map((it, k) => it?.label ?? `MISSING ${f.headliners[k]}`).join(" | "),
+    );
+    // Three of the same item would draw one mark three times.
+    ok(`${f.slug} headliners are three different items`, new Set(f.headliners).size === 3);
+  }
+}
+
 for (const format of formats) {
   console.log(`\n-- ${format.slug}: ${format.items.length} items, ${format.slots.length} slots, $${format.budget}`);
 

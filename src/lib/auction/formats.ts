@@ -115,6 +115,20 @@ function teamItem(abbr: string): AuctionItem | null {
   };
 }
 
+// Headliners are written as NAMES and resolved to ids here, because an
+// espnId is not a thing anybody can check by reading it - "3139477" is
+// either Patrick Mahomes or a typo and the file cannot tell you which.
+//
+// All three or none. Two headliners and a stranger reads as something
+// half-loaded; a clean fall back to a spread of the pool just reads as
+// a mode without a face yet. This is also what makes it safe against
+// the weekly sync: a player who leaves the league takes the trio with
+// him rather than leaving a hole.
+function idsByName(items: AuctionItem[], names: string[]): string[] | undefined {
+  const found = names.map((n) => items.find((i) => i.label === n)?.id).filter((id): id is string => Boolean(id));
+  return found.length === names.length ? found : undefined;
+}
+
 const NFL_TEAMS: AuctionFormat = {
   // THE SLUG STAYS. It is what a room broadcasts and what an OBS
   // browser source carries in ?format=, so changing it would break
@@ -128,7 +142,12 @@ const NFL_TEAMS: AuctionFormat = {
   // and named a different game: ranking the thirty-two, which is what
   // the tier list of that name actually is.
   title: "Full Roster",
+  short: "ROSTER",
+  category: "NFL",
   tagline: "Bid on a team, then decide what you took it for",
+  // Three crests anybody recognises, the middle one biggest. Teams, so
+  // these are ids already and cannot go stale the way a player can.
+  headliners: ["KC", "DAL", "PHI"],
   budget: 20,
   slots: [
     // The keys never change - they are in saved state - but the labels
@@ -146,10 +165,21 @@ const NFL_TEAMS: AuctionFormat = {
 
 // The other shape: the item IS the thing. No `fills`, so any quarterback
 // goes in any quarterback slot and is worth himself.
+const QB_ITEMS: AuctionItem[] = QUARTERBACKS.map((q) => ({
+  id: q.espnId,
+  label: q.name,
+  subtitle: TEAMS[q.team] ? `${TEAMS[q.team].city} ${TEAMS[q.team].name}` : q.team,
+  imageUrl: espnHeadshot(q.espnId),
+  accent: TEAMS[q.team]?.color,
+}));
+
 const QB_ROOM: AuctionFormat = {
   slug: "qb-room",
   title: "Quarterback Room",
+  short: "QB",
+  category: "NFL",
   tagline: "Four quarterbacks each. Nothing else matters",
+  headliners: idsByName(QB_ITEMS, ["Josh Allen", "Patrick Mahomes", "Lamar Jackson"]),
   budget: 20,
   slots: [
     { key: "qb1", label: "QB 1" },
@@ -157,13 +187,7 @@ const QB_ROOM: AuctionFormat = {
     { key: "qb3", label: "QB 3" },
     { key: "qb4", label: "QB 4" },
   ],
-  items: QUARTERBACKS.map((q) => ({
-    id: q.espnId,
-    label: q.name,
-    subtitle: TEAMS[q.team] ? `${TEAMS[q.team].city} ${TEAMS[q.team].name}` : q.team,
-    imageUrl: espnHeadshot(q.espnId),
-    accent: TEAMS[q.team]?.color,
-  })),
+  items: QB_ITEMS,
 };
 
 // Registered off the length of the pool, the same way tierTemplates.ts

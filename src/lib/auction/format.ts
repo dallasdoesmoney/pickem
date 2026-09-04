@@ -55,6 +55,26 @@ export type AuctionFormat = {
   slug: string;
   title: string;
   tagline: string;
+  // A word for the picker's tile. Every room of players is the same
+  // 30px photograph of a man without one - Running Backs and Tight Ends
+  // are indistinguishable as pictures alone.
+  short: string;
+  // Which shelf it sits on in the picker. Everything is football today;
+  // the moment there is a draft that is not, one flat list is the
+  // problem. Absent means the default shelf.
+  category?: string;
+  // THREE ITEM IDS FOR THE TILE, and the middle one is the face of the
+  // mode, so this is written centre-first.
+  //
+  // A pool has no ranking in it. `depth` is per team - it says Chase is
+  // Cincinnati's first receiver and nothing about whether he is better
+  // than Jefferson, and there is no column that would answer that. So
+  // this is an opinion, and it is kept in one place on purpose:
+  // changing who fronts a mode is editing three strings.
+  //
+  // Absent falls back to a spread of the pool, which is right for a
+  // mode whose items are all equally unknown.
+  headliners?: string[];
   // Dollars each player starts with. Twenty is the version people play.
   budget: number;
   // What every player has to fill, in the order they are shown.
@@ -94,6 +114,20 @@ export function formatProblems(format: AuctionFormat, playerCount: number): stri
     // unwinnable, which stalls the draft with no way forward.
     if (item.fills && Object.keys(item.fills).length === 0) {
       problems.push(`${item.label} cannot fill any slot`);
+    }
+  }
+
+  // HEADLINERS ARE HAND-TYPED NAMES against a pool a script rewrites
+  // every week, which is the exact shape of thing that goes quietly
+  // wrong: a player changes team or retires and his row is gone, and
+  // the tile silently falls back to a stranger. Checked here so a sync
+  // that drops one fails the format test instead.
+  if (format.headliners) {
+    if (format.headliners.length !== 3) {
+      problems.push(`${format.slug} has ${format.headliners.length} headliners, wants 3`);
+    }
+    for (const id of format.headliners) {
+      if (!ids.has(id)) problems.push(`${format.slug} headliner "${id}" is not in the pool`);
     }
   }
 
