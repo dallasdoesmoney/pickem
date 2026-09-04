@@ -7,7 +7,7 @@ import { AuctionState, RosterEntry, toAct, currentItem } from "@/lib/auction/eng
 import { PLAYER_COLORS, MONEY, MONEY_ON_LIGHT, outlined } from "./style";
 import { LogoReel, LotLogo, LotWaiting } from "./LotReel";
 import { onTheClock, TurnNameMark } from "./turnIdeas";
-import { AnimStyles, LandRing, SoldStamp, has, useDrain, type AnimKey } from "./anims";
+import { AnimStyles, LandRing, useDrain } from "./anims";
 
 // ONE SHAPE, FIVE WAYS.
 //
@@ -192,12 +192,11 @@ function nameStyle(text: string, base: number): CSSProperties {
   return { fontFamily: "var(--font-display)", fontSize: size, lineHeight: 1, color: "#ffffff", ...outlined(size) };
 }
 
-type LayoutProps = { state: AuctionState; format: AuctionFormat; anims?: AnimKey[] };
+type LayoutProps = { state: AuctionState; format: AuctionFormat };
 
-// The budget, counting down rather than snapping. Its own component so
-// the hook is never called conditionally - the animation is a prop, and
-// a hook behind an if is how that becomes a crash on the render where
-// somebody turns it off.
+// The budget, counting down rather than snapping. Its own component
+// because `budget(who)` is called twice per render and a hook cannot
+// live in a function called in a loop.
 function DrainingMoney({ amount, size }: { amount: number; size: number }) {
   return <Money amount={useDrain(amount)} size={size} />;
 }
@@ -538,7 +537,7 @@ const LOT_SIZE = 180;
 const SPINE_W = 200;
 const LABEL_W = 160;
 
-function SpineLayout({ state, format, anims }: LayoutProps) {
+function SpineLayout({ state, format }: LayoutProps) {
   const head = headline(state, format);
   // Whose move it is, and only while it is still the opening one - see
   // turnIdeas.tsx. Null the rest of the time, which is most of the time.
@@ -646,11 +645,7 @@ function SpineLayout({ state, format, anims }: LayoutProps) {
         </span>
         {/* Green, while the bid is a player colour. Green is what you
             have; a colour is what is being bid right now. */}
-        {has(anims, "drain") ? (
-          <DrainingMoney amount={state.players[who].budget} size={38} />
-        ) : (
-          <Money amount={state.players[who].budget} size={38} />
-        )}
+        <DrainingMoney amount={state.players[who].budget} size={38} />
       </div>
     </div>
   );
@@ -700,18 +695,15 @@ function SpineLayout({ state, format, anims }: LayoutProps) {
               // on a new one and settles once. A re-render for anything
               // else reuses it and it stays still.
               <span
-                key={has(anims, "land") ? `land:${item?.id ?? "none"}` : undefined}
-                className={has(anims, "land") && state.phase === "bidding" ? "versus-land" : undefined}
+                key={`land:${item?.id ?? "none"}`}
+                className={state.phase === "bidding" ? "versus-land" : undefined}
                 style={{ display: "inline-flex" }}
               >
                 <LotLogo item={item} size={LOT_SIZE} />
               </span>
             )}
-            {has(anims, "land") && state.phase === "bidding" && item && (
+            {state.phase === "bidding" && item && (
               <LandRing key={`ring:${item.id}`} size={LOT_SIZE} color={item.accent ?? "#ffffff"} />
-            )}
-            {has(anims, "sold") && wonBy !== null && state.won && (
-              <SoldStamp key={`sold:${item?.id ?? state.index}`} who={wonBy} size={LOT_SIZE} />
             )}
 
             {/* INSIDE the logo now, not hanging off its chin - hanging
@@ -725,8 +717,8 @@ function SpineLayout({ state, format, anims }: LayoutProps) {
                     different - and a re-broadcast of the SAME state has
                     to be silent. Same key, same element, no replay. */}
                 <span
-                  key={has(anims, "bump") ? `${state.bid?.by ?? "x"}:${head.amount}` : undefined}
-                  className={has(anims, "bump") ? "versus-bump" : undefined}
+                  key={`${state.bid?.by ?? "x"}:${head.amount}`}
+                  className="versus-bump"
                   style={{ display: "inline-flex" }}
                 >
                   <Money amount={head.amount} size={60} color={head.color} />
