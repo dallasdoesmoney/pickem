@@ -12,6 +12,7 @@ import {
   currentItem,
   openSlots,
   slotsItemCanFill,
+  targetOf,
   fillLabel,
 } from "@/lib/auction/engine";
 
@@ -227,17 +228,26 @@ export function AuctionBoard({
           </div>
         )}
 
-        {state.phase === "assigning" && state.won && item && (
+        {state.phase === "assigning" && state.won && item && (() => {
+          // UNDER SABOTAGE THE SLOTS ARE SOMEBODY ELSE'S. The winner pays
+          // and then chooses which of the OTHER player's slots to ruin,
+          // so this list, its colour and the line above it all have to
+          // follow the target rather than the buyer.
+          const target = targetOf(state, state.won.by);
+          const dumping = target !== state.won.by;
+          return (
           <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between gap-3">
               <span style={{ ...display(20, { color: PLAYER_COLORS[state.won.by], letterSpacing: 1 }), ...outlined(20, "soft") }}>
                 {state.players[state.won.by].name.toUpperCase()} WINS AT ${state.won.price}
               </span>
-              <span className="text-[12px] text-white/40">where does it go?</span>
+              <span className="text-[12px] text-white/40">
+                {dumping ? `stick it on ${state.players[target].name}` : "where does it go?"}
+              </span>
             </div>
 
             <div className="flex flex-col gap-2">
-              {slotsItemCanFill(item, openSlots(state.players[state.won.by])).map((slotKey) => {
+              {slotsItemCanFill(item, openSlots(state.players[target])).map((slotKey) => {
                 const slot = format.slots.find((s) => s.key === slotKey);
                 return (
                   <button
@@ -251,7 +261,9 @@ export function AuctionBoard({
                     </span>
                     {/* What you actually GET there - the whole point of
                         auctioning a team rather than a player. */}
-                    <span className="min-w-0 flex-1 truncate" style={{ ...display(17, { color: PLAYER_COLORS[state.won!.by] }) }}>
+                    {/* The TARGET's colour, because that is whose
+                        roster the name is about to appear on. */}
+                    <span className="min-w-0 flex-1 truncate" style={{ ...display(17, { color: PLAYER_COLORS[target] }) }}>
                       {fillLabel(item, slotKey)}
                     </span>
                   </button>
@@ -259,7 +271,8 @@ export function AuctionBoard({
               })}
             </div>
           </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* UNDO, kept away from the buttons it exists to reverse.
@@ -289,9 +302,28 @@ export function AuctionBoard({
               .map((h, i) => (
                 <div key={`${h.itemId}-${i}`} className="flex items-center gap-2 text-[12.5px]">
                   <span className="min-w-0 flex-1 truncate text-white/55">{h.label}</span>
-                  <span className="shrink-0" style={{ color: PLAYER_COLORS[h.by] }}>
-                    {state.players[h.by].name}
-                  </span>
+                  {/* WHO ENDED UP WITH IT, not who paid. history.by is the
+                      buyer, and under sabotage naming the buyer here says
+                      the opposite of what the rails show. The arrow keeps
+                      both facts: who spent the money, and who is stuck
+                      with the result. */}
+                  {(() => {
+                    const owner = targetOf(state, h.by);
+                    if (owner === h.by) {
+                      return (
+                        <span className="shrink-0" style={{ color: PLAYER_COLORS[h.by] }}>
+                          {state.players[h.by].name}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="shrink-0">
+                        <span style={{ color: PLAYER_COLORS[h.by] }}>{state.players[h.by].name}</span>
+                        <span className="text-white/30"> → </span>
+                        <span style={{ color: PLAYER_COLORS[owner] }}>{state.players[owner].name}</span>
+                      </span>
+                    );
+                  })()}
                   <span className="w-10 shrink-0 text-right text-white/40" style={{ fontVariantNumeric: "tabular-nums" }}>
                     ${h.price}
                   </span>

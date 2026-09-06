@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import { useLayoutEffect, useRef } from "react";
 import type { AuctionFormat, SlotDef } from "@/lib/auction/format";
-import { AuctionState, RosterEntry, toAct, currentItem } from "@/lib/auction/engine";
+import { AuctionState, RosterEntry, toAct, currentItem, targetOf } from "@/lib/auction/engine";
 import { PLAYER_COLORS, MONEY, MONEY_ON_LIGHT, INK, outlined } from "./style";
 import { LogoReel, LotLogo, LotWaiting } from "./LotReel";
 import { onTheClock, TurnNameMark } from "./turnIdeas";
@@ -169,6 +169,18 @@ function headline(state: AuctionState, format: AuctionFormat) {
   const waitingOn = acting ?? (state.phase === "ready" || state.phase === "spinning" ? state.opener : null);
   if (state.phase === "done") return { text: "DRAFT COMPLETE", color: "#ffffff", amount: null as number | null, live: false };
   if (state.phase === "assigning" && state.won) {
+    // UNDER SABOTAGE "SOLD TO" IS A LIE. The winner paid; the pick is
+    // about to land on somebody else's rail, and a viewer watching it
+    // fly the wrong way needs the line to have said so first.
+    const target = targetOf(state, state.won.by);
+    if (target !== state.won.by) {
+      return {
+        text: `${state.players[state.won.by].name.toUpperCase()} → ${state.players[target].name.toUpperCase()}`,
+        color: PLAYER_COLORS[state.won.by],
+        amount: state.won.price,
+        live: true,
+      };
+    }
     return { text: `SOLD TO ${state.players[state.won.by].name.toUpperCase()}`, color: PLAYER_COLORS[state.won.by], amount: state.won.price, live: true };
   }
   if (state.bid) {

@@ -33,6 +33,7 @@ const formats = Object.values(AUCTION_FORMATS);
 // two names.
 const DRAFT_PARAM = "draft";
 const NAMES_KEY = "pickem:versus-names";
+const SABOTAGE_KEY = "pickem:versus-sabotage";
 
 // The two names as an EXTERNAL STORE rather than React state restored in
 // an effect. localStorage does not exist on the server, so a plain
@@ -81,6 +82,44 @@ function serverNames(): string[] {
   return DEFAULT_NAMES;
 }
 
+// SABOTAGE, remembered the same way and for the same reason. It is a
+// rule you play a whole session under, not a decision you want to make
+// again every draft.
+const sabListeners = new Set<() => void>();
+let sabCache: boolean | null = null;
+
+function subscribeSabotage(cb: () => void): () => void {
+  sabListeners.add(cb);
+  return () => {
+    sabListeners.delete(cb);
+  };
+}
+
+function sabotageSnapshot(): boolean {
+  if (sabCache === null) {
+    try {
+      sabCache = localStorage.getItem(SABOTAGE_KEY) === "1";
+    } catch {
+      sabCache = false;
+    }
+  }
+  return sabCache;
+}
+
+function serverSabotage(): boolean {
+  return false;
+}
+
+function writeSabotage(on: boolean) {
+  sabCache = on;
+  try {
+    localStorage.setItem(SABOTAGE_KEY, on ? "1" : "0");
+  } catch {
+    // Not worth failing a draft over.
+  }
+  for (const cb of sabListeners) cb();
+}
+
 function writeNames(next: string[]) {
   namesCache = next;
   try {
@@ -109,6 +148,7 @@ function VersusInner() {
   const [slug, setSlug] = useState(picked ?? formats[0]?.slug ?? "");
 
   const names = useSyncExternalStore(subscribeNames, namesSnapshot, serverNames);
+  const sabotage = useSyncExternalStore(subscribeSabotage, sabotageSnapshot, serverSabotage);
   // THE UNDO STACK LIVES INSIDE THE GAME, not beside it. The engine is a
   // pure reducer, so an undo is just going back to a state it already
   // produced - no inverse of "pass" to write and nothing to keep in
@@ -146,7 +186,11 @@ function VersusInner() {
     // deliberately NOT the room code - the code outlives the draft, so
     // seeding from it would deal the same cards every single time.
     const seed = Math.random().toString(36).slice(2, 10);
-    setGame({ slug, state: startAuction(format, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed), past: [] });
+    setGame({
+      slug,
+      state: startAuction(format, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed, { sabotage }),
+      past: [],
+    });
   }
 
   // `record` is what separates a move somebody MADE from one the board
@@ -254,9 +298,44 @@ function VersusInner() {
             ))}
           </div>
 
+          {/* SABOTAGE. A rule rather than a mode, so it sits with the
+              names and applies to whichever draft is chosen rather than
+              doubling the picker. */}
+          <button
+            type="button"
+            onClick={() => writeSabotage(!sabotage)}
+            aria-pressed={sabotage}
+            className="mt-4 flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left transition-colors"
+            style={{
+              background: sabotage ? "rgba(255,86,86,0.12)" : "rgba(255,255,255,0.04)",
+              border: `2px solid ${sabotage ? "#ff5656" : "rgba(255,255,255,0.12)"}`,
+            }}
+          >
+            <span
+              className="grid h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors"
+              style={{ background: sabotage ? "#ff5656" : "rgba(255,255,255,0.18)" }}
+            >
+              <span
+                className="block h-5 w-5 rounded-full bg-white transition-transform"
+                style={{ transform: sabotage ? "translateX(20px)" : "translateX(0)" }}
+              />
+            </span>
+            <span className="min-w-0">
+              <span
+                className="block text-[12.5px] tracking-[0.14em]"
+                style={{ fontFamily: "var(--font-display)", color: sabotage ? "#ff8b8b" : "rgba(255,255,255,0.75)" }}
+              >
+                SABOTAGE
+              </span>
+              <span className="mt-0.5 block text-[12px] leading-snug text-white/50">
+                Everything you win goes on <em>their</em> roster, and you pick the slot. You still pay for it.
+              </span>
+            </span>
+          </button>
+
           <button
             onClick={start}
-            className="mt-5 rounded-xl px-5 py-3 text-[13px] tracking-[0.16em] text-[#08111f] transition-transform active:scale-[0.99]"
+            className="mt-4 rounded-xl px-5 py-3 text-[13px] tracking-[0.16em] text-[#08111f] transition-transform active:scale-[0.99]"
             style={{ fontFamily: "var(--font-display)", background: "#3ecb78" }}
           >
             START THE DRAFT

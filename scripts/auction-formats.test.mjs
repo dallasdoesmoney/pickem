@@ -14,7 +14,7 @@
 import { AUCTION_FORMATS } from "../src/lib/auction/formats.ts";
 import { WIDE_RECEIVERS } from "../src/data/rosters/wrs.ts";
 import { formatProblems } from "../src/lib/auction/format.ts";
-import { startAuction, openLot, reduce, toAct, bidRange, currentItem, openSlots, slotsItemCanFill } from "../src/lib/auction/engine.ts";
+import { startAuction, openLot, reduce, toAct, bidRange, currentItem, openSlots, slotsItemCanFill, targetOf } from "../src/lib/auction/engine.ts";
 
 let failed = 0;
 function ok(name, cond, detail = "") {
@@ -226,6 +226,90 @@ for (const format of formats) {
     ok("and the defense slot Def", teams.slots.some((s) => s.key === "def" && s.label === "Def"), "");
     ok("the keys are untouched", teams.slots.map((s) => s.key).join(",") === "qb,rb,rec,te,def", teams.slots.map((s) => s.key).join(","));
   }
+}
+
+
+// --- SABOTAGE ---------------------------------------------------------
+//
+// Everything you win lands on somebody ELSE'S roster and you choose which
+// of their slots it ruins. The mode is one function - targetOf - but it
+// has a deadlock in it that only shows up on a real board: two players
+// each filling the other, and nothing stopping one of them winning a
+// sixth lot with nowhere left to put it. The draft would stop dead,
+// mid-stream, with no legal move.
+//
+// couldUse() asks about the TARGET's open slots rather than the bidder's,
+// which makes the mode self-limiting. This is the proof, run the same way
+// the ordinary game is proved: hundreds of drafts of random legal moves,
+// looking for the one that hangs.
+{
+  const SAB_DRAFTS = 300;
+  for (const format of formats) {
+    let finished = 0;
+    let everyoneFull = 0;
+    let solvent = 0;
+    let ownRosterHits = 0;
+    let paidBySomeoneElse = 0;
+
+    for (let n = 0; n < SAB_DRAFTS; n++) {
+      let s = startAuction(format, ["A", "B"], `sab-${n}`, { sabotage: true });
+      let guard = 0;
+      let stuck = false;
+
+      while (s.phase !== "done" && guard++ < 2000) {
+        if (s.phase === "ready" || s.phase === "spinning") {
+          s = openLot(s, format);
+        } else if (s.phase === "bidding") {
+          const who = toAct(s, format);
+          if (who === null) { stuck = true; break; }
+          const range = bidRange(s, format, who);
+          const next =
+            !range || Math.random() < 0.45
+              ? reduce(s, { type: "pass", by: who }, format)
+              : reduce(s, { type: "bid", by: who, amount: range.min + Math.floor(Math.random() * Math.min(4, range.max - range.min + 1)) }, format);
+          if (next === s) { stuck = true; break; }
+          s = next;
+        } else {
+          // THE SLOTS OFFERED ARE THE TARGET'S. A board that offered the
+          // winner's own would be picking from a list the engine will
+          // reject, so this doubles as a check that the two agree.
+          const target = targetOf(s, s.won.by);
+          if (target === s.won.by) ownRosterHits++;
+          const before = s.players[target].roster;
+          const item = currentItem(s, format);
+          const options = slotsItemCanFill(item, openSlots(s.players[target]));
+          if (options.length === 0) { stuck = true; break; }
+          const slotKey = options[Math.floor(Math.random() * options.length)];
+          const payer = s.won.by;
+          const budgetBefore = s.players[payer].budget;
+          const price = s.won.price;
+          s = reduce(s, { type: "assign", slotKey }, format);
+          // The pick landed on the TARGET and the money came off the
+          // WINNER - the two halves of the whole idea.
+          if (s.players[target].roster[slotKey] && before[slotKey] === null) paidBySomeoneElse++;
+          if (s.players[payer].budget !== budgetBefore - price) { stuck = true; break; }
+        }
+      }
+
+      if (stuck || s.phase !== "done") continue;
+      finished++;
+      if (s.players.every((p) => openSlots(p).length === 0)) everyoneFull++;
+      if (s.players.every((p) => p.budget >= 0)) solvent++;
+    }
+
+    ok(`${format.slug} sabotage: every draft finished`, finished === SAB_DRAFTS, `${finished}/${SAB_DRAFTS} - a shortfall is the deadlock`);
+    ok(`${format.slug} sabotage: everybody still filled up`, everyoneFull === SAB_DRAFTS, `${everyoneFull}/${SAB_DRAFTS}`);
+    ok(`${format.slug} sabotage: nobody went overdrawn`, solvent === SAB_DRAFTS, `${solvent}/${SAB_DRAFTS}`);
+    ok(`${format.slug} sabotage: nothing landed on its own buyer`, ownRosterHits === 0, `${ownRosterHits} self-assignments`);
+    ok(`${format.slug} sabotage: every pick was paid for by the other player`, paidBySomeoneElse > 0, `${paidBySomeoneElse} picks`);
+  }
+
+  // AND THE MODE IS OFF BY DEFAULT. A state with no sabotage flag at all
+  // is the game as it was - which is also what an older board broadcasts.
+  const f = formats[0];
+  const plain = startAuction(f, ["A", "B"], "plain");
+  ok("sabotage is off unless asked for", plain.sabotage === false && targetOf(plain, 0) === 0, `sabotage=${plain.sabotage}`);
+  ok("and a state missing the flag entirely still targets itself", targetOf({ ...plain, sabotage: undefined }, 1) === 1);
 }
 
 console.log(failed === 0 ? "\nall checks pass" : `\n${failed} check(s) failed`);

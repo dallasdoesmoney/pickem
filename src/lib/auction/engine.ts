@@ -110,7 +110,18 @@ export type AuctionState = {
   // Set while phase is "assigning": who won, and what they paid.
   won: { by: PlayerIndex; price: number } | null;
   // Every sale, oldest first. What the overlay draws as the ticker.
+  // `by` is who PAID. Under sabotage that is not who ended up with it -
+  // the rosters are the truth about that, and they are what the graphic
+  // draws.
   history: { itemId: string; by: PlayerIndex; price: number; slotKey: string; label: string }[];
+
+  // SABOTAGE. Everything you win goes on somebody ELSE'S roster, and you
+  // choose which slot it ruins. You still pay for it.
+  //
+  // Optional because a state broadcast by an older board does not have
+  // it, and an overlay that throws is a black hole on a live stream.
+  // Absent means off, which is the game as it was.
+  sabotage?: boolean;
 };
 
 export type AuctionAction =
@@ -159,7 +170,12 @@ export function shuffled<T>(items: T[], seed: number): T[] {
   return out;
 }
 
-export function startAuction(format: AuctionFormat, names: string[], seed: string): AuctionState {
+export function startAuction(
+  format: AuctionFormat,
+  names: string[],
+  seed: string,
+  opts: { sabotage?: boolean } = {},
+): AuctionState {
   // THE WHOLE POOL, shuffled, not a slice exactly the size of the need.
   //
   // The first version dealt precisely slots x players items and stopped.
@@ -189,6 +205,7 @@ export function startAuction(format: AuctionFormat, names: string[], seed: strin
     bid: null,
     passed: [],
     won: null,
+    sabotage: opts.sabotage === true,
     history: [],
   };
 
@@ -217,6 +234,17 @@ export function advance(state: AuctionState, format: AuctionFormat): AuctionStat
   }
 }
 
+// WHOSE ROSTER A WIN LANDS ON. The whole of sabotage is this function.
+//
+// Normally you fill your own. Under sabotage you fill the next player's,
+// which for two people is simply "the other one" and for three is a
+// circle. Everything else in the engine asks this rather than assuming
+// the winner, which is why the mode is one concept rather than a special
+// case in five places.
+export function targetOf(state: AuctionState, who: PlayerIndex): PlayerIndex {
+  return state.sabotage ? (who + 1) % state.players.length : who;
+}
+
 export function openSlots(player: PlayerState): string[] {
   return Object.entries(player.roster)
     .filter(([, entry]) => entry === null)
@@ -234,10 +262,19 @@ export function currentItem(state: AuctionState, format: AuctionFormat): Auction
 // quarterback-only card is worth nothing to somebody who has already
 // filled their quarterback slot, and letting them bid it up would be a
 // way to burn the other player's money with no risk.
+// AND THE SLOTS IT ASKS ABOUT ARE THE TARGET'S, which is the difference
+// between sabotage working and sabotage deadlocking.
+//
+// Without this, two players each fill the other's roster and nothing
+// stops one of them winning a sixth lot with nowhere left to put it -
+// the draft stops dead, mid-stream, with no legal move. Asking about the
+// target makes it self-limiting instead: once you have finished ruining
+// somebody, you are out, exactly the way a full roster puts you out in
+// the ordinary game. Rule 3, pointed at the person you are filling.
 export function couldUse(state: AuctionState, format: AuctionFormat, who: PlayerIndex): boolean {
   const item = currentItem(state, format);
   if (!item) return false;
-  return slotsItemCanFill(item, openSlots(state.players[who])).length > 0;
+  return slotsItemCanFill(item, openSlots(state.players[targetOf(state, who)])).length > 0;
 }
 
 export function canBid(state: AuctionState, format: AuctionFormat, who: PlayerIndex): boolean {
@@ -374,8 +411,10 @@ export function reduce(state: AuctionState, action: AuctionAction, format: Aucti
     const item = currentItem(state, format);
     if (!item) return state;
     const who = state.won.by;
-    const player = state.players[who];
-    if (!slotsItemCanFill(item, openSlots(player)).includes(action.slotKey)) return state;
+    // Two different people once sabotage is on: `who` pays, `target`
+    // lives with it.
+    const target = targetOf(state, who);
+    if (!slotsItemCanFill(item, openSlots(state.players[target])).includes(action.slotKey)) return state;
 
     const label = item.fills?.[action.slotKey] ?? item.label;
     // THE SHORT FORM, IN THE ORDER THE FORMATS CAN SUPPLY IT.
@@ -387,15 +426,11 @@ export function reduce(state: AuctionState, action: AuctionAction, format: Aucti
     // graphic where every other mode puts a surname.
     const short = item.fillsShort?.[action.slotKey] ?? item.short ?? label;
     const entry: RosterEntry = { itemId: item.id, price: state.won!.price, label, short, badge: item.imageUrl, accent: item.accent };
-    const players = state.players.map((p, i) =>
-      i === who
-        ? {
-            ...p,
-            budget: p.budget - state.won!.price,
-            roster: { ...p.roster, [action.slotKey]: entry },
-          }
-        : p
-    );
+    const players = state.players.map((p, i) => {
+      const paid = i === who ? p.budget - state.won!.price : p.budget;
+      const roster = i === target ? { ...p.roster, [action.slotKey]: entry } : p.roster;
+      return paid === p.budget && roster === p.roster ? p : { ...p, budget: paid, roster };
+    });
 
     const history = [...state.history, { itemId: item.id, by: who, price: state.won.price, slotKey: action.slotKey, label }];
 
