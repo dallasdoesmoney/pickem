@@ -34,24 +34,56 @@ type Row = {
   streak: number;
   creator?: boolean;
   me?: boolean;
+  // EVERYTHING BELOW IS ALREADY IN THE DATABASE. Not in the leaderboard
+  // VIEW - that is the change - but in tables that are written today,
+  // by features that already ship. See the audit at the bottom of the
+  // page for where each one comes from.
+  lockW: number; // weekly_picks.is_lock, graded against game_results
+  lockL: number;
+  bestWeek: { week: number; correct: number; of: number };
+  form: boolean[]; // the last five weeks: won more than half, or not
+  longestStreak: number; // profiles.longest_check_in_streak
+  nameplate: { played: number; solved: number; avg: number }; // the daily game
+  badges: string[]; // user_badges
+  topTeam: string; // the team they back most, out of their own picks
 };
 
 // A believable board: a tight top, a long tail, a couple of small sample
 // sizes near the top (the case a bare W-L is misleading about), and YOU
 // well down it - which is the case every one of these has to handle and
 // the current design does not.
+const extra = (
+  lockW: number,
+  lockL: number,
+  bw: [number, number, number],
+  form: string,
+  longest: number,
+  np: [number, number, number],
+  badges: string[],
+  topTeam: string,
+) => ({
+  lockW,
+  lockL,
+  bestWeek: { week: bw[0], correct: bw[1], of: bw[2] },
+  form: [...form].map((c) => c === "W"),
+  longestStreak: longest,
+  nameplate: { played: np[0], solved: np[1], avg: np[2] },
+  badges,
+  topTeam,
+});
+
 const ROWS: Row[] = [
-  { id: "1", name: "Marcus Webb", correct: 141, graded: 176, points: 4120, streak: 23, creator: true },
-  { id: "2", name: "dallasdoesmoney", correct: 139, graded: 176, points: 3980, streak: 11, creator: true },
-  { id: "3", name: "Priya N.", correct: 138, graded: 176, points: 3610, streak: 4 },
-  { id: "4", name: "toothpick", correct: 133, graded: 176, points: 3350, streak: 0 },
-  { id: "5", name: "Jordan Reyes", correct: 130, graded: 168, points: 3190, streak: 7 },
-  { id: "6", name: "bigplaybrian", correct: 128, graded: 176, points: 2940, streak: 2 },
-  { id: "7", name: "Sam Okafor", correct: 124, graded: 160, points: 2810, streak: 0 },
-  { id: "8", name: "the_commish", correct: 121, graded: 176, points: 2640, streak: 15 },
-  { id: "9", name: "Ellie Barnes", correct: 119, graded: 152, points: 2480, streak: 1 },
-  { id: "10", name: "nightcapnate", correct: 117, graded: 176, points: 2310, streak: 0 },
-  { id: "11", name: "you", correct: 96, graded: 144, points: 1740, streak: 5, me: true },
+  { id: "1", name: "Marcus Webb", correct: 141, graded: 176, points: 4120, streak: 23, creator: true, ...extra(8, 3, [7, 15, 16], "WWLWW", 31, [88, 79, 4.1], ["🎯", "🔥", "📈"], "KC") },
+  { id: "2", name: "dallasdoesmoney", correct: 139, graded: 176, points: 3980, streak: 11, creator: true, ...extra(9, 2, [4, 14, 16], "WWWLW", 24, [91, 84, 3.8], ["🎯", "👑"], "DAL") },
+  { id: "3", name: "Priya N.", correct: 138, graded: 176, points: 3610, streak: 4, ...extra(6, 5, [9, 14, 16], "LWWWL", 12, [70, 61, 4.6], ["🔥"], "PHI") },
+  { id: "4", name: "toothpick", correct: 133, graded: 176, points: 3350, streak: 0, ...extra(7, 4, [2, 13, 16], "WLWLW", 9, [44, 35, 5.0], [], "BUF") },
+  { id: "5", name: "Jordan Reyes", correct: 130, graded: 168, points: 3190, streak: 7, ...extra(5, 6, [11, 13, 15], "WWLLW", 18, [66, 55, 4.7], ["📈"], "SF") },
+  { id: "6", name: "bigplaybrian", correct: 128, graded: 176, points: 2940, streak: 2, ...extra(4, 7, [3, 12, 16], "LWLWW", 6, [30, 22, 5.3], [], "GB") },
+  { id: "7", name: "Sam Okafor", correct: 124, graded: 160, points: 2810, streak: 0, ...extra(6, 4, [8, 13, 16], "WLLWL", 14, [51, 44, 4.4], ["🎯"], "BAL") },
+  { id: "8", name: "the_commish", correct: 121, graded: 176, points: 2640, streak: 15, ...extra(3, 8, [1, 12, 16], "LLWWL", 15, [95, 80, 4.2], ["🔥", "👑"], "NYJ") },
+  { id: "9", name: "Ellie Barnes", correct: 119, graded: 152, points: 2480, streak: 1, ...extra(5, 4, [6, 12, 15], "WLWLL", 8, [40, 34, 4.9], [], "DET") },
+  { id: "10", name: "nightcapnate", correct: 117, graded: 176, points: 2310, streak: 0, ...extra(4, 7, [10, 12, 16], "LLWLW", 5, [22, 15, 5.5], [], "LAR") },
+  { id: "11", name: "you", correct: 96, graded: 144, points: 1740, streak: 5, me: true, ...extra(7, 2, [5, 12, 16], "WWLWW", 11, [63, 58, 4.0], ["🎯", "🔥"], "CIN") },
 ];
 
 const pct = (r: Row) => (r.graded === 0 ? 0 : Math.round((r.correct / r.graded) * 100));
@@ -364,6 +396,121 @@ function VariantE({ pinned }: { pinned: boolean }) {
 }
 
 // ---------------------------------------------------------------------
+// F — the season sheet, with a drawer.
+//
+// THE ANSWER TO "what else is there about the player". Quite a lot, and
+// none of it belongs in the row: a leaderboard's job is to be scanned,
+// and a row carrying nine numbers is not scanned, it is squinted at. So
+// the row stays exactly as tight as E and everything else lives one tap
+// down.
+//
+// Every stat in the drawer comes out of a table that is written today.
+// See the audit under this - the change is to the leaderboard VIEW, not
+// to what the app collects.
+// ---------------------------------------------------------------------
+
+function FormPips({ form }: { form: boolean[] }) {
+  return (
+    <span className="flex gap-[3px]">
+      {form.map((w, i) => (
+        <span
+          key={i}
+          title={w ? "winning week" : "losing week"}
+          style={{ width: 7, height: 14, borderRadius: 2, background: w ? "#3ecb78" : "rgba(255,255,255,0.16)" }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div>
+      <p className="text-[9px] tracking-[0.14em] text-white/35" style={{ fontFamily: "var(--font-display)" }}>
+        {label}
+      </p>
+      <p className="mt-0.5 text-[15px] tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
+        {value}
+      </p>
+      {sub && <p className="text-[10.5px] text-white/40">{sub}</p>}
+    </div>
+  );
+}
+
+function VariantF() {
+  const [open, setOpen] = useState<string | null>("2");
+  return (
+    <div className="overflow-hidden rounded-2xl border" style={{ background: PANEL, borderColor: EDGE }}>
+      <div
+        className="flex items-center justify-between px-3 py-2.5"
+        style={{ borderBottom: `1px solid ${EDGE}`, background: "rgba(255,255,255,0.03)" }}
+      >
+        <span className="text-[10px] tracking-[0.16em] text-white/45" style={{ fontFamily: "var(--font-display)" }}>
+          SEASON STANDINGS
+        </span>
+        <span className="text-[11px] text-white/35">tap a row</span>
+      </div>
+      {ROWS.slice(0, 6).map((r, i) => (
+        <div key={r.id}>
+          <button
+            type="button"
+            onClick={() => setOpen(open === r.id ? null : r.id)}
+            className="relative flex w-full items-center gap-3 px-3 py-2.5 text-left"
+            style={{ borderTop: `1px solid ${HAIR}`, background: r.me ? "rgba(52,211,153,0.10)" : undefined }}
+          >
+            <span
+              aria-hidden
+              className="absolute inset-y-0 left-0"
+              style={{ width: `${pct(r)}%`, background: "rgba(62,203,120,0.09)" }}
+            />
+            <span className="relative">
+              <Rank i={i} />
+            </span>
+            <Avatar row={r} size={32} />
+            <span className="relative min-w-0 flex-1">
+              <Name row={r} />
+            </span>
+            {/* The one extra thing worth putting IN the row: five weeks
+                of form. It is five pixels wide per week and says more
+                about where somebody is going than the season total. */}
+            <span className="relative shrink-0">
+              <FormPips form={r.form} />
+            </span>
+            <span className="relative shrink-0 text-right">
+              <span className="block text-[14px] tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
+                {r.correct}-{r.graded - r.correct}
+              </span>
+              <span className="block text-[10.5px] tabular-nums text-white/40">{pct(r)}%</span>
+            </span>
+          </button>
+
+          {open === r.id && (
+            <div className="px-3 pb-4 pt-1" style={{ background: "rgba(0,0,0,0.22)" }}>
+              <div className="grid grid-cols-3 gap-y-3 gap-x-2">
+                <Stat label="LOCK OF WK" value={`${r.lockW}-${r.lockL}`} sub={`${Math.round((100 * r.lockW) / (r.lockW + r.lockL))}% on the big one`} />
+                <Stat label="BEST WEEK" value={`${r.bestWeek.correct}/${r.bestWeek.of}`} sub={`week ${r.bestWeek.week}`} />
+                <Stat label="POINTS" value={r.points.toLocaleString()} sub={`${getLevelInfo(r.points).rankEmoji} ${getLevelInfo(r.points).rankName}`} />
+                <Stat label="STREAK" value={`${r.streak}`} sub={`best ${r.longestStreak}`} />
+                <Stat label="NAMEPLATE" value={`${Math.round((100 * r.nameplate.solved) / r.nameplate.played)}%`} sub={`${r.nameplate.played} played · ${r.nameplate.avg} avg`} />
+                <Stat label="BACKS MOST" value={r.topTeam} sub="out of their own picks" />
+              </div>
+              {r.badges.length > 0 && (
+                <p className="mt-3 flex items-center gap-1.5 text-[11px] text-white/45">
+                  <span className="text-[9px] tracking-[0.14em]" style={{ fontFamily: "var(--font-display)" }}>
+                    BADGES
+                  </span>
+                  <span className="text-[15px]">{r.badges.join(" ")}</span>
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
 
 const VARIANTS = [
   { key: "a", name: "A — What ships now", note: "One bordered card per player: rank, avatar, name, record. The control.", render: () => <VariantA /> },
@@ -386,6 +533,12 @@ const VARIANTS = [
     render: () => <VariantD />,
   },
   {
+    key: "f",
+    name: "F — The season sheet, with a drawer",
+    note: "The answer to “what else is there about the player”: quite a lot, and none of it belongs in the row. A row carrying nine numbers is not scanned, it is squinted at — so the row stays as tight as E, five weeks of form go in beside the record, and everything else is one tap down. Every stat in the drawer comes out of a table the app writes today.",
+    render: () => <VariantF />,
+  },
+  {
     key: "e",
     name: "E — The season sheet",
     note: "Win rate as the row's own ground — a bar chart down the table without spending a column — and YOUR ROW PINNED to the bottom. On a board of two hundred that pinned row is the most useful thing on the page, and none of the others have it.",
@@ -393,22 +546,47 @@ const VARIANTS = [
   },
 ];
 
-// What else could go on it, and the honest split: what is already in the
-// row the page fetches, versus what would need something new stored.
-const FREE = [
-  ["Points", "The tiebreaker for every position on the board. Fetched today, drawn nowhere."],
-  ["Win rate", "A 141-35 and a 96-48 are both “winning” until you divide. correct/graded, already there."],
-  ["Level and rank", "Name, colour, tier and progress to the next one all come out of total_points."],
-  ["Games graded", "Sample size. Somebody 8-0 sitting above somebody 130-46 is a ranking nobody trusts."],
-  ["Gap to the player above", "“−2” next to a row turns a list into a race."],
-  ["Your row, pinned", "So the board is useful when you are 60th, which is most people most of the time."],
-];
-
-const NEEDS_DATA = [
-  ["Movement since last week", "Needs a weekly snapshot of the standings — one small table, written when a week is published."],
-  ["This week's record", "The leaderboard view is season totals only; per-week numbers would need to come through with it."],
-  ["Best week", "Same source as movement — worth having once the snapshot exists."],
-  ["Nameplate on the same board", "A different game in a different table. Doable, but it is a second ranking, not a column."],
+// WHAT ELSE THERE IS ABOUT A PLAYER, costed honestly. Three tiers,
+// because they are three genuinely different amounts of work - and the
+// middle one is the surprise: almost everything worth having is already
+// being written by a feature that ships, and is simply not in the
+// leaderboard VIEW.
+const TIERS: { head: string; tone: "free" | "view" | "new"; items: [string, string][] }[] = [
+  {
+    head: "Already fetched — drawn nowhere",
+    tone: "free",
+    items: [
+      ["Points", "The tiebreaker for every position on this board, and invisible today."],
+      ["Win rate", "141-35 and 96-48 are both “winning” until you divide."],
+      ["Level, rank and progress", "Name, colour, tier and how far to the next one, all out of total_points."],
+      ["Games graded", "Sample size. 8-0 above 130-46 is a ranking nobody trusts."],
+    ],
+  },
+  {
+    head: "One change to the leaderboard view",
+    tone: "view",
+    items: [
+      [
+        "Lock of the Week record",
+        "weekly_picks.is_lock joined to game_results. Their highest-conviction pick of each week, graded — the stat the whole Lock feature exists to produce, and it is shown nowhere on the site.",
+      ],
+      ["Form — the last five weeks", "Same join, grouped by week. Says where somebody is going; the season total only says where they have been."],
+      ["This week / best week", "Same join again, filtered or maxed."],
+      ["Longest streak ever", "profiles.longest_check_in_streak. It is a column. It is right there."],
+      ["Nameplate record", "The daily game already keeps played, solved and average guesses per person."],
+      ["Badges", "user_badges is one join and already readable by everyone."],
+      ["The team they back most", "The mode of their own picks. Not a ranking stat — a personality one, and the kind of thing people screenshot."],
+      ["Follower count", "follows, one join. Turns a name into somebody worth following."],
+    ],
+  },
+  {
+    head: "Needs something new stored",
+    tone: "new",
+    items: [
+      ["Movement since last week", "↑3 / ↓1 next to a rank. Needs a snapshot of the standings written when a week is published — one small table."],
+      ["Contrarian rate", "How often they went against the crowd and were right. Computable from weekly_picks, but it needs a per-game majority worked out and cached; too heavy for a view."],
+    ],
+  },
 ];
 
 export default function LeaderboardDemo() {
@@ -459,39 +637,34 @@ export default function LeaderboardDemo() {
 
       <section className="mt-14">
         <h2 className="text-[13px]" style={{ fontFamily: "var(--font-display)" }}>
-          WHAT ELSE COULD GO ON IT
+          WHAT ELSE THERE IS ABOUT A PLAYER
         </h2>
         <p className="mb-4 mt-1 max-w-2xl text-[12.5px] leading-snug text-white/50">
-          Split honestly, because the two halves cost very different things.
+          Rather a lot, and the middle tier is the surprise: almost everything worth having is already being written by a
+          feature that ships. It is simply not in the leaderboard view.
         </p>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border p-4" style={{ borderColor: "rgba(62,203,120,0.35)", background: "rgba(62,203,120,0.06)" }}>
-            <p className="text-[10px] tracking-[0.16em] text-[#7ee2a8]" style={{ fontFamily: "var(--font-display)" }}>
-              FREE — ALREADY FETCHED
-            </p>
-            <ul className="mt-3 flex flex-col gap-3">
-              {FREE.map(([t, d]) => (
-                <li key={t}>
-                  <p className="text-[13.5px] font-semibold">{t}</p>
-                  <p className="mt-0.5 text-[12.5px] leading-snug text-white/50">{d}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-2xl border p-4" style={{ borderColor: EDGE, background: PANEL }}>
-            <p className="text-[10px] tracking-[0.16em] text-white/45" style={{ fontFamily: "var(--font-display)" }}>
-              NEEDS SOMETHING STORED
-            </p>
-            <ul className="mt-3 flex flex-col gap-3">
-              {NEEDS_DATA.map(([t, d]) => (
-                <li key={t}>
-                  <p className="text-[13.5px] font-semibold">{t}</p>
-                  <p className="mt-0.5 text-[12.5px] leading-snug text-white/50">{d}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="flex flex-col gap-3">
+          {TIERS.map((tier) => {
+            const border = tier.tone === "free" ? "rgba(62,203,120,0.35)" : tier.tone === "view" ? "rgba(125,178,255,0.35)" : EDGE;
+            const bg = tier.tone === "free" ? "rgba(62,203,120,0.06)" : tier.tone === "view" ? "rgba(125,178,255,0.06)" : PANEL;
+            const ink = tier.tone === "free" ? "#7ee2a8" : tier.tone === "view" ? "#9dc4ff" : "rgba(255,255,255,0.45)";
+            return (
+              <div key={tier.head} className="rounded-2xl border p-4" style={{ borderColor: border, background: bg }}>
+                <p className="text-[10px] tracking-[0.16em]" style={{ fontFamily: "var(--font-display)", color: ink }}>
+                  {tier.head.toUpperCase()}
+                </p>
+                <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {tier.items.map(([t, d]) => (
+                    <li key={t}>
+                      <p className="text-[13.5px] font-semibold">{t}</p>
+                      <p className="mt-0.5 text-[12.5px] leading-snug text-white/50">{d}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </div>
       </section>
     </main>
