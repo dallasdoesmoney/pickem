@@ -1,0 +1,85 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { WavelengthState } from "@/lib/wavelength/engine";
+import { OverlayBoard, STAGE_W, STAGE_H } from "./OverlayBoard";
+
+// THE MIRROR, same idea as the draft's: the exact graphic OBS is drawing,
+// on the page you play on. Not a second rendering that happens to look
+// similar - the same component, from the same state, at the same
+// 1080 x 1920, scaled down and cropped to the strip it occupies.
+//
+// Cropping rather than showing the whole stage, because the stage is
+// mostly two empty rectangles where somebody's face goes, and squeezing
+// the graphic into the middle third of a phone screen makes it unreadable
+// on the one device it is being played on.
+//
+// The height is MEASURED rather than assumed. The graphic grows and
+// shrinks with the clue, the headline and the steal line, and a guessed
+// crop cut the bottom line off.
+export function WaveStage({ state }: { state: WavelengthState }) {
+  const box = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const [content, setContent] = useState(0);
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = inner.current?.querySelector<HTMLElement>("[data-band]");
+    if (!el) return;
+    const measure = () => {
+      // offsetTop/offsetHeight are pre-transform, so these are stage
+      // pixels whatever the scale happens to be.
+      // offsetTop/offsetHeight exist on HTMLElement only. Anything else
+      // in the band - a bare <svg>, say - answers undefined, and one
+      // undefined turns the whole measurement into NaN. Skipping them
+      // rather than trusting them means a mis-built band crops slightly
+      // wrong instead of falling back to the entire empty 1920 stage.
+      const kids = (Array.from(el.children) as HTMLElement[]).filter((k) => Number.isFinite(k.offsetHeight));
+      if (kids.length === 0) return;
+      const top = Math.min(...kids.map((k) => k.offsetTop));
+      const bottom = Math.max(...kids.map((k) => k.offsetTop + k.offsetHeight));
+      setContent(bottom - top);
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    for (const k of Array.from(el.children)) ro.observe(k);
+    return () => ro.disconnect();
+  }, [width, state]);
+
+  // No cameras on a web page, so the graphic centres in the whole stage
+  // and gets cropped to whatever it measured, with a little air around it.
+  const scale = width / STAGE_W;
+  const PAD = 40;
+  const height = content > 0 ? content + PAD * 2 : STAGE_H;
+  const cropTop = content > 0 ? (STAGE_H - content) / 2 - PAD : 0;
+
+  return (
+    <div ref={box} style={{ width: "100%", height: width ? height * scale : 0, position: "relative", overflow: "hidden" }}>
+      <div ref={inner} style={{ display: "contents" }}>
+        {width > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: -cropTop * scale,
+              left: 0,
+              width: STAGE_W,
+              height: STAGE_H,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            <OverlayBoard state={state} camTop={0} camBottom={0} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

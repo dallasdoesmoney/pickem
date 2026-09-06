@@ -1,4 +1,5 @@
 import type { AuctionState } from "./engine";
+import { channelFor } from "@/lib/rooms";
 
 // THE ROOM: what ties the board you play on to the graphic in OBS.
 //
@@ -17,26 +18,13 @@ import type { AuctionState } from "./engine";
 // source's settings, not on screen, so the realistic way to leak it is to
 // screen-share the OBS config. Rotating it is one button.
 
-// No 0/O/1/l/I - this gets read off a screen and typed by hand when
-// something goes wrong at 8:59pm.
-const ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-const CODE_LENGTH = 10;
-
-export function newRoomCode(): string {
-  const bytes = new Uint8Array(CODE_LENGTH);
-  crypto.getRandomValues(bytes);
-  // Modulo bias over 31 symbols from a 256-value byte is about 3% on the
-  // first nine symbols. At 10 characters that is ~48 bits either way; it
-  // does not move the guessability of this in any way that matters.
-  return Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("");
-}
-
-export function isRoomCode(value: string): boolean {
-  return value.length === CODE_LENGTH && [...value].every((c) => ALPHABET.includes(c));
-}
+// The code, the channel and the two event names are shared with every
+// other game that has a board and an overlay - see src/lib/rooms.ts.
+// Re-exported here so nothing that already imports them has to move.
+export { newRoomCode, isRoomCode, HELLO, STATE } from "@/lib/rooms";
 
 export function roomChannel(code: string): string {
-  return `versus:${code}`;
+  return channelFor("versus", code);
 }
 
 // WHOLE STATE, EVERY TIME - never a delta.
@@ -46,12 +34,6 @@ export function roomChannel(code: string): string {
 // desync once and stay desynced for the rest of the draft, on stream,
 // with no way to fix it short of reloading the source.
 export type BoardMessage = { slug: string; state: AuctionState };
-
-// The overlay says this when it joins. OBS reloads a browser source on
-// every scene switch and restart, and a broadcast channel has no history,
-// so without this a reloaded overlay would sit blank until the next bid.
-export const HELLO = "hello";
-export const STATE = "state";
 
 // Anything at all can arrive on a channel, and the overlay is the one
 // screen that must not throw - a crashed browser source is a black hole

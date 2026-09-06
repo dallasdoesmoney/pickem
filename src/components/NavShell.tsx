@@ -235,7 +235,9 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   // An early return here rather than moving NavShell into a route group:
   // the group would change how every page on the site is wrapped, and this
   // changes one route. Below every hook, so the hook order is unaffected.
-  if (pathname.startsWith("/versus/overlay")) return <>{children}</>;
+  // One line per game rather than a prefix match on "overlay", so a page
+  // is only ever stripped of the site's chrome deliberately.
+  if (pathname.startsWith("/versus/overlay") || pathname.startsWith("/wavelength/overlay")) return <>{children}</>;
 
   return (
     <div className="flex min-h-full">

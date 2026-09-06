@@ -23,7 +23,9 @@
     "test:formats": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/auction-formats.test.mjs",
     "test:versus": "node scripts/versus-hotseat.test.mjs",
     "test:room": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/versus-room.test.mjs",
-    "test:lock": "node scripts/lock-mode.test.mjs"
+    "test:lock": "node scripts/lock-mode.test.mjs",
+    "test:wavelength": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/wavelength-engine.test.mjs",
+    "test:wave-hotseat": "node scripts/wavelength-hotseat.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

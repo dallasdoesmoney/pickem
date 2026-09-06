@@ -21,11 +21,16 @@ export function OverlayLink({
   live,
   viewers,
   onRotate,
+  // Which game's browser source this is. Everything else about the
+  // handoff - the code, the size, the warning, the preview - is the same
+  // for any game with a board and an overlay, so only the route differs.
+  path = "/versus/overlay",
 }: {
   code: string | null;
   live: boolean;
   viewers: number;
   onRotate: () => void;
+  path?: string;
 }) {
   const origin = useSyncExternalStore(
     NO_ORIGIN_LISTENERS,
@@ -34,7 +39,7 @@ export function OverlayLink({
   );
   const [copied, setCopied] = useState(false);
 
-  const url = code && origin ? `${origin}/versus/overlay?room=${code}&top=560&bottom=560` : "";
+  const url = code && origin ? `${origin}${path}?room=${code}&top=560&bottom=560` : "";
 
   async function copy() {
     if (!url) return;
