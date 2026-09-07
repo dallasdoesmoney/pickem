@@ -146,7 +146,7 @@ export function WavelengthBoard({
             and the clue are all on the graphic below this, and printing
             any of them again here is one more thing that can end up
             disagreeing with the copy the viewers are watching. */}
-        <div className="mb-1 px-1">
+        <div className="mb-0.5 px-1">
           <span style={{ ...display(11, { letterSpacing: 3, color: "rgba(255,255,255,0.32)" }) }}>
             {deckTitle.toUpperCase()}
           </span>
@@ -159,7 +159,7 @@ export function WavelengthBoard({
       </div>
 
       {/* ---- and the only things you cannot do by looking ---- */}
-      <div className="mt-2 flex flex-col gap-4 border-t pt-5" style={{ borderColor: RULE }}>
+      <div className="mt-1 flex flex-col gap-3 border-t pt-4" style={{ borderColor: RULE }}>
         {state.phase === "clue" && (
           <>
             <div className="flex items-baseline justify-between gap-3">
@@ -293,7 +293,7 @@ export function WavelengthBoard({
       {/* UNDO, kept away from the buttons it exists to reverse - a reveal
           is final for the round and a mis-tapped side hands the other
           team a point, in front of an audience. */}
-      <div className="mt-4 flex justify-center">
+      <div className="mt-3 flex justify-center">
         <button
           onClick={onUndo}
           disabled={!canUndo}

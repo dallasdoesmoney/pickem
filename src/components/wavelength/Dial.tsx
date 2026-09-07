@@ -2,7 +2,7 @@
 
 import { useCallback, useId, useRef } from "react";
 import { DIAL_MAX, DIAL_MIN, BAND_2, BAND_3, BAND_4 } from "@/lib/wavelength/engine";
-import { INK, MONEY, PLAYER_COLORS, outlined } from "@/components/versus/style";
+import { INK, MONEY, outlined } from "@/components/versus/style";
 
 // THE DIAL. One component, drawn at whatever size it is handed, and it is
 // the only thing on either screen that knows the game is a half-circle.
@@ -32,17 +32,32 @@ import { INK, MONEY, PLAYER_COLORS, outlined } from "@/components/versus/style";
 //   the FACE   the rim, the needle, the hub and the two end words, which
 //              are on the outside of the case and never move with the lid
 
-// The case is cream now, not navy - it reads as a physical board game
-// under a camera instead of a piece of software, and the green wedge and
-// both player colours are louder against it.
-export const CREAM = "#f6ecd6";
-// WHAT IS UNDER THE LID IS STILL CREAM, a shade deeper. The first version
-// made the recess navy, which looked right for the half second the lid was
-// moving and then meant the whole face was dark blue for the entire
-// reveal - which is the moment everybody is actually looking at it. The
-// board is a cream board; opening it shows more cream, and the green is
-// what arrives.
-const SLOT = "#e3d3ac";
+// THE RECESS IS THE CREAM ONE. What is under the lid is the surface the
+// scoring wedge is printed on, so it is the pale board colour; the lid on
+// top of it is the light blue.
+const SLOT = "#f6ecd6";
+export const LID = "#7cc6f7";
+
+// ONE POINTER, ONE COLOUR. It used to be whichever team was psychic,
+// which meant the single most important object on the graphic changed
+// colour every round and matched a team label while doing it. A dial has
+// a needle; the needle is red-orange, on the blue lid and on the cream
+// recess alike, and the graphic says whose turn it is in words.
+const NEEDLE = "#ff5a24";
+
+// THE SCORING BANDS, and they are three different colours because "how
+// close was that" is the one question the whole graphic exists to answer -
+// three shades of one green made a viewer count rings to find out.
+//
+// Dark to bright as they get closer, which is what makes it readable at a
+// glance and over a compressed stream: hue alone smears, luminance does
+// not. Only the outer band ever touches the cream, so that is the one that
+// has to hold up against it - 6.4:1, measured.
+const BAND_FILL: Record<number, string> = {
+  2: "#5b34c9",
+  3: "#1c86c9",
+  4: MONEY,
+};
 
 // How long the lid takes. Exported because the board holds the target on
 // screen for exactly this long after the psychic lets go - otherwise the
@@ -80,8 +95,6 @@ export function Dial({
   // the message it was given.
   target,
   guess,
-  // Which team is on the dial, for the needle's colour.
-  team = 0,
   // Is the lid up. The reveal, and the psychic's peek, are the same
   // motion on the same face.
   open = false,
@@ -95,7 +108,6 @@ export function Dial({
   right: string;
   target: number | null;
   guess: number | null;
-  team?: number;
   open?: boolean;
   pulse?: boolean;
   onScrub?: (value: number) => void;
@@ -145,18 +157,31 @@ export function Dial({
     onScrub(Math.min(DIAL_MAX, Math.max(DIAL_MIN, Math.round((from + by) * 10) / 10)));
   };
 
-  const BANDS: { from: number; to: number; fill: string; band: number }[] =
+  const BANDS: { from: number; to: number; band: number }[] =
     target === null
       ? []
       : [
-          { from: target - BAND_2, to: target + BAND_2, fill: "#2f6f4a", band: 2 },
-          { from: target - BAND_3, to: target + BAND_3, fill: "#3f9e63", band: 3 },
-          { from: target - BAND_4, to: target + BAND_4, fill: MONEY, band: 4 },
+          { from: target - BAND_2, to: target + BAND_2, band: 2 },
+          { from: target - BAND_3, to: target + BAND_3, band: 3 },
+          { from: target - BAND_4, to: target + BAND_4, band: 4 },
         ];
   // Which band the needle actually landed in, so only that one flashes.
   const hit = target !== null && guess !== null ? BANDS.filter((b) => guess >= b.from && guess <= b.to).pop() : null;
 
-  const needleColor = PLAYER_COLORS[team] ?? PLAYER_COLORS[0];
+  // WHAT EACH RING IS WORTH, printed on it - 2 3 4 3 2 across the target,
+  // the way the board itself is marked. Three colours say "that is a
+  // different ring"; the numerals are what say how much better it was.
+  const marks =
+    target === null
+      ? []
+      : [
+          { at: target - (BAND_3 + BAND_2) / 2, n: 2 },
+          { at: target - (BAND_4 + BAND_3) / 2, n: 3 },
+          { at: target, n: 4 },
+          { at: target + (BAND_4 + BAND_3) / 2, n: 3 },
+          { at: target + (BAND_3 + BAND_2) / 2, n: 2 },
+        ].filter((m) => m.at >= DIAL_MIN + 1 && m.at <= DIAL_MAX - 1);
+
   const face = wedgePath(cx, cy, r, DIAL_MIN, DIAL_MAX);
   const inner = wedgePath(cx, cy, r * 0.985, DIAL_MIN, DIAL_MAX);
   const ticks = Array.from({ length: 11 }, (_, i) => i * 10);
@@ -244,10 +269,30 @@ export function Dial({
               data-wedge
               className={pulse && hit?.band === b.band ? "wl-band wl-pulse" : "wl-band"}
               d={wedgePath(cx, cy, r * 0.97, b.from, b.to)}
-              fill={b.fill}
-              opacity={0.96}
+              fill={BAND_FILL[b.band]}
             />
           ))}
+          {/* The numerals, in the graphic's own lettering - white with an
+              ink outline, which is the one treatment that holds on all
+              three band colours without a rule per colour. */}
+          {marks.map((m, i) => {
+            // Well out towards the rim: near the hub the rings converge to
+            // a point and five numerals inside 24 units of dial pile into
+            // each other.
+            const at = pointAt(cx, cy, r * 0.79, m.at);
+            const size = Math.round(width * 0.044);
+            return (
+              <text
+                key={`${m.n}-${i}`}
+                x={at.x}
+                y={at.y + size * 0.36}
+                textAnchor="middle"
+                style={{ ...outlined(size), fill: "#ffffff", fontFamily: "var(--font-display)", fontSize: size }}
+              >
+                {m.n}
+              </text>
+            );
+          })}
           {/* Faint ticks down in the recess, so the wedge can still be
               read against a number once the lid is up. */}
           {ticks.map((v) => {
@@ -271,13 +316,11 @@ export function Dial({
             className={open ? "wl-cover wl-open" : "wl-cover"}
             style={{ transformOrigin: `${cx}px ${cy}px` }}
           >
-            {/* OUTLINED, and that outline is the point. Lid and recess are
-                two shades of the same cream, so without a hard edge on the
-                sweeping side the shutter would appear to dissolve rather
-                than travel - and travelling is the whole trick. */}
+            {/* OUTLINED, so the sweeping edge is a hard line rather than
+                a colour boundary - travelling is the whole trick. */}
             <path
               d={inner}
-              fill={CREAM}
+              fill={LID}
               stroke={INK}
               strokeWidth={Math.max(3, width * 0.009)}
               strokeLinejoin="round"
@@ -305,8 +348,10 @@ export function Dial({
 
         {/* THE NEEDLE, drawn straight up and rotated into place, so moving
             it is one animatable transform rather than a redrawn line. The
-            ink under-stroke is what keeps a yellow needle legible on a
-            cream face, and both of them legible over a camera. */}
+            ink under-stroke is what carries it: red-orange on light blue
+            is 1.7:1, which is nothing - the black edge either side of it
+            is what you actually see, on the lid, on the cream and over a
+            camera alike. */}
         {guess !== null && (
           <g className="wl-needle" style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${angleFor(guess)}deg)` }}>
             <line
@@ -323,7 +368,7 @@ export function Dial({
               y1={cy}
               x2={cx}
               y2={cy - r * 0.985}
-              stroke={needleColor}
+              stroke={NEEDLE}
               strokeWidth={Math.max(5, width * 0.017)}
               strokeLinecap="round"
             />
@@ -335,7 +380,7 @@ export function Dial({
           cx={cx}
           cy={cy}
           r={Math.max(14, width * 0.055)}
-          fill={needleColor}
+          fill={NEEDLE}
           stroke={INK}
           strokeWidth={Math.max(3, width * 0.011)}
         />

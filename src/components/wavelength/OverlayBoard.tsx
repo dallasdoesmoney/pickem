@@ -78,6 +78,10 @@ export function WaveStyles() {
   );
 }
 
+// A SCOREBOARD ROW, not a column. Name over the psychic pill on one side
+// and the number beside it, because stacked they were 156 tall each and
+// the whole graphic overran the band it is supposed to sit inside - the
+// top and bottom of it were spilling into the two cam cutouts.
 function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; align: "left" | "right" }) {
   const team = state.teams[who];
   const isPsychic = state.psychic === who;
@@ -94,9 +98,54 @@ function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; alig
           : 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: align === "left" ? "flex-start" : "flex-end", gap: 6 }}>
-      <span style={{ fontFamily: "var(--font-display)", fontSize: 40, lineHeight: 1, color: PLAYER_COLORS[who], ...outlined(40) }}>
-        {team.name.toUpperCase()}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: align === "left" ? "row" : "row-reverse",
+        alignItems: "center",
+        gap: 16,
+      }}
+    >
+      <span
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: align === "left" ? "flex-start" : "flex-end",
+          gap: 5,
+          // Reserved whether or not the pill is there, so the two sides of
+          // the scoreboard sit on the same line all game.
+          minHeight: 62,
+          justifyContent: "center",
+        }}
+      >
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 1, color: PLAYER_COLORS[who], ...outlined(32) }}>
+          {team.name.toUpperCase()}
+        </span>
+        {/* WHO IS HOLDING THE CARD. Without it a viewer joining mid-round
+            has no idea which side is guessing and which is about to call
+            left or right. Keyed on the psychic so it pops across on the
+            swap instead of silently reappearing on the other side. */}
+        <span style={{ height: 25 }}>
+          {isPsychic && (
+            <span
+              key={state.psychic}
+              className="wl-pop"
+              style={{
+                display: "inline-block",
+                fontFamily: "var(--font-display)",
+                fontSize: 17,
+                letterSpacing: 3,
+                color: INK,
+                background: PLAYER_COLORS[who],
+                padding: "4px 10px",
+                borderRadius: 999,
+                boxShadow: PRESS,
+              }}
+            >
+              PSYCHIC
+            </span>
+          )}
+        </span>
       </span>
 
       <span style={{ position: "relative", display: "block" }}>
@@ -105,7 +154,7 @@ function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; alig
         <span
           key={team.score}
           className="wl-pop"
-          style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 64, lineHeight: 1, color: "#ffffff", ...outlined(64) }}
+          style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 58, lineHeight: 1, color: "#ffffff", ...outlined(58) }}
         >
           {team.score}
         </span>
@@ -115,43 +164,20 @@ function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; alig
             className="wl-float"
             style={{
               position: "absolute",
-              top: -6,
-              [align === "left" ? "left" : "right"]: -8,
+              top: -4,
+              [align === "left" ? "left" : "right"]: -10,
               fontFamily: "var(--font-display)",
-              fontSize: 40,
+              fontSize: 36,
               lineHeight: 1,
               whiteSpace: "nowrap",
               color: MONEY,
-              ...outlined(40),
+              ...outlined(36),
             }}
           >
             +{gained}
           </span>
         )}
       </span>
-
-      {/* WHO IS HOLDING THE CARD. Without it a viewer joining mid-round
-          has no idea which side is guessing and which is about to call
-          left or right. Keyed on the psychic so it pops across on the
-          swap instead of silently reappearing on the other side. */}
-      {isPsychic && (
-        <span
-          key={state.psychic}
-          className="wl-pop"
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 20,
-            letterSpacing: 3,
-            color: INK,
-            background: PLAYER_COLORS[who],
-            padding: "5px 12px",
-            borderRadius: 999,
-            boxShadow: PRESS,
-          }}
-        >
-          PSYCHIC
-        </span>
-      )}
     </div>
   );
 }
@@ -177,7 +203,7 @@ export function OverlayBoard({
 }) {
   const bandHeight = STAGE_H - camTop - camBottom;
   const reveal = state.phase === "reveal" || state.phase === "done";
-  const dialW = 760;
+  const dialW = 720;
 
   // What the big line says. One place, so the graphic never has two
   // opinions about what moment it is.
@@ -221,13 +247,13 @@ export function OverlayBoard({
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          gap: 18,
+          gap: 12,
           padding: "0 40px",
         }}
       >
         {/* Round and the target score, small, so a clip that starts here
             still says what is being played. */}
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 22, letterSpacing: 6, color: "rgba(255,255,255,0.45)", ...outlined(22) }}>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: 6, color: "rgba(255,255,255,0.45)", ...outlined(20) }}>
           ROUND {state.round} &middot; FIRST TO {WIN_SCORE}
         </span>
 
@@ -246,7 +272,6 @@ export function OverlayBoard({
             right={state.card.right}
             target={state.target}
             guess={state.guess}
-            team={state.psychic}
             open={reveal || peek}
             pulse={reveal}
             onScrub={onScrub}
@@ -256,9 +281,9 @@ export function OverlayBoard({
         {/* THE CLUE, which is the whole round in one word. Biggest thing
             on the graphic after the dial, and empty until the psychic has
             actually said it. */}
-        <div style={{ minHeight: 92, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
+        <div style={{ minHeight: 76, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
           {state.clue.trim() === "" ? (
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 34, letterSpacing: 4, color: "rgba(255,255,255,0.3)", ...outlined(34) }}>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 30, letterSpacing: 4, color: "rgba(255,255,255,0.3)", ...outlined(30) }}>
               WAITING FOR THE CLUE
             </span>
           ) : (
@@ -271,11 +296,11 @@ export function OverlayBoard({
                 fontFamily: "var(--font-display)",
                 // Long clues shrink rather than wrap: two lines here
                 // would push the dial into a cam band.
-                fontSize: state.clue.length > 18 ? 52 : 76,
+                fontSize: state.clue.length > 18 ? 48 : 68,
                 lineHeight: 1,
                 color: "#ffffff",
                 textAlign: "center",
-                ...outlined(state.clue.length > 18 ? 52 : 76),
+                ...outlined(state.clue.length > 18 ? 48 : 68),
               }}
             >
               &ldquo;{state.clue.toUpperCase()}&rdquo;
@@ -286,7 +311,7 @@ export function OverlayBoard({
         <span
           key={headline.text}
           className="wl-in"
-          style={{ fontFamily: "var(--font-display)", fontSize: 40, letterSpacing: 3, color: headline.color, ...outlined(40) }}
+          style={{ fontFamily: "var(--font-display)", fontSize: 36, letterSpacing: 3, color: headline.color, ...outlined(36) }}
         >
           {headline.text}
         </span>
@@ -296,7 +321,7 @@ export function OverlayBoard({
           <span
             key={`stolen-${state.round}`}
             className="wl-in"
-            style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: 3, color: PLAYER_COLORS[other(state.psychic)], ...outlined(26) }}
+            style={{ fontFamily: "var(--font-display)", fontSize: 24, letterSpacing: 3, color: PLAYER_COLORS[other(state.psychic)], ...outlined(24) }}
           >
             {state.teams[other(state.psychic)].name.toUpperCase()} CALLED THE SIDE &middot; +1
           </span>

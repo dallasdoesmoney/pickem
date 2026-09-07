@@ -169,6 +169,24 @@ try {
   await page.getByRole("button", { name: /NEW GAME/i }).click();
   await page.getByRole("button", { name: /START THE GAME/i }).waitFor({ timeout: 30000 });
   ok("NEW GAME returns to setup", true);
+
+  // THE GRAPHIC HAS TO FIT BETWEEN THE TWO CAMERAS, and this is the only
+  // way to know: the band is 800px tall at the default 560/560, the
+  // content grows with the clue, the headline and the steal line, and
+  // anything over 800 spills straight onto somebody's face on the stream.
+  // It cannot be seen on the control board, where there are no cam bands
+  // at all - so it is measured on the real browser source.
+  for (const phase of ["clue", "guess", "steal", "reveal"]) {
+    await page.goto(`${BASE}/wavelength/overlay?phase=${phase}&top=560&bottom=560`, { waitUntil: "networkidle" });
+    const fit = await page.evaluate(() => {
+      const band = document.querySelector("[data-band]");
+      const kids = [...band.children].filter((k) => Number.isFinite(k.offsetHeight));
+      const top = Math.min(...kids.map((k) => k.offsetTop));
+      const bottom = Math.max(...kids.map((k) => k.offsetTop + k.offsetHeight));
+      return { content: bottom - top, band: band.offsetHeight };
+    });
+    ok(`the graphic clears the cam bands (${phase})`, fit.content <= fit.band, `${fit.content} of ${fit.band}px`);
+  }
 } finally {
   await browser.close();
 }

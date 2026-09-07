@@ -24,10 +24,17 @@ export function WaveStage({
   // the stream, not a second set of controls beside them.
   peek = false,
   onScrub,
+  // HOW TALL IT IS ALLOWED TO GET, and it needs a ceiling: scaled purely
+  // to the width, a 900px-wide column drew the graphic 750px tall and the
+  // controls under it were below the fold on a laptop - the game was
+  // unplayable without scrolling to reach the buttons. Above this the
+  // graphic stops growing and centres instead.
+  maxHeight = 430,
 }: {
   state: WavelengthState;
   peek?: boolean;
   onScrub?: (value: number) => void;
+  maxHeight?: number;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -67,20 +74,24 @@ export function WaveStage({
 
   // No cameras on a web page, so the graphic centres in the whole stage
   // and gets cropped to whatever it measured, with a little air around it.
-  const scale = width / STAGE_W;
-  const PAD = 40;
-  const height = content > 0 ? content + PAD * 2 : STAGE_H;
+  const PAD = 24;
+  const cropped = content > 0 ? content + PAD * 2 : STAGE_H;
+  // Whichever runs out first, the width of the column or the height it is
+  // allowed. Then centred in whatever width is left over, so a capped
+  // graphic sits in the middle of the page rather than off to one side.
+  const scale = Math.min(width / STAGE_W, maxHeight / cropped);
   const cropTop = content > 0 ? (STAGE_H - content) / 2 - PAD : 0;
+  const drawn = STAGE_W * scale;
 
   return (
-    <div ref={box} style={{ width: "100%", height: width ? height * scale : 0, position: "relative", overflow: "hidden" }}>
+    <div ref={box} style={{ width: "100%", height: width ? cropped * scale : 0, position: "relative", overflow: "hidden" }}>
       <div ref={inner} style={{ display: "contents" }}>
         {width > 0 && (
           <div
             style={{
               position: "absolute",
               top: -cropTop * scale,
-              left: 0,
+              left: (width - drawn) / 2,
               width: STAGE_W,
               height: STAGE_H,
               transform: `scale(${scale})`,
