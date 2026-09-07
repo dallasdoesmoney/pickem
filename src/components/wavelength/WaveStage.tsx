@@ -17,7 +17,18 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "./OverlayBoard";
 // The height is MEASURED rather than assumed. The graphic grows and
 // shrinks with the clue, the headline and the steal line, and a guessed
 // crop cut the bottom line off.
-export function WaveStage({ state }: { state: WavelengthState }) {
+export function WaveStage({
+  state,
+  // Both board-only. The mirror is not a picture of the graphic, it is the
+  // graphic - so the dial you drag and the lid you lift are the ones on
+  // the stream, not a second set of controls beside them.
+  peek = false,
+  onScrub,
+}: {
+  state: WavelengthState;
+  peek?: boolean;
+  onScrub?: (value: number) => void;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -76,7 +87,7 @@ export function WaveStage({ state }: { state: WavelengthState }) {
               transformOrigin: "top left",
             }}
           >
-            <OverlayBoard state={state} camTop={0} camBottom={0} />
+            <OverlayBoard state={state} camTop={0} camBottom={0} peek={peek} onScrub={onScrub} />
           </div>
         )}
       </div>

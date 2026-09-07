@@ -245,10 +245,10 @@ function WavelengthInner() {
               played it. Three lines, because anything longer does not get
               read while people are waiting to start. */}
           <div className="mt-5 flex items-center gap-4 rounded-2xl px-4 py-4" style={{ border: "2px solid rgba(255,255,255,0.10)" }}>
-            <Dial width={140} left="Cold" right="Hot" target={68} guess={54} team={0} showTarget />
+            <Dial width={140} left="Cold" right="Hot" target={68} guess={54} team={0} open />
             <ol className="min-w-0 flex-1 text-[12px] leading-relaxed text-white/50">
-              <li>1. The psychic holds the phone and sees the target.</li>
-              <li>2. They give one clue. Their team turns the dial.</li>
+              <li>1. The psychic holds a button and the dial opens, for them.</li>
+              <li>2. They give one clue. Their team drags the needle.</li>
               <li>3. The other team calls which side it really is on.</li>
             </ol>
           </div>

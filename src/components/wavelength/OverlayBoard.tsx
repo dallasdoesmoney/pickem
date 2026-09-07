@@ -3,7 +3,7 @@
 import type { WavelengthState } from "@/lib/wavelength/engine";
 import { WIN_SCORE, other } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, INK, outlined } from "@/components/versus/style";
-import { Dial } from "./Dial";
+import { Dial, COVER_MS } from "./Dial";
 
 // THE GRAPHIC, on the same 1080 x 1920 transparent stage the draft uses,
 // with the same two cam bands clear at the top and the bottom. Everything
@@ -16,22 +16,128 @@ export const STAGE_H = 1920;
 // The press, the same block of ink the draft's picks wear.
 const PRESS = `4px 5px 0 ${INK}`;
 
+// EVERY MOVING PART, in one place.
+//
+// This is a graphic on a live stream, so nothing here is decoration: a
+// number that changes without moving is a number nobody notices, and the
+// whole reveal is a piece of theatre. Keyframes rather than a library -
+// the overlay is a browser source that must not throw, and the smallest
+// thing that can go wrong is the best thing to ship.
+//
+// Everything is driven off state through React keys, so a re-render mid
+// stream replays an animation rather than getting stuck half way through
+// one.
+export function WaveStyles() {
+  return (
+    <style>{`
+      /* The lid. A 180deg sector clipped to the top half, so swinging it
+         round simply puts it in the half that is clipped away. */
+      .wl-cover { transition: transform ${COVER_MS}ms cubic-bezier(.22,.7,.28,1); }
+      /* Negative, so the shutter travels away to the left and the face
+         uncovers the way the spectrum reads - the left word first. */
+      .wl-cover.wl-open { transform: rotate(-180deg); }
+
+      /* The needle glides. On the board that is the drag having weight;
+         on the overlay it is the difference between the guess moving and
+         the guess teleporting. */
+      .wl-needle { transition: transform 170ms cubic-bezier(.2,.75,.3,1); }
+
+      .wl-pulse { animation: wl-pulse 780ms ease-in-out 2 both; }
+      @keyframes wl-pulse { 0%,100% { opacity: .96 } 50% { opacity: .38 } }
+
+      /* A new card arriving. */
+      .wl-in { animation: wl-in 440ms cubic-bezier(.2,.8,.3,1) both; }
+      @keyframes wl-in {
+        from { opacity: 0; transform: translateY(18px) scale(.965) }
+        to   { opacity: 1; transform: none }
+      }
+
+      /* A number that just changed, or a line that just appeared. */
+      .wl-pop { animation: wl-pop 520ms cubic-bezier(.34,1.45,.5,1) both; }
+      @keyframes wl-pop {
+        0%   { opacity: 0; transform: scale(.72) }
+        58%  { opacity: 1; transform: scale(1.09) }
+        100% { opacity: 1; transform: scale(1) }
+      }
+
+      /* The points, leaving the scoreboard on their way up. */
+      .wl-float { animation: wl-float 1700ms cubic-bezier(.2,.7,.3,1) both; }
+      @keyframes wl-float {
+        0%   { opacity: 0; transform: translateY(14px) scale(.7) }
+        16%  { opacity: 1; transform: translateY(0) scale(1.15) }
+        72%  { opacity: 1; transform: translateY(-34px) scale(1) }
+        100% { opacity: 0; transform: translateY(-64px) scale(1) }
+      }
+
+      /* Nobody has to watch any of this. */
+      @media (prefers-reduced-motion: reduce) {
+        .wl-cover, .wl-needle { transition: none }
+        .wl-pulse, .wl-in, .wl-pop, .wl-float { animation: none }
+      }
+    `}</style>
+  );
+}
+
 function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; align: "left" | "right" }) {
   const team = state.teams[who];
   const isPsychic = state.psychic === who;
+  const scored = state.scored;
+  // What this team just took off the round, so it can be thrown up out of
+  // their own score rather than printed in a corner.
+  const gained =
+    scored === null
+      ? 0
+      : isPsychic
+        ? scored.band
+        : scored.stolen
+          ? 1
+          : 0;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: align === "left" ? "flex-start" : "flex-end", gap: 6 }}>
       <span style={{ fontFamily: "var(--font-display)", fontSize: 40, lineHeight: 1, color: PLAYER_COLORS[who], ...outlined(40) }}>
         {team.name.toUpperCase()}
       </span>
-      <span style={{ fontFamily: "var(--font-display)", fontSize: 64, lineHeight: 1, color: "#ffffff", ...outlined(64) }}>
-        {team.score}
+
+      <span style={{ position: "relative", display: "block" }}>
+        {/* Keyed on the score, so the digits pop the moment they change
+            and sit still the rest of the time. */}
+        <span
+          key={team.score}
+          className="wl-pop"
+          style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 64, lineHeight: 1, color: "#ffffff", ...outlined(64) }}
+        >
+          {team.score}
+        </span>
+        {gained > 0 && (
+          <span
+            key={`${state.round}-${gained}`}
+            className="wl-float"
+            style={{
+              position: "absolute",
+              top: -6,
+              [align === "left" ? "left" : "right"]: -8,
+              fontFamily: "var(--font-display)",
+              fontSize: 40,
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+              color: MONEY,
+              ...outlined(40),
+            }}
+          >
+            +{gained}
+          </span>
+        )}
       </span>
+
       {/* WHO IS HOLDING THE CARD. Without it a viewer joining mid-round
           has no idea which side is guessing and which is about to call
-          left or right. */}
+          left or right. Keyed on the psychic so it pops across on the
+          swap instead of silently reappearing on the other side. */}
       {isPsychic && (
         <span
+          key={state.psychic}
+          className="wl-pop"
           style={{
             fontFamily: "var(--font-display)",
             fontSize: 20,
@@ -54,10 +160,20 @@ export function OverlayBoard({
   state,
   camTop = 560,
   camBottom = 560,
+  // BOARD ONLY, and it never crosses the wire. The psychic holding the
+  // phone lifts the lid on this same face; the overlay is not passed it,
+  // and could not draw the wedge anyway because the message it was given
+  // has no target in it.
+  peek = false,
+  // Handed in only by the board, which is what makes the dial a control
+  // there and a picture everywhere else.
+  onScrub,
 }: {
   state: WavelengthState;
   camTop?: number;
   camBottom?: number;
+  peek?: boolean;
+  onScrub?: (value: number) => void;
 }) {
   const bandHeight = STAGE_H - camTop - camBottom;
   const reveal = state.phase === "reveal" || state.phase === "done";
@@ -89,6 +205,7 @@ export function OverlayBoard({
 
   return (
     <div style={{ width: STAGE_W, height: STAGE_H, position: "relative", overflow: "hidden" }}>
+      <WaveStyles />
       <div
         // Marked so WaveStage can measure it: cropping the graphic out of
         // the stage means knowing how tall the graphic actually is, and
@@ -119,13 +236,10 @@ export function OverlayBoard({
           <Score state={state} who={1} align="right" />
         </div>
 
-        {/* WRAPPED IN A DIV, and it has to be. An <svg> is an SVGElement,
-            not an HTMLElement, so it has no offsetTop or offsetHeight -
-            and WaveStage measures this band's children through exactly
-            those two properties. Left bare, the measurement came back
-            NaN, the mirror silently fell back to drawing the whole 1920
-            stage, and a third of the control screen was empty. */}
-        <div>
+        {/* KEYED ON THE CARD, so a new round is a new dial arriving rather
+            than the old one's words changing under a lid that is halfway
+            through closing. */}
+        <div key={`${state.round}-${state.card.id}`} className="wl-in" style={{ display: "flex", justifyContent: "center" }}>
           <Dial
             width={dialW}
             left={state.card.left}
@@ -133,7 +247,9 @@ export function OverlayBoard({
             target={state.target}
             guess={state.guess}
             team={state.psychic}
-            showTarget={reveal}
+            open={reveal || peek}
+            pulse={reveal}
+            onScrub={onScrub}
           />
         </div>
 
@@ -146,7 +262,11 @@ export function OverlayBoard({
               WAITING FOR THE CLUE
             </span>
           ) : (
+            // Not keyed on the text: this pops when the clue first lands
+            // and then updates letter by letter as it is typed, which is
+            // the point of carrying it live.
             <span
+              className="wl-pop"
               style={{
                 fontFamily: "var(--font-display)",
                 // Long clues shrink rather than wrap: two lines here
@@ -163,13 +283,21 @@ export function OverlayBoard({
           )}
         </div>
 
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 40, letterSpacing: 3, color: headline.color, ...outlined(40) }}>
+        <span
+          key={headline.text}
+          className="wl-in"
+          style={{ fontFamily: "var(--font-display)", fontSize: 40, letterSpacing: 3, color: headline.color, ...outlined(40) }}
+        >
           {headline.text}
         </span>
 
         {/* The catch-up point, only once it has been decided. */}
         {reveal && state.scored?.stolen && (
-          <span style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: 3, color: PLAYER_COLORS[other(state.psychic)], ...outlined(26) }}>
+          <span
+            key={`stolen-${state.round}`}
+            className="wl-in"
+            style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: 3, color: PLAYER_COLORS[other(state.psychic)], ...outlined(26) }}
+          >
             {state.teams[other(state.psychic)].name.toUpperCase()} CALLED THE SIDE &middot; +1
           </span>
         )}

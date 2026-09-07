@@ -39,6 +39,19 @@ await page.route("**/rest/v1/**", (r) => r.fulfill({ status: 200, contentType: "
 
 const wedges = () => page.locator("main [data-wedge]").count();
 
+// Press a value on the face. The hub is the middle of the flat bottom
+// edge, the arc runs 0 on the left to 100 on the right, and the element is
+// a scaled-down copy of a 1080-wide stage - so everything is worked out
+// from the box the browser actually reports.
+async function clickDialAt(dial, value) {
+  const b = await dial.boundingBox();
+  const r = b.width / 2;
+  const ang = (1 - value / 100) * Math.PI;
+  await dial.click({
+    position: { x: r + r * 0.6 * Math.cos(ang), y: r - r * 0.6 * Math.sin(ang) },
+  });
+}
+
 try {
   // networkidle, not domcontentloaded: a click landed before React
   // had attached does nothing at all, silently, and the failure that
@@ -58,26 +71,32 @@ try {
   // start once the game has, not here.
 
   await page.getByRole("button", { name: /START THE GAME/i }).click();
-  await page.getByRole("button", { name: /HOLD TO SEE THE TARGET/i }).waitFor({ timeout: 30000 });
+  await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).waitFor({ timeout: 30000 });
   ok("the first round comes up", (await page.locator("main [data-band]").innerText()).includes("ROUND 1"));
   ok("nothing to undo yet", await page.getByRole("button", { name: /UNDO LAST MOVE/i }).isDisabled());
 
   // THE DIAL IS DEAD UNTIL THERE IS A CLUE. Otherwise a team can turn it
   // before anybody has said anything, which is not a round.
-  ok("no dial before a clue", (await page.locator("main input[type=range]").count()) === 0);
-  ok("nothing to reveal before a clue", (await page.getByRole("button", { name: /REVEAL/i }).count()) === 0);
+  ok("no dial to drag before a clue", (await page.getByRole("slider").count()) === 0);
+  // The reveal is its own button and it is not reachable yet. HOLD TO OPEN
+  // THE DIAL is a different control with a similar name, hence the anchors.
+  ok("nothing to reveal before a clue", (await page.getByRole("button", { name: /^OPEN THE DIAL$/ }).count()) === 0);
 
-  // THE ONE PLACE THE TARGET IS SEEN, and it is a press-and-hold.
+  // THE ONE PLACE THE TARGET IS SEEN, and it happens ON THE DIAL - the
+  // same face the stream is watching, not a second picture beside it.
   ok("the target is not on screen", (await wedges()) === 0);
-  const peek = page.getByRole("button", { name: /HOLD TO SEE THE TARGET/i });
-  await peek.hover();
+  ok("the lid starts shut", (await page.locator("main .wl-cover.wl-open").count()) === 0);
+  await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).hover();
   await page.mouse.down();
-  await page.waitForTimeout(120);
-  ok("holding shows the target", (await page.locator("main [data-peek]").count()) === 1);
-  ok("and it is drawn as a wedge", (await wedges()) > 0);
+  await page.waitForTimeout(150);
+  ok("holding opens the lid on the dial", (await page.locator("main .wl-cover.wl-open").count()) === 1);
+  ok("and the wedge is under it", (await wedges()) > 0);
   await page.mouse.up();
-  await page.waitForTimeout(120);
-  ok("letting go hides it again", (await page.locator("main [data-peek]").count()) === 0);
+  // The lid takes COVER_MS to swing back and the target stays in the state
+  // until it has - so this waits past both rather than racing them.
+  await page.waitForTimeout(150);
+  ok("letting go starts it shutting at once", (await page.locator("main .wl-cover.wl-open").count()) === 0);
+  await page.waitForTimeout(900);
   ok("and the wedge goes with it", (await wedges()) === 0);
 
   let rounds = 0;
@@ -104,10 +123,19 @@ try {
     }
 
     // ---- the dial ----
-    const dial = page.locator("main input[type=range]");
+    // Dragged on the face, which is the only way to guess now. Clicking a
+    // point is the same gesture the engine sees, and it also checks the
+    // angle-to-value mapping: a dial that reads every press as 50 would
+    // play a whole game without ever failing anything else here.
+    const dial = page.getByRole("slider");
     await dial.waitFor({ timeout: 5000 });
-    await dial.fill(String(20 + ((rounds * 17) % 60)));
-    await page.waitForTimeout(80);
+    const want = [24, 41, 58, 72, 88][rounds % 5];
+    await clickDialAt(dial, want);
+    await page.waitForTimeout(120);
+    const got = Number(await dial.getAttribute("aria-valuenow"));
+    if (Math.abs(got - want) > 3) {
+      ok("the dial lands where it was pressed", false, `asked ${want}, got ${got}`);
+    }
     if ((await wedges()) > 0) leakedRounds++;
 
     // ---- the call ----
@@ -116,7 +144,7 @@ try {
     if ((await wedges()) > 0) leakedRounds++;
 
     // ---- and only now ----
-    await page.getByRole("button", { name: /REVEAL THE TARGET/i }).click();
+    await page.getByRole("button", { name: /^OPEN THE DIAL$/ }).click();
     await page.waitForTimeout(120);
     if ((await wedges()) === 0) {
       ok("the reveal draws the wedge", false, `round ${rounds + 1}`);

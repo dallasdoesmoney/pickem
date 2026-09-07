@@ -1,19 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { WavelengthState, WavelengthAction } from "@/lib/wavelength/engine";
-import { other } from "@/lib/wavelength/engine";
+import { other, redactFor } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, outlined, display } from "@/components/versus/style";
 import { WaveStage } from "./WaveStage";
-import { Dial } from "./Dial";
+import { COVER_MS } from "./Dial";
 
 // THE CONTROL SCREEN, which is the overlay plus buttons - the same
 // arrangement the draft settled on. The graphic is the page, full width,
-// and underneath it are only the things you cannot do by looking: see the
-// target, type the clue, turn the dial, call the side, reveal.
+// and underneath it are only the things you cannot do by looking.
 //
-// One screen, in a room, passed around. Which is the whole reason for the
-// HOLD button below.
+// THE DIAL IS NOT UNDER HERE. It is the graphic itself: the guess is made
+// by dragging the needle on the same face the stream is watching, and the
+// target is uncovered by lifting the lid on that same face. A slider under
+// the picture and a second little dial off to one side were two people
+// describing a game nobody could actually see happening.
+//
+// WHICH MEANS THE MIRROR IS NOT QUITE THE OVERLAY, and the difference is
+// exactly one thing: the lid. The state this page draws is redacted the
+// same way the broadcast is - see `shown` below - so the wedge is not in
+// this screen's DOM either, except while the psychic is holding it open.
 
 const RULE = "rgba(255,255,255,0.10)";
 
@@ -51,62 +58,6 @@ function ActionButton({
   );
 }
 
-// THE ONE PLACE THE TARGET IS SEEN, and it has to be held down.
-//
-// Everybody is looking at the same screen, which is exactly the problem:
-// the psychic needs the answer and nobody else may have it. A button that
-// toggles gets left on. A button that has to be held is only ever showing
-// the target while somebody is holding the phone, which is the same
-// gesture as picking up the physical screen and tilting it away - and it
-// puts itself back the instant they let go, including if they drop it,
-// switch apps, or hand it over.
-function PeekAtTarget({ state }: { state: WavelengthState }) {
-  const [held, setHeld] = useState(false);
-  const release = () => setHeld(false);
-
-  return (
-    <div>
-      <button
-        type="button"
-        onPointerDown={() => setHeld(true)}
-        onPointerUp={release}
-        onPointerLeave={release}
-        onPointerCancel={release}
-        onBlur={release}
-        onContextMenu={(e) => e.preventDefault()}
-        className="w-full rounded-xl py-4"
-        style={{
-          ...display(14, { letterSpacing: 2, color: held ? "#05070d" : PLAYER_COLORS[state.psychic] }),
-          background: held ? PLAYER_COLORS[state.psychic] : "transparent",
-          border: `2px dashed ${held ? PLAYER_COLORS[state.psychic] : RULE}`,
-          // A long press on a touch screen otherwise selects text or pops
-          // the browser's own menu over the answer.
-          touchAction: "none",
-          userSelect: "none",
-          WebkitUserSelect: "none",
-          WebkitTouchCallout: "none",
-        }}
-      >
-        {held ? "LET GO TO HIDE IT" : "HOLD TO SEE THE TARGET"}
-      </button>
-
-      {held && state.target !== null && (
-        <div data-peek className="mt-3 flex justify-center rounded-xl py-4" style={{ border: `2px solid ${RULE}` }}>
-          <Dial
-            width={300}
-            left={state.card.left}
-            right={state.card.right}
-            target={state.target}
-            guess={null}
-            team={state.psychic}
-            showTarget
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function WavelengthBoard({
   state,
   deckTitle,
@@ -118,7 +69,7 @@ export function WavelengthBoard({
   state: WavelengthState;
   deckTitle: string;
   // `record` is what separates a move somebody MADE from a knob being
-  // turned. Every keystroke of a clue and every pixel of the dial is an
+  // turned. Every keystroke of a clue and every degree of the dial is an
   // action, and recording them would make UNDO mean "delete one letter".
   onAction: (action: WavelengthAction, record?: boolean) => void;
   onUndo: () => void;
@@ -132,20 +83,79 @@ export function WavelengthBoard({
   // locked once the other team has called a side.
   const dialLive = (state.phase === "clue" && hasClue) || state.phase === "guess";
 
+  // THE PEEK. Everybody is looking at the same screen, which is exactly
+  // the problem: the psychic needs the answer and nobody else may have it.
+  // A button that toggles gets left on. A button that has to be HELD is
+  // only ever open while somebody is holding the phone - the same gesture
+  // as picking up the physical board and tilting it away - and it shuts
+  // itself the instant they let go, drop it, or hand it over.
+  //
+  // `closing` keeps the target on screen for exactly as long as the lid
+  // takes to swing back. Without it the wedge vanishes on release and the
+  // lid closes over an empty recess.
+  const [peek, setPeek] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Whether the lid is up, tracked outside React as well. A pointer-up and
+  // a blur both fire on the same release, and the second one must not
+  // start a second closing timer - and none of this can live inside a
+  // setState updater, which React is allowed to call twice.
+  const held = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
+
+  function hold() {
+    if (held.current) return;
+    held.current = true;
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setClosing(false);
+    setPeek(true);
+  }
+
+  function release() {
+    if (!held.current) return;
+    held.current = false;
+    setPeek(false);
+    setClosing(true);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    // A shade longer than the lid takes, so the wedge is still there for
+    // the last frame of the shutter rather than a frame short of it.
+    closeTimer.current = setTimeout(() => setClosing(false), COVER_MS + 80);
+  }
+
+  // TWO DIFFERENT QUESTIONS, and running them off one flag was a bug: the
+  // lid must start closing the instant the psychic lets go, while the
+  // target has to stay in the state until the shutter has finished
+  // travelling. Tied together, the lid sat open for the whole close window
+  // and then slammed - and the wedge blinked out from under it on the way.
+  //
+  // Memoised because WaveStage measures the graphic whenever this changes,
+  // and a fresh object every render would remeasure forever.
+  const shown = useMemo(() => (peek || closing ? state : redactFor(state)), [peek, closing, state]);
+
   return (
     <div className="flex w-full flex-col">
       {/* ---- the graphic, exactly as the stream gets it ---- */}
       <div className="w-full">
         {/* The DECK, and only the deck. The round, the score, the target
-            and the clue are all on the graphic two inches below this, and
-            printing any of them again here is one more thing that can end
-            up disagreeing with the copy the viewers are watching. */}
+            and the clue are all on the graphic below this, and printing
+            any of them again here is one more thing that can end up
+            disagreeing with the copy the viewers are watching. */}
         <div className="mb-1 px-1">
           <span style={{ ...display(11, { letterSpacing: 3, color: "rgba(255,255,255,0.32)" }) }}>
             {deckTitle.toUpperCase()}
           </span>
         </div>
-        <WaveStage state={state} />
+        <WaveStage
+          state={shown}
+          peek={peek}
+          onScrub={dialLive ? (value) => onAction({ type: "guess", value }, false) : undefined}
+        />
       </div>
 
       {/* ---- and the only things you cannot do by looking ---- */}
@@ -159,7 +169,29 @@ export function WavelengthBoard({
               <span className="text-[12px] text-white/40">nobody else looks</span>
             </div>
 
-            <PeekAtTarget state={state} />
+            <button
+              type="button"
+              onPointerDown={hold}
+              onPointerUp={release}
+              onPointerLeave={release}
+              onPointerCancel={release}
+              onBlur={release}
+              onContextMenu={(e) => e.preventDefault()}
+              className="w-full rounded-xl py-4"
+              style={{
+                ...display(14, { letterSpacing: 2, color: peek ? "#05070d" : PLAYER_COLORS[state.psychic] }),
+                background: peek ? PLAYER_COLORS[state.psychic] : "transparent",
+                border: `2px dashed ${peek ? PLAYER_COLORS[state.psychic] : RULE}`,
+                // A long press on a touch screen otherwise selects text or
+                // pops the browser's own menu over the answer.
+                touchAction: "none",
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none",
+              }}
+            >
+              {peek ? "LET GO TO CLOSE IT" : "HOLD TO OPEN THE DIAL"}
+            </button>
 
             <label className="flex flex-col gap-1.5">
               <span className="text-[10px] tracking-[0.16em] text-white/35" style={{ fontFamily: "var(--font-display)" }}>
@@ -178,7 +210,7 @@ export function WavelengthBoard({
 
             <p className="text-[11.5px] leading-relaxed text-white/35">
               Say it out loud as well &mdash; it goes straight onto the overlay. Then{" "}
-              <span className="text-white/60">{psychic.name}&rsquo;s team</span> turns the dial.
+              <span className="text-white/60">{psychic.name}&rsquo;s team</span> drags the needle on the dial above.
             </p>
           </>
         )}
@@ -187,32 +219,18 @@ export function WavelengthBoard({
           <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between gap-3">
               <span style={{ ...display(16, { color: PLAYER_COLORS[state.psychic], letterSpacing: 1 }) }}>
-                TURN THE DIAL
+                DRAG THE NEEDLE
               </span>
               <span style={{ ...display(22, { color: "rgba(255,255,255,0.75)", fontVariantNumeric: "tabular-nums" }) }}>
                 {state.guess === null ? "—" : state.guess.toFixed(1)}
               </span>
             </div>
 
-            {/* The two ends, named, because a bare 0-100 slider says
-                nothing about which way round the card is. */}
-            <div className="flex items-center justify-between gap-3 text-[11.5px] text-white/45">
-              <span className="min-w-0 truncate">{state.card.left}</span>
-              <span className="min-w-0 truncate text-right">{state.card.right}</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={0.5}
-              value={state.guess ?? 50}
-              onChange={(e) => onAction({ type: "guess", value: Number(e.target.value) }, false)}
-              aria-label="Where the target is"
-              className="h-8 w-full"
-              style={{ accentColor: PLAYER_COLORS[state.psychic] }}
-            />
-
-            {state.guess !== null && (
+            {state.guess === null ? (
+              <p className="text-[11.5px] text-white/35">
+                Anywhere on the dial. {state.card.left} is hard left, {state.card.right} is hard right.
+              </p>
+            ) : (
               <>
                 <div className="flex items-baseline justify-between gap-3 pt-1">
                   <span style={{ ...display(16, { color: PLAYER_COLORS[other(state.psychic)], letterSpacing: 1 }) }}>
@@ -242,7 +260,7 @@ export function WavelengthBoard({
               <span className="text-[12px] text-white/40">everyone in?</span>
             </div>
             <ActionButton onClick={() => onAction({ type: "reveal" })} grow>
-              REVEAL THE TARGET
+              OPEN THE DIAL
             </ActionButton>
           </div>
         )}
