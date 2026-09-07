@@ -213,7 +213,12 @@ export function Dial({
           { at: target, n: 4 },
           { at: target + (BAND_4 + BAND_3) / 2, n: 3 },
           { at: target + (BAND_3 + BAND_2) / 2, n: 2 },
-        ].filter((m) => m.at >= DIAL_MIN + 1 && m.at <= DIAL_MAX - 1);
+          // A numeral is about a unit and a half wide on the arc and it
+          // sits inside the same clip as the wedge, so one any closer to
+          // an end than this gets sliced down the middle rather than
+          // tidily left out. The wedge itself still runs right off the
+          // edge - that is the point of letting the target go there.
+        ].filter((m) => m.at >= DIAL_MIN + 2 && m.at <= DIAL_MAX - 2);
 
   const face = wedgePath(cx, cy, r, DIAL_MIN, DIAL_MAX);
   const inner = wedgePath(cx, cy, r * 0.985, DIAL_MIN, DIAL_MAX);
@@ -392,7 +397,11 @@ export function Dial({
             is 1.7:1, which is nothing - the black edge either side of it
             is what you actually see, on the lid, on the cream and over a
             camera alike. */}
-        {guess !== null && (
+        {/* ALWAYS DRAWN, even before anybody has placed it. A dial has a
+            needle; one that blinks into existence the moment a team
+            commits reads as a bug, and the graphic already says whose turn
+            it is in words. Parked dead centre until it is moved. */}
+        {(
           // NO EASING WHILE A FINGER IS ON IT. The transition exists for
           // the overlay, where a new guess arrives every so often and
           // should glide in rather than teleport. Under a live drag it is
@@ -402,7 +411,7 @@ export function Dial({
           // all and the rest lurched. Measured, then removed.
           <g
             className={dragged ? "wl-needle wl-dragging" : "wl-needle"}
-            style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${angleFor(guess)}deg)` }}
+            style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${angleFor(guess ?? 50)}deg)` }}
           >
             <line
               x1={cx}

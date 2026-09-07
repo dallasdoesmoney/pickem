@@ -21,21 +21,28 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/wavelength/OverlayB
 //   ?deck=football    which deck the DEMO draws from (ignored in a room)
 //   ?phase=clue|guess|steal|reveal   which moment the DEMO holds on
 //   ?t1=Us&t2=Them    names on the DEMO scores (ignored in a room)
+//   ?target=2.5       put the DEMO's wedge at an exact spot, for looking
+//                     at the extremes without playing forty rounds
 
 // A deterministic mid-round position, so the graphic can be judged with
 // something in it rather than four em dashes. Demo only - in a room every
 // one of these numbers comes off the wire, and the target does not arrive
 // at all until the reveal.
-function demoState(deckKey: DeckKey, names: string[], phase: string | null): WavelengthState {
-  let state = startGame(deck(deckKey), deckKey, names, "overlay-demo");
+function demoState(deckKey: DeckKey, names: string[], phase: string | null, target: number | null): WavelengthState {
+  const DEMO_SEED = "overlay-demo";
+  let state = startGame(deck(deckKey), deckKey, names, DEMO_SEED);
   state = { ...state, teams: state.teams.map((t, i) => ({ ...t, score: i === 0 ? 6 : 4 })), round: 5 };
+  // The wedge can sit anywhere on the dial now, including mostly off the
+  // bottom of either end, and those are exactly the positions that are
+  // awkward to reach by playing. Demo only.
+  if (target !== null) state = { ...state, target };
   if (phase === "clue" || phase === null) return { ...state, clue: "Coffee" };
-  state = reduce(state, { type: "clue", text: "Coffee" }, deck(deckKey));
-  state = reduce(state, { type: "guess", value: 61.5 }, deck(deckKey));
+  state = reduce(state, { type: "clue", text: "Coffee" }, deck(deckKey), DEMO_SEED);
+  state = reduce(state, { type: "guess", value: 61.5 }, deck(deckKey), DEMO_SEED);
   if (phase === "guess") return state;
-  state = reduce(state, { type: "steal", side: "right" }, deck(deckKey));
+  state = reduce(state, { type: "steal", side: "right" }, deck(deckKey), DEMO_SEED);
   if (phase === "steal") return state;
-  return reduce(state, { type: "reveal" }, deck(deckKey));
+  return reduce(state, { type: "reveal" }, deck(deckKey), DEMO_SEED);
 }
 
 // A cam band in preview: a translucent tint over the checkerboard, not a
@@ -91,7 +98,12 @@ function OverlayInner() {
     ? message.state
     : room
       ? null
-      : demoState(demoDeck, [params.get("t1") ?? "Team 1", params.get("t2") ?? "Team 2"], params.get("phase"));
+      : demoState(
+          demoDeck,
+          [params.get("t1") ?? "Team 1", params.get("t2") ?? "Team 2"],
+          params.get("phase"),
+          params.has("target") ? Number(params.get("target")) : null,
+        );
 
   return (
     <>

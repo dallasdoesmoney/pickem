@@ -49,11 +49,22 @@ export const BAND_4 = SLOT_WIDTH / 2;
 export const BAND_3 = BAND_4 + SLOT_WIDTH;
 export const BAND_2 = BAND_3 + SLOT_WIDTH;
 
-// How far from either edge the target may be. Without this the target
-// sits at 99 often enough to matter, and a target on the edge is a bad
-// round - half the wedge is off the board, so the best possible clue
-// still scores two.
-const EDGE_MARGIN = BAND_2 + 2;
+// HOW FAR FROM EITHER EDGE THE TARGET MAY BE, and the answer is barely at
+// all. Think of it the way the physical game works: the scoring wedge is
+// printed on a full circle and only the top half of that circle shows, so
+// the wedge can sit anywhere - including mostly below the horizon with
+// just its inner half on the board.
+//
+// The one thing that must always be on the board is the whole bullseye,
+// because a 4 you cannot reach is not a round. At exactly this margin the
+// four is fully on and one complete side of the wedge with it - the full
+// four and one half of the points - which is the least the board is ever
+// allowed to show.
+//
+// It used to be BAND_2 + 2, which pinned every target between 14 and 86:
+// the four could never land near either end, and after a few streams that
+// is a pattern people play against.
+const EDGE_MARGIN = BAND_4;
 
 export const WIN_SCORE = 10;
 
@@ -102,20 +113,30 @@ export type WavelengthState = {
 };
 
 // A tiny deterministic generator, same idea as the auction's shuffle: a
-// draft played from a given seed deals the same cards, which is what
-// makes a bug reproducible instead of a story about last Tuesday.
+// game played from a given seed deals the same cards, which is what makes
+// a bug reproducible instead of a story about last Tuesday.
 function rng(seed: string): () => number {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
-  return () => {
+  const next = () => {
     h ^= h << 13;
     h ^= h >>> 17;
     h ^= h << 5;
-    return ((h >>> 0) % 100000) / 100000;
+    // Divided by the full 2^32 rather than taken modulo 100000: the
+    // modulo left a visible bias - two buckets in twenty sitting three
+    // standard deviations high over five thousand targets - and it threw
+    // away most of the resolution while doing it.
+    return (h >>> 0) / 4294967296;
   };
+  // Thrown away, because the strings handed to this differ by a character
+  // or two - one round number, one score - and xorshift takes a few turns
+  // to forget how close two starting states were. Without it, adjacent
+  // rounds draw suspiciously similar numbers.
+  for (let i = 0; i < 12; i++) next();
+  return next;
 }
 
 function pickTarget(random: () => number): number {
@@ -130,6 +151,14 @@ function pickCard(cards: Spectrum[], seen: string[], random: () => number): Spec
   return pool[Math.floor(random() * pool.length) % pool.length];
 }
 
+// THE SEED IS NOT PART OF THE STATE, and that is deliberate rather than
+// tidy. The state is the thing that gets broadcast, and the seed plus the
+// round plus the scores - all of which are on the wire already - is enough
+// to recompute the target. A seed riding along in the payload would undo
+// the entire redaction one round at a time.
+//
+// So the board holds it and hands it to reduce(); a secret that is not in
+// the object cannot leak out of the object.
 export function startGame(
   cards: Spectrum[],
   deckKey: string,
@@ -192,6 +221,10 @@ export function reduce(
   state: WavelengthState,
   action: WavelengthAction,
   cards: Spectrum[],
+  // The game's own seed, for dealing the next round. Required rather than
+  // defaulted: a caller that forgets it would silently go back to dealing
+  // every game the same cards, which is exactly the bug this replaced.
+  seed: string,
 ): WavelengthState {
   if (action.type === "clue") {
     if (state.phase !== "clue") return state;
@@ -237,9 +270,13 @@ export function reduce(
 
   if (action.type === "next") {
     if (state.phase !== "reveal") return state;
-    // Seeded from the round rather than from the original seed, so the
-    // next card does not depend on how long the last one took.
-    const random = rng(`${state.deck}:${state.round}:${state.teams.map((t) => t.score).join("-")}`);
+    // SEEDED FROM THIS GAME, not just from where the game has got to.
+    // It used to be `${deck}:${round}:${scores}` with no game seed in it,
+    // which meant round two after a scoreless round one dealt the same
+    // target in every game ever played - ten differently-seeded games all
+    // came back with 18.5, measured. The round and the scores are still in
+    // there so a round does not depend on how long the last one took.
+    const random = rng(`${seed}:${state.deck}:${state.round}:${state.teams.map((t) => t.score).join("-")}`);
     const card = pickCard(cards, state.seen, random);
     return {
       ...state,

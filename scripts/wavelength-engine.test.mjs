@@ -1,7 +1,7 @@
 // Wavelength's rules, and the one thing about them that is a security
 // property rather than a rule.
 //
-// The engine is a pure reduce(state, action, cards), for the same reason
+// The engine is a pure reduce(state, action, cards, SEED), for the same reason
 // the auction's is: the rules are the part that has to be right, and they
 // can be wrong in ways nobody notices until the last round of a live
 // stream. So they are checked here rather than by playing.
@@ -97,39 +97,40 @@ ok("a perfect guess cannot be stolen from", stealHits(40, 40, "left") === false 
 
 // ---- the phase machine --------------------------------------------------
 
-const fresh = startGame(CARDS, "everything", ["Us", "Them"], "phases");
+const SEED = "phases";
+const fresh = startGame(CARDS, "everything", ["Us", "Them"], SEED);
 ok("a new game starts on the clue", fresh.phase === "clue" && fresh.round === 1);
 ok("a new game has no clue, no guess, no score", fresh.clue === "" && fresh.guess === null && fresh.teams.every((t) => t.score === 0));
-ok("the dial is dead before there is a clue", reduce(fresh, { type: "guess", value: 50 }, CARDS) === fresh);
-ok("nothing to reveal before there is a guess", reduce(fresh, { type: "reveal" }, CARDS) === fresh);
-ok("no side to call before there is a guess", reduce(fresh, { type: "steal", side: "left" }, CARDS) === fresh);
-ok("no next round before a reveal", reduce(fresh, { type: "next" }, CARDS) === fresh);
+ok("the dial is dead before there is a clue", reduce(fresh, { type: "guess", value: 50 }, CARDS, SEED) === fresh);
+ok("nothing to reveal before there is a guess", reduce(fresh, { type: "reveal" }, CARDS, SEED) === fresh);
+ok("no side to call before there is a guess", reduce(fresh, { type: "steal", side: "left" }, CARDS, SEED) === fresh);
+ok("no next round before a reveal", reduce(fresh, { type: "next" }, CARDS, SEED) === fresh);
 ok("the psychic is waited on first", waitingOn(fresh) === fresh.psychic);
 
-const clued = reduce(fresh, { type: "clue", text: "Coffee" }, CARDS);
+const clued = reduce(fresh, { type: "clue", text: "Coffee" }, CARDS, SEED);
 ok("a clue is taken while on the clue", clued.clue === "Coffee" && clued.phase === "clue");
-ok("a clue can be backspaced to nothing", reduce(clued, { type: "clue", text: "" }, CARDS).clue === "");
-const turned = reduce(clued, { type: "guess", value: 61.5 }, CARDS);
+ok("a clue can be backspaced to nothing", reduce(clued, { type: "clue", text: "" }, CARDS, SEED).clue === "");
+const turned = reduce(clued, { type: "guess", value: 61.5 }, CARDS, SEED);
 ok("the first turn of the dial opens the guess", turned.phase === "guess" && turned.guess === 61.5);
-ok("the dial still moves after that", reduce(turned, { type: "guess", value: 20 }, CARDS).guess === 20);
-ok("the dial cannot leave the board", reduce(turned, { type: "guess", value: 900 }, CARDS).guess === DIAL_MAX);
-ok("nor the other way", reduce(turned, { type: "guess", value: -900 }, CARDS).guess === DIAL_MIN);
-const called = reduce(turned, { type: "steal", side: "right" }, CARDS);
+ok("the dial still moves after that", reduce(turned, { type: "guess", value: 20 }, CARDS, SEED).guess === 20);
+ok("the dial cannot leave the board", reduce(turned, { type: "guess", value: 900 }, CARDS, SEED).guess === DIAL_MAX);
+ok("nor the other way", reduce(turned, { type: "guess", value: -900 }, CARDS, SEED).guess === DIAL_MIN);
+const called = reduce(turned, { type: "steal", side: "right" }, CARDS, SEED);
 ok("a called side locks the dial", called.phase === "steal" && called.steal === "right");
-ok("the dial is locked once a side is called", reduce(called, { type: "guess", value: 5 }, CARDS) === called);
+ok("the dial is locked once a side is called", reduce(called, { type: "guess", value: 5 }, CARDS, SEED) === called);
 // The turn changes hands inside the guess phase, which is the part the
 // board draws its buttons from.
 ok("the psychic's team is waited on until the dial moves", waitingOn(clued) === clued.psychic);
 ok("the other team is waited on for the call", waitingOn(turned) === other(turned.psychic));
 ok("nobody is waited on once the side is called", waitingOn(called) === null);
-const shown = reduce(called, { type: "reveal" }, CARDS);
+const shown = reduce(called, { type: "reveal" }, CARDS, SEED);
 ok("the reveal scores", shown.phase === "reveal" && shown.scored !== null);
 ok("nobody is waited on at the reveal", waitingOn(shown) === null);
-const nextRound = reduce(shown, { type: "next" }, CARDS);
+const nextRound = reduce(shown, { type: "next" }, CARDS, SEED);
 ok("the next round swaps the psychic", nextRound.psychic === other(shown.psychic));
 ok("and clears the round", nextRound.clue === "" && nextRound.guess === null && nextRound.steal === null && nextRound.scored === null);
 ok("and deals a card that has not been seen", !shown.seen.includes(nextRound.card.id));
-ok("a clue is too long to break the graphic", reduce(fresh, { type: "clue", text: "x".repeat(500) }, CARDS).clue.length <= 60);
+ok("a clue is too long to break the graphic", reduce(fresh, { type: "clue", text: "x".repeat(500) }, CARDS, SEED).clue.length <= 60);
 
 // ---- whole games --------------------------------------------------------
 //
@@ -140,75 +141,69 @@ let games = 0;
 let states = 0;
 let leaks = 0;
 let badScores = 0;
-let edgeTargets = 0;
+const allTargets = [];
 let overWin = 0;
 let repeats = 0;
 
-// Every path in a JSON-safe object whose value equals `value`. The point
-// is that checking the `target` field is not enough: what crosses the wire
-// is the whole object, so a copy of the number anywhere in it - a nested
-// card, a scored block, a field added next year - is just as readable to
-// anybody who opens the browser source.
+// IS THE TARGET IN THIS MESSAGE, asked the only way that really answers
+// it: redact the state twice, once with the real target and once with a
+// different one, and compare the payloads byte for byte. If they are
+// identical then the payload cannot carry any information about the
+// target - not the number itself, not a copy of it nested somewhere, not
+// anything derived from it.
 //
-// Paths rather than a substring search of the JSON, because a guess that
-// lands exactly on the target is a legal and fairly common thing for the
-// message to contain, and grepping the bytes cannot tell the two apart.
-function pathsHolding(value, node, path = "state", found = []) {
-  if (node === value) found.push(path);
-  else if (node && typeof node === "object") {
-    for (const [k, v] of Object.entries(node)) pathsHolding(value, v, `${path}.${k}`, found);
-  }
-  return found;
-}
-
+// The first version of this hunted for the target's VALUE anywhere in the
+// message. That was both weaker and wrong: weaker because a derived field
+// would have sailed past it, and wrong because once the target was allowed
+// near the edges of the dial it started colliding with ordinary small
+// numbers - a team on 4 points and a target of 4.0 got reported as a leak.
 function checkRedaction(state) {
   states++;
   const sent = redactFor(state);
   if (state.phase === "reveal" || state.phase === "done") return sent;
 
-  // The board still knows the answer; the message must not.
-  const carried = pathsHolding(state.target, JSON.parse(JSON.stringify(sent))).filter(
-    // The dial's position is the team's own guess. It is on screen
-    // already, and it being right is the good outcome, not a leak.
-    (p) => p !== "state.guess",
-  );
-  if (carried.length > 0) {
+  const decoy = redactFor({ ...state, target: (state.target + 37.3) % 100 });
+  if (JSON.stringify(sent) !== JSON.stringify(decoy)) {
     leaks++;
-    if (leaks === 1) console.log(`     leaked at ${carried.join(", ")}`);
+    if (leaks === 1) console.log(`     the payload changes with the target:\n       ${JSON.stringify(sent)}`);
   }
   return sent;
 }
 
 for (let g = 0; g < 200; g++) {
   const cards = g % 2 === 0 ? CARDS : NFL_SPECTRUMS;
-  let s = startGame(cards, g % 2 === 0 ? "everything" : "football", ["Us", "Them"], `game-${g}`);
+  // ITS OWN SEED, and it matters even in a test: the seed is what makes
+  // two games deal differently, so sharing one across all 200 would hide
+  // the very thing the spread check below is looking for.
+  const gameSeed = `game-${g}`;
+  let s = startGame(cards, g % 2 === 0 ? "everything" : "football", ["Us", "Them"], gameSeed);
   const dealt = [s.card.id];
   let rounds = 0;
   checkRedaction(s);
 
   while (s.phase !== "done" && rounds < 80) {
     rounds++;
-    if (s.target < BAND_2 || s.target > DIAL_MAX - BAND_2) edgeTargets++;
+    allTargets.push(s.target);
 
     const before = s.teams.map((t) => t.score);
     const psychic = s.psychic;
 
-    s = reduce(s, { type: "clue", text: "clue" }, cards);
+    s = reduce(s, { type: "clue", text: "clue" }, cards, gameSeed);
     checkRedaction(s);
 
     // A spread of guesses: dead on, close, miles off, and on the edges,
     // so every band and both sides of the call get played for real.
     const guess = [s.target, s.target + 2, s.target - 9, s.target + 30, DIAL_MIN, DIAL_MAX][rounds % 6];
-    s = reduce(s, { type: "guess", value: guess }, cards);
+    s = reduce(s, { type: "guess", value: guess }, cards, gameSeed);
     checkRedaction(s);
 
     const side = rounds % 2 === 0 ? "left" : "right";
-    s = reduce(s, { type: "steal", side }, cards);
+    s = reduce(s, { type: "steal", side }, cards, gameSeed);
     checkRedaction(s);
 
     const target = s.target;
     const locked = s.guess;
-    s = reduce(s, { type: "reveal" }, cards);
+    s = reduce(s, { type: "reveal" }, cards, gameSeed);
     checkRedaction(s);
 
     // Scored against the rules computed independently, not against the
@@ -226,7 +221,7 @@ for (let g = 0; g < 200; g++) {
     }
     if (s.teams.some((t) => t.score >= WIN_SCORE)) overWin++;
 
-    s = reduce(s, { type: "next" }, cards);
+    s = reduce(s, { type: "next" }, cards, gameSeed);
     checkRedaction(s);
     // Cards do not come round again while there are unplayed ones left.
     if (dealt.length < cards.length && dealt.includes(s.card.id)) repeats++;
@@ -238,7 +233,70 @@ for (let g = 0; g < 200; g++) {
 ok("200 games all finish", games === 200, `${games} reached a winner`);
 ok("every score matches the rules", badScores === 0, `${states} states scored`);
 ok("nobody wins without reaching the score", overWin === 0);
-ok("a target is never close enough to the edge to be unwinnable", edgeTargets === 0);
+// WHERE THE TARGET IS ALLOWED TO BE, which is very nearly anywhere.
+//
+// Think of it as the physical game: the wedge is printed on a full circle
+// and only the top half shows, so it can sit mostly below the horizon with
+// just its inner half on the board. The one thing that must always be
+// reachable is the whole bullseye.
+//
+// It used to be pinned between 14 and 86 - the four could never land near
+// either end - which after a few streams is a pattern people play against.
+{
+  const lo = Math.min(...allTargets), hi = Math.max(...allTargets);
+  ok(
+    "the whole bullseye is always on the board",
+    allTargets.every((t) => t >= BAND_4 - 1e-9 && t <= DIAL_MAX - BAND_4 + 1e-9),
+    `${lo} to ${hi}`,
+  );
+  ok("and the target reaches both ends of the dial", lo < 5 && hi > 95, `${lo} / ${hi}`);
+  ok(
+    "the wedge does hang off an edge sometimes",
+    allTargets.filter((t) => t < BAND_2 || t > DIAL_MAX - BAND_2).length > allTargets.length / 10,
+    `${allTargets.filter((t) => t < BAND_2 || t > DIAL_MAX - BAND_2).length} of ${allTargets.length}`,
+  );
+
+  // Uniform across the window it is allowed, in twenty equal buckets.
+  // Measured against the LEGAL span rather than against 0..100, because
+  // the two end tenths are only partly reachable and comparing them to a
+  // flat tenth would understate them.
+  const LO = BAND_4, HI = DIAL_MAX - BAND_4, N = 20, W = (HI - LO) / N;
+  const buckets = Array.from({ length: N }, (_, i) =>
+    allTargets.filter((t) => t >= LO + i * W && t < (i === N - 1 ? HI + 1e-9 : LO + (i + 1) * W)).length,
+  );
+  const expect = allTargets.length / N;
+  const worst = Math.max(...buckets.map((b) => Math.abs(b - expect))) / expect;
+  // Loose on purpose: this is a fairness check, not a chi-square. The
+  // modulo-biased generator this replaced sat at 21%.
+  ok("targets are spread evenly across the dial", worst < 0.3, `worst bucket ${(worst * 100).toFixed(1)}% off`);
+}
+
+// AND TWO GAMES ARE NOT THE SAME GAME. The per-round deal used to be
+// seeded from `deck:round:scores` with nothing about WHICH game it was, so
+// round two after a scoreless round one dealt an identical target every
+// time - ten differently-seeded games all came back 18.5.
+{
+  const targets = [];
+  for (let g = 0; g < 10; g++) {
+    const seed = `distinct-${g}`;
+    let s = startGame(CARDS, "everything", ["A", "B"], seed);
+    s = reduce(s, { type: "clue", text: "x" }, CARDS, seed);
+    s = reduce(s, { type: "guess", value: 0 }, CARDS, seed);
+    s = reduce(s, { type: "steal", side: "left" }, CARDS, seed);
+    s = reduce(s, { type: "reveal" }, CARDS, seed);
+    targets.push(reduce(s, { type: "next" }, CARDS, seed).target);
+  }
+  ok("two games do not deal the same round two", new Set(targets).size >= 9, `${new Set(targets).size} distinct of 10`);
+}
+
+// The seed is the one thing that could hand the overlay the answer a round
+// early - it plus the round and the scores, which are already on the wire,
+// recomputes the target. It is not on the state at all, which is why.
+ok(
+  "the seed is not part of the state",
+  !Object.prototype.hasOwnProperty.call(fresh, "seed") && !JSON.stringify(fresh).includes("phases"),
+  "reduce() takes it as an argument instead",
+);
 ok("the deck does not repeat while it has cards left", repeats === 0);
 
 // THE ONE THAT MATTERS.
@@ -251,10 +309,10 @@ ok(
   "and it IS on the wire at the reveal",
   (() => {
     let s = startGame(CARDS, "everything", ["Us", "Them"], "reveal-check");
-    s = reduce(s, { type: "clue", text: "x" }, CARDS);
-    s = reduce(s, { type: "guess", value: 40 }, CARDS);
-    s = reduce(s, { type: "steal", side: "left" }, CARDS);
-    s = reduce(s, { type: "reveal" }, CARDS);
+    s = reduce(s, { type: "clue", text: "x" }, CARDS, SEED);
+    s = reduce(s, { type: "guess", value: 40 }, CARDS, SEED);
+    s = reduce(s, { type: "steal", side: "left" }, CARDS, SEED);
+    s = reduce(s, { type: "reveal" }, CARDS, SEED);
     return redactFor(s).target === s.target && s.target !== null;
   })(),
   "a redaction that never lifts would draw an empty wedge",
@@ -272,8 +330,8 @@ ok(
 // Round-tripped through JSON, because that is what actually crosses.
 const live = (() => {
   let s = startGame(CARDS, "everything", ["Us", "Them"], "wire");
-  s = reduce(s, { type: "clue", text: "Coffee" }, CARDS);
-  s = reduce(s, { type: "guess", value: 61.5 }, CARDS);
+  s = reduce(s, { type: "clue", text: "Coffee" }, CARDS, SEED);
+  s = reduce(s, { type: "guess", value: 61.5 }, CARDS, SEED);
   return s;
 })();
 const payload = JSON.parse(JSON.stringify({ deck: "everything", state: redactFor(live) }));

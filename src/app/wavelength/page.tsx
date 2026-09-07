@@ -78,7 +78,11 @@ function writeNames(next: string[]) {
   for (const cb of listeners) cb();
 }
 
-type Game = { deck: DeckKey; state: WavelengthState; past: WavelengthState[] };
+// THE SEED SITS HERE, beside the state rather than inside it. It is what
+// deals every round after the first, and the state is the thing that gets
+// broadcast - see the note above startGame(). Keeping it out here is what
+// stops the overlay being handed enough to work the target out for itself.
+type Game = { deck: DeckKey; seed: string; state: WavelengthState; past: WavelengthState[] };
 
 function isDeckKey(value: string | null): value is DeckKey {
   return DECKS.some((d) => d.key === value);
@@ -116,6 +120,7 @@ function WavelengthInner() {
     const seed = Math.random().toString(36).slice(2, 10);
     setGame({
       deck: deckKey,
+      seed,
       state: startGame(deck(deckKey), deckKey, names.map((n, i) => n.trim() || `Team ${i + 1}`), seed),
       past: [],
     });
@@ -124,7 +129,7 @@ function WavelengthInner() {
   const act = useCallback((action: WavelengthAction, record = true) => {
     setGame((g) => {
       if (!g) return g;
-      const next = reduce(g.state, action, deck(g.deck));
+      const next = reduce(g.state, action, deck(g.deck), g.seed);
       // A rejected action returns the same state. Pushing it would make
       // UNDO burn a press doing nothing.
       if (next === g.state) return g;
