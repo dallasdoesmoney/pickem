@@ -41,6 +41,8 @@ export function WaveStyles() {
          on the overlay it is the difference between the guess moving and
          the guess teleporting. */
       .wl-needle { transition: transform 170ms cubic-bezier(.2,.75,.3,1); }
+      /* Except while somebody is dragging it, when easing is just lag. */
+      .wl-needle.wl-dragging { transition: none; }
 
       .wl-pulse { animation: wl-pulse 780ms ease-in-out 2 both; }
       @keyframes wl-pulse { 0%,100% { opacity: .96 } 50% { opacity: .38 } }

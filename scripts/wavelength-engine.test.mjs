@@ -65,7 +65,25 @@ ok("a hair outside that is 2", bandFor(50, 50 - BAND_3 - 0.1) === 2);
 ok("the edge of the two band is 2", bandFor(50, 50 + BAND_2) === 2);
 ok("a hair outside the wedge is nothing", bandFor(50, 50 + BAND_2 + 0.1) === 0);
 ok("the far end of the dial is nothing", bandFor(50, DIAL_MAX) === 0 && bandFor(50, DIAL_MIN) === 0);
-ok("the wedge is symmetrical", [0.5, 3.5, 7.5, 12, 20].every((d) => bandFor(50, 50 - d) === bandFor(50, 50 + d)));
+ok("the wedge is symmetrical", [0.5, 2.4, 4, 7.2, 12, 20].every((d) => bandFor(50, 50 - d) === bandFor(50, 50 + d)));
+
+// FIVE EQUAL SLOTS, 2 3 4 3 2, the way the board is printed. Checked as
+// widths rather than as the three constants, because that is the thing
+// that is actually true about it and the thing that was wrong before: the
+// bullseye used to be 7 units against 4 and 4.5 for its neighbours.
+{
+  const widths = [BAND_2 - BAND_3, BAND_3 - BAND_4, BAND_4 * 2, BAND_3 - BAND_4, BAND_2 - BAND_3];
+  const even = widths.every((w) => Math.abs(w - widths[0]) < 1e-9);
+  ok("all five scoring slots are the same width", even, widths.map((w) => w.toFixed(2)).join(" / "));
+}
+
+// The float dust that made a guess landing exactly on a line score the
+// band below the one it earned.
+ok(
+  "a guess exactly on a boundary takes the better band",
+  bandFor(50, 50 - BAND_3) === 3 && bandFor(50, 50 + BAND_3) === 3 && bandFor(50, 50 - BAND_4) === 4,
+  "50 - 7.2 is 7.200000000000003, not 7.2",
+);
 
 // ---- the catch-up call --------------------------------------------------
 

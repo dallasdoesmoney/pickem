@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useRef } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { DIAL_MAX, DIAL_MIN, BAND_2, BAND_3, BAND_4 } from "@/lib/wavelength/engine";
 import { INK, MONEY, outlined } from "@/components/versus/style";
 
@@ -125,6 +125,9 @@ export function Dial({
 
   const box = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  // State as well as a ref, because the needle's CSS depends on it - see
+  // the transition note below. It flips twice a drag, not sixty times.
+  const [dragged, setDragged] = useState(false);
 
   // WHERE ON THE FACE WAS THAT. Measured off the element's own rectangle
   // rather than the SVG's coordinates, because on the control board this
@@ -149,6 +152,36 @@ export function Dial({
       onScrub(Math.min(DIAL_MAX, Math.max(DIAL_MIN, Math.round(raw * 10) / 10)));
     },
     [onScrub, width, cx, cy],
+  );
+
+  // ONE UPDATE PER FRAME, however fast the mouse is reporting.
+  //
+  // A pointing device is not capped at 60Hz - a gaming mouse reports at
+  // 1000 - and every raw move here would be a React render of the entire
+  // graphic and, on the board, a message onto the wire. Coalescing to an
+  // animation frame throws away the moves nobody could have seen anyway
+  // and always keeps the newest one.
+  const pending = useRef<{ x: number; y: number } | null>(null);
+  const frame = useRef<number | null>(null);
+
+  const queue = useCallback(
+    (x: number, y: number) => {
+      pending.current = { x, y };
+      if (frame.current !== null) return;
+      frame.current = requestAnimationFrame(() => {
+        frame.current = null;
+        const at = pending.current;
+        if (at) scrubTo(at.x, at.y);
+      });
+    },
+    [scrubTo],
+  );
+
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+    },
+    [],
   );
 
   const nudge = (by: number) => {
@@ -215,17 +248,22 @@ export function Dial({
             "aria-valuenow": guess ?? 50,
             onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
               dragging.current = true;
+              setDragged(true);
               e.currentTarget.setPointerCapture(e.pointerId);
+              // Straight through rather than queued: a tap on the face
+              // should land on the frame it happened.
               scrubTo(e.clientX, e.clientY);
             },
             onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
-              if (dragging.current) scrubTo(e.clientX, e.clientY);
+              if (dragging.current) queue(e.clientX, e.clientY);
             },
             onPointerUp: () => {
               dragging.current = false;
+              setDragged(false);
             },
             onPointerCancel: () => {
               dragging.current = false;
+              setDragged(false);
             },
             onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
               const step =
@@ -276,17 +314,19 @@ export function Dial({
               ink outline, which is the one treatment that holds on all
               three band colours without a rule per colour. */}
           {marks.map((m, i) => {
-            // Well out towards the rim: near the hub the rings converge to
-            // a point and five numerals inside 24 units of dial pile into
-            // each other.
-            const at = pointAt(cx, cy, r * 0.79, m.at);
-            const size = Math.round(width * 0.044);
+            // Up near the rim, where the slot is at its widest and where
+            // the eye already is - and TURNED WITH THE ARC, so the five of
+            // them read as printing on a dial rather than five numbers
+            // dropped on top of one.
+            const at = pointAt(cx, cy, r * 0.87, m.at);
+            const size = Math.round(width * 0.036);
             return (
               <text
                 key={`${m.n}-${i}`}
                 x={at.x}
                 y={at.y + size * 0.36}
                 textAnchor="middle"
+                transform={`rotate(${angleFor(m.at)} ${at.x} ${at.y})`}
                 style={{ ...outlined(size), fill: "#ffffff", fontFamily: "var(--font-display)", fontSize: size }}
               >
                 {m.n}
@@ -353,7 +393,17 @@ export function Dial({
             is what you actually see, on the lid, on the cream and over a
             camera alike. */}
         {guess !== null && (
-          <g className="wl-needle" style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${angleFor(guess)}deg)` }}>
+          // NO EASING WHILE A FINGER IS ON IT. The transition exists for
+          // the overlay, where a new guess arrives every so often and
+          // should glide in rather than teleport. Under a live drag it is
+          // the opposite of help: every move restarts a 170ms ease from
+          // wherever the needle had got to, so it never tracks the cursor
+          // and never settles - a third of frames showed no movement at
+          // all and the rest lurched. Measured, then removed.
+          <g
+            className={dragged ? "wl-needle wl-dragging" : "wl-needle"}
+            style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${angleFor(guess)}deg)` }}
+          >
             <line
               x1={cx}
               y1={cy}

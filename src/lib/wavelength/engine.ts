@@ -35,13 +35,19 @@ export const DIAL_MAX = 100;
 // the target. Four points for the bullseye, then three, then two, and
 // nothing outside.
 //
-// The whole wedge is 24 units of 100 - a shade under a quarter of the
-// dial, which is roughly what the physical board gives you. They are
-// constants rather than literals in the scoring function because they are
-// the first thing anybody will want to tune after playing it twice.
-export const BAND_4 = 3.5;
-export const BAND_3 = 7.5;
-export const BAND_2 = 12;
+// FIVE EQUAL SLOTS - 2 3 4 3 2 - the way the board is printed. They were
+// not: the bullseye was 7 units wide against 4 and 4.5 for the rings
+// either side, so the hardest thing to hit was the biggest target on the
+// dial and it looked wrong next to its neighbours.
+//
+// The whole wedge is still 24 units of 100, a shade under a quarter of the
+// dial, so each slot is 4.8. Constants rather than literals in the scoring
+// function because they are the first thing anybody will want to tune
+// after playing it twice.
+const SLOT_WIDTH = 4.8;
+export const BAND_4 = SLOT_WIDTH / 2;
+export const BAND_3 = BAND_4 + SLOT_WIDTH;
+export const BAND_2 = BAND_3 + SLOT_WIDTH;
 
 // How far from either edge the target may be. Without this the target
 // sits at 99 often enough to matter, and a target on the edge is a bad
@@ -150,11 +156,18 @@ export function startGame(
 
 // WHAT A GUESS IS WORTH. Distance from the centre of the target, in
 // bands. Nothing outside the widest band scores.
+// A hair of tolerance on each edge, and it is not pedantry: the dial and
+// the target are both quantised to a tenth, so landing exactly on a
+// boundary is a thing that happens in real play - and 50 - 7.2 comes back
+// as 7.200000000000003, which put a guess sitting precisely on the line
+// into the band BELOW the one it had earned.
+const EDGE = 1e-9;
+
 export function bandFor(target: number, guess: number): number {
   const d = Math.abs(guess - target);
-  if (d <= BAND_4) return 4;
-  if (d <= BAND_3) return 3;
-  if (d <= BAND_2) return 2;
+  if (d <= BAND_4 + EDGE) return 4;
+  if (d <= BAND_3 + EDGE) return 3;
+  if (d <= BAND_2 + EDGE) return 2;
   return 0;
 }
 

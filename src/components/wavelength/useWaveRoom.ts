@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import type { WavelengthState } from "@/lib/wavelength/engine";
@@ -79,11 +79,60 @@ export function useWaveRoomCode() {
 // `state` is null before a game has been started. The board still joins
 // the channel then, so the link can be pasted into OBS and confirmed
 // working while there is still time to fix it.
+
+// HOW OFTEN THE WIRE IS ALLOWED TO CARRY A STATE.
+//
+// Dragging the needle changes the state on every animation frame, and one
+// broadcast per frame is sixty messages a second down a channel built for
+// moves, not for motion. This is a leading-and-TRAILING throttle: the
+// first change goes out immediately, the rest are collapsed, and the last
+// one always goes out - which is the part that matters, because a dropped
+// final send would leave the stream showing a needle that has stopped
+// somewhere the board is not.
+//
+// 50ms is well inside the needle's own 170ms glide on the overlay, so the
+// motion still looks continuous over there.
+const SEND_MS = 50;
+
 export function useWaveBroadcast(code: string | null, deck: string, state: WavelengthState | null) {
   const latest = useRef<WaveMessage | null>(state ? { deck, state: redactFor(state) } : null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [live, setLive] = useState(false);
   const [viewers, setViewers] = useState(0);
+  const sentAt = useRef(0);
+  const trailing = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const push = useCallback(() => {
+    const send = () => {
+      sentAt.current = Date.now();
+      if (channelRef.current && latest.current) {
+        void channelRef.current.send({ type: "broadcast", event: STATE, payload: latest.current });
+      }
+    };
+    const since = Date.now() - sentAt.current;
+    if (since >= SEND_MS) {
+      if (trailing.current) {
+        clearTimeout(trailing.current);
+        trailing.current = null;
+      }
+      send();
+      return;
+    }
+    // One trailing send is already booked; it will pick up whatever
+    // latest.current holds by the time it fires.
+    if (trailing.current) return;
+    trailing.current = setTimeout(() => {
+      trailing.current = null;
+      send();
+    }, SEND_MS - since);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (trailing.current) clearTimeout(trailing.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!code) return;
@@ -121,8 +170,8 @@ export function useWaveBroadcast(code: string | null, deck: string, state: Wavel
   useEffect(() => {
     if (!state) return;
     latest.current = { deck, state: redactFor(state) };
-    void channelRef.current?.send({ type: "broadcast", event: STATE, payload: latest.current });
-  }, [deck, state]);
+    push();
+  }, [deck, state, push]);
 
   return { live, viewers };
 }

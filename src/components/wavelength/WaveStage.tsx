@@ -41,6 +41,17 @@ export function WaveStage({
   const [width, setWidth] = useState(0);
   const [content, setContent] = useState(0);
 
+  // Everything about the state that can change how TALL the graphic is.
+  // Deliberately not the guess: see the measuring effect below.
+  const layoutKey = [
+    state.round,
+    state.card.id,
+    state.phase,
+    state.clue,
+    state.scored ? `${state.scored.band}-${state.scored.stolen}` : "",
+    state.teams.map((t) => `${t.name}:${t.score}`).join(","),
+  ].join("|");
+
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -70,7 +81,14 @@ export function WaveStage({
     ro.observe(el);
     for (const k of Array.from(el.children)) ro.observe(k);
     return () => ro.disconnect();
-  }, [width, state]);
+    // KEYED ON WHAT CHANGES THE LAYOUT, not on the whole state. The guess
+    // changes on every pointer move while somebody is dragging the needle,
+    // and with `state` in here that tore down the observer, rebuilt it,
+    // re-observed six children and forced a synchronous re-measure of the
+    // whole 1080x1920 tree - sixty-two times in one drag, measured. The
+    // needle lives inside a fixed-size SVG and moves nothing, so it has no
+    // business in this dependency list.
+  }, [width, layoutKey]);
 
   // No cameras on a web page, so the graphic centres in the whole stage
   // and gets cropped to whatever it measured, with a little air around it.
