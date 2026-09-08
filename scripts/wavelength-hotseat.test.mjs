@@ -80,7 +80,19 @@ try {
 
   await page.getByRole("button", { name: /START THE GAME/i }).click();
   await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).waitFor({ timeout: 30000 });
-  ok("the first round comes up", (await page.locator("main [data-band]").innerText()).includes("ROUND 1"));
+  ok("the first round comes up", (await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).count()) === 1);
+
+  // THE GRAPHIC SAYS NOTHING IT DOES NOT HAVE TO. It used to narrate
+  // itself - the round, whose turn it was, what it was waiting for - and
+  // all of that is on this screen already and being said out loud on the
+  // stream. What is on the layer is the score, the dial and the clue.
+  {
+    const drawn = (await page.locator("main [data-band]").innerText()).toUpperCase();
+    for (const chatter of ["ROUND", "WAITING", "THINKING", "TURNING", "FIRST TO"]) {
+      ok(`the overlay does not say ${chatter.toLowerCase()}`, !drawn.includes(chatter), drawn.replace(/\n/g, " ").slice(0, 50));
+    }
+    ok("but it does carry the score", /\b0\b/.test(drawn) && drawn.includes("TEAM 1"));
+  }
   ok("nothing to undo yet", await page.getByRole("button", { name: /UNDO LAST MOVE/i }).isDisabled());
 
   // THE DIAL IS LIVE FROM THE OFF. It used to wait for a clue to be typed,
@@ -204,8 +216,8 @@ try {
   await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).waitFor({ timeout: 30000 });
 
   const band0 = await page.locator("main [data-band]").innerText();
-  ok("a co-op run says how long it is", /ROUND 1 OF 5/.test(band0), band0.split("\n")[0]);
-  ok("and shows one pile, not two scores", /0\s*\/\s*\d+/.test(band0.replace(/\n/g, " ")));
+  ok("a co-op run shows one pile, not two scores", /0\s*\/\s*\d+/.test(band0.replace(/\n/g, " ")), band0.replace(/\n/g, " "));
+  ok("and still says nothing about rounds", !band0.toUpperCase().includes("ROUND"));
 
   let coopRounds = 0;
   let coopLeaks = 0;

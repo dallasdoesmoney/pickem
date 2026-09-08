@@ -1,7 +1,7 @@
 "use client";
 
 import type { WavelengthState } from "@/lib/wavelength/engine";
-import { WIN_SCORE, COOP_MAX, other } from "@/lib/wavelength/engine";
+import { WIN_SCORE, COOP_MAX } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, INK, outlined } from "@/components/versus/style";
 import { Dial, COVER_MS, DEFAULT_BANDS, type BandPalette } from "./Dial";
 
@@ -273,36 +273,21 @@ export function OverlayBoard({
 }) {
   const bandHeight = STAGE_H - camTop - camBottom;
   const reveal = state.phase === "reveal" || state.phase === "done";
-  const dialW = 720;
+  const dialW = 860;
 
   // What the big line says. One place, so the graphic never has two
   // opinions about what moment it is.
   const coop = state.mode === "coop";
-  const headline = (() => {
-    if (state.phase === "done") {
-      if (coop) return { text: `${state.pot} OUT OF ${COOP_MAX}`, color: MONEY };
-      const winner = state.teams[0].score >= WIN_SCORE ? 0 : 1;
-      return { text: `${state.teams[winner].name.toUpperCase()} WINS`, color: PLAYER_COLORS[winner] };
-    }
-    if (reveal && state.scored) {
-      const band = state.scored.band;
-      return {
-        text: band > 0 ? `+${band}` : "MISSED",
-        color: band > 0 ? MONEY : "rgba(255,255,255,0.7)",
-      };
-    }
-    if (state.phase === "steal") {
-      const caller = other(state.psychic);
-      return { text: `${state.teams[caller].name.toUpperCase()} CALLS IT`, color: PLAYER_COLORS[caller] };
-    }
-    if (state.phase === "guess") {
-      // In co-op the psychic is the one who may NOT touch the dial, so the
-      // line has to name the other one.
-      const turning = coop ? other(state.psychic) : state.psychic;
-      return { text: `${state.teams[turning].name.toUpperCase()} IS TURNING`, color: PLAYER_COLORS[turning] };
-    }
-    return { text: `${state.teams[state.psychic].name.toUpperCase()} IS THINKING`, color: PLAYER_COLORS[state.psychic] };
-  })();
+  // ONE LINE, AT THE END. Everything else this used to say - who is
+  // thinking, who is turning, who calls it, what the round scored - is on
+  // the board screen for the person running the game, and was noise on a
+  // stream where both of them are talking anyway.
+  const ending = coop
+    ? { text: `${state.pot} OUT OF ${COOP_MAX}`, color: MONEY }
+    : (() => {
+        const winner = state.teams[0].score >= WIN_SCORE ? 0 : 1;
+        return { text: `${state.teams[winner].name.toUpperCase()} WINS`, color: PLAYER_COLORS[winner] };
+      })();
 
   return (
     <div style={{ width: STAGE_W, height: STAGE_H, position: "relative", overflow: "hidden" }}>
@@ -322,24 +307,18 @@ export function OverlayBoard({
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          gap: 12,
+          gap: 16,
           padding: "0 40px",
         }}
       >
-        {/* Round and the target score, small, so a clip that starts here
-            still says what is being played. */}
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: 6, color: "rgba(255,255,255,0.45)", ...outlined(20) }}>
-          {coop ? (
-            <>
-              ROUND {Math.min(state.round, state.runLength)} OF {state.runLength} &middot; TOGETHER
-            </>
-          ) : (
-            <>
-              ROUND {state.round} &middot; FIRST TO {WIN_SCORE}
-            </>
-          )}
-        </span>
-
+        {/* NOTHING BUT THE GAME.
+            
+            This layer used to narrate itself - the round, whose turn it
+            was, what it was waiting for. All of that is on the board
+            screen, where the person running it needs it, and none of it is
+            on the stream, where two people are already saying it out loud.
+            What is left is the three things a viewer cannot get any other
+            way: the score, the dial, and the clue if one was typed. */}
         {coop ? (
           <CoopScore state={state} />
         ) : (
@@ -366,15 +345,12 @@ export function OverlayBoard({
           />
         </div>
 
-        {/* THE CLUE, which is the whole round in one word. Biggest thing
-            on the graphic after the dial, and empty until the psychic has
-            actually said it. */}
-        <div style={{ minHeight: 76, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
-          {state.clue.trim() === "" ? (
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 30, letterSpacing: 4, color: "rgba(255,255,255,0.3)", ...outlined(30) }}>
-              WAITING FOR THE CLUE
-            </span>
-          ) : (
+        {/* THE CLUE, when there is one. The room is empty rather than
+            captioned when there is not - but it is still RESERVED, because
+            a graphic that jumps up forty pixels the moment somebody starts
+            typing is worse than a graphic with a gap in it. */}
+        <div style={{ minHeight: 84, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
+          {state.clue.trim() !== "" && (
             // Not keyed on the text: this pops when the clue first lands
             // and then updates letter by letter as it is typed, which is
             // the point of carrying it live.
@@ -384,11 +360,11 @@ export function OverlayBoard({
                 fontFamily: "var(--font-display)",
                 // Long clues shrink rather than wrap: two lines here
                 // would push the dial into a cam band.
-                fontSize: state.clue.length > 18 ? 48 : 68,
+                fontSize: state.clue.length > 18 ? 52 : 74,
                 lineHeight: 1,
                 color: "#ffffff",
                 textAlign: "center",
-                ...outlined(state.clue.length > 18 ? 48 : 68),
+                ...outlined(state.clue.length > 18 ? 52 : 74),
               }}
             >
               &ldquo;{state.clue.toUpperCase()}&rdquo;
@@ -396,22 +372,15 @@ export function OverlayBoard({
           )}
         </div>
 
-        <span
-          key={headline.text}
-          className="wl-in"
-          style={{ fontFamily: "var(--font-display)", fontSize: 36, letterSpacing: 3, color: headline.color, ...outlined(36) }}
-        >
-          {headline.text}
-        </span>
-
-        {/* The catch-up point, only once it has been decided. */}
-        {reveal && !coop && state.scored?.stolen && (
+        {/* THE ONE LINE THAT SURVIVED, and only at the very end. A game
+            that simply stops is a strange thing to watch. */}
+        {state.phase === "done" && (
           <span
-            key={`stolen-${state.round}`}
+            key={ending.text}
             className="wl-in"
-            style={{ fontFamily: "var(--font-display)", fontSize: 24, letterSpacing: 3, color: PLAYER_COLORS[other(state.psychic)], ...outlined(24) }}
+            style={{ fontFamily: "var(--font-display)", fontSize: 44, letterSpacing: 3, color: ending.color, ...outlined(44) }}
           >
-            {state.teams[other(state.psychic)].name.toUpperCase()} CALLED THE SIDE &middot; +1
+            {ending.text}
           </span>
         )}
       </div>

@@ -3,9 +3,11 @@
 import { Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { isRoomCode } from "@/lib/wavelength/room";
+import { COOP_MAX, WIN_SCORE, other } from "@/lib/wavelength/engine";
 import { useWaveGuest } from "@/components/wavelength/useWaveRoom";
 import { WaveStage } from "@/components/wavelength/WaveStage";
-import { display } from "@/components/versus/style";
+import { WaveStyles } from "@/components/wavelength/OverlayBoard";
+import { PLAYER_COLORS, MONEY, display, outlined } from "@/components/versus/style";
 
 // THE SECOND PAIR OF HANDS.
 //
@@ -59,6 +61,43 @@ function JoinInner() {
   // drawn with a stale local needle on it.
   const shown = state === null ? null : canMove && local !== null ? { ...state, guess: local } : state;
 
+  // WHAT IS HAPPENING, in the board's own words. Worked out from the same
+  // state the board is drawing, so the two screens cannot end up saying
+  // different things about the same moment.
+  const status = (() => {
+    if (!shown) return { line: "", color: "#ffffff", note: "" };
+    const psychic = shown.teams[shown.psychic];
+    const guessing = shown.teams[other(shown.psychic)];
+    const coop = shown.mode === "coop";
+
+    if (shown.phase === "done") {
+      if (coop) return { line: `${shown.pot} OUT OF ${COOP_MAX}`, color: MONEY, note: "run over" };
+      const winner = shown.teams[0].score >= WIN_SCORE ? 0 : 1;
+      return { line: `${shown.teams[winner].name.toUpperCase()} WINS`, color: PLAYER_COLORS[winner], note: "" };
+    }
+    if (shown.phase === "reveal" && shown.scored) {
+      const band = shown.scored.band;
+      return {
+        line: band > 0 ? `+${band}` : "MISSED",
+        color: band > 0 ? MONEY : "rgba(255,255,255,0.6)",
+        note: shown.scored.stolen ? `${guessing.name} called the side, +1` : "the board deals the next one",
+      };
+    }
+    if (shown.phase === "steal") {
+      return {
+        line: `${guessing.name.toUpperCase()} SAYS ${shown.steal === "left" ? "LEFT" : "RIGHT"}`,
+        color: PLAYER_COLORS[other(shown.psychic)],
+        note: "dial locked",
+      };
+    }
+    // clue or guess: the dial is yours.
+    return {
+      line: "DRAG THE NEEDLE",
+      color: "rgba(255,255,255,0.85)",
+      note: coop ? `${psychic.name} is the psychic` : `${psychic.name}'s clue`,
+    };
+  })();
+
   if (!code) {
     return (
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col px-4 pb-16 pt-12">
@@ -89,6 +128,9 @@ function JoinInner() {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 px-4 pb-10 pt-3">
+      {/* The dial has a lid, and a lid with no keyframes never opens - so
+          the graphic's stylesheet has to be on this page too. */}
+      <WaveStyles />
       <div className="flex items-center justify-between gap-3 px-1">
         <span style={{ ...display(11, { letterSpacing: 3, color: "rgba(255,255,255,0.32)" }) }}>
           ON THE DIAL
@@ -105,23 +147,36 @@ function JoinInner() {
       {shown ? (
         <>
           <WaveStage state={shown} onScrub={canMove ? onScrub : undefined} />
-          <div className="mt-1 border-t pt-4 text-center" style={{ borderColor: RULE }}>
-            {canMove ? (
-              <>
-                <p style={{ ...display(16, { letterSpacing: 1, color: "rgba(255,255,255,0.8)" }) }}>DRAG THE NEEDLE</p>
-                <p className="mt-1.5 text-[12px] text-white/40">
-                  {shown.card.left} on the left, {shown.card.right} on the right. Say when you are happy
-                  &mdash; the board opens it.
-                </p>
-              </>
-            ) : (
-              <p className="text-[12.5px] text-white/40">
-                {shown.phase === "steal" ? "Waiting on the call." : "The board has it from here."}
-              </p>
-            )}
+
+          {/* EVERYTHING THE BOARD KNOWS, minus the buttons that run it.
+              The graphic is deliberately bare now - it is a stream layer,
+              not a status readout - so the round, the turn and the result
+              are printed here instead, the same way they are on the board
+              screen. The one thing this page never shows is the target
+              before the reveal, and that is not a decision made here: it
+              is not in the message. */}
+          <div className="mt-1 flex flex-col gap-2 border-t pt-4" style={{ borderColor: RULE }}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span style={{ ...display(11, { letterSpacing: 3, color: "rgba(255,255,255,0.32)" }) }}>
+                {shown.mode === "coop"
+                  ? `ROUND ${Math.min(shown.round, shown.runLength)} OF ${shown.runLength}`
+                  : `ROUND ${shown.round} · FIRST TO ${WIN_SCORE}`}
+              </span>
+              <span className="text-[11px] text-white/35">
+                {shown.mode === "coop"
+                  ? `${shown.pot} of ${COOP_MAX}`
+                  : `${shown.teams[0].name} ${shown.teams[0].score} — ${shown.teams[1].score} ${shown.teams[1].name}`}
+              </span>
+            </div>
+
+            <div className="flex items-baseline justify-between gap-3">
+              <span style={{ ...display(18, { color: status.color, letterSpacing: 1 }), ...outlined(18, "soft") }}>
+                {status.line}
+              </span>
+              {status.note && <span className="text-[12px] text-white/40">{status.note}</span>}
+            </div>
           </div>
-        </>
-      ) : (
+        </>      ) : (
         <div className="flex flex-1 items-center justify-center py-20">
           <p className="text-center text-[13px] text-white/35">
             {live ? "Connected. Waiting for the board to start a game." : "Connecting to the room…"}
