@@ -19,10 +19,9 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "./OverlayBoard";
 // crop cut the bottom line off.
 export function WaveStage({
   state,
-  // Both board-only. The mirror is not a picture of the graphic, it is the
-  // graphic - so the dial you drag and the lid you lift are the ones on
-  // the stream, not a second set of controls beside them.
-  peek = false,
+  // The mirror is not a picture of the graphic, it is the graphic - so
+  // the dial you drag is the one on the stream, not a second control
+  // beside it. The lid needs no prop: it is part of the game now.
   onScrub,
   // HOW TALL IT IS ALLOWED TO GET, and it needs a ceiling: scaled purely
   // to the width, a 900px-wide column drew the graphic 750px tall and the
@@ -32,7 +31,6 @@ export function WaveStage({
   maxHeight = 430,
 }: {
   state: WavelengthState;
-  peek?: boolean;
   onScrub?: (value: number) => void;
   maxHeight?: number;
 }) {
@@ -49,6 +47,7 @@ export function WaveStage({
     state.phase,
     state.clue,
     state.scored ? `${state.scored.band}-${state.scored.stolen}` : "",
+    state.peek,
     state.teams.map((t) => `${t.name}:${t.score}`).join(","),
   ].join("|");
 
@@ -116,7 +115,7 @@ export function WaveStage({
               transformOrigin: "top left",
             }}
           >
-            <OverlayBoard state={state} camTop={0} camBottom={0} peek={peek} onScrub={onScrub} />
+            <OverlayBoard state={state} camTop={0} camBottom={0} onScrub={onScrub} />
           </div>
         )}
       </div>

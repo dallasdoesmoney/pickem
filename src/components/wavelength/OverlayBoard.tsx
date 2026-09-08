@@ -80,10 +80,11 @@ export function WaveStyles() {
   );
 }
 
-// A SCOREBOARD ROW, not a column. Name over the psychic pill on one side
-// and the number beside it, because stacked they were 156 tall each and
-// the whole graphic overran the band it is supposed to sit inside - the
-// top and bottom of it were spilling into the two cam cutouts.
+// TWO NUMBERS AND A PILL. The names came off: on a stream the two people
+// are on camera and being addressed by name out loud, so printing "TEAM 1"
+// over the top of them was the caption telling you what you are looking
+// at. Which side is which is carried by the colour, the same two colours
+// the draft uses, and by the pill on whoever is holding the card.
 function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; align: "left" | "right" }) {
   const team = state.teams[who];
   const isPsychic = state.psychic === who;
@@ -108,26 +109,23 @@ function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; alig
         gap: 16,
       }}
     >
+      {/* WHO IS HOLDING THE CARD. Without it a viewer joining mid-round
+          has no idea which side is guessing and which is about to call
+          left or right - and with the names gone it is the only thing
+          left that says so. Keyed on the psychic so it pops across on the
+          swap instead of silently reappearing on the other side. */}
       <span
         style={{
           display: "flex",
-          flexDirection: "column",
-          alignItems: align === "left" ? "flex-start" : "flex-end",
-          gap: 5,
+          alignItems: "center",
           // Reserved whether or not the pill is there, so the two sides of
           // the scoreboard sit on the same line all game.
-          minHeight: 62,
-          justifyContent: "center",
+          minHeight: 30,
+          minWidth: 96,
+          justifyContent: align === "left" ? "flex-start" : "flex-end",
         }}
       >
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 1, color: PLAYER_COLORS[who], ...outlined(32) }}>
-          {team.name.toUpperCase()}
-        </span>
-        {/* WHO IS HOLDING THE CARD. Without it a viewer joining mid-round
-            has no idea which side is guessing and which is about to call
-            left or right. Keyed on the psychic so it pops across on the
-            swap instead of silently reappearing on the other side. */}
-        <span style={{ height: 25 }}>
+        <span>
           {isPsychic && (
             <span
               key={state.psychic}
@@ -135,11 +133,11 @@ function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; alig
               style={{
                 display: "inline-block",
                 fontFamily: "var(--font-display)",
-                fontSize: 17,
+                fontSize: 19,
                 letterSpacing: 3,
                 color: INK,
                 background: PLAYER_COLORS[who],
-                padding: "4px 10px",
+                padding: "5px 12px",
                 borderRadius: 999,
                 boxShadow: PRESS,
               }}
@@ -156,7 +154,7 @@ function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; alig
         <span
           key={team.score}
           className="wl-pop"
-          style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 58, lineHeight: 1, color: "#ffffff", ...outlined(58) }}
+          style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 72, lineHeight: 1, color: PLAYER_COLORS[who], ...outlined(72) }}
         >
           {team.score}
         </span>
@@ -191,22 +189,18 @@ function CoopScore({ state }: { state: WavelengthState }) {
   const gained = state.scored ? state.scored.band : 0;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-      <span style={{ display: "flex", flexDirection: "column", gap: 5, minHeight: 62, justifyContent: "center" }}>
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 1, color: PLAYER_COLORS[state.psychic], ...outlined(32) }}>
-          {state.teams[state.psychic].name.toUpperCase()}
-        </span>
+      <span style={{ display: "flex", alignItems: "center", minHeight: 30, minWidth: 96 }}>
         <span
           key={state.psychic}
           className="wl-pop"
           style={{
             display: "inline-block",
-            alignSelf: "flex-start",
             fontFamily: "var(--font-display)",
-            fontSize: 17,
+            fontSize: 19,
             letterSpacing: 3,
             color: INK,
             background: PLAYER_COLORS[state.psychic],
-            padding: "4px 10px",
+            padding: "5px 12px",
             borderRadius: 999,
             boxShadow: PRESS,
           }}
@@ -219,7 +213,7 @@ function CoopScore({ state }: { state: WavelengthState }) {
         <span
           key={state.pot}
           className="wl-pop"
-          style={{ fontFamily: "var(--font-display)", fontSize: 58, lineHeight: 1, color: "#ffffff", ...outlined(58) }}
+          style={{ fontFamily: "var(--font-display)", fontSize: 72, lineHeight: 1, color: "#ffffff", ...outlined(72) }}
         >
           {state.pot}
         </span>
@@ -254,11 +248,6 @@ export function OverlayBoard({
   state,
   camTop = 560,
   camBottom = 560,
-  // BOARD ONLY, and it never crosses the wire. The psychic holding the
-  // phone lifts the lid on this same face; the overlay is not passed it,
-  // and could not draw the wedge anyway because the message it was given
-  // has no target in it.
-  peek = false,
   // Handed in only by the board, which is what makes the dial a control
   // there and a picture everywhere else.
   onScrub,
@@ -267,7 +256,6 @@ export function OverlayBoard({
   state: WavelengthState;
   camTop?: number;
   camBottom?: number;
-  peek?: boolean;
   onScrub?: (value: number) => void;
   bands?: BandPalette;
 }) {
@@ -336,9 +324,18 @@ export function OverlayBoard({
             width={dialW}
             left={state.card.left}
             right={state.card.right}
-            target={state.target}
+            // NOT DRAWN UNLESS IT IS MEANT TO BE SEEN, which is a
+            // separate question from whether the lid is open: the wedge
+            // has to outlive the shutter on the way down. Passing null
+            // rather than hiding it under the lid keeps the rendered
+            // graphic honest - if the wedge is in the page, it is because
+            // somebody is allowed to look at it.
+            target={reveal || state.peek !== "shut" ? state.target : null}
             guess={state.guess}
-            open={reveal || peek}
+            // OFF THE STATE, so the lid is the same lid on every screen -
+            // the board, the stream and the join link all draw whatever
+            // the game says, rather than each keeping its own idea of it.
+            open={reveal || state.peek === "open"}
             pulse={reveal}
             bands={bands}
             onScrub={onScrub}

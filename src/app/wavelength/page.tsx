@@ -472,7 +472,7 @@ function WavelengthInner() {
           <div className="mt-5 flex items-center gap-4 rounded-2xl px-4 py-4" style={{ border: "2px solid rgba(255,255,255,0.10)" }}>
             <Dial width={150} left="Cold" right="Hot" target={68} guess={54} open />
             <ol className="min-w-0 flex-1 text-[12px] leading-relaxed text-white/50">
-              <li>1. The psychic holds a button and the dial opens, for them.</li>
+              <li>1. The psychic holds a button and the dial opens &mdash; on every screen.</li>
               <li>2. They say one clue out loud. The other drags the needle.</li>
               <li>3. {mode === "coop" ? "Open the dial and bank the points." : "The other team calls which side it really is on."}</li>
             </ol>

@@ -6,12 +6,17 @@
 // can be wrong in ways nobody notices until the last round of a live
 // stream. So they are checked here rather than by playing.
 //
-// THE TARGET IS THE ONE SECRET IN THE GAME. Everything else on the wire is
-// already on screen. If the target reaches the overlay before the reveal
-// then anybody holding the browser source URL - which lives in an OBS
-// config and gets screen-shared - can read the answer out of the payload,
-// and the game is over as a game. That is what the redaction block below
-// exists for, and it is deliberately the longest one in this file.
+// THE TARGET IS THE ONE SECRET IN THE GAME, and the rule about it is not
+// "the graphic declines to draw it" - it is that the number is not in the
+// MESSAGE. A number in the payload is a number anybody holding the browser
+// source URL can read, and that URL lives in an OBS config and gets
+// screen-shared.
+//
+// It is allowed out at exactly two moments, and the second one is a
+// choice rather than a leak: the reveal, and while the psychic is holding
+// the lid open - because opening the dial is now a beat the stream and the
+// join link are meant to see. Both are checked here; so is the fact that
+// it is nowhere near the wire at any other time.
 
 import {
   startGame,
@@ -222,7 +227,12 @@ let repeats = 0;
 function checkRedaction(state) {
   states++;
   const sent = redactFor(state);
+  // Two moments the answer is allowed out: the reveal, and while the lid
+  // is up - the psychic opening the dial is a beat everybody is meant to
+  // see now, so for those seconds it really is on the wire. Both are
+  // checked on their own below.
   if (state.phase === "reveal" || state.phase === "done") return sent;
+  if (state.peek !== "shut") return sent;
 
   const decoy = redactFor({ ...state, target: (state.target + 37.3) % 100 });
   if (JSON.stringify(sent) !== JSON.stringify(decoy)) {
@@ -379,6 +389,42 @@ ok(
   })(),
   "a redaction that never lifts would draw an empty wedge",
 );
+
+// ---- the lid -------------------------------------------------------------
+//
+// Opening the dial is a move now, and it is the one move that changes what
+// is allowed onto the wire. Three states rather than two, because the
+// target has to outlive the shutter: the lid is only DRAWN open on "open",
+// and the answer survives "closing" as well, or the wedge blinks out from
+// under a lid still travelling.
+
+{
+  const LID = "lid";
+  const shut = startGame(CARDS, "everything", ["A", "B"], LID);
+  ok("a round starts with the lid shut", shut.peek === "shut");
+  ok("and the answer is not on the wire", redactFor(shut).target === null);
+
+  const open = reduce(shut, { type: "peek", at: "open" }, CARDS, LID);
+  ok("holding it open is a move", open.peek === "open");
+  ok("and the answer goes out with it", redactFor(open).target === open.target);
+
+  const closing = reduce(open, { type: "peek", at: "closing" }, CARDS, LID);
+  ok("the answer outlives the shutter", redactFor(closing).target === closing.target);
+
+  const done = reduce(closing, { type: "peek", at: "shut" }, CARDS, LID);
+  ok("and goes away once it has landed", redactFor(done).target === null);
+  ok("a peek that changes nothing is not a move", reduce(done, { type: "peek", at: "shut" }, CARDS, LID) === done);
+
+  // The lid cannot come back down over a revealed target, which would just
+  // be a way to hide the result.
+  let after = reduce(shut, { type: "guess", value: 50 }, CARDS, LID);
+  after = reduce(after, { type: "reveal" }, CARDS, LID);
+  ok("the lid is fixed once the round is revealed", reduce(after, { type: "peek", at: "open" }, CARDS, LID) === after);
+
+  // And a new round shuts it again.
+  const next = reduce(reduce(after, { type: "peek", at: "shut" }, CARDS, LID), { type: "next" }, CARDS, LID);
+  ok("the next round starts shut", next.peek === "shut" && redactFor(next).target === null);
+}
 
 // ---- co-op --------------------------------------------------------------
 //

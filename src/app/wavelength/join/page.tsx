@@ -16,11 +16,11 @@ import { PLAYER_COLORS, MONEY, display, outlined } from "@/components/versus/sty
 // The board still runs the game: it deals, it reveals, it scores. All that
 // crosses from here is a number.
 //
-// WHICH MEANS THIS PAGE IS SAFE TO BE THE GUESSER'S, and that is not a
-// happy accident. A guest is handed exactly the message the OBS browser
-// source gets, and the target is not in it until the reveal - so the
-// person guessing genuinely cannot see the answer, without anybody having
-// to be trusted not to look.
+// IT SEES WHAT THE STREAM SEES, which now includes the target for the
+// couple of seconds the psychic is holding the dial open. That was a
+// deliberate trade - the reveal is a beat everybody is meant to watch -
+// and it means this is a link for the people PLAYING rather than a link
+// that is safe to hand to whoever is guessing against you.
 //
 // Deliberately unlinked and noindexed - see ../layout.tsx.
 

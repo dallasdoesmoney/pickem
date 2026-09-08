@@ -39,6 +39,7 @@ export function isWaveMessage(value: unknown): value is WaveMessage {
   const s = state as Partial<WavelengthState>;
   return (
     (s.mode === "teams" || s.mode === "coop") &&
+    (s.peek === "open" || s.peek === "closing" || s.peek === "shut") &&
     typeof s.pot === "number" &&
     typeof s.runLength === "number" &&
     Array.isArray(s.teams) &&

@@ -121,6 +121,19 @@ export type WavelengthState = {
   // before the reveal - which is most of them.
   target: number | null;
 
+  // IS THE LID UP, and why it is three states rather than a boolean.
+  //
+  // The psychic opening the dial is now something EVERYBODY sees - the
+  // stream and whoever is on the join link - so it cannot be a flag one
+  // screen keeps to itself. It is part of the game, it travels with the
+  // game, and every screen draws the same lid.
+  //
+  // "closing" is the middle state and it is not decoration: the target has
+  // to stay in the message until the shutter has finished travelling, or
+  // the wedge blinks out from under a lid that is still moving. The lid is
+  // only drawn open on "open"; the target survives both.
+  peek: "open" | "closing" | "shut";
+
   clue: string;
   // Where the team left the dial. Null until they lock it in.
   guess: number | null;
@@ -200,6 +213,7 @@ export function startGame(
     card,
     seen: [card.id],
     target: pickTarget(random),
+    peek: "shut",
     clue: "",
     guess: null,
     steal: null,
@@ -233,6 +247,7 @@ export function stealHits(target: number, guess: number, side: "left" | "right")
 }
 
 export type WavelengthAction =
+  | { type: "peek"; at: "open" | "closing" | "shut" }
   | { type: "clue"; text: string }
   | { type: "guess"; value: number }
   | { type: "steal"; side: "left" | "right" }
@@ -250,6 +265,15 @@ export function reduce(
   // every game the same cards, which is exactly the bug this replaced.
   seed: string,
 ): WavelengthState {
+  if (action.type === "peek") {
+    // Only ever before the reveal. After it the wedge is on screen for
+    // everyone anyway, and a lid that could shut again over a revealed
+    // target would just be a way to hide the result.
+    if (state.phase === "reveal" || state.phase === "done") return state;
+    if (state.peek === action.at) return state;
+    return { ...state, peek: action.at };
+  }
+
   if (action.type === "clue") {
     if (state.phase !== "clue") return state;
     // Typed rather than submitted, so the graphic fills in as the psychic
@@ -326,6 +350,7 @@ export function reduce(
       card,
       seen: [...state.seen, card.id].slice(-cards.length),
       target: pickTarget(random),
+      peek: "shut",
       clue: "",
       guess: null,
       steal: null,
@@ -338,17 +363,27 @@ export function reduce(
 
 // THE ONE SECRET, AND THE ONE PLACE IT IS KEPT.
 //
-// The board holds the target from the moment the card comes up. The
-// overlay must not have it until the reveal - and "must not have it"
-// means it is not in the message, not that the graphic declines to draw
-// it. A number that is in the payload is a number anybody who opens the
-// browser source can read, and the browser source is a URL that lives in
-// an OBS config and gets screen-shared.
+// The board holds the target from the moment the card comes up, and the
+// rule is that it is not in the MESSAGE until it is allowed to be seen -
+// not that the graphic declines to draw it. A number in the payload is a
+// number anybody who opens the browser source can read, and that URL
+// lives in an OBS config and gets screen-shared.
 //
-// So the board redacts before it sends, and the overlay is simply never
-// given the answer until there is no longer an answer to protect.
+// TWO MOMENTS IT IS ALLOWED, and the second one is a deliberate trade:
+//
+//   the reveal, obviously; and
+//
+//   while the lid is UP. The psychic opening the dial is a beat everybody
+//   is meant to see now - the stream and whoever is on the join link - so
+//   for those couple of seconds the answer really is on the wire. That is
+//   the cost of showing it, and it is the whole cost: it buys the moment
+//   where the room watches somebody look at the answer.
+//
+// Which means the join link is no longer safe to hand to somebody who
+// must not know. It is a link for the people playing.
 export function redactFor(state: WavelengthState): WavelengthState {
   if (state.phase === "reveal" || state.phase === "done") return state;
+  if (state.peek !== "shut") return state;
   return { ...state, target: null };
 }
 

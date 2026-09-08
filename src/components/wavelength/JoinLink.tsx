@@ -61,10 +61,10 @@ export function JoinLink({ code }: { code: string | null }) {
       </div>
 
       <p className="mt-2.5 text-[11.5px] leading-relaxed text-white/40">
-        Send this to whoever is guessing and they turn the needle from their own phone
-        &mdash; <strong className="font-normal text-white/60">they never see the target</strong>, same as
-        the stream. You still deal, reveal and score from here. Anyone with the link can move
-        the dial, so keep it to the people playing.
+        Whoever opens this turns the needle from their own phone; you still deal, reveal and
+        score from here. They see everything the stream sees &mdash;{" "}
+        <strong className="font-normal text-white/60">including the target while you hold the dial open</strong>,
+        so this is a link for the people playing, not for the person guessing against you.
       </p>
     </div>
   );

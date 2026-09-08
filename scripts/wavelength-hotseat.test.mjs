@@ -91,7 +91,10 @@ try {
     for (const chatter of ["ROUND", "WAITING", "THINKING", "TURNING", "FIRST TO"]) {
       ok(`the overlay does not say ${chatter.toLowerCase()}`, !drawn.includes(chatter), drawn.replace(/\n/g, " ").slice(0, 50));
     }
-    ok("but it does carry the score", /\b0\b/.test(drawn) && drawn.includes("TEAM 1"));
+    // The names came off too - two colours and a pill say which side is
+    // which, over a shot where both of them are on camera anyway.
+    ok("nor the team names", !drawn.includes("TEAM 1") && !drawn.includes("TEAM 2"), drawn.replace(/\n/g, " ").slice(0, 50));
+    ok("but it does carry the score", /\b0\b/.test(drawn) && drawn.includes("PSYCHIC"));
   }
   ok("nothing to undo yet", await page.getByRole("button", { name: /UNDO LAST MOVE/i }).isDisabled());
 

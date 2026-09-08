@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { WavelengthState, WavelengthAction } from "@/lib/wavelength/engine";
-import { other, redactFor, COOP_MAX } from "@/lib/wavelength/engine";
+import { other, COOP_MAX } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, outlined, display } from "@/components/versus/style";
 import { WaveStage } from "./WaveStage";
 import { COVER_MS } from "./Dial";
@@ -17,10 +17,11 @@ import { COVER_MS } from "./Dial";
 // the picture and a second little dial off to one side were two people
 // describing a game nobody could actually see happening.
 //
-// WHICH MEANS THE MIRROR IS NOT QUITE THE OVERLAY, and the difference is
-// exactly one thing: the lid. The state this page draws is redacted the
-// same way the broadcast is - see `shown` below - so the wedge is not in
-// this screen's DOM either, except while the psychic is holding it open.
+// AND THE MIRROR IS EXACTLY THE OVERLAY AGAIN. It briefly was not: the
+// lid was a flag this screen kept to itself, so it had to redact its own
+// copy of the state to hide the wedge from itself. The lid is part of the
+// game now - everybody sees it open - so there is nothing left to hide
+// differently and this page draws the state as it is.
 
 const RULE = "rgba(255,255,255,0.10)";
 
@@ -86,23 +87,19 @@ export function WavelengthBoard({
   const dialLive = state.phase === "clue" || state.phase === "guess";
   const placed = state.guess !== null;
 
-  // THE PEEK. Everybody is looking at the same screen, which is exactly
-  // the problem: the psychic needs the answer and nobody else may have it.
-  // A button that toggles gets left on. A button that has to be HELD is
-  // only ever open while somebody is holding the phone - the same gesture
-  // as picking up the physical board and tilting it away - and it shuts
-  // itself the instant they let go, drop it, or hand it over.
+  // THE PEEK, which is now a move like any other.
   //
-  // `closing` keeps the target on screen for exactly as long as the lid
-  // takes to swing back. Without it the wedge vanishes on release and the
-  // lid closes over an empty recess.
-  const [peek, setPeek] = useState(false);
-  const [closing, setClosing] = useState(false);
+  // It used to be a flag this screen kept to itself, because the target
+  // was nobody else's business. It is everybody's business now - the
+  // stream and the join link both show the dial open - so it goes through
+  // the reducer and rides the wire with the rest of the game. Not recorded
+  // on the undo stack: looking at something is not a move.
+  //
+  // Still a HOLD rather than a toggle. A toggle gets left on, and this one
+  // now leaves the answer on three screens when it is.
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Whether the lid is up, tracked outside React as well. A pointer-up and
-  // a blur both fire on the same release, and the second one must not
-  // start a second closing timer - and none of this can live inside a
-  // setState updater, which React is allowed to call twice.
+  // Tracked outside React as well: a pointer-up and a blur both fire on
+  // the same release, and the second must not start a second timer.
   const held = useRef(false);
 
   useEffect(
@@ -116,30 +113,20 @@ export function WavelengthBoard({
     if (held.current) return;
     held.current = true;
     if (closeTimer.current) clearTimeout(closeTimer.current);
-    setClosing(false);
-    setPeek(true);
+    onAction({ type: "peek", at: "open" }, false);
   }
 
   function release() {
     if (!held.current) return;
     held.current = false;
-    setPeek(false);
-    setClosing(true);
+    // "closing" keeps the target in the message while the shutter travels;
+    // without it the wedge blinks out from under a lid still moving.
+    onAction({ type: "peek", at: "closing" }, false);
     if (closeTimer.current) clearTimeout(closeTimer.current);
-    // A shade longer than the lid takes, so the wedge is still there for
-    // the last frame of the shutter rather than a frame short of it.
-    closeTimer.current = setTimeout(() => setClosing(false), COVER_MS + 80);
+    closeTimer.current = setTimeout(() => onAction({ type: "peek", at: "shut" }, false), COVER_MS + 80);
   }
 
-  // TWO DIFFERENT QUESTIONS, and running them off one flag was a bug: the
-  // lid must start closing the instant the psychic lets go, while the
-  // target has to stay in the state until the shutter has finished
-  // travelling. Tied together, the lid sat open for the whole close window
-  // and then slammed - and the wedge blinked out from under it on the way.
-  //
-  // Memoised because WaveStage measures the graphic whenever this changes,
-  // and a fresh object every render would remeasure forever.
-  const shown = useMemo(() => (peek || closing ? state : redactFor(state)), [peek, closing, state]);
+  const peek = state.peek === "open";
 
   return (
     <div className="flex w-full flex-col">
@@ -154,9 +141,12 @@ export function WavelengthBoard({
             {deckTitle.toUpperCase()}
           </span>
         </div>
+        {/* THE SAME STATE EVERYBODY ELSE GETS. It used to be redacted
+            here too, separately, so this screen could hide the wedge from
+            itself; with the lid in the game there is nothing left to hide
+            differently and the mirror is exactly the overlay again. */}
         <WaveStage
-          state={shown}
-          peek={peek}
+          state={state}
           onScrub={dialLive ? (value) => onAction({ type: "guess", value }, false) : undefined}
         />
       </div>
