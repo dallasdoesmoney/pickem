@@ -30,8 +30,8 @@ import {
   DIAL_MAX,
   WIN_SCORE,
 } from "../src/lib/wavelength/engine.ts";
-import { SPECTRUMS, NFL_SPECTRUMS, DECKS, deck } from "../src/lib/wavelength/spectrums.ts";
-import { waveChannel, isWaveMessage } from "../src/lib/wavelength/room.ts";
+import { SPECTRUMS, NFL_SPECTRUMS, DECKS, deck, cardsFor, customCards, CUSTOM_MAX, CUSTOM_LEN } from "../src/lib/wavelength/spectrums.ts";
+import { waveChannel, isWaveMessage, isMoveMessage, MOVE, STATE } from "../src/lib/wavelength/room.ts";
 import { roomChannel } from "../src/lib/auction/room.ts";
 
 let failed = 0;
@@ -52,7 +52,52 @@ ok(
   new Set(CARDS.map((c) => `${c.left.toLowerCase()}|${c.right.toLowerCase()}`)).size === CARDS.length,
 );
 ok("the football deck is only football", NFL_SPECTRUMS.every((c) => c.nfl === true), `${NFL_SPECTRUMS.length} cards`);
-ok("both decks have enough to play a game", DECKS.every((d) => d.cards.length >= WIN_SCORE * 2));
+// The custom deck ships empty on purpose - its cards are written by
+// whoever is playing and live in their browser, not in this file.
+ok(
+  "both written decks have enough to play a game",
+  DECKS.filter((d) => d.key !== "custom").every((d) => d.cards.length >= WIN_SCORE * 2),
+);
+
+// ---- the pairs somebody types --------------------------------------------
+
+{
+  const typed = [
+    { left: "  Worst team  ", right: "Best team" },
+    { left: "Only half", right: "   " },
+    { left: "", right: "Also only half" },
+    { left: "x".repeat(200), right: "y".repeat(200) },
+  ];
+  const made = customCards(typed);
+  ok("a written pair becomes a card", made.length === 2, `${made.length} of ${typed.length} rows`);
+  ok("with the whitespace off it", made[0].left === "Worst team" && made[0].right === "Best team");
+  ok("half a pair is not a card", made.every((c) => c.left !== "" && c.right !== ""));
+  ok("and a long one is cut to fit the dial", made[1].left.length === CUSTOM_LEN);
+  ok("ids are unique", new Set(made.map((c) => c.id)).size === made.length);
+  ok(
+    "there is a ceiling on how many",
+    customCards(Array.from({ length: CUSTOM_MAX + 20 }, (_, i) => ({ left: `l${i}`, right: `r${i}` }))).length === CUSTOM_MAX,
+  );
+  ok("nothing written is no cards, not a crash", customCards([]).length === 0);
+
+  // One resolver, so no caller has to remember which kind of deck it holds.
+  ok("cardsFor sends a built-in key to its own deck", cardsFor("football", typed) === NFL_SPECTRUMS);
+  ok("and a custom key to what was written", cardsFor("custom", typed).length === 2);
+
+  // A whole game off four written prompts - the deck wraps rather than
+  // running out, which is what makes a short list usable at all.
+  const SHORT = "written-seed";
+  let w = startGame(made, "custom", ["A", "B"], SHORT, "coop");
+  let turns = 0;
+  while (w.phase !== "done" && turns < 30) {
+    turns++;
+    w = reduce(w, { type: "guess", value: 50 }, made, SHORT);
+    w = reduce(w, { type: "reveal" }, made, SHORT);
+    if (w.phase === "done") break;
+    w = reduce(w, { type: "next" }, made, SHORT);
+  }
+  ok("a run plays out on two written cards", w.phase === "done", `${turns} rounds off ${made.length} cards`);
+}
 ok("an unknown deck key falls back rather than throwing", deck("nonsense").length > 0);
 
 // ---- scoring ------------------------------------------------------------
@@ -417,6 +462,55 @@ for (const [name, bad] of [
   ["no pot", { deck: "x", state: { ...payload.state, pot: undefined } }],
 ]) {
   ok(`drops ${name}`, !isWaveMessage(bad));
+}
+
+// ---- the one message that travels the other way -------------------------
+//
+// A guest turning the dial from their own phone is the only thing on this
+// channel that goes towards the board, and it arrives from a machine
+// nobody controls over a room anybody with the code can reach. So it is
+// checked exactly as hard as everything else, and it carries exactly one
+// number - the board reduces it like any other action and can refuse it.
+
+ok("a move and a state are different events", MOVE !== STATE);
+ok("a move is a number", isMoveMessage({ value: 61.5 }));
+ok("zero is a number too", isMoveMessage({ value: 0 }));
+for (const [name, bad] of [
+  ["null", null],
+  ["a bare number", 42],
+  ["an empty object", {}],
+  ["a string value", { value: "61.5" }],
+  ["a null value", { value: null }],
+  ["NaN", { value: NaN }],
+  ["infinity", { value: Infinity }],
+  ["a nested object", { value: { value: 5 } }],
+]) {
+  ok(`drops a move that is ${name}`, !isMoveMessage(bad));
+}
+
+// OUT OF RANGE IS NOT THE VALIDATOR'S PROBLEM, and deliberately so: the
+// reducer already clamps every guess to the dial, so a hostile 9999 lands
+// on the right-hand edge rather than being a second place that has to
+// remember the rule.
+{
+  const SILLY = "clamp";
+  let s3 = startGame(CARDS, "everything", ["A", "B"], SILLY);
+  s3 = reduce(s3, { type: "guess", value: 99999 }, CARDS, SILLY);
+  ok("a move way off the dial is clamped, not obeyed", s3.guess === DIAL_MAX, `${s3.guess}`);
+  s3 = reduce(s3, { type: "guess", value: -99999 }, CARDS, SILLY);
+  ok("and the same the other way", s3.guess === DIAL_MIN, `${s3.guess}`);
+}
+
+// And a move is refused outright wherever the dial is not live, which is
+// what stops a guest nudging the needle after the side has been called.
+{
+  const LOCKED = "locked";
+  let s4 = startGame(CARDS, "everything", ["A", "B"], LOCKED);
+  s4 = reduce(s4, { type: "guess", value: 40 }, CARDS, LOCKED);
+  const atCall = reduce(s4, { type: "steal", side: "left" }, CARDS, LOCKED);
+  ok("a move after the call is refused", reduce(atCall, { type: "guess", value: 90 }, CARDS, LOCKED) === atCall);
+  const atReveal = reduce(atCall, { type: "reveal" }, CARDS, LOCKED);
+  ok("and so is one after the reveal", reduce(atReveal, { type: "guess", value: 90 }, CARDS, LOCKED) === atReveal);
 }
 
 console.log(failed === 0 ? "\nall good" : `\n${failed} failed`);

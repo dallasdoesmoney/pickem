@@ -5,7 +5,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
 import type { WavelengthState } from "@/lib/wavelength/engine";
 import { redactFor } from "@/lib/wavelength/engine";
-import { HELLO, STATE, isRoomCode, isWaveMessage, newRoomCode, waveChannel, type WaveMessage } from "@/lib/wavelength/room";
+import { HELLO, STATE, MOVE, isMoveMessage, isRoomCode, isWaveMessage, newRoomCode, waveChannel, type WaveMessage } from "@/lib/wavelength/room";
 
 // The wavelength end of the same wire the draft uses, and built the same
 // way for the same reasons - see src/components/versus/useRoom.ts. The one
@@ -94,13 +94,31 @@ export function useWaveRoomCode() {
 // motion still looks continuous over there.
 const SEND_MS = 50;
 
-export function useWaveBroadcast(code: string | null, deck: string, state: WavelengthState | null) {
+export function useWaveBroadcast(
+  code: string | null,
+  deck: string,
+  state: WavelengthState | null,
+  // A GUEST'S HAND ON THE DIAL. Handed a value, not an action: the board
+  // decides what to do with it, and the reducer refuses it outright in any
+  // phase where the dial is not live. The guest is a second pair of hands,
+  // not a second authority.
+  onMove?: (value: number) => void,
+) {
   const latest = useRef<WaveMessage | null>(state ? { deck, state: redactFor(state) } : null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [live, setLive] = useState(false);
   const [viewers, setViewers] = useState(0);
   const sentAt = useRef(0);
   const trailing = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Held in a ref so the channel effect below does not tear down and
+  // rebuild the whole subscription every time the board re-renders. Kept
+  // up to date in an effect rather than during render, which is where a
+  // ref may actually be written.
+  const moveRef = useRef(onMove);
+  useEffect(() => {
+    moveRef.current = onMove;
+  }, [onMove]);
 
   const push = useCallback(() => {
     const send = () => {
@@ -149,6 +167,12 @@ export function useWaveBroadcast(code: string | null, deck: string, state: Wavel
     channel.on("presence", { event: "sync" }, () => {
       setViewers(Object.keys(channel.presenceState()).length);
     });
+    channel.on("broadcast", { event: MOVE }, ({ payload }) => {
+      // Arrives from somebody else's machine over a channel anybody with
+      // the code can reach. Checked, then handed to the reducer, which is
+      // the thing that actually decides whether a move is legal.
+      if (isMoveMessage(payload)) moveRef.current?.(payload.value);
+    });
 
     channel.subscribe((status) => {
       setLive(status === "SUBSCRIBED");
@@ -174,6 +198,84 @@ export function useWaveBroadcast(code: string | null, deck: string, state: Wavel
   }, [deck, state, push]);
 
   return { live, viewers };
+}
+
+// GUEST SIDE. Listens like the overlay does, and can push the dial.
+//
+// It is given exactly the same redacted state the browser source gets,
+// which is not a limitation but the point: the guest is the one GUESSING,
+// so the target must not be in the message they receive. The room code is
+// the only credential, same as the overlay - see the warning on the link.
+export function useWaveGuest(code: string | null) {
+  const [message, setMessage] = useState<WaveMessage | null>(null);
+  const [live, setLive] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const sentAt = useRef(0);
+  const trailing = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queued = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (trailing.current) clearTimeout(trailing.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!code) return;
+    const channel = supabase.channel(waveChannel(code));
+    channelRef.current = channel;
+
+    channel.on("broadcast", { event: STATE }, ({ payload }) => {
+      if (isWaveMessage(payload)) setMessage(payload);
+    });
+
+    channel.subscribe((status) => {
+      setLive(status === "SUBSCRIBED");
+      if (status !== "SUBSCRIBED") return;
+      void channel.track({ role: "guest" });
+      // Same hello the overlay says: a guest that joins mid-round has
+      // missed every message so far.
+      void channel.send({ type: "broadcast", event: HELLO, payload: {} });
+    });
+
+    return () => {
+      channelRef.current = null;
+      setLive(false);
+      void supabase.removeChannel(channel);
+    };
+  }, [code]);
+
+  // Throttled exactly like the board's own broadcast, and for the same
+  // reason: a drag is sixty values a second and the wire wants moves, not
+  // motion. Trailing send included, so wherever the needle is let go is
+  // where the board ends up.
+  const move = useCallback((value: number) => {
+    queued.current = value;
+    const send = () => {
+      sentAt.current = Date.now();
+      const v = queued.current;
+      if (channelRef.current && v !== null) {
+        void channelRef.current.send({ type: "broadcast", event: MOVE, payload: { value: v } });
+      }
+    };
+    const since = Date.now() - sentAt.current;
+    if (since >= SEND_MS) {
+      if (trailing.current) {
+        clearTimeout(trailing.current);
+        trailing.current = null;
+      }
+      send();
+      return;
+    }
+    if (trailing.current) return;
+    trailing.current = setTimeout(() => {
+      trailing.current = null;
+      send();
+    }, SEND_MS - since);
+  }, []);
+
+  return { message, live, move };
 }
 
 // OVERLAY SIDE. Listens, and holds on to the last thing it was told.

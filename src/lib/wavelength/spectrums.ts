@@ -135,15 +135,44 @@ export const SPECTRUMS: Spectrum[] = raw.map(([left, right, nfl], i) => ({
 
 export const NFL_SPECTRUMS = SPECTRUMS.filter((s) => s.nfl);
 
-// The two decks the picker offers. Named the way they are chosen rather
-// than the way they are stored.
-export type DeckKey = "everything" | "football";
+// The decks the picker offers. Named the way they are chosen rather than
+// the way they are stored.
+//
+// "custom" is the odd one out and has to be: its cards are written by
+// whoever is playing and live in their browser, not in this file. It ships
+// empty here and the board fills it in - see cardsFor().
+export type DeckKey = "everything" | "football" | "custom";
 
 export const DECKS: { key: DeckKey; title: string; note: string; cards: Spectrum[] }[] = [
   { key: "everything", title: "Everything", note: "Football and not", cards: SPECTRUMS },
   { key: "football", title: "Football only", note: "Every card is an NFL argument", cards: NFL_SPECTRUMS },
+  { key: "custom", title: "Your own", note: "Write the pairs yourself", cards: [] },
 ];
 
 export function deck(key: DeckKey): Spectrum[] {
   return (DECKS.find((d) => d.key === key) ?? DECKS[0]).cards;
+}
+
+// A written pair, as it is typed and as it is stored. Trimmed and dropped
+// if either end is blank, because half a spectrum is not a card.
+export type Pair = { left: string; right: string };
+
+export const CUSTOM_MAX = 40;
+// Long enough for "Would not survive in the wild", short enough that the
+// two ends still fit either side of the dial.
+export const CUSTOM_LEN = 28;
+
+export function customCards(pairs: Pair[]): Spectrum[] {
+  return pairs
+    .map((p) => ({ left: p.left.trim().slice(0, CUSTOM_LEN), right: p.right.trim().slice(0, CUSTOM_LEN) }))
+    .filter((p) => p.left !== "" && p.right !== "")
+    .slice(0, CUSTOM_MAX)
+    .map((p, i) => ({ id: `c${i}`, left: p.left, right: p.right }));
+}
+
+// WHICH CARDS A GAME IS ACTUALLY PLAYING. The built-in decks answer for
+// themselves; the custom one is whatever was typed. One function so no
+// caller has to remember which kind it is holding.
+export function cardsFor(key: DeckKey, custom: Pair[]): Spectrum[] {
+  return key === "custom" ? customCards(custom) : deck(key);
 }

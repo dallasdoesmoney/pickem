@@ -1,7 +1,7 @@
 import type { WavelengthState } from "./engine";
 import { channelFor } from "@/lib/rooms";
 
-export { newRoomCode, isRoomCode, HELLO, STATE } from "@/lib/rooms";
+export { newRoomCode, isRoomCode, HELLO, STATE, MOVE } from "@/lib/rooms";
 
 // Its own channel namespace, so a room code reused from a draft cannot
 // put a Wavelength board on a Versus overlay - which drops every message
@@ -14,6 +14,18 @@ export function waveChannel(code: string): string {
 // broadcast then costs nothing: the next action overwrites everything and
 // the overlay is correct again.
 export type WaveMessage = { deck: string; state: WavelengthState };
+
+// A GUEST'S HAND ON THE DIAL, and the only message that travels towards
+// the board. Checked exactly as hard as everything else: this one arrives
+// from a different machine over a channel anybody with the code can reach,
+// so a number is a number or it is dropped.
+export type MoveMessage = { value: number };
+
+export function isMoveMessage(value: unknown): value is MoveMessage {
+  if (typeof value !== "object" || value === null) return false;
+  const { value: v } = value as { value?: unknown };
+  return typeof v === "number" && Number.isFinite(v);
+}
 
 // Anything at all can arrive on a channel, and the overlay is the one
 // screen that must not throw - a crashed browser source is a black hole

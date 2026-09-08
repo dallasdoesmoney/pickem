@@ -61,11 +61,19 @@ try {
   // TWO STEPS, same as the draft: the deck first, then names and the OBS
   // link behind it.
   await page.getByRole("button", { name: /USE THIS DECK/i }).waitFor({ timeout: 40000 });
-  ok("the picker offers both decks", (await page.locator("main button[aria-pressed]").count()) === 2);
+  // Everything, football only, and your own.
+  ok("the picker offers three decks", (await page.locator("main button[aria-pressed]").count()) === 3);
 
   await page.getByRole("button", { name: /USE THIS DECK/i }).click();
   await page.getByRole("button", { name: /START THE GAME/i }).waitFor({ timeout: 30000 });
   ok("the setup screen restates the deck", (await page.getByRole("button", { name: /^Change$/ }).count()) === 1);
+  // The rules panel shows a dial with its lid up. It is drawn by the same
+  // component as the graphic and needs the same stylesheet - without it
+  // the illustration of "the dial opens" is a dial that never opens.
+  ok(
+    "the rules picture shows an open dial",
+    (await page.locator("main .wl-cover.wl-open").count()) === 1,
+  );
   // The rules illustration on the setup screen is a dial with its wedge
   // showing, and it is not part of a round - so the leak checks below
   // start once the game has, not here.
@@ -196,7 +204,7 @@ try {
   await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).waitFor({ timeout: 30000 });
 
   const band0 = await page.locator("main [data-band]").innerText();
-  ok("a co-op run says how long it is", /ROUND 1 OF \d+/.test(band0), band0.split("\n")[0]);
+  ok("a co-op run says how long it is", /ROUND 1 OF 5/.test(band0), band0.split("\n")[0]);
   ok("and shows one pile, not two scores", /0\s*\/\s*\d+/.test(band0.replace(/\n/g, " ")));
 
   let coopRounds = 0;
@@ -222,11 +230,73 @@ try {
     }
   }
   ok("a co-op run ends on its own", (await page.getByRole("button", { name: /GO AGAIN/i }).count()) > 0, `${coopRounds} rounds`);
+  ok("and it is five rounds long", coopRounds === 5, `${coopRounds}`);
   ok("the target stays hidden in co-op too", coopLeaks === 0);
   {
     const done = await page.locator("main [data-band]").innerText();
     ok("and it finishes on a total", /\d+ OUT OF \d+/.test(done.replace(/\n/g, " ")), done.replace(/\n/g, " ").slice(0, 60));
   }
+
+  // ---- A DECK SOMEBODY TYPED ---------------------------------------------
+  //
+  // Written on the picker, kept in the browser, and dealt like any other
+  // deck. The words have to reach the graphic, because those two ends are
+  // the entire round.
+  await page.goto(`${BASE}/wavelength`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /YOUR OWN/i }).click();
+  await page.waitForTimeout(150);
+  ok(
+    "an empty custom deck cannot be used",
+    await page.getByRole("button", { name: /USE THIS DECK/i }).isDisabled(),
+  );
+
+  const written = [
+    ["Worst team", "Best team"],
+    ["Worst call", "Best call"],
+  ];
+  for (const [left, right] of written) {
+    await page.getByRole("button", { name: /ADD A PAIR/i }).click();
+    await page.waitForTimeout(80);
+    const rows = page.locator('main input[placeholder="Worst team"]');
+    const i = (await rows.count()) - 1;
+    await rows.nth(i).fill(left);
+    await page.locator('main input[placeholder="Best team"]').nth(i).fill(right);
+    await page.waitForTimeout(80);
+  }
+  ok(
+    "writing a pair makes it usable",
+    !(await page.getByRole("button", { name: /USE THIS DECK/i }).isDisabled()),
+  );
+
+  // Half a pair is not a card, and the count has to say so.
+  await page.getByRole("button", { name: /ADD A PAIR/i }).click();
+  await page.waitForTimeout(120);
+  await page.locator('main input[placeholder="Worst team"]').last().fill("Only one end");
+  await page.waitForTimeout(150);
+  ok(
+    "half a pair does not count as a card",
+    (await page.getByRole("button", { name: /YOUR OWN/i }).innerText()).includes("2 cards"),
+    (await page.getByRole("button", { name: /YOUR OWN/i }).innerText()).replace(/\n/g, " "),
+  );
+
+  await page.getByRole("button", { name: /USE THIS DECK/i }).click();
+  await page.getByRole("button", { name: /START THE GAME/i }).waitFor({ timeout: 30000 });
+  await page.getByRole("button", { name: /START THE GAME/i }).click();
+  await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).waitFor({ timeout: 30000 });
+  {
+    const drawn = (await page.locator("main [data-band]").innerText()).toUpperCase();
+    const dealt = written.some(([l, r]) => drawn.includes(l.toUpperCase()) && drawn.includes(r.toUpperCase()));
+    ok("a written pair is dealt onto the graphic", dealt, drawn.replace(/\n/g, " ").slice(0, 70));
+  }
+  // And it survives a reload, which is the whole reason it is stored.
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /START THE GAME/i }).waitFor({ timeout: 30000 });
+  await page.getByRole("button", { name: /^Change$/ }).click();
+  await page.waitForTimeout(200);
+  ok(
+    "the pairs are still there after a reload",
+    (await page.getByRole("button", { name: /YOUR OWN/i }).innerText()).includes("2 cards"),
+  );
 
   // THE GRAPHIC HAS TO FIT BETWEEN THE TWO CAMERAS, and this is the only
   // way to know: the band is 800px tall at the default 560/560, the

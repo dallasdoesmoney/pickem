@@ -74,10 +74,10 @@ export const WIN_SCORE = 10;
 // question is how many points the pair can pile up over a fixed run.
 //
 // A fixed run rather than "first to ten", because a shared score racing to
-// a target has no tension: you always get there eventually. Seven rounds,
-// twenty-eight available, and a number at the end worth beating.
+// a target has no tension: you always get there eventually. Five rounds,
+// twenty available, and a number at the end worth beating.
 export type Mode = "teams" | "coop";
-export const COOP_ROUNDS = 7;
+export const COOP_ROUNDS = 5;
 export const COOP_MAX = COOP_ROUNDS * 4;
 
 export type Phase =

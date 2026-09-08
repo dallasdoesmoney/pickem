@@ -2,12 +2,14 @@
 
 import { Suspense, useCallback, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { DECKS, deck, type DeckKey } from "@/lib/wavelength/spectrums";
+import { DECKS, cardsFor, customCards, CUSTOM_LEN, CUSTOM_MAX, type DeckKey, type Pair } from "@/lib/wavelength/spectrums";
 import { startGame, reduce, COOP_ROUNDS, COOP_MAX, type Mode, type WavelengthState, type WavelengthAction } from "@/lib/wavelength/engine";
 import { WavelengthBoard } from "@/components/wavelength/Board";
 import { Dial } from "@/components/wavelength/Dial";
+import { WaveStyles } from "@/components/wavelength/OverlayBoard";
 import { OverlayLink } from "@/components/versus/OverlayLink";
 import { useWaveRoomCode, useWaveBroadcast } from "@/components/wavelength/useWaveRoom";
+import { JoinLink } from "@/components/wavelength/JoinLink";
 import { PLAYER_COLORS } from "@/components/versus/style";
 
 // THE CONTROL BOARD, played in the room. Both teams act on this one
@@ -27,6 +29,7 @@ import { PLAYER_COLORS } from "@/components/versus/style";
 const DECK_PARAM = "deck";
 const NAMES_KEY = "pickem:wavelength-teams";
 const MODE_KEY = "pickem:wavelength-mode";
+const PAIRS_KEY = "pickem:wavelength-pairs";
 const UNDO_DEPTH = 40;
 
 // The team names as an EXTERNAL STORE rather than state restored in an
@@ -117,6 +120,56 @@ function writeMode(next: Mode) {
   for (const cb of modeListeners) cb();
 }
 
+// THE PAIRS SOMEBODY WROTE, kept the same way as the names and for the
+// same reason: you write a set of prompts for a bit, and being asked to
+// type them again next time is the difference between using this and not.
+const pairListeners = new Set<() => void>();
+let pairsCache: Pair[] | null = null;
+
+function readPairs(): Pair[] {
+  try {
+    const raw = localStorage.getItem(PAIRS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((p) => p && typeof p.left === "string" && typeof p.right === "string")
+        .slice(0, CUSTOM_MAX)
+        .map((p) => ({ left: p.left.slice(0, CUSTOM_LEN), right: p.right.slice(0, CUSTOM_LEN) }));
+    }
+  } catch {
+    // Blocked storage or somebody's corrupted value. An empty list is a
+    // perfectly good starting point.
+  }
+  return [];
+}
+
+function subscribePairs(cb: () => void): () => void {
+  pairListeners.add(cb);
+  return () => {
+    pairListeners.delete(cb);
+  };
+}
+
+function pairsSnapshot(): Pair[] {
+  if (pairsCache === null) pairsCache = readPairs();
+  return pairsCache;
+}
+
+const NO_PAIRS: Pair[] = [];
+function serverPairs(): Pair[] {
+  return NO_PAIRS;
+}
+
+function writePairs(next: Pair[]) {
+  pairsCache = next.slice(0, CUSTOM_MAX);
+  try {
+    localStorage.setItem(PAIRS_KEY, JSON.stringify(pairsCache));
+  } catch {
+    // Not worth failing a game over.
+  }
+  for (const cb of pairListeners) cb();
+}
+
 // THE SEED SITS HERE, beside the state rather than inside it. It is what
 // deals every round after the first, and the state is the thing that gets
 // broadcast - see the note above startGame(). Keeping it out here is what
@@ -137,6 +190,9 @@ function WavelengthInner() {
 
   const names = useSyncExternalStore(subscribeNames, namesSnapshot, serverNames);
   const mode = useSyncExternalStore(subscribeMode, modeSnapshot, serverMode);
+  const pairs = useSyncExternalStore(subscribePairs, pairsSnapshot, serverPairs);
+  // What "Your own" would actually deal: blank rows are not cards.
+  const written = customCards(pairs);
   // THE UNDO STACK LIVES INSIDE THE GAME, not beside it. An undo is just
   // going back to a state the reducer already produced - but it has to be
   // the same piece of state as the game, because pushing to a second
@@ -147,7 +203,6 @@ function WavelengthInner() {
   const { code, rotate } = useWaveRoomCode();
   // Joined before the game starts, so the overlay can be set up in OBS and
   // confirmed working while there is still time to fix it.
-  const { live, viewers } = useWaveBroadcast(code, game?.deck ?? deckKey, game?.state ?? null);
 
   const step: "pick" | "setup" = picked ? "setup" : "pick";
 
@@ -161,7 +216,7 @@ function WavelengthInner() {
     setGame({
       deck: deckKey,
       seed,
-      state: startGame(deck(deckKey), deckKey, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed, mode),
+      state: startGame(cardsFor(deckKey, pairs), deckKey, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed, mode),
       past: [],
     });
   }
@@ -169,13 +224,20 @@ function WavelengthInner() {
   const act = useCallback((action: WavelengthAction, record = true) => {
     setGame((g) => {
       if (!g) return g;
-      const next = reduce(g.state, action, deck(g.deck), g.seed);
+      const next = reduce(g.state, action, cardsFor(g.deck, pairsSnapshot()), g.seed);
       // A rejected action returns the same state. Pushing it would make
       // UNDO burn a press doing nothing.
       if (next === g.state) return g;
       return { ...g, state: next, past: record ? [...g.past, g.state].slice(-UNDO_DEPTH) : g.past };
     });
   }, []);
+
+  // A GUEST'S HAND ON THE DIAL, reduced exactly like a local drag - not
+  // recorded on the undo stack, because a knob being turned is not a move
+  // somebody made. The reducer refuses it outright in any phase where the
+  // dial is not live, so nothing here has to check.
+  const onMove = useCallback((value: number) => act({ type: "guess", value }, false), [act]);
+  const { live, viewers } = useWaveBroadcast(code, game?.deck ?? deckKey, game?.state ?? null, onMove);
 
   const undo = useCallback(() => {
     setGame((g) => {
@@ -198,12 +260,18 @@ function WavelengthInner() {
           onRestart={() => setGame(null)}
         />
         <OverlayLink code={code} live={live} viewers={viewers} onRotate={rotate} path="/wavelength/overlay" />
+        <JoinLink code={code} />
       </main>
     );
   }
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-16 pt-10">
+      {/* The dial in the rules panel below has a lid, and a lid without
+          the keyframes is just a lid that never opens - so the graphic's
+          stylesheet has to be on this page too, not only inside the
+          OverlayBoard the board screen renders. */}
+      <WaveStyles />
       <h1 className="text-center text-[clamp(1.6rem,7vw,2.6rem)] leading-none tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
         WAVELENGTH
       </h1>
@@ -218,7 +286,9 @@ function WavelengthInner() {
             // A card each rather than a select, because the two decks are
             // a real choice about what the room is playing and the sample
             // card underneath is what actually tells you.
-            const sample = d.cards[0];
+            // The built-in decks carry their own; the custom one shows the
+            // first thing actually written rather than a made-up example.
+            const sample = d.key === "custom" ? written[0] : d.cards[0];
             return (
               <button
                 key={d.key}
@@ -238,19 +308,95 @@ function WavelengthInner() {
                   >
                     {d.title.toUpperCase()}
                   </span>
-                  <span className="text-[11px] text-white/35">{d.cards.length} cards</span>
+                  <span className="text-[11px] text-white/35">
+                    {(d.key === "custom" ? written.length : d.cards.length)} cards
+                  </span>
                 </div>
                 <p className="mt-1 text-[12.5px] text-white/45">{d.note}</p>
-                <p className="mt-2 text-[12px] text-white/60">
-                  <span className="text-white/35">e.g.</span> {sample.left} &nbsp;&harr;&nbsp; {sample.right}
-                </p>
+                {sample && (
+                  <p className="mt-2 text-[12px] text-white/60">
+                    <span className="text-white/35">e.g.</span> {sample.left} &nbsp;&harr;&nbsp; {sample.right}
+                  </p>
+                )}
+                {d.key === "custom" && !sample && (
+                  <p className="mt-2 text-[12px] text-white/35">Nothing written yet.</p>
+                )}
               </button>
             );
           })}
 
+          {/* THE EDITOR, and only when it is the deck being used. Two
+              boxes and a button: the whole feature is "let us type our
+              own", and a form with more in it than that would be in the
+              way of the four prompts somebody actually wanted. */}
+          {deckKey === "custom" && (
+            <div className="rounded-2xl px-4 py-4" style={{ border: "2px solid rgba(255,255,255,0.12)" }}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[11px] tracking-[0.16em] text-white/45" style={{ fontFamily: "var(--font-display)" }}>
+                  YOUR PAIRS
+                </span>
+                <span className="text-[11px] text-white/30">
+                  {written.length} ready{pairs.length > written.length ? ` · ${pairs.length - written.length} unfinished` : ""}
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2">
+                {pairs.map((pair, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      value={pair.left}
+                      onChange={(e) =>
+                        writePairs(pairs.map((p, j) => (j === i ? { ...p, left: e.target.value } : p)))
+                      }
+                      placeholder="Worst team"
+                      maxLength={CUSTOM_LEN}
+                      className="min-w-0 flex-1 rounded-lg border bg-white/[0.05] px-2.5 py-2 text-[13px] outline-none transition-colors focus:border-white/45"
+                      style={{ borderColor: "rgba(255,255,255,0.12)" }}
+                    />
+                    <span className="shrink-0 text-white/25">&harr;</span>
+                    <input
+                      value={pair.right}
+                      onChange={(e) =>
+                        writePairs(pairs.map((p, j) => (j === i ? { ...p, right: e.target.value } : p)))
+                      }
+                      placeholder="Best team"
+                      maxLength={CUSTOM_LEN}
+                      className="min-w-0 flex-1 rounded-lg border bg-white/[0.05] px-2.5 py-2 text-[13px] outline-none transition-colors focus:border-white/45"
+                      style={{ borderColor: "rgba(255,255,255,0.12)" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => writePairs(pairs.filter((_, j) => j !== i))}
+                      aria-label={`Remove pair ${i + 1}`}
+                      className="shrink-0 rounded-lg px-2 py-2 text-[13px] text-white/35 transition-colors hover:bg-white/10 hover:text-white/70"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => writePairs([...pairs, { left: "", right: "" }])}
+                disabled={pairs.length >= CUSTOM_MAX}
+                className="mt-3 w-full rounded-lg py-2.5 text-[11px] tracking-[0.16em] text-white/60 transition-colors hover:bg-white/[0.06] disabled:opacity-30"
+                style={{ fontFamily: "var(--font-display)", border: "2px dashed rgba(255,255,255,0.14)" }}
+              >
+                + ADD A PAIR
+              </button>
+
+              <p className="mt-2.5 text-[11.5px] leading-relaxed text-white/35">
+                Left end first. They are kept in this browser, so they are still here next time
+                &mdash; and both ends have to be filled in for a pair to be dealt.
+              </p>
+            </div>
+          )}
+
           <button
             onClick={() => choose(deckKey)}
-            className="mt-2 rounded-xl px-5 py-3 text-[13px] tracking-[0.16em] text-[#08111f] transition-transform active:scale-[0.99]"
+            disabled={deckKey === "custom" && written.length === 0}
+            className="mt-2 rounded-xl px-5 py-3 text-[13px] tracking-[0.16em] text-[#08111f] transition-transform active:scale-[0.99] disabled:opacity-40"
             style={{ fontFamily: "var(--font-display)", background: "#3ecb78" }}
           >
             USE THIS DECK
@@ -340,8 +486,9 @@ function WavelengthInner() {
             START THE GAME
           </button>
 
-          <div className="mt-6">
+          <div className="mt-6 flex flex-col gap-4">
             <OverlayLink code={code} live={live} viewers={viewers} onRotate={rotate} path="/wavelength/overlay" />
+            <JoinLink code={code} />
           </div>
         </>
       )}

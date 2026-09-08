@@ -51,3 +51,13 @@ export function channelFor(game: string, code: string): string {
 // so without this a reloaded overlay would sit blank until the next move.
 export const HELLO = "hello";
 export const STATE = "state";
+
+// THE ONLY THING THAT TRAVELS THE OTHER WAY.
+//
+// Everywhere else on this channel the board talks and everyone else
+// listens, which is what keeps it simple: one writer, no conflicts, no
+// server. A guest moving the dial breaks that in exactly one place - so it
+// is exactly one message, carrying exactly one number, and the board is
+// still the only thing that changes the game. A MOVE is a request; the
+// board reduces it like any other action, and can refuse it.
+export const MOVE = "move";
