@@ -1,7 +1,7 @@
 "use client";
 
 import type { WavelengthState } from "@/lib/wavelength/engine";
-import { WIN_SCORE, COOP_MAX } from "@/lib/wavelength/engine";
+import { WIN_SCORE, potMax } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, INK, outlined } from "@/components/versus/style";
 import { Dial, COVER_MS, DEFAULT_BANDS, type BandPalette } from "./Dial";
 
@@ -218,7 +218,7 @@ function CoopScore({ state }: { state: WavelengthState }) {
           {state.pot}
         </span>
         <span style={{ fontFamily: "var(--font-display)", fontSize: 26, lineHeight: 1, color: "rgba(255,255,255,0.45)", ...outlined(26) }}>
-          / {COOP_MAX}
+          / {potMax(state.runLength)}
         </span>
         {gained > 0 && (
           <span
@@ -271,7 +271,7 @@ export function OverlayBoard({
   // the board screen for the person running the game, and was noise on a
   // stream where both of them are talking anyway.
   const ending = coop
-    ? { text: `${state.pot} OUT OF ${COOP_MAX}`, color: MONEY }
+    ? { text: `${state.pot} OUT OF ${potMax(state.runLength)}`, color: MONEY }
     : (() => {
         const winner = state.teams[0].score >= WIN_SCORE ? 0 : 1;
         return { text: `${state.teams[winner].name.toUpperCase()} WINS`, color: PLAYER_COLORS[winner] };

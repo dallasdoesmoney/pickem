@@ -245,7 +245,7 @@ try {
     }
   }
   ok("a co-op run ends on its own", (await page.getByRole("button", { name: /GO AGAIN/i }).count()) > 0, `${coopRounds} rounds`);
-  ok("and it is five rounds long", coopRounds === 5, `${coopRounds}`);
+  ok("a built-in deck runs five", coopRounds === 5, `${coopRounds}`);
   ok("the target stays hidden in co-op too", coopLeaks === 0);
   {
     const done = await page.locator("main [data-band]").innerText();
@@ -296,12 +296,47 @@ try {
 
   await page.getByRole("button", { name: /USE THIS DECK/i }).click();
   await page.getByRole("button", { name: /START THE GAME/i }).waitFor({ timeout: 30000 });
+  // A WRITTEN RUN IS ITS OWN LENGTH. Two pairs is four rounds, because
+  // each of the two takes a turn being the psychic on each pair - so the
+  // setup screen has to be offering four, not five.
+  ok(
+    "co-op on a written deck offers a run the length of the list",
+    (await page.getByRole("button", { name: /CO-OP/ }).innerText()).includes("4 rounds"),
+    (await page.getByRole("button", { name: /CO-OP/ }).innerText()).replace(/\n/g, " "),
+  );
   await page.getByRole("button", { name: /START THE GAME/i }).click();
   await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).waitFor({ timeout: 30000 });
   {
     const drawn = (await page.locator("main [data-band]").innerText()).toUpperCase();
     const dealt = written.some(([l, r]) => drawn.includes(l.toUpperCase()) && drawn.includes(r.toUpperCase()));
     ok("a written pair is dealt onto the graphic", dealt, drawn.replace(/\n/g, " ").slice(0, 70));
+  }
+
+  // Play it out and watch which pair comes up with whom. Both people must
+  // get a turn on both pairs, which is the whole reason it is four rounds.
+  {
+    const seen = [];
+    for (let steps = 0; steps < 20; steps++) {
+      if (await page.getByRole("button", { name: /GO AGAIN/i }).count()) break;
+      const band = (await page.locator("main [data-band]").innerText()).toUpperCase();
+      const which = written.findIndex(([l]) => band.includes(l.toUpperCase()));
+      // Read whoever the board actually names, rather than assuming what
+      // the two of them are called - the defaults are not what this test
+      // first guessed, and guessing made every round look identical.
+      const who = (await page.locator("main").innerText()).match(/(.+?) IS THE PSYCHIC/i)?.[1] ?? "?";
+      seen.push(`${which}:${who}`);
+      await clickDialAt(page.getByRole("slider"), 50);
+      await page.waitForTimeout(100);
+      await page.getByRole("button", { name: /OPEN THE DIAL$/ }).first().click();
+      await page.waitForTimeout(150);
+      const next = page.getByRole("button", { name: /NEXT ROUND/i });
+      if (await next.count()) {
+        await next.click();
+        await page.waitForTimeout(120);
+      }
+    }
+    ok("two written pairs is a four round run", seen.length === 4, seen.join(" "));
+    ok("every pair is played by both of them", new Set(seen).size === 4, seen.join(" "));
   }
   // And it survives a reload, which is the whole reason it is stored.
   await page.reload({ waitUntil: "networkidle" });

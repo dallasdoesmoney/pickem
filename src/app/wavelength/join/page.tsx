@@ -3,7 +3,7 @@
 import { Suspense, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { isRoomCode } from "@/lib/wavelength/room";
-import { COOP_MAX, WIN_SCORE, other } from "@/lib/wavelength/engine";
+import { potMax, WIN_SCORE, other } from "@/lib/wavelength/engine";
 import { useWaveGuest } from "@/components/wavelength/useWaveRoom";
 import { WaveStage } from "@/components/wavelength/WaveStage";
 import { WaveStyles } from "@/components/wavelength/OverlayBoard";
@@ -71,7 +71,7 @@ function JoinInner() {
     const coop = shown.mode === "coop";
 
     if (shown.phase === "done") {
-      if (coop) return { line: `${shown.pot} OUT OF ${COOP_MAX}`, color: MONEY, note: "run over" };
+      if (coop) return { line: `${shown.pot} OUT OF ${potMax(shown.runLength)}`, color: MONEY, note: "run over" };
       const winner = shown.teams[0].score >= WIN_SCORE ? 0 : 1;
       return { line: `${shown.teams[winner].name.toUpperCase()} WINS`, color: PLAYER_COLORS[winner], note: "" };
     }
@@ -164,7 +164,7 @@ function JoinInner() {
               </span>
               <span className="text-[11px] text-white/35">
                 {shown.mode === "coop"
-                  ? `${shown.pot} of ${COOP_MAX}`
+                  ? `${shown.pot} of ${potMax(shown.runLength)}`
                   : `${shown.teams[0].name} ${shown.teams[0].score} — ${shown.teams[1].score} ${shown.teams[1].name}`}
               </span>
             </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { WavelengthState, WavelengthAction } from "@/lib/wavelength/engine";
-import { other, COOP_MAX } from "@/lib/wavelength/engine";
+import { other, potMax } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, outlined, display } from "@/components/versus/style";
 import { WaveStage } from "./WaveStage";
 import { COVER_MS } from "./Dial";
@@ -294,7 +294,7 @@ export function WavelengthBoard({
             </div>
             {state.phase === "done" ? (
               <ActionButton onClick={onRestart} grow>
-                {coop ? `${state.pot} OF ${COOP_MAX} — GO AGAIN` : "NEW GAME"}
+                {coop ? `${state.pot} OF ${potMax(state.runLength)} — GO AGAIN` : "NEW GAME"}
               </ActionButton>
             ) : (
               <ActionButton onClick={() => onAction({ type: "next" })} grow>

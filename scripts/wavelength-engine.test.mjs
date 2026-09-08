@@ -30,7 +30,8 @@ import {
   BAND_3,
   BAND_4,
   COOP_ROUNDS,
-  COOP_MAX,
+  pairedRunLength,
+  potMax,
   DIAL_MIN,
   DIAL_MAX,
   WIN_SCORE,
@@ -89,19 +90,52 @@ ok(
   ok("cardsFor sends a built-in key to its own deck", cardsFor("football", typed) === NFL_SPECTRUMS);
   ok("and a custom key to what was written", cardsFor("custom", typed).length === 2);
 
-  // A whole game off four written prompts - the deck wraps rather than
-  // running out, which is what makes a short list usable at all.
+  // A RUN THROUGH WHAT WAS WRITTEN, twice. Two prompts is four rounds,
+  // three is six - because the point of the pairing is that each of the
+  // two people is the psychic on every prompt.
+  ok("two written pairs is a four round run", pairedRunLength(made) === 4, `${pairedRunLength(made)}`);
+  ok("three would be six", pairedRunLength([1, 2, 3]) === 6);
+  ok("and an empty list still deals something", pairedRunLength([]) === 2);
+
   const SHORT = "written-seed";
-  let w = startGame(made, "custom", ["A", "B"], SHORT, "coop");
+  let w = startGame(made, "custom", ["A", "B"], SHORT, "coop", pairedRunLength(made));
+  ok("the run is as long as the list", w.runLength === 4);
+
+  const dealtTo = [];
   let turns = 0;
   while (w.phase !== "done" && turns < 30) {
     turns++;
+    dealtTo.push(`${w.card.id}/${w.psychic}`);
     w = reduce(w, { type: "guess", value: 50 }, made, SHORT);
     w = reduce(w, { type: "reveal" }, made, SHORT);
     if (w.phase === "done") break;
     w = reduce(w, { type: "next" }, made, SHORT);
   }
-  ok("a run plays out on two written cards", w.phase === "done", `${turns} rounds off ${made.length} cards`);
+  ok("a written run is exactly its length", turns === 4, `${turns} rounds off ${made.length} cards`);
+  ok("and it ends", w.phase === "done");
+
+  // THE POINT OF THE PAIRING. Every card, once for each of them, and no
+  // card twice with the same person holding it.
+  ok("every pairing is played once", new Set(dealtTo).size === 4, dealtTo.join(" "));
+  for (const card of made) {
+    const psychics = dealtTo.filter((d) => d.startsWith(`${card.id}/`)).map((d) => d.split("/")[1]);
+    ok(`both take a turn on ${card.left}`, psychics.length === 2 && psychics[0] !== psychics[1], psychics.join(","));
+  }
+  ok("the pot ceiling follows the run", potMax(w.runLength) === 16, `${potMax(w.runLength)}`);
+
+  // The big decks are not played through twice - eighty-eight cards twice
+  // is not an evening - so they keep the standard run and deal fresh.
+  const big = startGame(CARDS, "everything", ["A", "B"], SHORT, "coop");
+  ok("a built-in deck still runs five", big.runLength === COOP_ROUNDS);
+  let b2 = big;
+  const bigCards = [];
+  for (let i = 0; i < 3; i++) {
+    bigCards.push(b2.card.id);
+    b2 = reduce(b2, { type: "guess", value: 50 }, CARDS, SHORT);
+    b2 = reduce(b2, { type: "reveal" }, CARDS, SHORT);
+    b2 = reduce(b2, { type: "next" }, CARDS, SHORT);
+  }
+  ok("and deals a fresh card every round", new Set(bigCards).size === 3, bigCards.join(","));
 }
 ok("an unknown deck key falls back rather than throwing", deck("nonsense").length > 0);
 
@@ -465,7 +499,7 @@ ok(
   ok("a run is exactly its length", rounds === COOP_ROUNDS, `${rounds} rounds`);
   ok("and it ends", s2.phase === "done");
   ok("the pot is the sum of the bands", s2.pot === expected, `${s2.pot} vs ${expected}`);
-  ok("the pot cannot beat what is on the table", s2.pot <= COOP_MAX, `${s2.pot} of ${COOP_MAX}`);
+  ok("the pot cannot beat what is on the table", s2.pot <= potMax(COOP_ROUNDS), `${s2.pot} of ${potMax(COOP_ROUNDS)}`);
   // Both people give clues, or one of them is just watching.
   ok("the psychic still swaps every round", psychics.every((p, i) => p === i % 2), psychics.join(""));
 }

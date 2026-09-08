@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DECKS, cardsFor, customCards, CUSTOM_LEN, CUSTOM_MAX, type DeckKey, type Pair } from "@/lib/wavelength/spectrums";
-import { startGame, reduce, COOP_ROUNDS, COOP_MAX, type Mode, type WavelengthState, type WavelengthAction } from "@/lib/wavelength/engine";
+import { startGame, reduce, COOP_ROUNDS, pairedRunLength, potMax, type Mode, type WavelengthState, type WavelengthAction } from "@/lib/wavelength/engine";
 import { WavelengthBoard } from "@/components/wavelength/Board";
 import { Dial } from "@/components/wavelength/Dial";
 import { WaveStyles } from "@/components/wavelength/OverlayBoard";
@@ -176,6 +176,15 @@ function writePairs(next: Pair[]) {
 // stops the overlay being handed enough to work the target out for itself.
 type Game = { deck: DeckKey; seed: string; state: WavelengthState; past: WavelengthState[] };
 
+// Module scope on purpose. Math.random() called inside a component is
+// something React's lint is right to be suspicious of - a component must
+// be safe to re-render - and hoisting it out says plainly that this is a
+// one-off draw made when a button is pressed, not a value the render
+// depends on.
+function newSeed(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
 function isDeckKey(value: string | null): value is DeckKey {
   return DECKS.some((d) => d.key === value);
 }
@@ -193,6 +202,11 @@ function WavelengthInner() {
   const pairs = useSyncExternalStore(subscribePairs, pairsSnapshot, serverPairs);
   // What "Your own" would actually deal: blank rows are not cards.
   const written = customCards(pairs);
+  // HOW LONG A CO-OP RUN IS. A written deck is played through twice, so
+  // each of you is the psychic on every prompt you bothered to write;
+  // anything off one of the big decks stops after five, because eighty-
+  // eight cards twice is not an evening.
+  const runLength = deckKey === "custom" ? pairedRunLength(written) : COOP_ROUNDS;
   // THE UNDO STACK LIVES INSIDE THE GAME, not beside it. An undo is just
   // going back to a state the reducer already produced - but it has to be
   // the same piece of state as the game, because pushing to a second
@@ -212,11 +226,11 @@ function WavelengthInner() {
   }
 
   function start() {
-    const seed = Math.random().toString(36).slice(2, 10);
+    const seed = newSeed();
     setGame({
       deck: deckKey,
       seed,
-      state: startGame(cardsFor(deckKey, pairs), deckKey, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed, mode),
+      state: startGame(cardsFor(deckKey, pairs), deckKey, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed, mode, runLength),
       past: [],
     });
   }
@@ -439,7 +453,14 @@ function WavelengthInner() {
           <div className="mt-5 grid grid-cols-2 gap-2">
             {([
               { key: "teams" as const, title: "TEAM VS TEAM", note: `First to ${10}. The other side calls which way you missed.` },
-              { key: "coop" as const, title: "CO-OP", note: `Both of you, ${COOP_ROUNDS} rounds, ${COOP_MAX} points on the table.` },
+              {
+                key: "coop" as const,
+                title: "CO-OP",
+                note:
+                  deckKey === "custom"
+                    ? `Both of you, ${runLength} rounds — each pair twice — ${potMax(runLength)} points.`
+                    : `Both of you, ${runLength} rounds, ${potMax(runLength)} points on the table.`,
+              },
             ]).map((m) => {
               const on = mode === m.key;
               return (

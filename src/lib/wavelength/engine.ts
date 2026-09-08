@@ -74,11 +74,31 @@ export const WIN_SCORE = 10;
 // question is how many points the pair can pile up over a fixed run.
 //
 // A fixed run rather than "first to ten", because a shared score racing to
-// a target has no tension: you always get there eventually. Five rounds,
-// twenty available, and a number at the end worth beating.
+// a target has no tension: you always get there eventually. A number at
+// the end is the thing worth beating.
 export type Mode = "teams" | "coop";
+
+// Five rounds off one of the big decks, which is a length rather than a
+// rule - there are eighty-eight cards, so where it stops is arbitrary and
+// five is a good clip.
 export const COOP_ROUNDS = 5;
-export const COOP_MAX = COOP_ROUNDS * 4;
+
+// A WRITTEN DECK IS DIFFERENT. If somebody sat down and typed three
+// prompts, the run is those three prompts - twice, so each of them gets a
+// turn being the psychic on each one. Three categories, six rounds.
+//
+// Which also means the deal is PAIRED: the same card comes up twice in a
+// row, with a fresh target the second time and the other person holding
+// it. Alternating instead would put the same psychic on the same card
+// both times, since the psychic swaps every round anyway.
+export function pairedRunLength(cards: Spectrum[]): number {
+  return Math.max(1, cards.length) * 2;
+}
+
+// Four points a round is the most that is on the table.
+export function potMax(runLength: number): number {
+  return runLength * 4;
+}
 
 export type Phase =
   // The card is up and the psychic is looking at the target. Nobody else
@@ -198,6 +218,10 @@ export function startGame(
   names: string[],
   seed: string,
   mode: Mode = "teams",
+  // How long a co-op run is. Left out it is the standard five; a written
+  // deck passes its own length, which is what makes "your own" a run
+  // through your own list rather than five rounds of it.
+  runLength: number = COOP_ROUNDS,
 ): WavelengthState {
   const random = rng(seed);
   const card = pickCard(cards, [], random);
@@ -205,7 +229,7 @@ export function startGame(
     deck: deckKey,
     mode,
     pot: 0,
-    runLength: mode === "coop" ? COOP_ROUNDS : 0,
+    runLength: mode === "coop" ? Math.max(1, Math.round(runLength)) : 0,
     teams: names.map((name) => ({ name, score: 0 })),
     psychic: 0,
     round: 1,
@@ -341,7 +365,14 @@ export function reduce(
     // came back with 18.5, measured. The round and the scores are still in
     // there so a round does not depend on how long the last one took.
     const random = rng(`${seed}:${state.deck}:${state.round}:${state.teams.map((t) => t.score).join("-")}`);
-    const card = pickCard(cards, state.seen, random);
+
+    // A PAIRED RUN KEEPS THE CARD FOR A SECOND GO. The run is exactly two
+    // rounds per card, so the odd rounds deal and the even ones hand the
+    // same card to the other person - fresh target, other psychic. Worked
+    // out from the numbers rather than carried as a flag: a run that is
+    // twice the deck is a run through the deck twice.
+    const paired = state.mode === "coop" && state.runLength === cards.length * 2;
+    const card = paired && state.round % 2 === 1 ? state.card : pickCard(cards, state.seen, random);
     return {
       ...state,
       round: state.round + 1,
