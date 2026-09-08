@@ -70,7 +70,11 @@ export const BAND_PALETTES = {
 } as const;
 
 export type BandPalette = keyof typeof BAND_PALETTES;
-export const DEFAULT_BANDS: BandPalette = "grape";
+// Navy, steel, gold - the quiet one, and the one that was picked. The
+// other three stay because ?bands= switches an OBS source between them
+// without a deploy, which is the cheap way to change your mind about this
+// halfway through a stream.
+export const DEFAULT_BANDS: BandPalette = "gold";
 
 export function isBandPalette(value: string | null): value is BandPalette {
   return value !== null && value in BAND_PALETTES;
