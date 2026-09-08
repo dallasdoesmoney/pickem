@@ -58,7 +58,7 @@ export const KICKERS: Kicker[] = [
   { espnId: "2971573", name: "Ka'imi Fairbairn", team: "HOU", depth: 1, heightIn: 72, weightLb: 183, age: 32, jersey: 15 },
   { espnId: "4249087", name: "Matt Gay", team: "LV", depth: 1, heightIn: 72, weightLb: 232, age: 32, jersey: 4 },
   { espnId: "10621", name: "Nick Folk", team: "ATL", depth: 1, heightIn: 73, weightLb: 225, age: 41, jersey: 6 },
-  { espnId: "4243371", name: "Riley Patterson", team: "MIA", depth: 1, heightIn: 72, weightLb: 190, age: 26, jersey: 47 },
+  { espnId: "4243371", name: "Riley Patterson", team: "MIA", depth: 1, heightIn: 72, weightLb: 190, age: 27, jersey: 47 },
   { espnId: "4568263", name: "Ryan Fitzgerald", team: "CAR", depth: 1, heightIn: 71, weightLb: 193, age: 26, jersey: 10 },
   { espnId: "4571557", name: "Spencer Shrader", team: "IND", depth: 1, heightIn: 74, weightLb: 201, age: 27, jersey: 3 },
   { espnId: "4869461", name: "Trey Smack", team: "GB", depth: 1, heightIn: 73, weightLb: 188, age: 23, jersey: 28 },
