@@ -3,10 +3,11 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { deck, DECKS, type DeckKey } from "@/lib/wavelength/spectrums";
-import { startGame, reduce, type WavelengthState } from "@/lib/wavelength/engine";
+import { startGame, reduce, COOP_ROUNDS, type Mode, type WavelengthState } from "@/lib/wavelength/engine";
 import { isRoomCode } from "@/lib/wavelength/room";
 import { useWaveRoomState } from "@/components/wavelength/useWaveRoom";
 import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/wavelength/OverlayBoard";
+import { DEFAULT_BANDS, isBandPalette } from "@/components/wavelength/Dial";
 
 // THE OBS BROWSER SOURCE, the twin of /versus/overlay.
 //
@@ -23,15 +24,22 @@ import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/wavelength/OverlayB
 //   ?t1=Us&t2=Them    names on the DEMO scores (ignored in a room)
 //   ?target=2.5       put the DEMO's wedge at an exact spot, for looking
 //                     at the extremes without playing forty rounds
+//   ?mode=coop        draw the DEMO as a co-op run rather than two teams
+//   ?bands=sea        which scoring-band palette - see Dial.tsx. This one
+//                     applies in a room too, so an OBS source can be set
+//                     to a palette without a deploy
 
 // A deterministic mid-round position, so the graphic can be judged with
 // something in it rather than four em dashes. Demo only - in a room every
 // one of these numbers comes off the wire, and the target does not arrive
 // at all until the reveal.
-function demoState(deckKey: DeckKey, names: string[], phase: string | null, target: number | null): WavelengthState {
+function demoState(deckKey: DeckKey, names: string[], phase: string | null, target: number | null, mode: Mode): WavelengthState {
   const DEMO_SEED = "overlay-demo";
-  let state = startGame(deck(deckKey), deckKey, names, DEMO_SEED);
-  state = { ...state, teams: state.teams.map((t, i) => ({ ...t, score: i === 0 ? 6 : 4 })), round: 5 };
+  let state = startGame(deck(deckKey), deckKey, names, DEMO_SEED, mode);
+  state =
+    mode === "coop"
+      ? { ...state, pot: 11, round: 4, runLength: COOP_ROUNDS }
+      : { ...state, teams: state.teams.map((t, i) => ({ ...t, score: i === 0 ? 6 : 4 })), round: 5 };
   // The wedge can sit anywhere on the dial now, including mostly off the
   // bottom of either end, and those are exactly the positions that are
   // awkward to reach by playing. Demo only.
@@ -87,6 +95,9 @@ function OverlayInner() {
   const camTop = Number(params.get("top") ?? 560);
   const camBottom = Number(params.get("bottom") ?? 560);
   const preview = params.get("preview") === "1";
+  const bandsParam = params.get("bands");
+  const bands = isBandPalette(bandsParam) ? bandsParam : DEFAULT_BANDS;
+  const coopDemo = params.get("mode") === "coop";
 
   const deckParam = params.get("deck");
   const demoDeck: DeckKey = DECKS.some((d) => d.key === deckParam) ? (deckParam as DeckKey) : DECKS[0].key;
@@ -100,9 +111,10 @@ function OverlayInner() {
       ? null
       : demoState(
           demoDeck,
-          [params.get("t1") ?? "Team 1", params.get("t2") ?? "Team 2"],
+          coopDemo ? [params.get("t1") ?? "Dallas", params.get("t2") ?? "Noah"] : [params.get("t1") ?? "Team 1", params.get("t2") ?? "Team 2"],
           params.get("phase"),
           params.has("target") ? Number(params.get("target")) : null,
+          coopDemo ? "coop" : "teams",
         );
 
   return (
@@ -149,7 +161,7 @@ function OverlayInner() {
         )}
 
         {state ? (
-          <OverlayBoard state={state} camTop={camTop} camBottom={camBottom} />
+          <OverlayBoard state={state} camTop={camTop} camBottom={camBottom} bands={bands} />
         ) : (
           // Small and dim on purpose. If this ever does appear on a live
           // stream it should read as a status light, not an error page.

@@ -68,6 +68,18 @@ const EDGE_MARGIN = BAND_4;
 
 export const WIN_SCORE = 10;
 
+// TWO WAYS TO PLAY, and the second one is the common one: most nights it
+// is two people at a desk, not two teams. In CO-OP they are on the same
+// side - one psychic, one guesser, swapping every round - and the only
+// question is how many points the pair can pile up over a fixed run.
+//
+// A fixed run rather than "first to ten", because a shared score racing to
+// a target has no tension: you always get there eventually. Seven rounds,
+// twenty-eight available, and a number at the end worth beating.
+export type Mode = "teams" | "coop";
+export const COOP_ROUNDS = 7;
+export const COOP_MAX = COOP_ROUNDS * 4;
+
 export type Phase =
   // The card is up and the psychic is looking at the target. Nobody else
   // is allowed to see anything yet.
@@ -82,7 +94,15 @@ export type Phase =
 
 export type WavelengthState = {
   deck: string;
+  mode: Mode;
+  // Always the two PEOPLE, in both modes. In co-op they still take turns
+  // being the psychic, so both names and both colours are still needed -
+  // it is only the scoring that is shared.
   teams: { name: string; score: number }[];
+  // Co-op only: the shared pile, and how long the run is. Zero and zero in
+  // a team game, where the score lives on the teams themselves.
+  pot: number;
+  runLength: number;
   // Whose turn it is to be psychic. The other team is the one calling
   // left or right.
   psychic: TeamIndex;
@@ -164,11 +184,15 @@ export function startGame(
   deckKey: string,
   names: string[],
   seed: string,
+  mode: Mode = "teams",
 ): WavelengthState {
   const random = rng(seed);
   const card = pickCard(cards, [], random);
   return {
     deck: deckKey,
+    mode,
+    pot: 0,
+    runLength: mode === "coop" ? COOP_ROUNDS : 0,
     teams: names.map((name) => ({ name, score: 0 })),
     psychic: 0,
     round: 1,
@@ -239,17 +263,20 @@ export function reduce(
   if (action.type === "guess") {
     if (state.phase !== "clue" && state.phase !== "guess") return state;
     const value = Math.min(DIAL_MAX, Math.max(DIAL_MIN, Math.round(action.value * 10) / 10));
-    // Moving the dial during "clue" is how the team plays: the phase
-    // advances the moment the psychic has typed something, so the dial is
-    // live and the graphic shows it moving.
-    if (state.phase === "clue") {
-      if (state.clue.trim() === "") return state;
-      return { ...state, phase: "guess", guess: value };
-    }
+    // THE CLUE IS NOT REQUIRED. It used to be - the dial stayed dead until
+    // something had been typed - which is exactly backwards for the way
+    // this actually gets played: the clue is SAID, out loud, and everybody
+    // in the room and on the stream already heard it. Typing it in is for
+    // when you want it on the graphic for a clip, not a toll gate on the
+    // rest of the round.
+    if (state.phase === "clue") return { ...state, phase: "guess", guess: value };
     return { ...state, guess: value };
   }
 
   if (action.type === "steal") {
+    // Nobody to call it in co-op - the other side of the table is on your
+    // side of the table.
+    if (state.mode === "coop") return state;
     // The dial has to be somewhere before there are sides to choose
     // between.
     if (state.phase !== "guess" || state.guess === null) return state;
@@ -257,9 +284,22 @@ export function reduce(
   }
 
   if (action.type === "reveal") {
-    if (state.phase !== "steal" || state.guess === null || state.target === null) return state;
+    // FROM EITHER PHASE. Calling a side is a move you may want to skip -
+    // and in co-op there is no side to call at all - so the reveal is
+    // reachable as soon as the dial is somewhere. Requiring the call first
+    // made a two-press round into a four-press one.
+    if (state.phase !== "guess" && state.phase !== "steal") return state;
+    if (state.guess === null || state.target === null) return state;
     const band = bandFor(state.target, state.guess);
     const stolen = state.steal !== null && stealHits(state.target, state.guess, state.steal);
+
+    if (state.mode === "coop") {
+      const pot = state.pot + band;
+      // A run is over when its rounds are used up, however it went.
+      const over = state.round >= state.runLength;
+      return { ...state, phase: over ? "done" : "reveal", pot, scored: { band, stolen: false } };
+    }
+
     const teams = state.teams.map((t, i) => ({
       ...t,
       score: t.score + (i === state.psychic ? band : stolen ? 1 : 0),
@@ -324,7 +364,12 @@ export function redactFor(state: WavelengthState): WavelengthState {
 // reveal, and a reveal is not a team's move.
 export function waitingOn(state: WavelengthState): TeamIndex | null {
   if (state.phase === "clue") return state.psychic;
-  if (state.phase === "guess") return state.guess === null ? state.psychic : other(state.psychic);
+  // In co-op the pair are on the same side, so the dial never changes
+  // hands - the psychic is simply the one who may not touch it.
+  if (state.phase === "guess") {
+    if (state.mode === "coop") return other(state.psychic);
+    return state.guess === null ? state.psychic : other(state.psychic);
+  }
   return null;
 }
 

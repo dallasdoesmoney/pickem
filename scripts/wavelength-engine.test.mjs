@@ -1,7 +1,7 @@
 // Wavelength's rules, and the one thing about them that is a security
 // property rather than a rule.
 //
-// The engine is a pure reduce(state, action, cards, SEED), for the same reason
+// The engine is a pure reduce(state, action, cards, seed), for the same reason
 // the auction's is: the rules are the part that has to be right, and they
 // can be wrong in ways nobody notices until the last round of a live
 // stream. So they are checked here rather than by playing.
@@ -24,6 +24,8 @@ import {
   BAND_2,
   BAND_3,
   BAND_4,
+  COOP_ROUNDS,
+  COOP_MAX,
   DIAL_MIN,
   DIAL_MAX,
   WIN_SCORE,
@@ -101,7 +103,22 @@ const SEED = "phases";
 const fresh = startGame(CARDS, "everything", ["Us", "Them"], SEED);
 ok("a new game starts on the clue", fresh.phase === "clue" && fresh.round === 1);
 ok("a new game has no clue, no guess, no score", fresh.clue === "" && fresh.guess === null && fresh.teams.every((t) => t.score === 0));
-ok("the dial is dead before there is a clue", reduce(fresh, { type: "guess", value: 50 }, CARDS, SEED) === fresh);
+// THE CLUE IS NOT A GATE. It used to be - the dial stayed dead until
+// something had been typed - which is backwards for a game whose clue is
+// SAID out loud. Typing it is for putting it on the graphic.
+{
+  const turnedWithoutAClue = reduce(fresh, { type: "guess", value: 50 }, CARDS, SEED);
+  ok(
+    "the dial turns with no clue typed at all",
+    turnedWithoutAClue.phase === "guess" && turnedWithoutAClue.guess === 50 && turnedWithoutAClue.clue === "",
+  );
+  // ...and the whole round is reachable from there, in two presses.
+  const straightToReveal = reduce(turnedWithoutAClue, { type: "reveal" }, CARDS, SEED);
+  ok(
+    "and the reveal is reachable without calling a side",
+    straightToReveal.phase === "reveal" && straightToReveal.scored !== null && straightToReveal.scored.stolen === false,
+  );
+}
 ok("nothing to reveal before there is a guess", reduce(fresh, { type: "reveal" }, CARDS, SEED) === fresh);
 ok("no side to call before there is a guess", reduce(fresh, { type: "steal", side: "left" }, CARDS, SEED) === fresh);
 ok("no next round before a reveal", reduce(fresh, { type: "next" }, CARDS, SEED) === fresh);
@@ -318,6 +335,50 @@ ok(
   "a redaction that never lifts would draw an empty wedge",
 );
 
+// ---- co-op --------------------------------------------------------------
+//
+// Two people on the same side, a fixed run, one pile. The mode changes
+// three rules and nothing else, so those three are what is checked: no
+// side to call, points go to the pot rather than a team, and the run ends
+// when its rounds are used up rather than when somebody reaches a score.
+
+{
+  const SOLO = "coop-seed";
+  const start = startGame(CARDS, "everything", ["Dallas", "Noah"], SOLO, "coop");
+  ok("a co-op run starts empty", start.mode === "coop" && start.pot === 0 && start.runLength === COOP_ROUNDS);
+  ok("nobody has a team score in co-op", start.teams.every((t) => t.score === 0));
+
+  const turned = reduce(start, { type: "guess", value: start.target }, CARDS, SOLO);
+  ok("there is no side to call in co-op", reduce(turned, { type: "steal", side: "left" }, CARDS, SOLO) === turned);
+  const shownCoop = reduce(turned, { type: "reveal" }, CARDS, SOLO);
+  ok("a dead-on guess banks four", shownCoop.pot === 4, `${shownCoop.pot}`);
+  ok("and no team score moved", shownCoop.teams.every((t) => t.score === 0));
+  ok("the psychic gets no separate credit", shownCoop.scored.stolen === false);
+
+  // Play the whole run out, scoring it independently.
+  let s2 = start;
+  let expected = 0;
+  let rounds = 0;
+  const psychics = [];
+  while (s2.phase !== "done" && rounds < 40) {
+    rounds++;
+    psychics.push(s2.psychic);
+    const aim = [s2.target, s2.target + 3, s2.target - 20, s2.target + 6][rounds % 4];
+    const clamped = Math.min(DIAL_MAX, Math.max(DIAL_MIN, aim));
+    s2 = reduce(s2, { type: "guess", value: clamped }, CARDS, SOLO);
+    expected += bandFor(s2.target, s2.guess);
+    s2 = reduce(s2, { type: "reveal" }, CARDS, SOLO);
+    if (s2.phase === "done") break;
+    s2 = reduce(s2, { type: "next" }, CARDS, SOLO);
+  }
+  ok("a run is exactly its length", rounds === COOP_ROUNDS, `${rounds} rounds`);
+  ok("and it ends", s2.phase === "done");
+  ok("the pot is the sum of the bands", s2.pot === expected, `${s2.pot} vs ${expected}`);
+  ok("the pot cannot beat what is on the table", s2.pot <= COOP_MAX, `${s2.pot} of ${COOP_MAX}`);
+  // Both people give clues, or one of them is just watching.
+  ok("the psychic still swaps every round", psychics.every((p, i) => p === i % 2), psychics.join(""));
+}
+
 // ---- the wire -----------------------------------------------------------
 
 ok("the channel is namespaced to the game", waveChannel("23456789ab") === "wavelength:23456789ab");
@@ -352,6 +413,8 @@ for (const [name, bad] of [
   ["no card", { deck: "x", state: { ...payload.state, card: null } }],
   ["half a card", { deck: "x", state: { ...payload.state, card: { left: "Cold" } } }],
   ["a clue that is a number", { deck: "x", state: { ...payload.state, clue: 7 } }],
+  ["a mode nobody has heard of", { deck: "x", state: { ...payload.state, mode: "solo" } }],
+  ["no pot", { deck: "x", state: { ...payload.state, pot: undefined } }],
 ]) {
   ok(`drops ${name}`, !isWaveMessage(bad));
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { WavelengthState, WavelengthAction } from "@/lib/wavelength/engine";
-import { other, redactFor } from "@/lib/wavelength/engine";
+import { other, redactFor, COOP_MAX } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, outlined, display } from "@/components/versus/style";
 import { WaveStage } from "./WaveStage";
 import { COVER_MS } from "./Dial";
@@ -78,10 +78,13 @@ export function WavelengthBoard({
 }) {
   const psychic = state.teams[state.psychic];
   const guessing = state.teams[other(state.psychic)];
-  const hasClue = state.clue.trim() !== "";
-  // The dial is live from the moment there is a clue on the board, and
-  // locked once the other team has called a side.
-  const dialLive = (state.phase === "clue" && hasClue) || state.phase === "guess";
+  const coop = state.mode === "coop";
+  // LIVE FROM THE START OF THE ROUND. It used to wait for a clue to be
+  // typed, which is a toll gate on a game whose clue is SAID out loud -
+  // everybody in the room and on the stream already heard it. Typing it in
+  // is for putting it on the graphic, not for unlocking the dial.
+  const dialLive = state.phase === "clue" || state.phase === "guess";
+  const placed = state.guess !== null;
 
   // THE PEEK. Everybody is looking at the same screen, which is exactly
   // the problem: the psychic needs the answer and nobody else may have it.
@@ -209,8 +212,10 @@ export function WavelengthBoard({
             </label>
 
             <p className="text-[11.5px] leading-relaxed text-white/35">
-              Say it out loud as well &mdash; it goes straight onto the overlay. Then{" "}
-              <span className="text-white/60">{psychic.name}&rsquo;s team</span> drags the needle on the dial above.
+              Optional &mdash; say it out loud and skip the box if you like; this is only
+              for getting it onto the overlay. Either way,{" "}
+              <span className="text-white/60">{coop ? guessing.name : `${psychic.name}'s team`}</span> drags the
+              needle on the dial above.
             </p>
           </>
         )}
@@ -226,10 +231,16 @@ export function WavelengthBoard({
               </span>
             </div>
 
-            {state.guess === null ? (
+            {!placed ? (
               <p className="text-[11.5px] text-white/35">
                 Anywhere on the dial. {state.card.left} is hard left, {state.card.right} is hard right.
               </p>
+            ) : coop ? (
+              // No other side of the table to call it, so a co-op round is
+              // two presses: put the needle somewhere, open the dial.
+              <ActionButton onClick={() => onAction({ type: "reveal" })} grow>
+                OPEN THE DIAL
+              </ActionButton>
             ) : (
               <>
                 <div className="flex items-baseline justify-between gap-3 pt-1">
@@ -246,6 +257,17 @@ export function WavelengthBoard({
                     RIGHT &rarr;
                   </ActionButton>
                 </div>
+                {/* SKIPPABLE. The call is a real part of the game, but so
+                    is not bothering with it - and being made to press one
+                    of two buttons you did not want turns a two-press round
+                    into a four-press one. */}
+                <button
+                  onClick={() => onAction({ type: "reveal" })}
+                  className="self-center rounded-lg px-4 py-2 transition-colors"
+                  style={{ ...display(11, { letterSpacing: 2, color: "rgba(255,255,255,0.5)" }), border: `2px solid ${RULE}` }}
+                >
+                  SKIP THE CALL &mdash; OPEN THE DIAL
+                </button>
               </>
             )}
           </div>
@@ -269,17 +291,20 @@ export function WavelengthBoard({
           <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between gap-3">
               <span style={{ ...display(20, { color: PLAYER_COLORS[state.psychic], letterSpacing: 1 }), ...outlined(20, "soft") }}>
-                {state.scored.band > 0 ? `${psychic.name.toUpperCase()} +${state.scored.band}` : `${psychic.name.toUpperCase()} MISSED`}
+                {state.scored.band > 0
+                  ? `${coop ? "TOGETHER" : psychic.name.toUpperCase()} +${state.scored.band}`
+                  : `${coop ? "TOGETHER" : psychic.name.toUpperCase()} MISSED`}
               </span>
-              {state.scored.stolen && (
+              {!coop && state.scored.stolen && (
                 <span style={{ ...display(15, { color: PLAYER_COLORS[other(state.psychic)] }) }}>
                   {guessing.name.toUpperCase()} +1
                 </span>
               )}
+              {coop && <span className="text-[12px] text-white/40">{state.pot} so far</span>}
             </div>
             {state.phase === "done" ? (
               <ActionButton onClick={onRestart} grow>
-                NEW GAME
+                {coop ? `${state.pot} OF ${COOP_MAX} — GO AGAIN` : "NEW GAME"}
               </ActionButton>
             ) : (
               <ActionButton onClick={() => onAction({ type: "next" })} grow>

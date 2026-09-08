@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DECKS, deck, type DeckKey } from "@/lib/wavelength/spectrums";
-import { startGame, reduce, type WavelengthState, type WavelengthAction } from "@/lib/wavelength/engine";
+import { startGame, reduce, COOP_ROUNDS, COOP_MAX, type Mode, type WavelengthState, type WavelengthAction } from "@/lib/wavelength/engine";
 import { WavelengthBoard } from "@/components/wavelength/Board";
 import { Dial } from "@/components/wavelength/Dial";
 import { OverlayLink } from "@/components/versus/OverlayLink";
@@ -26,6 +26,7 @@ import { PLAYER_COLORS } from "@/components/versus/style";
 // dumps you back on a picker to choose the deck you were already using.
 const DECK_PARAM = "deck";
 const NAMES_KEY = "pickem:wavelength-teams";
+const MODE_KEY = "pickem:wavelength-mode";
 const UNDO_DEPTH = 40;
 
 // The team names as an EXTERNAL STORE rather than state restored in an
@@ -78,6 +79,44 @@ function writeNames(next: string[]) {
   for (const cb of listeners) cb();
 }
 
+// WHICH GAME IT IS, remembered the same way and for the same reason as the
+// names: a room that plays co-op plays co-op all night, and being asked
+// again every single game is the wrong default.
+const modeListeners = new Set<() => void>();
+let modeCache: Mode | null = null;
+
+function subscribeMode(cb: () => void): () => void {
+  modeListeners.add(cb);
+  return () => {
+    modeListeners.delete(cb);
+  };
+}
+
+function modeSnapshot(): Mode {
+  if (modeCache === null) {
+    try {
+      modeCache = localStorage.getItem(MODE_KEY) === "coop" ? "coop" : "teams";
+    } catch {
+      modeCache = "teams";
+    }
+  }
+  return modeCache;
+}
+
+function serverMode(): Mode {
+  return "teams";
+}
+
+function writeMode(next: Mode) {
+  modeCache = next;
+  try {
+    localStorage.setItem(MODE_KEY, next);
+  } catch {
+    // Not worth failing a game over.
+  }
+  for (const cb of modeListeners) cb();
+}
+
 // THE SEED SITS HERE, beside the state rather than inside it. It is what
 // deals every round after the first, and the state is the thing that gets
 // broadcast - see the note above startGame(). Keeping it out here is what
@@ -97,6 +136,7 @@ function WavelengthInner() {
   const [deckKey, setDeckKey] = useState<DeckKey>(picked ?? DECKS[0].key);
 
   const names = useSyncExternalStore(subscribeNames, namesSnapshot, serverNames);
+  const mode = useSyncExternalStore(subscribeMode, modeSnapshot, serverMode);
   // THE UNDO STACK LIVES INSIDE THE GAME, not beside it. An undo is just
   // going back to a state the reducer already produced - but it has to be
   // the same piece of state as the game, because pushing to a second
@@ -121,7 +161,7 @@ function WavelengthInner() {
     setGame({
       deck: deckKey,
       seed,
-      state: startGame(deck(deckKey), deckKey, names.map((n, i) => n.trim() || `Team ${i + 1}`), seed),
+      state: startGame(deck(deckKey), deckKey, names.map((n, i) => n.trim() || `Player ${i + 1}`), seed, mode),
       past: [],
     });
   }
@@ -234,7 +274,7 @@ function WavelengthInner() {
             {names.map((name, i) => (
               <label key={i} className="flex flex-col gap-1.5">
                 <span className="text-[10px] tracking-[0.16em]" style={{ fontFamily: "var(--font-display)", color: PLAYER_COLORS[i] }}>
-                  TEAM {i + 1}
+                  {mode === "coop" ? `PLAYER ${i + 1}` : `TEAM ${i + 1}`}
                 </span>
                 <input
                   value={name}
@@ -246,6 +286,40 @@ function WavelengthInner() {
             ))}
           </div>
 
+          {/* HOW IT IS BEING PLAYED. Two buttons rather than a switch,
+              because these are two different games rather than a setting
+              on one - and most nights it is two people at a desk, not two
+              teams, so co-op is not the afterthought it sounds like. */}
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            {([
+              { key: "teams" as const, title: "TEAM VS TEAM", note: `First to ${10}. The other side calls which way you missed.` },
+              { key: "coop" as const, title: "CO-OP", note: `Both of you, ${COOP_ROUNDS} rounds, ${COOP_MAX} points on the table.` },
+            ]).map((m) => {
+              const on = mode === m.key;
+              return (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => writeMode(m.key)}
+                  aria-pressed={on}
+                  className="rounded-2xl px-3.5 py-3 text-left transition-colors"
+                  style={{
+                    background: on ? "rgba(0,227,95,0.10)" : "rgba(255,255,255,0.04)",
+                    border: `2px solid ${on ? "#3ecb78" : "rgba(255,255,255,0.12)"}`,
+                  }}
+                >
+                  <span
+                    className="block text-[12.5px] tracking-[0.14em]"
+                    style={{ fontFamily: "var(--font-display)", color: on ? "#8fe9b4" : "rgba(255,255,255,0.75)" }}
+                  >
+                    {m.title}
+                  </span>
+                  <span className="mt-1 block text-[11.5px] leading-snug text-white/45">{m.note}</span>
+                </button>
+              );
+            })}
+          </div>
+
           {/* WHAT THE GAME IS, for the half of the room that has never
               played it. Three lines, because anything longer does not get
               read while people are waiting to start. */}
@@ -253,8 +327,8 @@ function WavelengthInner() {
             <Dial width={150} left="Cold" right="Hot" target={68} guess={54} open />
             <ol className="min-w-0 flex-1 text-[12px] leading-relaxed text-white/50">
               <li>1. The psychic holds a button and the dial opens, for them.</li>
-              <li>2. They give one clue. Their team drags the needle.</li>
-              <li>3. The other team calls which side it really is on.</li>
+              <li>2. They say one clue out loud. The other drags the needle.</li>
+              <li>3. {mode === "coop" ? "Open the dial and bank the points." : "The other team calls which side it really is on."}</li>
             </ol>
           </div>
 

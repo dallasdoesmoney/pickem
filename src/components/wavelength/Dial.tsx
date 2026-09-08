@@ -49,15 +49,32 @@ const NEEDLE = "#ff5a24";
 // close was that" is the one question the whole graphic exists to answer -
 // three shades of one green made a viewer count rings to find out.
 //
-// Dark to bright as they get closer, which is what makes it readable at a
-// glance and over a compressed stream: hue alone smears, luminance does
-// not. Only the outer band ever touches the cream, so that is the one that
-// has to hold up against it - 6.4:1, measured.
-const BAND_FILL: Record<number, string> = {
-  2: "#5b34c9",
-  3: "#1c86c9",
-  4: MONEY,
-};
+// FOUR PALETTES, all measured before they were offered. Every one of them
+// steps dark to bright as the rings get closer, which is what makes it
+// readable at a glance and over a compressed stream: hue alone smears,
+// luminance does not. Only the outer band ever touches the cream, so that
+// is the one that has to hold up against it - the weakest here is 6.4:1.
+//
+// Three more were measured and thrown out: one whose bullseye was nearly
+// the same colour as the cream recess, one whose inner ring collided with
+// the orange needle, and one that was three greens.
+export const BAND_PALETTES = {
+  // Violet, blue, money green.
+  grape: ["#5b34c9", "#1c86c9", MONEY],
+  // Navy, teal, mint. The furthest from the orange needle.
+  sea: ["#123b6b", "#0f8ea0", "#31e0b0"],
+  // Indigo, magenta, yellow. Loud on purpose.
+  arcade: ["#3a2c8f", "#e0357b", "#ffd23a"],
+  // Navy, steel, gold. The quiet one.
+  gold: ["#1f2d5c", "#4f7fbf", "#ffc21a"],
+} as const;
+
+export type BandPalette = keyof typeof BAND_PALETTES;
+export const DEFAULT_BANDS: BandPalette = "grape";
+
+export function isBandPalette(value: string | null): value is BandPalette {
+  return value !== null && value in BAND_PALETTES;
+}
 
 // How long the lid takes. Exported because the board holds the target on
 // screen for exactly this long after the psychic lets go - otherwise the
@@ -100,6 +117,7 @@ export function Dial({
   open = false,
   // Flash the band that just scored.
   pulse = false,
+  bands = DEFAULT_BANDS,
   // Handed in only by the board. Without it the dial is a picture.
   onScrub,
 }: {
@@ -110,6 +128,7 @@ export function Dial({
   guess: number | null;
   open?: boolean;
   pulse?: boolean;
+  bands?: BandPalette;
   onScrub?: (value: number) => void;
 }) {
   // Two dials can be on one page - the mirror and the rules picture on the
@@ -312,7 +331,7 @@ export function Dial({
               data-wedge
               className={pulse && hit?.band === b.band ? "wl-band wl-pulse" : "wl-band"}
               d={wedgePath(cx, cy, r * 0.97, b.from, b.to)}
-              fill={BAND_FILL[b.band]}
+              fill={(BAND_PALETTES[bands] ?? BAND_PALETTES[DEFAULT_BANDS])[b.band - 2]}
             />
           ))}
           {/* The numerals, in the graphic's own lettering - white with an

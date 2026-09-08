@@ -75,9 +75,10 @@ try {
   ok("the first round comes up", (await page.locator("main [data-band]").innerText()).includes("ROUND 1"));
   ok("nothing to undo yet", await page.getByRole("button", { name: /UNDO LAST MOVE/i }).isDisabled());
 
-  // THE DIAL IS DEAD UNTIL THERE IS A CLUE. Otherwise a team can turn it
-  // before anybody has said anything, which is not a round.
-  ok("no dial to drag before a clue", (await page.getByRole("slider").count()) === 0);
+  // THE DIAL IS LIVE FROM THE OFF. It used to wait for a clue to be typed,
+  // which is a toll gate on a game whose clue is SAID out loud - and on a
+  // stream everybody already heard it.
+  ok("the dial can be dragged with no clue typed", (await page.getByRole("slider").count()) === 1);
   // The reveal is its own button and it is not reachable yet. HOLD TO OPEN
   // THE DIAL is a different control with a similar name, hence the anchors.
   ok("nothing to reveal before a clue", (await page.getByRole("button", { name: /^OPEN THE DIAL$/ }).count()) === 0);
@@ -102,12 +103,16 @@ try {
   let rounds = 0;
   let leakedRounds = 0;
   let clues = 0;
+  let skipped = 0;
 
   for (let steps = 0; steps < 120; steps++) {
     if (await page.getByRole("button", { name: /NEW GAME/i }).count()) break;
 
     // ---- the clue ----
-    const clue = page.locator("main input[type=text]");
+    // Typed on some rounds and skipped entirely on others, because "you do
+    // not have to type it" is only true if a round played without touching
+    // the box actually finishes.
+    const clue = rounds % 2 === 0 ? page.locator("main input[type=text]") : page.locator("main input[data-never]");
     if (await clue.count()) {
       const word = ["Coffee", "Tuesday", "Airport", "Dentist"][clues % 4];
       await clue.fill(word);
@@ -138,13 +143,20 @@ try {
     }
     if ((await wedges()) > 0) leakedRounds++;
 
-    // ---- the call ----
-    await page.getByRole("button", { name: rounds % 2 === 0 ? /LEFT$/ : /^RIGHT/ }).click();
-    await page.waitForTimeout(80);
-    if ((await wedges()) > 0) leakedRounds++;
+    // ---- the call, which is optional now ----
+    if (rounds % 3 !== 2) {
+      await page.getByRole("button", { name: rounds % 2 === 0 ? /LEFT$/ : /^RIGHT/ }).click();
+      await page.waitForTimeout(80);
+      if ((await wedges()) > 0) leakedRounds++;
+      skipped += 0;
+    } else {
+      skipped++;
+    }
 
     // ---- and only now ----
-    await page.getByRole("button", { name: /^OPEN THE DIAL$/ }).click();
+    // Named the same whether it is reached through the call or straight
+    // from the dial, so this one press ends the round either way.
+    await page.getByRole("button", { name: /OPEN THE DIAL$/ }).first().click();
     await page.waitForTimeout(120);
     if ((await wedges()) === 0) {
       ok("the reveal draws the wedge", false, `round ${rounds + 1}`);
@@ -160,6 +172,8 @@ try {
   }
 
   ok("the game plays to a winner", (await page.getByRole("button", { name: /NEW GAME/i }).count()) > 0, `${rounds} rounds`);
+  ok("rounds finished without typing a clue", clues < rounds, `${clues} clues typed over ${rounds} rounds`);
+  ok("and rounds finished without calling a side", skipped > 0, `${skipped} calls skipped`);
   ok("the target is never on screen before the reveal", leakedRounds === 0, `${rounds} rounds watched`);
   ok("somebody reached the score", /WINS/.test(await page.locator("main [data-band]").innerText()));
   ok("undo is live once moves have been made", !(await page.getByRole("button", { name: /UNDO LAST MOVE/i }).isDisabled()));
@@ -169,6 +183,50 @@ try {
   await page.getByRole("button", { name: /NEW GAME/i }).click();
   await page.getByRole("button", { name: /START THE GAME/i }).waitFor({ timeout: 30000 });
   ok("NEW GAME returns to setup", true);
+
+  // ---- CO-OP, which is the mode most nights actually use ----------------
+  //
+  // Two people on the same side, a fixed run, one pile. Played through here
+  // rather than only in the engine tests because the mode changes what the
+  // BOARD offers - there is no side to call, so a round is two presses -
+  // and a rule that is right while the button is missing is no use.
+  await page.getByRole("button", { name: /CO-OP/ }).click();
+  await page.waitForTimeout(120);
+  await page.getByRole("button", { name: /START THE GAME/i }).click();
+  await page.getByRole("button", { name: /HOLD TO OPEN THE DIAL/i }).waitFor({ timeout: 30000 });
+
+  const band0 = await page.locator("main [data-band]").innerText();
+  ok("a co-op run says how long it is", /ROUND 1 OF \d+/.test(band0), band0.split("\n")[0]);
+  ok("and shows one pile, not two scores", /0\s*\/\s*\d+/.test(band0.replace(/\n/g, " ")));
+
+  let coopRounds = 0;
+  let coopLeaks = 0;
+  for (let steps = 0; steps < 40; steps++) {
+    if (await page.getByRole("button", { name: /GO AGAIN/i }).count()) break;
+    const dial = page.getByRole("slider");
+    await dial.waitFor({ timeout: 5000 });
+    await clickDialAt(dial, [30, 55, 70][coopRounds % 3]);
+    await page.waitForTimeout(120);
+    if ((await wedges()) > 0) coopLeaks++;
+    // No LEFT / RIGHT in co-op: there is nobody to call it.
+    if (await page.getByRole("button", { name: /LEFT$/ }).count()) {
+      ok("co-op offers no side to call", false, `round ${coopRounds + 1}`);
+    }
+    await page.getByRole("button", { name: /OPEN THE DIAL$/ }).first().click();
+    await page.waitForTimeout(150);
+    coopRounds++;
+    const next = page.getByRole("button", { name: /NEXT ROUND/i });
+    if (await next.count()) {
+      await next.click();
+      await page.waitForTimeout(100);
+    }
+  }
+  ok("a co-op run ends on its own", (await page.getByRole("button", { name: /GO AGAIN/i }).count()) > 0, `${coopRounds} rounds`);
+  ok("the target stays hidden in co-op too", coopLeaks === 0);
+  {
+    const done = await page.locator("main [data-band]").innerText();
+    ok("and it finishes on a total", /\d+ OUT OF \d+/.test(done.replace(/\n/g, " ")), done.replace(/\n/g, " ").slice(0, 60));
+  }
 
   // THE GRAPHIC HAS TO FIT BETWEEN THE TWO CAMERAS, and this is the only
   // way to know: the band is 800px tall at the default 560/560, the

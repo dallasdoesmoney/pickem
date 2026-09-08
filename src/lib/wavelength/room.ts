@@ -26,6 +26,9 @@ export function isWaveMessage(value: unknown): value is WaveMessage {
   if (typeof state !== "object" || state === null) return false;
   const s = state as Partial<WavelengthState>;
   return (
+    (s.mode === "teams" || s.mode === "coop") &&
+    typeof s.pot === "number" &&
+    typeof s.runLength === "number" &&
     Array.isArray(s.teams) &&
     s.teams.length === 2 &&
     s.teams.every((t) => typeof t?.name === "string" && typeof t?.score === "number") &&

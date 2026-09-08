@@ -1,9 +1,9 @@
 "use client";
 
 import type { WavelengthState } from "@/lib/wavelength/engine";
-import { WIN_SCORE, other } from "@/lib/wavelength/engine";
+import { WIN_SCORE, COOP_MAX, other } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, INK, outlined } from "@/components/versus/style";
-import { Dial, COVER_MS } from "./Dial";
+import { Dial, COVER_MS, DEFAULT_BANDS, type BandPalette } from "./Dial";
 
 // THE GRAPHIC, on the same 1080 x 1920 transparent stage the draft uses,
 // with the same two cam bands clear at the top and the bottom. Everything
@@ -184,6 +184,72 @@ function Score({ state, who, align }: { state: WavelengthState; who: 0 | 1; alig
   );
 }
 
+// CO-OP, WHICH IS ONE SCORE AND TWO PEOPLE. The team scoreboard says who
+// is beating whom, and here nobody is - so it says the only two things
+// that matter instead: whose turn it is to be psychic, and the pile.
+function CoopScore({ state }: { state: WavelengthState }) {
+  const gained = state.scored ? state.scored.band : 0;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+      <span style={{ display: "flex", flexDirection: "column", gap: 5, minHeight: 62, justifyContent: "center" }}>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 32, lineHeight: 1, color: PLAYER_COLORS[state.psychic], ...outlined(32) }}>
+          {state.teams[state.psychic].name.toUpperCase()}
+        </span>
+        <span
+          key={state.psychic}
+          className="wl-pop"
+          style={{
+            display: "inline-block",
+            alignSelf: "flex-start",
+            fontFamily: "var(--font-display)",
+            fontSize: 17,
+            letterSpacing: 3,
+            color: INK,
+            background: PLAYER_COLORS[state.psychic],
+            padding: "4px 10px",
+            borderRadius: 999,
+            boxShadow: PRESS,
+          }}
+        >
+          PSYCHIC
+        </span>
+      </span>
+
+      <span style={{ position: "relative", display: "flex", alignItems: "baseline", gap: 10 }}>
+        <span
+          key={state.pot}
+          className="wl-pop"
+          style={{ fontFamily: "var(--font-display)", fontSize: 58, lineHeight: 1, color: "#ffffff", ...outlined(58) }}
+        >
+          {state.pot}
+        </span>
+        <span style={{ fontFamily: "var(--font-display)", fontSize: 26, lineHeight: 1, color: "rgba(255,255,255,0.45)", ...outlined(26) }}>
+          / {COOP_MAX}
+        </span>
+        {gained > 0 && (
+          <span
+            key={`${state.round}-${gained}`}
+            className="wl-float"
+            style={{
+              position: "absolute",
+              top: -4,
+              right: -10,
+              fontFamily: "var(--font-display)",
+              fontSize: 36,
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+              color: MONEY,
+              ...outlined(36),
+            }}
+          >
+            +{gained}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 export function OverlayBoard({
   state,
   camTop = 560,
@@ -196,12 +262,14 @@ export function OverlayBoard({
   // Handed in only by the board, which is what makes the dial a control
   // there and a picture everywhere else.
   onScrub,
+  bands = DEFAULT_BANDS,
 }: {
   state: WavelengthState;
   camTop?: number;
   camBottom?: number;
   peek?: boolean;
   onScrub?: (value: number) => void;
+  bands?: BandPalette;
 }) {
   const bandHeight = STAGE_H - camTop - camBottom;
   const reveal = state.phase === "reveal" || state.phase === "done";
@@ -209,8 +277,10 @@ export function OverlayBoard({
 
   // What the big line says. One place, so the graphic never has two
   // opinions about what moment it is.
+  const coop = state.mode === "coop";
   const headline = (() => {
     if (state.phase === "done") {
+      if (coop) return { text: `${state.pot} OUT OF ${COOP_MAX}`, color: MONEY };
       const winner = state.teams[0].score >= WIN_SCORE ? 0 : 1;
       return { text: `${state.teams[winner].name.toUpperCase()} WINS`, color: PLAYER_COLORS[winner] };
     }
@@ -226,7 +296,10 @@ export function OverlayBoard({
       return { text: `${state.teams[caller].name.toUpperCase()} CALLS IT`, color: PLAYER_COLORS[caller] };
     }
     if (state.phase === "guess") {
-      return { text: `${state.teams[state.psychic].name.toUpperCase()} IS TURNING`, color: PLAYER_COLORS[state.psychic] };
+      // In co-op the psychic is the one who may NOT touch the dial, so the
+      // line has to name the other one.
+      const turning = coop ? other(state.psychic) : state.psychic;
+      return { text: `${state.teams[turning].name.toUpperCase()} IS TURNING`, color: PLAYER_COLORS[turning] };
     }
     return { text: `${state.teams[state.psychic].name.toUpperCase()} IS THINKING`, color: PLAYER_COLORS[state.psychic] };
   })();
@@ -256,13 +329,25 @@ export function OverlayBoard({
         {/* Round and the target score, small, so a clip that starts here
             still says what is being played. */}
         <span style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: 6, color: "rgba(255,255,255,0.45)", ...outlined(20) }}>
-          ROUND {state.round} &middot; FIRST TO {WIN_SCORE}
+          {coop ? (
+            <>
+              ROUND {Math.min(state.round, state.runLength)} OF {state.runLength} &middot; TOGETHER
+            </>
+          ) : (
+            <>
+              ROUND {state.round} &middot; FIRST TO {WIN_SCORE}
+            </>
+          )}
         </span>
 
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", width: "100%" }}>
-          <Score state={state} who={0} align="left" />
-          <Score state={state} who={1} align="right" />
-        </div>
+        {coop ? (
+          <CoopScore state={state} />
+        ) : (
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", width: "100%" }}>
+            <Score state={state} who={0} align="left" />
+            <Score state={state} who={1} align="right" />
+          </div>
+        )}
 
         {/* KEYED ON THE CARD, so a new round is a new dial arriving rather
             than the old one's words changing under a lid that is halfway
@@ -276,6 +361,7 @@ export function OverlayBoard({
             guess={state.guess}
             open={reveal || peek}
             pulse={reveal}
+            bands={bands}
             onScrub={onScrub}
           />
         </div>
@@ -319,7 +405,7 @@ export function OverlayBoard({
         </span>
 
         {/* The catch-up point, only once it has been decided. */}
-        {reveal && state.scored?.stolen && (
+        {reveal && !coop && state.scored?.stolen && (
           <span
             key={`stolen-${state.round}`}
             className="wl-in"
