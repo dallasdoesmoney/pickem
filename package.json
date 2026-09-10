@@ -30,7 +30,8 @@
     "kickoffs": "node scripts/gen-kickoff-migration.mjs",
     "test:kickoff": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/lock-at-kickoff.test.mjs",
     "test:weeklylock": "node scripts/weekly-lock.test.mjs",
-    "test:heal": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/pick-heal.test.mjs"
+    "test:heal": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/pick-heal.test.mjs",
+    "test:picksave": "node scripts/pick-save.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

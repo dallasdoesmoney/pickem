@@ -134,9 +134,18 @@ ok("generator guards a drifted parser", /games\.length < 200/.test(genSource), r
 // delete has to be scoped to the same set being inserted.
 const picksSource = readFileSync(join(ROOT, "src", "lib", "supabase", "picks.ts"), "utf8");
 const save = picksSource.slice(picksSource.indexOf("export async function saveWeeklyPicks"), picksSource.indexOf("export async function fetchSeasonPicks"));
-ok("save scopes its delete by game_id", /\.delete\(\)[\s\S]{0,200}\.in\("game_id", open\)/.test(save));
-ok("save only inserts open games", /\.filter\(\(\[gameId\]\) => openGameIds\.has\(gameId\)\)/.test(save));
+// Only ever deletes games the board no longer has a pick for, and only
+// after the writes have landed. The delete-everything-then-put-it-back
+// shape is what emptied boards twice in one day; if it comes back, so
+// does that.
+ok("save deletes only un-picked games", /\.delete\(\)[\s\S]{0,220}\.in\("game_id", unpicked\)/.test(save));
+ok("un-picked means exactly that", /const unpicked = open\.filter\(\(gameId\) => !picks\[gameId\]\);/.test(save));
+ok("save writes with an upsert", /\.upsert\(rows, \{ onConflict: "user_id,week,game_id" \}\)/.test(save));
+ok("save only writes open games", /\.filter\(\(\[gameId\]\) => openGameIds\.has\(gameId\)\)/.test(save));
 ok("save no-ops when nothing is open", /if \(open\.length === 0\) return;/.test(save));
+ok("the lock is released before it is reclaimed", save.indexOf("is_lock: false") < save.indexOf(".upsert("));
+ok("writes happen before the delete", save.indexOf(".upsert(") < save.indexOf(".delete()"));
+ok("no unscoped week-wide delete", !/\.delete\(\)[\s\S]{0,200}\.eq\("week", week\)\s*;/.test(save));
 
 // Every caller passes the set - a missed one would be a TypeScript error,
 // but the point is that none of them fell back to a whole-week wipe.

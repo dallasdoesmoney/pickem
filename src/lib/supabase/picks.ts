@@ -16,20 +16,29 @@ export async function fetchWeeklyPicks(userId: string, week: number): Promise<We
   return { picks, lockedGameId };
 }
 
-// Delete-then-insert for the given scope rather than a diff/upsert - "Save
-// & Submit" means "persist exactly what's on screen right now," including
-// picks the user toggled back off, which a pure upsert would leave behind
-// as stale rows.
+// Persist exactly what is on the board, without ever passing through a
+// state where it is gone.
 //
-// `openGameIds` narrows that scope to the games that have not kicked off.
-// Once picks lock per game, a whole-week wipe stops being a safe way to
-// say "here is the current board": RLS refuses to delete a started game's
-// row, the row survives, and the re-insert then collides with it on
-// (user_id, week, game_id) - so a single started game would fail every
-// later save of that week. Scoping the delete to the same set we are
-// about to insert keeps the statement and the policy agreeing about what
-// is being replaced. Started games are simply not touched, in either
-// direction, which is the whole point of the lock.
+// This used to delete the week and then insert it back. That reads as one
+// operation and is really two round trips, which cost us twice in one
+// day: when the insert was refused the delete had already committed and
+// the board was empty, and when two writers overlapped - the device-copy
+// restore and the page's autosave - each one's delete landed between the
+// other's delete and insert, so somebody got an error on a save that had
+// nothing wrong with it.
+//
+// Three narrow statements instead, ordered so that no failure and no
+// interleaving can lose a pick:
+//
+//   1. release a lock that has moved     - fails: nothing has changed yet
+//   2. upsert the board                  - fails: nothing has been deleted
+//   3. delete only what was un-picked    - fails: every pick still stands
+//
+// Nothing here is destructive until after the writes have succeeded, and
+// every statement is idempotent, so running this twice at once converges
+// instead of colliding. `openGameIds` keeps all three off games that have
+// already kicked off - RLS would refuse those anyway, and the point of
+// the lock is that a started game is not touched in either direction.
 export async function saveWeeklyPicks(
   userId: string,
   week: number,
@@ -38,18 +47,29 @@ export async function saveWeeklyPicks(
   openGameIds: Set<string>,
 ) {
   const open = [...openGameIds];
-  // Nothing left open this week: no delete (it would only ever be
-  // refused) and nothing to write.
+  // Nothing left open this week: every statement below would be refused,
+  // and none of them would mean anything.
   if (open.length === 0) return;
 
-  const { error: deleteError } = await supabase
+  // 1. weekly_picks_one_lock_per_week is a partial unique index, so two
+  //    rows claiming is_lock at the same instant is a constraint
+  //    violation, not last-write-wins. The old claim has to be given up
+  //    before the new one is written - and this is an update, so it can
+  //    only ever clear a flag, never remove a pick.
+  let releaseLock = supabase
     .from("weekly_picks")
-    .delete()
+    .update({ is_lock: false })
     .eq("user_id", userId)
     .eq("week", week)
-    .in("game_id", open);
-  if (deleteError) throw deleteError;
+    .eq("is_lock", true);
+  if (lockedGameId) releaseLock = releaseLock.neq("game_id", lockedGameId);
+  const { error: lockError } = await releaseLock;
+  if (lockError) throw lockError;
 
+  // 2. One statement, so a row that is refused takes only itself down -
+  //    the reason a whole slate could vanish over a single bad row before
+  //    was that the refusal rolled back an insert the delete had already
+  //    made necessary.
   const rows = Object.entries(picks)
     .filter(([gameId]) => openGameIds.has(gameId))
     .map(([gameId, teamAbbr]) => ({
@@ -59,10 +79,27 @@ export async function saveWeeklyPicks(
       team_abbr: teamAbbr,
       is_lock: gameId === lockedGameId,
     }));
-  if (rows.length === 0) return;
+  if (rows.length > 0) {
+    const { error: upsertError } = await supabase
+      .from("weekly_picks")
+      .upsert(rows, { onConflict: "user_id,week,game_id" });
+    if (upsertError) throw upsertError;
+  }
 
-  const { error: insertError } = await supabase.from("weekly_picks").insert(rows);
-  if (insertError) throw insertError;
+  // 3. "Save" still means "the board as it stands", so a game toggled
+  //    back off has to lose its row - but only that game. Naming the
+  //    un-picked games explicitly is what makes this incapable of
+  //    deleting a pick the user still has, however it is interleaved.
+  const unpicked = open.filter((gameId) => !picks[gameId]);
+  if (unpicked.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("weekly_picks")
+      .delete()
+      .eq("user_id", userId)
+      .eq("week", week)
+      .in("game_id", unpicked);
+    if (deleteError) throw deleteError;
+  }
 }
 
 export async function fetchSeasonPicks(userId: string, trackedTeam: TeamAbbr): Promise<Record<number, TeamAbbr>> {
