@@ -20,17 +20,45 @@ export async function fetchWeeklyPicks(userId: string, week: number): Promise<We
 // & Submit" means "persist exactly what's on screen right now," including
 // picks the user toggled back off, which a pure upsert would leave behind
 // as stale rows.
-export async function saveWeeklyPicks(userId: string, week: number, picks: Record<string, TeamAbbr>, lockedGameId: string | null) {
-  const { error: deleteError } = await supabase.from("weekly_picks").delete().eq("user_id", userId).eq("week", week);
+//
+// `openGameIds` narrows that scope to the games that have not kicked off.
+// Once picks lock per game, a whole-week wipe stops being a safe way to
+// say "here is the current board": RLS refuses to delete a started game's
+// row, the row survives, and the re-insert then collides with it on
+// (user_id, week, game_id) - so a single started game would fail every
+// later save of that week. Scoping the delete to the same set we are
+// about to insert keeps the statement and the policy agreeing about what
+// is being replaced. Started games are simply not touched, in either
+// direction, which is the whole point of the lock.
+export async function saveWeeklyPicks(
+  userId: string,
+  week: number,
+  picks: Record<string, TeamAbbr>,
+  lockedGameId: string | null,
+  openGameIds: Set<string>,
+) {
+  const open = [...openGameIds];
+  // Nothing left open this week: no delete (it would only ever be
+  // refused) and nothing to write.
+  if (open.length === 0) return;
+
+  const { error: deleteError } = await supabase
+    .from("weekly_picks")
+    .delete()
+    .eq("user_id", userId)
+    .eq("week", week)
+    .in("game_id", open);
   if (deleteError) throw deleteError;
 
-  const rows = Object.entries(picks).map(([gameId, teamAbbr]) => ({
-    user_id: userId,
-    week,
-    game_id: gameId,
-    team_abbr: teamAbbr,
-    is_lock: gameId === lockedGameId,
-  }));
+  const rows = Object.entries(picks)
+    .filter(([gameId]) => openGameIds.has(gameId))
+    .map(([gameId, teamAbbr]) => ({
+      user_id: userId,
+      week,
+      game_id: gameId,
+      team_abbr: teamAbbr,
+      is_lock: gameId === lockedGameId,
+    }));
   if (rows.length === 0) return;
 
   const { error: insertError } = await supabase.from("weekly_picks").insert(rows);

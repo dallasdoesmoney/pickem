@@ -146,6 +146,41 @@ create trigger game_results_set_updated_at before update on public.game_results
 -- update public.profiles set is_admin = true
 --   where id = (select id from auth.users where email = 'you@example.com');
 
+-- game_kickoffs: the database's own copy of the schedule's kickoff times,
+-- so RLS can close a pick when its game starts instead of waiting for an
+-- admin to flip weeks.is_open by hand. The rows are GENERATED from
+-- src/data/games.ts and live in 0062_lock_at_kickoff.sql - run that file
+-- to fill this table, and re-run it whenever the schedule changes.
+create table public.game_kickoffs (
+  game_id text primary key,
+  week integer not null,
+  kickoff timestamptz not null
+);
+create index game_kickoffs_week_idx on public.game_kickoffs (week);
+alter table public.game_kickoffs enable row level security;
+create policy "game_kickoffs_select_all" on public.game_kickoffs for select using (true);
+-- Admin-only writes: a user who could edit this table could move a
+-- kickoff into the future and reopen a game they had just watched.
+create policy "game_kickoffs_insert_admin" on public.game_kickoffs for insert with check (public.is_admin());
+create policy "game_kickoffs_update_admin" on public.game_kickoffs for update using (public.is_admin());
+create policy "game_kickoffs_delete_admin" on public.game_kickoffs for delete using (public.is_admin());
+
+-- "There IS a row and it is in the future", not "there is NO row saying
+-- it started" - a game_id this table has never heard of is unpickable
+-- rather than permanently editable. Fail shut; see 0062 for why.
+create or replace function public.game_is_open(p_game_id text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.game_kickoffs k
+    where k.game_id = p_game_id and k.kickoff > now()
+  );
+$$;
+
 -- weekly_picks (one row per pick, not a JSON blob - needed for a future leaderboard)
 create table public.weekly_picks (
   id uuid primary key default gen_random_uuid(),
@@ -164,14 +199,17 @@ create index weekly_picks_user_week_idx on public.weekly_picks (user_id, week);
 create unique index weekly_picks_one_lock_per_week on public.weekly_picks (user_id, week) where is_lock;
 alter table public.weekly_picks enable row level security;
 create policy "weekly_picks_select_own" on public.weekly_picks for select using (auth.uid() = user_id);
--- Insert/update/delete additionally require the week to be open - a
--- closed week can't be written to even by someone bypassing the app's UI.
+-- Insert/update/delete additionally require two things: the week to be
+-- open (an admin's manual override) and the game itself not to have
+-- kicked off yet. See 0062_lock_at_kickoff.sql - the per-game rule is the
+-- real deadline, and game_kickoffs plus game_is_open() are created there,
+-- generated from src/data/games.ts.
 create policy "weekly_picks_insert_own" on public.weekly_picks for insert
-  with check (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true));
+  with check (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true) and public.game_is_open(weekly_picks.game_id));
 create policy "weekly_picks_update_own" on public.weekly_picks for update
-  using (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true));
+  using (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true) and public.game_is_open(weekly_picks.game_id));
 create policy "weekly_picks_delete_own" on public.weekly_picks for delete
-  using (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true));
+  using (auth.uid() = user_id and exists (select 1 from public.weeks w where w.week = weekly_picks.week and w.is_open = true) and public.game_is_open(weekly_picks.game_id));
 create trigger weekly_picks_set_updated_at
   before update on public.weekly_picks for each row execute function public.set_updated_at();
 

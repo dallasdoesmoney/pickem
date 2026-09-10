@@ -6,6 +6,8 @@ import { CURRENT_WEEK, GAMES_BY_WEEK } from "@/data/games";
 import { GameCard, COMPACT_SCALE, PILL_WIDTH } from "@/components/GameCard";
 import { LOCK_COLOR } from "@/components/TeamHalfPill";
 import { usePicks } from "@/hooks/usePicks";
+import { useNow } from "@/hooks/useNow";
+import { isKickedOff, openGameIds } from "@/lib/lockAtKickoff";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSignInModal } from "@/hooks/useSignInModal";
@@ -398,7 +400,11 @@ export default function Home() {
   const currentWeekRow = weeks.find((w) => w.week === activeWeek);
   // Before weeks finish loading, default to editable so the page behaves
   // exactly as it always has rather than briefly locking every control.
+  // This is the week-level switch only - an admin closing a week early.
+  // Whether any individual game can still be picked is kickoff's call,
+  // below.
   const isEditable = weeks.length === 0 || currentWeekRow?.is_open === true;
+  const now = useNow();
   const { user: authUser } = useAuth();
 
   useEffect(() => {
@@ -504,6 +510,12 @@ export default function Home() {
   }, []);
   const myRank = user && leaderboardRows ? leaderboardRows.findIndex((r) => r.user_id === user.id) : -1;
   const pickedCount = Object.keys(picks).length;
+  // Read at write time rather than off `now`, so what a save is allowed
+  // to touch is decided by the clock at the moment the request leaves -
+  // the same clock the database's own policy will check a few
+  // milliseconds later. Reusing a render-time snapshot would let a save
+  // fired 14 seconds after the last tick still claim a started game.
+  const openIdsNow = () => openGameIds(games, Date.now());
   const gradedCount = games.filter((g) => results[g.id]).length;
   const correctCount = games.filter((g) => results[g.id] && picks[g.id] === results[g.id]).length;
   const hasResults = gradedCount > 0;
@@ -549,7 +561,7 @@ export default function Home() {
     // pending-save effect below picks it back up once the page reloads
     // with a session.
     if (!userId) return;
-    saveWeeklyPicks(userId, activeWeek, picks, lockedGameId)
+    saveWeeklyPicks(userId, activeWeek, picks, lockedGameId, openIdsNow())
       .then(() => {
         syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
       })
@@ -565,8 +577,12 @@ export default function Home() {
   // mid-pick with a dialog). Once the week's closed, "incomplete" no
   // longer means anything - the picks are whatever they ended up being.
   async function confirmIfIncomplete(confirmLabel: string) {
-    if (!isEditable || pickedCount >= games.length) return true;
-    const remaining = games.length - pickedCount;
+    // Count only what can still be picked. Nagging about "3 picks left"
+    // when all three games kicked off an hour ago is asking for something
+    // the board will not let anybody do.
+    const stillOpen = openIdsNow();
+    const remaining = [...stillOpen].filter((id) => !picks[id]).length;
+    if (!isEditable || remaining === 0) return true;
     return confirm(`You still have ${remaining} pick${remaining === 1 ? "" : "s"} left this week. Continue anyway?`, confirmLabel);
   }
 
@@ -594,7 +610,7 @@ export default function Home() {
       // pending-save effect below picks it back up once the page reloads
       // with a session, so there's nothing more to do in this click.
       if (!userId) return;
-      await saveWeeklyPicks(userId, activeWeek, picks, lockedGameId);
+      await saveWeeklyPicks(userId, activeWeek, picks, lockedGameId, openIdsNow());
       posthog.capture("weekly_picks_saved", {
         week: activeWeek,
         picks_count: Object.keys(picks).length,
@@ -613,7 +629,7 @@ export default function Home() {
     if (!user || !loaded || view.streamerMode) return;
     if (sessionStorage.getItem(PENDING_SAVE_KEY) !== "1") return;
     sessionStorage.removeItem(PENDING_SAVE_KEY);
-    saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId)
+    saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId, openIdsNow())
       .then(() => {
         syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
       })
@@ -643,7 +659,7 @@ export default function Home() {
     }
     if (!user || view.streamerMode) return;
     const timeout = setTimeout(() => {
-      saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId)
+      saveWeeklyPicks(user.id, activeWeek, picks, lockedGameId, openIdsNow())
         .then(() => {
           syncWeeklyPickemAchievements().catch((err) => console.error("Achievement sync failed", err));
         })
@@ -807,7 +823,7 @@ export default function Home() {
           onPick={(team) => setPick(game.id, team)}
           tag={tags[game.id]}
           result={results[game.id]}
-          locked={!isEditable}
+          locked={!isEditable || isKickedOff(game, now)}
           isLockPick={lockedGameId === game.id}
           hasLock={lockedGameId !== null}
           onToggleLock={() => {

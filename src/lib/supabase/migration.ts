@@ -1,4 +1,6 @@
+import { GAMES_BY_WEEK } from "@/data/games";
 import { TEAMS, TeamAbbr } from "@/data/teams";
+import { openGameIds } from "@/lib/lockAtKickoff";
 import { supabase } from "@/lib/supabase/client";
 import { fetchWeeklyPicks, fetchSeasonPicks, saveWeeklyPicks, saveSeasonPicks } from "@/lib/supabase/picks";
 import { updateAvatar } from "@/lib/supabase/profile";
@@ -55,7 +57,12 @@ export async function migrateLocalDataToAccount(userId: string): Promise<boolean
         const existing = await fetchWeeklyPicks(userId, week);
         if (Object.keys(existing.picks).length === 0) {
           const lockedGameId = localStorage.getItem(lockKeyFor(week));
-          await saveWeeklyPicks(userId, week, picks, lockedGameId && picks[lockedGameId] ? lockedGameId : null);
+          // Only the games that have not kicked off. Signing up on a
+          // Monday must not backfill a pick onto a game that was played
+          // on Sunday - the database would refuse it anyway, and here
+          // that refusal would abort the whole import.
+          const open = openGameIds(GAMES_BY_WEEK[week] ?? [], Date.now());
+          await saveWeeklyPicks(userId, week, picks, lockedGameId && picks[lockedGameId] ? lockedGameId : null, open);
           migrated = true;
         }
       }
