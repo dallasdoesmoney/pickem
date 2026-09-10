@@ -42,6 +42,16 @@ if (!CAMPAIGN) {
 const KIND = `announcement:${CAMPAIGN}`;
 if (!/^announcement:[a-z0-9-]{3,60}$/.test(KIND)) {
   console.error(`Campaign name must be lowercase letters, digits and dashes: got "${CAMPAIGN}"`);
+  // The one that has actually happened: the dispatch form's label got
+  // pasted in along with the value. Worth naming, because the generic
+  // message above sends you looking at the campaign file, which is fine.
+  if (/^\s*campaign\s*:/i.test(CAMPAIGN)) {
+    console.error(`\nThat looks like the form label came with it. Put only the name in the box:`);
+    console.error(`  ${CAMPAIGN.replace(/^\s*campaign\s*:\s*/i, "")}`);
+  }
+  // Refuses rather than repairs, deliberately. This name is the ledger
+  // key that stops a re-run mailing everybody twice, so guessing at what
+  // was meant is the one thing it must never do.
   process.exit(1);
 }
 
