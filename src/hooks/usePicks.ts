@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { GAMES_BY_WEEK } from "@/data/games";
 import { TeamAbbr } from "@/data/teams";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchWeeklyPicks } from "@/lib/supabase/picks";
+import { openGameIds } from "@/lib/lockAtKickoff";
+import { healFromLocalCopy } from "@/lib/pickHeal";
+import { fetchWeeklyPicks, saveWeeklyPicks } from "@/lib/supabase/picks";
 
 type Picks = Record<string, TeamAbbr>;
 
@@ -49,12 +52,19 @@ export function usePicks(week: number, sandbox = false) {
         try {
           const { picks: dbPicks, lockedGameId: dbLock } = await fetchWeeklyPicks(user.id, week);
           if (cancelled) return;
-          setPicks(dbPicks);
-          setLockedGameId(dbLock);
-          localStorage.setItem(picksKey, JSON.stringify(dbPicks));
-          if (dbLock) localStorage.setItem(lockKey, dbLock);
+          const { picks, lockedGameId, restored } = healFromLocalCopy(dbPicks, dbLock, picksKey, lockKey, week);
+          setPicks(picks);
+          setLockedGameId(lockedGameId);
+          localStorage.setItem(picksKey, JSON.stringify(picks));
+          if (lockedGameId) localStorage.setItem(lockKey, lockedGameId);
           else localStorage.removeItem(lockKey);
           setLoaded(true);
+          if (restored > 0) {
+            console.warn(`Restored ${restored} pick(s) for week ${week} from this device's copy`);
+            saveWeeklyPicks(user.id, week, picks, lockedGameId, openGameIds(GAMES_BY_WEEK[week] ?? [], Date.now())).catch((err) =>
+              console.error("Restoring picks to the account failed", err),
+            );
+          }
           return;
         } catch (err) {
           console.error("Failed to load picks from account, falling back to this device's local copy", err);

@@ -1,4 +1,4 @@
-import { TeamAbbr } from "./teams";
+import type { TeamAbbr } from "./teams";
 
 export type Game = {
   id: string;
