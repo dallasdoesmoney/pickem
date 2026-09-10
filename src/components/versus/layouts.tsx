@@ -313,8 +313,28 @@ const MARK_ALPHA = 0.46;
 // pill's falls a pixel less than the others, because the rails leave
 // only 6-7px between rows and 5px would put the block on the head of
 // the chip below. Measured on the board, not judged by eye.
-const PRESS_PILL = `4px 4px 0 ${INK}`;
+//
+// EACH BLOCK CONTRASTS WITH ITS OWN OBJECT, which is why they are not all
+// the same colour. The pill's block sits against a team fill; the name's
+// is behind white text; the price's is under a white capsule. One rule,
+// three answers.
+//
+// The pill's is WHITE. Ink was the obvious choice and it was wrong, in a
+// way that only shows up across the whole league: measured against all 32
+// fills, an ink block drops under 1.5:1 on ELEVEN of them and to 1.04:1
+// on the Raiders, where it is simply not there. White never drops below
+// 1.76:1 - its worst case is Steelers gold - so the pills finally read as
+// one set instead of some having a block and some not.
+//
+// What no measurement decides: this layer is transparent, so the block
+// also lands on whatever the camera is showing. White loses on a bright
+// backdrop the way ink loses on a dark one. The pill is the thing it has
+// to hold a shape against, so the pill is what it was measured on.
+const PRESS_PILL = `4px 4px 0 #ffffff`;
+// Ink, and it stays ink: this one is behind WHITE lettering.
 const PRESS_NAME = `3px 4px 0 ${INK}`;
+// Ink, and it stays ink: this one is under a WHITE capsule, where a white
+// block would be no block at all.
 const PRESS_PRICE = `3px 4px 0 ${INK}`;
 
 function PickChip({ entry, who }: { entry: RosterEntry; who: number }) {
