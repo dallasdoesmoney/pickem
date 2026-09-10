@@ -158,7 +158,11 @@ function PosRow({
 // so the reel stops dead on the real logo instead of the layout jumping.
 function Lot({ state, format, size }: { state: AuctionState; format: AuctionFormat; size: number }) {
   const item = currentItem(state, format);
-  if (state.phase === "ready") return <LotWaiting size={size} />;
+  // The board at rest, at BOTH ends of the draft. currentItem still
+  // resolves once the draft is over - the index is sitting on the last
+  // lot - so this slot was showing the final pick as though it were up
+  // next, on a board where every seat is already full.
+  if (state.phase === "ready" || state.phase === "done") return <LotWaiting size={size} />;
   if (state.phase === "spinning" && item) return <LogoReel key={item.id} format={format} targetId={item.id} size={size} />;
   return <LotLogo item={item} size={size} />;
 }
@@ -803,7 +807,10 @@ function SpineLayout({ state, format }: LayoutProps) {
               justifyContent: "center",
             }}
           >
-            {state.phase === "ready" ? (
+            {state.phase === "done" ? (
+              // Same mark that holds this spot before START - see Lot().
+              <LotWaiting size={LOT_SIZE} />
+            ) : state.phase === "ready" ? (
               held ? <LotLogo item={held} size={LOT_SIZE} /> : <LotWaiting size={LOT_SIZE} />
             ) : state.phase === "spinning" && item ? (
               <LogoReel key={item.id} format={format} targetId={item.id} size={LOT_SIZE} />

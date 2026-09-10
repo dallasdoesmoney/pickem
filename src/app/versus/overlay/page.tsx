@@ -21,7 +21,9 @@ import { isLayoutKey } from "@/components/versus/layouts";
 //   ?bottom=560       pixels reserved for the bottom cam
 //   ?preview=1        look at it WITHOUT OBS - see below
 //   ?format=nfl-teams which mode the DEMO draws (ignored in a room)
-//   ?phase=ready|spinning|open  which moment of a lot the DEMO holds on
+//   ?phase=ready|spinning|open|done  which moment the DEMO holds on.
+//                     "done" drafts the whole board out, which is the only
+//                     way to look at the finished state without playing one
 //   ?layout=a..e      which arrangement - see layouts.tsx
 //   ?p1=Noah&p2=Ben   names on the DEMO rails (ignored in a room)
 //
@@ -48,6 +50,26 @@ function demoState(format: AuctionFormat, names: string[], seed: string, lots: n
       const slot = open.find((s) => !item?.fills || s.key in item.fills);
       if (slot) state = reduce(state, { type: "assign", slotKey: slot.key }, format);
     }
+  }
+  // THE FINISHED BOARD. Every seat full, nothing on the block. Reaching
+  // it by hand meant drafting a whole roster, which is why the centre
+  // slot sat there showing the last pick as if it were up next for as
+  // long as it did - nobody looks at the end of a draft on purpose.
+  if (phase === "done") {
+    while (state.phase !== "done") {
+      const who = state.opener;
+      state = openLot(state, format);
+      state = reduce(state, { type: "bid", by: who, amount: 1 }, format);
+      if (state.phase === "bidding") state = reduce(state, { type: "pass", by: (who + 1) % 2 }, format);
+      if (state.phase === "assigning") {
+        const open = format.slots.filter((sl) => state.players[state.won!.by].roster[sl.key] === null);
+        const item = format.items.find((it) => it.id === state.order[state.index]);
+        const slot = open.find((sl) => !item?.fills || sl.key in item.fills);
+        if (slot) state = reduce(state, { type: "assign", slotKey: slot.key }, format);
+        else break;
+      } else break;
+    }
+    return state;
   }
   // Which moment of a lot to hold on. The reel and the not-yet-started
   // card are two thirds of what is on screen during a draft, so they have
