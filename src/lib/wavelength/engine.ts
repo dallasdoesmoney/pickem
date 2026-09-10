@@ -192,8 +192,62 @@ function rng(seed: string): () => number {
   return next;
 }
 
-function pickTarget(random: () => number): number {
-  return Math.round((EDGE_MARGIN + random() * (DIAL_MAX - 2 * EDGE_MARGIN)) * 10) / 10;
+// HOW FAR THE WEDGE MUST MOVE BETWEEN ROUNDS.
+//
+// The dial is genuinely uniform - measured, 953 positions, flat across
+// twenty buckets, adjacent rounds no more alike than distant ones. The
+// trouble is that uniform CLUMPS, and a clump is dull to watch: five
+// rounds make ten pairs, so two of them land within 10 of each other in
+// 93% of games. Nothing is broken; it is just not good television.
+//
+// So this is a deliberate departure from random, and only between
+// CONSECUTIVE rounds - two spots being similar four rounds apart is
+// nobody's complaint.
+//
+// BAND_2 rather than a number picked to feel right: it is the outer edge
+// of the scoring zone, so the new bullseye always sits outside the old
+// one's scoring entirely. Aiming at where it was last round now scores
+// zero, which is the property that makes the move meaningful rather than
+// cosmetic. Even at its most constrained - the previous target dead
+// centre - that still leaves 713 of the 953 positions live.
+export const MIN_GAP = BAND_2;
+
+// Everything is worked in tenths as integers. The dial's resolution is
+// 0.1, and doing the arithmetic in floats and rounding at the end is how
+// a value lands 11.999999 from the last one and slips under a rule that
+// says 12.
+const TENTH = 10;
+const LO10 = Math.round(EDGE_MARGIN * TENTH);
+const HI10 = Math.round((DIAL_MAX - EDGE_MARGIN) * TENTH);
+
+// `avoid` is the previous round's target, when there is one.
+//
+// Drawn from the allowed span DIRECTLY rather than by drawing and
+// re-rolling until it is far enough away. Rejection sampling would be
+// simpler to write and would have two problems worth avoiding in a
+// reducer: it consumes an unpredictable number of values from a stream
+// the whole game is recomputed from, and it has no guaranteed end. This
+// picks one number from the two allowed stretches, so it is exactly
+// uniform over what is permitted, always terminates, and costs one draw.
+function pickTarget(random: () => number, avoid: number | null = null): number {
+  if (avoid === null) return Math.round(LO10 + random() * (HI10 - LO10)) / TENTH;
+
+  const gap = Math.round(MIN_GAP * TENTH);
+  const at = Math.round(avoid * TENTH);
+  // The two stretches left over once the forbidden window is cut out.
+  const lowEnd = Math.min(HI10, at - gap);
+  const highStart = Math.max(LO10, at + gap);
+  const lowSpan = Math.max(0, lowEnd - LO10 + 1);
+  const highSpan = Math.max(0, HI10 - highStart + 1);
+
+  // Cannot happen with MIN_GAP this size - the narrowest case leaves 713
+  // positions - but a future gap set too wide should degrade to "ignore
+  // the rule" rather than to a wedge stuck at one end of the dial.
+  if (lowSpan + highSpan <= 0) return Math.round(LO10 + random() * (HI10 - LO10)) / TENTH;
+
+  const pick = Math.floor(random() * (lowSpan + highSpan));
+  const chosen = pick < lowSpan ? LO10 + pick : highStart + (pick - lowSpan);
+  return Math.min(HI10, Math.max(LO10, chosen)) / TENTH;
 }
 
 function pickCard(cards: Spectrum[], seen: string[], random: () => number): Spectrum {
@@ -380,7 +434,9 @@ export function reduce(
       phase: "clue",
       card,
       seen: [...state.seen, card.id].slice(-cards.length),
-      target: pickTarget(random),
+      // Kept clear of where it just was - see MIN_GAP. The round that has
+      // only just been revealed is the one still in everybody's eye.
+      target: pickTarget(random, state.target),
       peek: "shut",
       clue: "",
       guess: null,

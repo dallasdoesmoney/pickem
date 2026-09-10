@@ -17,6 +17,7 @@ import {
   BAND_4,
   DIAL_MAX,
   COOP_ROUNDS,
+  MIN_GAP,
 } from "../src/lib/wavelength/engine.ts";
 import { cardsFor } from "../src/lib/wavelength/spectrums.ts";
 
@@ -93,8 +94,24 @@ for (let i = 0; i < BUCKETS; i++) {
   console.log(`   ${from}  ${String(counts[i]).padStart(4)}  ${bar}`);
 }
 console.log();
-ok("flat across the dial", chi < 43.82, `chi2=${chi.toFixed(1)} (19 df, 43.82 = p .001)`);
-ok("no bucket is wildly off", worst < 0.15, `worst bucket ${(worst * 100).toFixed(1)}% from flat`);
+// NOT a flatness test any more, and that is a decision rather than a
+// slackened threshold.
+//
+// Holding consecutive rounds MIN_GAP apart necessarily tilts the dial
+// toward its ends: a position near an edge is legal after more
+// predecessors than a central one is, so it comes up more often. No
+// minimum-separation rule can avoid that, and the alternative - wrapping
+// the exclusion around the dial, which does restore exact uniformity -
+// would forbid following a target near one end with one near the other,
+// which is the best transition the game has.
+//
+// So the invariant is now "the tilt stays small and bounded", measured:
+// about +8 to +10% in the outermost buckets, under 5% everywhere else.
+// chi-square is printed rather than asserted - at 20,000 samples it
+// detects the tilt we chose on purpose, which makes it the wrong alarm.
+console.log(`   chi2 = ${chi.toFixed(1)} - expected to exceed flat; see MIN_GAP\n`);
+ok("the tilt stays bounded", worst < 0.15, `worst bucket ${(worst * 100).toFixed(1)}% from flat`);
+ok("the dial is not lopsided", Math.abs(all.reduce((a, b) => a + b, 0) / all.length - 50) < 1, `mean ${(all.reduce((a, b) => a + b, 0) / all.length).toFixed(2)}`);
 
 // --- the failure people actually notice --------------------------------
 // Not "is it uniform" but "does it repeat". Two targets within a band-4
@@ -117,7 +134,25 @@ const b2bRate = backToBack / (GAMES * (COOP_ROUNDS - 1));
 console.log(`   two rounds landing within +-${NEAR}: ${(nearRate * 100).toFixed(1)}% of pairs`);
 console.log(`   back-to-back within +-${NEAR}:       ${(b2bRate * 100).toFixed(1)}% of rounds\n`);
 ok("repeats are at chance, not above", nearRate < 0.075, `${(nearRate * 100).toFixed(1)}% vs ~4.8% expected`);
-ok("adjacent rounds are independent", b2bRate < 0.075, `${(b2bRate * 100).toFixed(1)}%`);
+
+// --- the rule that is NOT random --------------------------------------
+// Consecutive rounds are held apart on purpose: a wedge that barely moves
+// between two guesses is dull to watch, and that was the one complaint.
+// Non-adjacent rounds are deliberately left alone - two similar spots
+// four rounds apart is nobody's problem.
+let closest = Infinity;
+let violations = 0;
+for (let i = 0; i < GAMES; i++) {
+  const t = all.slice(i * COOP_ROUNDS, (i + 1) * COOP_ROUNDS);
+  for (let r = 1; r < t.length; r++) {
+    const d = Math.abs(t[r] - t[r - 1]);
+    closest = Math.min(closest, d);
+    if (d < MIN_GAP - 1e-9) violations++;
+  }
+}
+console.log(`   closest two consecutive rounds ever came: ${closest.toFixed(1)} (floor is ${MIN_GAP})\n`);
+ok("consecutive rounds always clear the gap", violations === 0, `${violations} of ${GAMES * (COOP_ROUNDS - 1)} under ${MIN_GAP}`);
+ok("and the gap actually binds", closest >= MIN_GAP - 1e-9 && closest < MIN_GAP + 2, `${closest.toFixed(1)} - the rule is doing work, not sitting unused`);
 
 // --- the bug that was actually there once ------------------------------
 // Round two used to be identical in every game, because the reseed did
@@ -149,6 +184,15 @@ for (const width of [5, 10, 15, 20]) {
   }
   console.log(`   two of five rounds within +-${String(width).padStart(2)}: ${((games / GAMES) * 100).toFixed(0)}% of games`);
 }
+
+// --- and the tilt must not compound -----------------------------------
+// A fixed lean toward the ends is a price worth paying; a lean that grows
+// every round is a wedge that ends every game in a corner. Round one is
+// unconstrained, so rounds two and five are the comparison that matters.
+const outer = (v) => v < LO + (HI - LO) * 0.1 || v > HI - (HI - LO) * 0.1;
+const edgeRate = byRound.map((a) => a.filter(outer).length / a.length);
+console.log(`\n   in the outer tenth, by round: ${edgeRate.map((e) => `${(e * 100).toFixed(1)}%`).join("  ")}`);
+ok("the tilt does not compound", Math.abs(edgeRate[COOP_ROUNDS - 1] - edgeRate[1]) < 0.03, `round 2 ${(edgeRate[1] * 100).toFixed(1)}% vs round ${COOP_ROUNDS} ${(edgeRate[COOP_ROUNDS - 1] * 100).toFixed(1)}%`);
 
 // --- and the bands it lands in ----------------------------------------
 // Where the wedge sits changes how hard the round is: a target near an
