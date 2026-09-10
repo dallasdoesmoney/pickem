@@ -255,9 +255,18 @@ async function send(to, subject, body, unsubUrl) {
 
 async function main() {
   const campaign = await import(`./campaigns/${CAMPAIGN}.mjs`);
-  const { html, text, SUBJECT } = campaign;
+  const { html, text, SUBJECT, PATH } = campaign;
   if (typeof html !== "function" || typeof text !== "function" || !SUBJECT) {
     throw new Error(`campaigns/${CAMPAIGN}.mjs must export html(), text() and SUBJECT`);
+  }
+  // Where the button goes. Optional, and it defaults to the daily game
+  // because every campaign before this one was about the daily game -
+  // a blast about the pick'em board is not, and a link that quietly
+  // sends everybody to the wrong page is not the kind of mistake an
+  // email lets you take back.
+  const DEST = PATH ?? "/nfl-nameplate";
+  if (!/^\/[a-z0-9\-/]{0,60}$/.test(DEST)) {
+    throw new Error(`campaigns/${CAMPAIGN}.mjs exports an odd PATH: ${DEST}`);
   }
 
   console.log(`Campaign: ${KIND}`);
@@ -269,7 +278,7 @@ async function main() {
     // /unsubscribe page already handles an unknown token gracefully - it
     // says the link did not match anything, which is true.
     const view = {
-      playUrl: `${SITE}/nfl-nameplate?from=announcement&utm_source=email&utm_medium=announcement&utm_campaign=${CAMPAIGN}`,
+      playUrl: `${SITE}${DEST}?from=announcement&utm_source=email&utm_medium=announcement&utm_campaign=${CAMPAIGN}`,
       unsubUrl: `${SITE}/unsubscribe?t=00000000-0000-0000-0000-000000000000`,
       addr: EMAIL_POSTAL_ADDRESS,
       logo: `${SITE}/email-logo.png`,
@@ -300,7 +309,7 @@ async function main() {
     // compare a launch blast against a deadline nudge rather than
     // lumping both under "email".
     const playUrl =
-      `${SITE}/nfl-nameplate?from=announcement` +
+      `${SITE}${DEST}?from=announcement` +
       `&utm_source=email&utm_medium=announcement&utm_campaign=${CAMPAIGN}`;
     const view = { playUrl, unsubUrl, addr: EMAIL_POSTAL_ADDRESS, logo: `${SITE}/email-logo.png` };
 
