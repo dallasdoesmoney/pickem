@@ -276,6 +276,29 @@ function pickCard(cards: Spectrum[], seen: string[], random: () => number): Spec
   return pool[Math.floor(random() * pool.length) % pool.length];
 }
 
+// IS THIS RUN THE DECK PLAYED STRAIGHT THROUGH, TWICE?
+//
+// A run twice the length of the deck can only be one thing: every card,
+// with both people taking a turn as the psychic on each. That is what a
+// written deck is, and it is the case where the deck HAS an order worth
+// respecting - somebody typed those categories in a sequence and meant
+// it.
+//
+// Derived from the run's shape rather than carried as a flag or checked
+// against the deck's name, so it stays true of anything with that shape
+// and does not need the engine to know what "custom" means.
+function isPairedRun(cards: Spectrum[], mode: Mode, runLength: number): boolean {
+  return mode === "coop" && runLength === Math.max(1, cards.length) * 2;
+}
+
+// Which card a paired run is on. Two rounds per card, in the order the
+// deck was written: rounds 1 and 2 are the first pair, 3 and 4 the
+// second, and so on. Modulo so a run that somehow outlives its deck wraps
+// rather than falling off the end.
+function cardInOrder(cards: Spectrum[], round: number): Spectrum {
+  return cards[Math.floor((round - 1) / 2) % cards.length];
+}
+
 // THE SEED IS NOT PART OF THE STATE, and that is deliberate rather than
 // tidy. The state is the thing that gets broadcast, and the seed plus the
 // round plus the scores - all of which are on the wire already - is enough
@@ -296,12 +319,15 @@ export function startGame(
   runLength: number = COOP_ROUNDS,
 ): WavelengthState {
   const random = rng(seed);
-  const card = pickCard(cards, [], random);
+  const runs = mode === "coop" ? Math.max(1, Math.round(runLength)) : 0;
+  // A written deck opens on the first thing that was written, not on a
+  // shuffle of it.
+  const card = isPairedRun(cards, mode, runs) ? cardInOrder(cards, 1) : pickCard(cards, [], random);
   return {
     deck: deckKey,
     mode,
     pot: 0,
-    runLength: mode === "coop" ? Math.max(1, Math.round(runLength)) : 0,
+    runLength: runs,
     teams: names.map((name) => ({ name, score: 0 })),
     psychic: 0,
     round: 1,
@@ -438,13 +464,17 @@ export function reduce(
     // there so a round does not depend on how long the last one took.
     const random = rng(`${seed}:${state.deck}:${state.round}:${state.teams.map((t) => t.score).join("-")}`);
 
-    // A PAIRED RUN KEEPS THE CARD FOR A SECOND GO. The run is exactly two
-    // rounds per card, so the odd rounds deal and the even ones hand the
-    // same card to the other person - fresh target, other psychic. Worked
-    // out from the numbers rather than carried as a flag: a run that is
-    // twice the deck is a run through the deck twice.
-    const paired = state.mode === "coop" && state.runLength === cards.length * 2;
-    const card = paired && state.round % 2 === 1 ? state.card : pickCard(cards, state.seen, random);
+    // A PAIRED RUN WALKS THE DECK IN ORDER, two rounds per card - the
+    // same card twice in a row with a fresh target and the other person
+    // holding it, then on to the next one.
+    //
+    // It used to keep the card for the second go and then DRAW the next
+    // one at random, which quietly threw away the order somebody typed
+    // their categories in. The pairing looked right and the sequence was
+    // a shuffle, so the bug only showed up if you knew what you had
+    // written down.
+    const paired = isPairedRun(cards, state.mode, state.runLength);
+    const card = paired ? cardInOrder(cards, state.round + 1) : pickCard(cards, state.seen, random);
     return {
       ...state,
       round: state.round + 1,

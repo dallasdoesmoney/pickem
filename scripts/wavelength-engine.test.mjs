@@ -641,5 +641,61 @@ for (const [name, bad] of [
   ok("and so is one after the reveal", reduce(atReveal, { type: "guess", value: 90 }, CARDS, LOCKED) === atReveal);
 }
 
+// A WRITTEN DECK PLAYS IN THE ORDER IT WAS WRITTEN.
+//
+// Somebody types their categories in a sequence and means it. The pairing
+// was right - each card twice, so both people get a turn as psychic on it
+// - but the NEXT card was drawn at random, so the run was a shuffle of
+// the list rather than the list. The pairing made that hard to see: it
+// looked orderly and was not.
+{
+  const pairs = [
+    { left: "Worst team", right: "Best team" },
+    { left: "Overrated", right: "Underrated" },
+    { left: "Cheap", right: "Expensive" },
+  ];
+  const written = customCards(pairs);
+  const runLength = pairedRunLength(written);
+  ok("three pairs is a six-round run", runLength === 6, `${runLength}`);
+
+  // Ten seeds, because the old behaviour landed on the right order by
+  // luck roughly one time in six and a single seed would have shipped it.
+  const orders = new Set();
+  const psychics = new Set();
+  for (let g = 0; g < 10; g++) {
+    const seed = `written-${g}`;
+    let s = startGame(written, "custom", ["A", "B"], seed, "coop", runLength);
+    const played = [];
+    const held = [];
+    for (let r = 0; r < runLength; r++) {
+      played.push(written.findIndex((c) => c.id === s.card.id));
+      held.push(s.psychic);
+      s = reduce(s, { type: "clue", text: "x" }, written, seed);
+      s = reduce(s, { type: "guess", value: 50 }, written, seed);
+      s = reduce(s, { type: "reveal" }, written, seed);
+      if (s.phase === "done") break;
+      s = reduce(s, { type: "next" }, written, seed);
+    }
+    orders.add(played.join(","));
+    psychics.add(held.join(","));
+  }
+  ok("every seed plays the same order", orders.size === 1, [...orders][0]);
+  ok("and it is the order written", [...orders][0] === "0,0,1,1,2,2", [...orders][0]);
+  // The reason a card comes up twice in the first place.
+  ok("both people are psychic on each card", psychics.size === 1 && [...psychics][0] === "0,1,0,1,0,1", [...psychics][0]);
+}
+
+// The big decks must NOT do that. Eighty-eight cards and a five-round run
+// is not a run through a list, and dealing those in file order would mean
+// every game opened on the same card.
+{
+  const firsts = new Set();
+  for (let g = 0; g < 60; g++) {
+    const s = startGame(CARDS, "everything", ["A", "B"], `deck-${g}`, "coop", COOP_ROUNDS);
+    firsts.add(s.card.id);
+  }
+  ok("a big deck still shuffles", firsts.size > 40, `${firsts.size} different opening cards in 60 games`);
+}
+
 console.log(failed === 0 ? "\nall good" : `\n${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
