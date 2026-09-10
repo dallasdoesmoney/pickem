@@ -1,7 +1,7 @@
 "use client";
 
 import type { WavelengthState } from "@/lib/wavelength/engine";
-import { WIN_SCORE, potMax } from "@/lib/wavelength/engine";
+import { WIN_SCORE, potMax, lidFor } from "@/lib/wavelength/engine";
 import { PLAYER_COLORS, MONEY, INK, outlined } from "@/components/versus/style";
 import { Dial, COVER_MS, DEFAULT_BANDS, type BandPalette } from "./Dial";
 
@@ -261,6 +261,10 @@ export function OverlayBoard({
 }) {
   const bandHeight = STAGE_H - camTop - camBottom;
   const reveal = state.phase === "reveal" || state.phase === "done";
+  // The graphic asks the engine what it is allowed to show rather than
+  // working it out again here - see lidFor(). Two copies of this rule is
+  // how the reveal went missing from a recording.
+  const lid = lidFor(state);
   const dialW = 860;
 
   // What the big line says. One place, so the graphic never has two
@@ -330,12 +334,12 @@ export function OverlayBoard({
             // rather than hiding it under the lid keeps the rendered
             // graphic honest - if the wedge is in the page, it is because
             // somebody is allowed to look at it.
-            target={reveal || state.peek !== "shut" ? state.target : null}
+            target={lid.wedge ? state.target : null}
             guess={state.guess}
             // OFF THE STATE, so the lid is the same lid on every screen -
             // the board, the stream and the join link all draw whatever
             // the game says, rather than each keeping its own idea of it.
-            open={reveal || state.peek === "open"}
+            open={lid.open}
             pulse={reveal}
             bands={bands}
             onScrub={onScrub}

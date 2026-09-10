@@ -24,6 +24,7 @@ import {
   bandFor,
   stealHits,
   redactFor,
+  lidFor,
   waitingOn,
   other,
   BAND_2,
@@ -502,6 +503,53 @@ ok(
   ok("the pot cannot beat what is on the table", s2.pot <= potMax(COOP_ROUNDS), `${s2.pot} of ${potMax(COOP_ROUNDS)}`);
   // Both people give clues, or one of them is just watching.
   ok("the psychic still swaps every round", psychics.every((p, i) => p === i % 2), psychics.join(""));
+}
+
+// ---- THE WHOLE HOP, minus the socket ------------------------------------
+//
+// THIS IS THE ONE THAT WAS MISSING, and a recording paid for it: a stream
+// went out where the overlay never showed the psychic opening the dial.
+// Every piece was tested - the rules said the lid was open, the redaction
+// said the target was allowed out, the validator accepted the message -
+// and none of that adds up to "the graphic drew it", because the step that
+// decides what the graphic draws only existed inside a React component.
+//
+// So: take a real board state, redact it the way the board does, put it
+// through JSON the way the wire does, check it the way the overlay does,
+// and then ask THE GRAPHIC'S OWN FUNCTION what it would have drawn. Not a
+// copy of the rule - the same lidFor() the overlay calls.
+
+{
+  const WIRE = "wire-hop";
+  const start = startGame(CARDS, "everything", ["Us", "Them"], WIRE);
+
+  // Down the wire exactly as the board sends it.
+  const send = (state) => {
+    const payload = JSON.parse(JSON.stringify({ deck: state.deck, state: redactFor(state) }));
+    return isWaveMessage(payload) ? payload.state : null;
+  };
+
+  const shut = send(start);
+  ok("a shut lid survives the wire", shut !== null);
+  ok("and the overlay would draw it shut", lidFor(shut).open === false && lidFor(shut).wedge === false);
+  ok("with no target to draw", shut.target === null);
+
+  const open = reduce(start, { type: "peek", at: "open" }, CARDS, WIRE);
+  const openOnWire = send(open);
+  ok("an OPEN lid survives the wire", openOnWire !== null);
+  ok("THE OVERLAY WOULD DRAW IT OPEN", lidFor(openOnWire).open === true, "this is the one that was broken");
+  ok("and it has the wedge to draw", lidFor(openOnWire).wedge === true && openOnWire.target === open.target);
+
+  const closing = send(reduce(open, { type: "peek", at: "closing" }, CARDS, WIRE));
+  ok("a closing lid is drawn shut", lidFor(closing).open === false);
+  ok("but still has its wedge, mid-shutter", lidFor(closing).wedge === true && closing.target !== null);
+
+  // And the reveal, which is the other moment the wedge is allowed out.
+  let played = reduce(start, { type: "guess", value: 40 }, CARDS, WIRE);
+  played = reduce(played, { type: "reveal" }, CARDS, WIRE);
+  const revealed = send(played);
+  ok("the reveal reaches the overlay open", lidFor(revealed).open === true && lidFor(revealed).wedge === true);
+  ok("with the answer on it", revealed.target === played.target);
 }
 
 // ---- the wire -----------------------------------------------------------

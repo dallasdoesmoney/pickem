@@ -418,6 +418,27 @@ export function redactFor(state: WavelengthState): WavelengthState {
   return { ...state, target: null };
 }
 
+// WHAT A SCREEN DOES WITH A STATE IT WAS HANDED, and it lives here rather
+// than inside the graphic for one reason: this is the thing that broke.
+//
+// A recording went out where the overlay never showed the psychic opening
+// the dial. The rules were right, the message was right - but nothing
+// tested the step in between, because the only place that decision existed
+// was inside a React component nothing but a browser could call. It is a
+// pure function of the state now, so the wire test can round-trip a real
+// board state through JSON and ask the graphic's own code what it would
+// have drawn.
+export function lidFor(state: WavelengthState): { open: boolean; wedge: boolean } {
+  const revealed = state.phase === "reveal" || state.phase === "done";
+  return {
+    // The lid is only DRAWN open on "open"...
+    open: revealed || state.peek === "open",
+    // ...but the wedge outlives the shutter on the way down, or it blinks
+    // out from under a lid that is still travelling.
+    wedge: revealed || state.peek !== "shut",
+  };
+}
+
 // Whose move the game is waiting for, as something the board can print.
 //
 // The turn changes hands INSIDE the guess phase, which is the part that is
