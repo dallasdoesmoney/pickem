@@ -196,21 +196,39 @@ function rng(seed: string): () => number {
 //
 // The dial is genuinely uniform - measured, 953 positions, flat across
 // twenty buckets, adjacent rounds no more alike than distant ones. The
-// trouble is that uniform CLUMPS, and a clump is dull to watch: five
-// rounds make ten pairs, so two of them land within 10 of each other in
-// 93% of games. Nothing is broken; it is just not good television.
+// trouble is that uniform CLUMPS, and a clump back-to-back is dull to
+// watch: nothing is broken, it is just not good television.
 //
 // So this is a deliberate departure from random, and only between
-// CONSECUTIVE rounds - two spots being similar four rounds apart is
-// nobody's complaint.
+// CONSECUTIVE rounds - two similar spots four rounds apart is nobody's
+// complaint, and constraining those would cost far more randomness than
+// it bought.
 //
-// BAND_2 rather than a number picked to feel right: it is the outer edge
-// of the scoring zone, so the new bullseye always sits outside the old
-// one's scoring entirely. Aiming at where it was last round now scores
-// zero, which is the property that makes the move meaningful rather than
-// cosmetic. Even at its most constrained - the previous target dead
-// centre - that still leaves 713 of the 953 positions live.
-export const MIN_GAP = BAND_2;
+// BAND_3, which is the outer edge of the 3-zone. The point is to look
+// like a different place, NOT to punish anyone for remembering the last
+// one: aim at exactly where the wedge sat last round and you still score
+// 3. That is the brief - visibly moved, still scoreable.
+//
+// It is worth writing down what the wider alternative cost, because the
+// obvious instinct is that further is better. BAND_2 (12) puts the new
+// bullseye outside the old scoring zone entirely, so the old spot scores
+// zero - and it doubled the price below, 11% out in the end buckets
+// against 5.7%. Twice the distortion to make the game meaner. BAND_3
+// moves 13.6 degrees of arc, which is plainly a different place on
+// screen, and leaves the dial within noise of flat.
+//
+// WHAT IT COSTS. Holding rounds apart tilts the dial toward its ends at
+// all - an edge position is legal after more predecessors than a central
+// one is, and no minimum-separation rule can avoid that. At this distance
+// it is 20.3% of targets in the outer tenth against 20.0% for a flat
+// dial, which is nothing. It also does not compound: round two reaches
+// that and rounds three onward stay there.
+//
+// The one thing that removes the tilt exactly is wrapping the exclusion
+// around the dial, and it is rejected on purpose - it would forbid
+// following a target near one end with one near the other, which is the
+// best transition the game has.
+export const MIN_GAP = BAND_3;
 
 // Everything is worked in tenths as integers. The dial's resolution is
 // 0.1, and doing the arithmetic in floats and rounding at the end is how

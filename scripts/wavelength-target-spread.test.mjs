@@ -106,11 +106,14 @@ console.log();
 // which is the best transition the game has.
 //
 // So the invariant is now "the tilt stays small and bounded", measured:
-// about +8 to +10% in the outermost buckets, under 5% everywhere else.
+// under 6% in the worst bucket at the gap we settled on, and 20.3% of
+// targets in the outer tenth against 20.0% for a flat dial. A wider gap
+// costs more - BAND_2 doubled it - which is half the reason the gap is
+// the size it is.
 // chi-square is printed rather than asserted - at 20,000 samples it
 // detects the tilt we chose on purpose, which makes it the wrong alarm.
 console.log(`   chi2 = ${chi.toFixed(1)} - expected to exceed flat; see MIN_GAP\n`);
-ok("the tilt stays bounded", worst < 0.15, `worst bucket ${(worst * 100).toFixed(1)}% from flat`);
+ok("the tilt stays bounded", worst < 0.08, `worst bucket ${(worst * 100).toFixed(1)}% from flat`);
 ok("the dial is not lopsided", Math.abs(all.reduce((a, b) => a + b, 0) / all.length - 50) < 1, `mean ${(all.reduce((a, b) => a + b, 0) / all.length).toFixed(2)}`);
 
 // --- the failure people actually notice --------------------------------
