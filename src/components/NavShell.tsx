@@ -237,7 +237,13 @@ export function NavShell({ children }: { children: React.ReactNode }) {
   // changes one route. Below every hook, so the hook order is unaffected.
   // One line per game rather than a prefix match on "overlay", so a page
   // is only ever stripped of the site's chrome deliberately.
-  if (pathname.startsWith("/versus/overlay") || pathname.startsWith("/wavelength/overlay")) return <>{children}</>;
+  if (
+    pathname.startsWith("/versus/overlay") ||
+    pathname.startsWith("/wavelength/overlay") ||
+    // TEMPORARY, and it goes when the still tool does.
+    pathname.startsWith("/wavelength/still")
+  )
+    return <>{children}</>;
 
   return (
     <div className="flex min-h-full">
