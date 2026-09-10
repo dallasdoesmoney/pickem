@@ -25,6 +25,7 @@
     "test:room": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/versus-room.test.mjs",
     "test:lock": "node scripts/lock-mode.test.mjs",
     "test:wavelength": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/wavelength-engine.test.mjs",
+    "test:spread": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/wavelength-target-spread.test.mjs",
     "test:wave-hotseat": "node scripts/wavelength-hotseat.test.mjs",
     "test:wave-guest": "node scripts/wavelength-guest.test.mjs",
     "kickoffs": "node scripts/gen-kickoff-migration.mjs",
