@@ -282,6 +282,11 @@ export function useWaveGuest(code: string | null) {
 export function useWaveRoomState(code: string | null) {
   const [message, setMessage] = useState<WaveMessage | null>(null);
   const [live, setLive] = useState(false);
+  // Diagnostics, for the ?debug=1 readout and nothing else. Not shown
+  // on a stream, and never used to decide what the graphic draws.
+  const [seen, setSeen] = useState(0);
+  const [dropped, setDropped] = useState(0);
+  const [at, setAt] = useState(0);
 
   useEffect(() => {
     if (!code) return;
@@ -292,7 +297,16 @@ export function useWaveRoomState(code: string | null) {
       // check is dropped rather than drawn, and the overlay keeps showing
       // the last good state - a crashed browser source is a black hole in
       // the middle of a live stream.
-      if (isWaveMessage(payload)) setMessage(payload);
+      if (isWaveMessage(payload)) {
+        setMessage(payload);
+        setSeen((n) => n + 1);
+        setAt(Date.now());
+      } else {
+        // Counted, because "dropped everything silently" and "heard
+        // nothing at all" look identical on screen and have completely
+        // different causes. See the ?debug=1 readout on the overlay.
+        setDropped((n) => n + 1);
+      }
     });
 
     channel.subscribe((status) => {
@@ -311,5 +325,5 @@ export function useWaveRoomState(code: string | null) {
   // NOTE: `message` is never cleared on disconnect. A brief websocket
   // wobble mid-round should leave the graphic exactly where it was, not
   // blank the screen and then repopulate.
-  return { message, live };
+  return { message, live, seen, dropped, at };
 }

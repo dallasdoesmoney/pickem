@@ -2,8 +2,9 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { useNow } from "@/hooks/useNow";
 import { deck, DECKS, type DeckKey } from "@/lib/wavelength/spectrums";
-import { startGame, reduce, COOP_ROUNDS, type Mode, type WavelengthState } from "@/lib/wavelength/engine";
+import { startGame, reduce, lidFor, COOP_ROUNDS, type Mode, type WavelengthState } from "@/lib/wavelength/engine";
 import { isRoomCode } from "@/lib/wavelength/room";
 import { useWaveRoomState } from "@/components/wavelength/useWaveRoom";
 import { OverlayBoard, STAGE_W, STAGE_H } from "@/components/wavelength/OverlayBoard";
@@ -28,12 +29,20 @@ import { DEFAULT_BANDS, isBandPalette } from "@/components/wavelength/Dial";
 //   ?bands=sea        which scoring-band palette - see Dial.tsx. This one
 //                     applies in a room too, so an OBS source can be set
 //                     to a palette without a deploy
+//   ?peek=open        draw the DEMO mid-peek - the moment the psychic
+//                     lifts the lid to look. This is the frame that went
+//                     missing from a recording, so it is worth being able
+//                     to look at it without setting up a room
+//   ?debug=1          a small readout: which build is drawing, whether the
+//                     socket is up, what has arrived, and what the lid is
+//                     doing. CHECK THIS BEFORE RECORDING - a stale OBS
+//                     cache looks exactly like a broken game.
 
 // A deterministic mid-round position, so the graphic can be judged with
 // something in it rather than four em dashes. Demo only - in a room every
 // one of these numbers comes off the wire, and the target does not arrive
 // at all until the reveal.
-function demoState(deckKey: DeckKey, names: string[], phase: string | null, target: number | null, mode: Mode): WavelengthState {
+function demoState(deckKey: DeckKey, names: string[], phase: string | null, target: number | null, mode: Mode, peek: WavelengthState["peek"]): WavelengthState {
   const DEMO_SEED = "overlay-demo";
   let state = startGame(deck(deckKey), deckKey, names, DEMO_SEED, mode);
   state =
@@ -44,6 +53,11 @@ function demoState(deckKey: DeckKey, names: string[], phase: string | null, targ
   // bottom of either end, and those are exactly the positions that are
   // awkward to reach by playing. Demo only.
   if (target !== null) state = { ...state, target };
+  // Set on the state rather than passed to the graphic, so the demo goes
+  // through lidFor() exactly the way a real board's message does - a demo
+  // that took a shortcut here would happily draw a peek the live path
+  // cannot.
+  if (peek !== "shut") state = { ...state, peek };
   if (phase === "clue" || phase === null) return { ...state, clue: "Coffee" };
   state = reduce(state, { type: "clue", text: "Coffee" }, deck(deckKey), DEMO_SEED);
   state = reduce(state, { type: "guess", value: 61.5 }, deck(deckKey), DEMO_SEED);
@@ -82,6 +96,80 @@ function CamStandIn({ top, height, tint, label }: { top: number; height: number;
   );
 }
 
+// WHAT TO CHECK BEFORE YOU HIT RECORD.
+//
+// The reveal went missing from a whole recording once, and the reason it
+// was only discovered in the edit is that all three ways it can fail look
+// identical on screen - a dial that never opens:
+//
+//   1. OBS is serving a stale bundle. The likeliest one by far, because
+//      OBS caches a browser source hard and an old overlay ACCEPTS a new
+//      board's message perfectly happily; it just does not draw the part
+//      it has never heard of. `build` is what catches this.
+//   2. The socket is not connected, or nothing is arriving. `socket` and
+//      `heard` catch that.
+//   3. Messages arrive and are thrown out by the validator. Invisible
+//      before now, because a dropped message leaves the last good state on
+//      screen. `dropped` catches it.
+//
+// Behind ?debug=1, never on by accident, and it reads state rather than
+// deciding anything - turning it on cannot change what the graphic draws.
+function Readout({
+  live,
+  seen,
+  dropped,
+  at,
+  state,
+  room,
+}: {
+  live: boolean;
+  seen: number;
+  dropped: number;
+  at: number;
+  state: WavelengthState | null;
+  room: string | null;
+}) {
+  const lid = state ? lidFor(state) : null;
+  // The same ticking clock the pick'em board locks on. Date.now() straight
+  // in the render is impure and would freeze at whatever the last render
+  // happened to see - which for a readout whose job is "is anything still
+  // arriving" is the one thing it must not do.
+  const now = useNow();
+  const ago = at && now ? `${Math.round((now - at) / 1000)}s ago` : at ? "just now" : "never";
+  const rows: [string, string, boolean][] = [
+    ["build", process.env.NEXT_PUBLIC_BUILD_REF ?? "?", true],
+    ["room", room ?? "none (demo)", !!room],
+    ["socket", live ? "connected" : "not connected", live],
+    ["heard", `${seen} · ${ago}`, seen > 0],
+    ["dropped", String(dropped), dropped === 0],
+    ["peek", state ? state.peek : "-", true],
+    ["lid", lid ? `${lid.open ? "open" : "shut"} · wedge ${lid.wedge ? "on" : "off"}` : "-", true],
+  ];
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 12,
+        right: 12,
+        zIndex: 20,
+        padding: "10px 12px",
+        borderRadius: 10,
+        background: "rgba(5,7,13,0.9)",
+        border: "1px solid rgba(255,255,255,0.18)",
+        font: "12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace",
+        color: "rgba(255,255,255,0.85)",
+      }}
+    >
+      {rows.map(([label, value, good]) => (
+        <div key={label} style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
+          <span style={{ color: "rgba(255,255,255,0.45)" }}>{label}</span>
+          <span style={{ color: good ? "#7cf0a8" : "#ff8f6b" }}>{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function OverlayInner() {
   const params = useSearchParams();
 
@@ -90,7 +178,7 @@ function OverlayInner() {
   // than subscribing to a channel named after somebody's typo.
   const roomParam = params.get("room");
   const room = roomParam && isRoomCode(roomParam) ? roomParam : null;
-  const { message } = useWaveRoomState(room);
+  const { message, live, seen, dropped, at } = useWaveRoomState(room);
 
   const camTop = Number(params.get("top") ?? 560);
   const camBottom = Number(params.get("bottom") ?? 560);
@@ -115,6 +203,7 @@ function OverlayInner() {
           params.get("phase"),
           params.has("target") ? Number(params.get("target")) : null,
           coopDemo ? "coop" : "teams",
+          params.get("peek") === "open" ? "open" : params.get("peek") === "closing" ? "closing" : "shut",
         );
 
   return (
@@ -185,6 +274,8 @@ function OverlayInner() {
           </div>
         )}
       </div>
+
+      {params.get("debug") === "1" && <Readout live={live} seen={seen} dropped={dropped} at={at} state={state} room={room} />}
 
       {preview && (
         // Outside the stage, so it is not scaled with the graphic and
