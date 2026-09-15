@@ -61,9 +61,9 @@ export const QUARTERBACKS: Quarterback[] = [
   { espnId: "3916387", name: "Lamar Jackson", team: "BAL", depth: 1, heightIn: 74, weightLb: 205, age: 29, jersey: 8 },
   { espnId: "4242512", name: "Malik Willis", team: "MIA", depth: 1, heightIn: 73, weightLb: 225, age: 27, jersey: 2 },
   { espnId: "12483", name: "Matthew Stafford", team: "LAR", depth: 1, heightIn: 75, weightLb: 214, age: 38, jersey: 9 },
+  { espnId: "4360423", name: "Michael Penix Jr.", team: "ATL", depth: 1, heightIn: 75, weightLb: 220, age: 26, jersey: 9 },
   { espnId: "3139477", name: "Patrick Mahomes", team: "KC", depth: 1, heightIn: 74, weightLb: 225, age: 30, jersey: 15 },
   { espnId: "3912547", name: "Sam Darnold", team: "SEA", depth: 1, heightIn: 75, weightLb: 225, age: 29, jersey: 14 },
   { espnId: "4360310", name: "Trevor Lawrence", team: "JAX", depth: 1, heightIn: 78, weightLb: 220, age: 26, jersey: 16 },
-  { espnId: "4241479", name: "Tua Tagovailoa", team: "ATL", depth: 1, heightIn: 73, weightLb: 225, age: 28, jersey: 1 },
   { espnId: "4360689", name: "Tyler Shough", team: "NO", depth: 1, heightIn: 77, weightLb: 219, age: 26, jersey: 6 },
 ];
