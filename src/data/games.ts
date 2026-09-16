@@ -384,4 +384,4 @@ export const GAMES_BY_WEEK: Record<number, Game[]> = {
 // Only this week's games render anywhere in the app - bump this each
 // week (and fill in that week's spreads) to advance the season. Weeks
 // after this one are effectively hidden simply by never being read.
-export const CURRENT_WEEK = 1;
+export const CURRENT_WEEK = 2;
