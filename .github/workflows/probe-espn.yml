@@ -1,0 +1,34 @@
+# Prints what ESPN returns for a week. Writes nothing, anywhere.
+#
+# A button, not a schedule - it exists to be run once before the records
+# and lines sync is written, so that parser gets built against a real
+# response instead of a remembered one. No secrets: ESPN's scoreboard is
+# public, and this job talks to nothing else.
+#
+# Delete this workflow along with the script once the sync it informs is
+# written and trusted.
+name: Probe ESPN
+
+on:
+  workflow_dispatch:
+    inputs:
+      week:
+        description: "Which week to look at"
+        type: string
+        default: "2"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Probe
+        run: node scripts/probe-espn.mjs
+        env:
+          WEEK: ${{ inputs.week }}
