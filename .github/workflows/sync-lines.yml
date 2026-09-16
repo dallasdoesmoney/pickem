@@ -1,0 +1,81 @@
+# Records and betting lines, pulled from ESPN and committed.
+#
+# Separate from sync-results.yml on purpose. That job has `contents: read`
+# and talks only to Supabase; this one has to write to the repository, and
+# widening the results job's permissions to share a cron would hand write
+# access to a job that has never needed it.
+#
+# The commit is the deploy: games.ts is a checked-in file, so Netlify
+# picks the change up and the board is current a couple of minutes later.
+# It commits only when something actually changed, so a quiet run is
+# silent rather than a stream of empty commits.
+name: Sync records and lines
+
+on:
+  schedule:
+    # Every three hours through the season, offset from sync-results so
+    # the two are not pushing at the same minute. Records move after each
+    # game day; lines move all week.
+    - cron: "30 */3 * 9,10,11,12,1,2 *"
+  workflow_dispatch:
+    inputs:
+      week:
+        description: "Which week (blank = the next one with a game still to play)"
+        type: string
+        default: ""
+      dry_run:
+        description: "Print what would change and write nothing"
+        type: boolean
+        default: false
+
+# This one writes. See the note at the top for why it is its own file.
+permissions:
+  contents: write
+
+# One at a time: two runs committing to the same file would race, and the
+# later one has strictly fresher numbers anyway.
+concurrency:
+  group: sync-lines
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The parser first. It is pure and needs no network, so a shape
+      # change that breaks the rewriter fails here rather than halfway
+      # through editing the schedule.
+      - name: Test the parser
+        run: node scripts/sync-lines.test.mjs
+
+      - name: Pull records and lines
+        run: node scripts/sync-lines.mjs
+        env:
+          WEEK: ${{ inputs.week }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+
+      # Only the schedule file. An `add -A` here would sweep up anything
+      # else a future step leaves behind, and this job should never commit
+      # something it did not write.
+      - name: Commit if anything moved
+        if: ${{ !inputs.dry_run }}
+        run: |
+          if git diff --quiet -- src/data/games.ts; then
+            echo "No change to src/data/games.ts - nothing to commit."
+            exit 0
+          fi
+          git config user.name "sideline-brew-bot"
+          git config user.email "noreply@sidelinebrew.com"
+          git add src/data/games.ts
+          git commit -m "Records and lines, pulled from ESPN
+
+          Automated by .github/workflows/sync-lines.yml. Only favorite,
+          spread, awayRecord and homeRecord are ever touched; ids and
+          kickoffs are asserted unchanged before anything is written,
+          because a moved kickoff would put games.ts out of step with the
+          game_kickoffs table and quietly break the pick lock."
+          git push
