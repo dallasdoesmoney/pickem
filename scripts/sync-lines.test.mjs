@@ -48,11 +48,25 @@ ok("no records at all is undefined", recordFor({}) === undefined);
 ok("prefers the overall record", recordFor({ records: [{ type: "home", summary: "0-0" }, { type: "total", summary: "2-1" }] }) === "2-1");
 
 const withOdds = (odds) => ({ odds: odds ? [odds] : [] });
-ok("reads a details line", JSON.stringify(oddsFor(withOdds({ details: "BUF -2.5" }), "DET", "BUF")) === '{"favorite":"BUF","spread":2.5}');
+{
+  // Fields, not exact JSON: the result also carries provenance (which
+  // book, and the raw string it was read from) so the run log can show
+  // where a number came from, and an exact-shape assertion would break
+  // every time that grows.
+  const o = oddsFor(withOdds({ details: "BUF -2.5", provider: { name: "ESPN BET" } }), "DET", "BUF");
+  ok("reads a details line", o.favorite === "BUF" && o.spread === 2.5, `${o.favorite} -${o.spread}`);
+  ok("and says which book it came from", o.from === "ESPN BET" && o.raw === "BUF -2.5", `${o.from} / ${o.raw}`);
+  const many = oddsFor({ odds: [{ details: "BUF -2.5" }, { details: "BUF -3" }] }, "DET", "BUF");
+  ok("flags when a book was picked out of several", /1 of 2/.test(many.from), many.from);
+}
 ok("the away team can be the favourite", oddsFor(withOdds({ details: "DET -1" }), "DET", "BUF").favorite === "DET");
 ok("maps ESPN's abbreviation", oddsFor(withOdds({ details: "WSH -3" }), "WAS", "DAL").favorite === "WAS");
 ok("a pick'em clears the line", oddsFor(withOdds({ details: "EVEN" }), "DET", "BUF").favorite === null);
-ok("falls back to the flags", JSON.stringify(oddsFor(withOdds({ details: "", homeTeamOdds: { favorite: true }, spread: -6 }), "DET", "BUF")) === '{"favorite":"BUF","spread":6}');
+{
+  const o = oddsFor(withOdds({ details: "", homeTeamOdds: { favorite: true }, spread: -6 }), "DET", "BUF");
+  ok("falls back to the flags", o.favorite === "BUF" && o.spread === 6, `${o.favorite} -${o.spread}`);
+  ok("and marks the fallback as such", /via flags/.test(o.from), o.from);
+}
 // The one that matters: a favourite who is not in this game is a parse
 // error, not a line, and must not reach the file.
 ok("refuses a team not in the game", JSON.stringify(oddsFor(withOdds({ details: "KC -3" }), "DET", "BUF")) === "{}");

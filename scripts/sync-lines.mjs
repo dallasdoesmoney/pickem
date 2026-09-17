@@ -130,11 +130,14 @@ export function oddsFor(comp, awayAbbr, homeAbbr) {
   // rendering of that, and the card already knows how to draw it.
   if (/^(even|pk|pick)$/i.test(details)) return { favorite: null, spread: null };
 
+  const provider = odds.provider?.name ?? "unnamed provider";
+  const from = `${provider}${comp?.odds?.length > 1 ? ` (1 of ${comp.odds.length})` : ""}`;
+
   const m = /^([A-Z]{2,4})\s*(-?\d+(?:\.\d+)?)$/.exec(details);
   if (m) {
     const favorite = ours(m[1]);
     const spread = Math.abs(Number(m[2]));
-    if ((favorite === awayAbbr || favorite === homeAbbr) && isSpread(spread)) return { favorite, spread };
+    if ((favorite === awayAbbr || favorite === homeAbbr) && isSpread(spread)) return { favorite, spread, from, raw: details };
   }
 
   // Fallback: whoever is flagged favourite, with the magnitude of the
@@ -144,7 +147,7 @@ export function oddsFor(comp, awayAbbr, homeAbbr) {
   if (homeFav !== awayFav && typeof odds.spread === "number") {
     const favorite = homeFav ? homeAbbr : awayAbbr;
     const spread = Math.abs(odds.spread);
-    if (isSpread(spread)) return { favorite, spread };
+    if (isSpread(spread)) return { favorite, spread, from: `${from}, via flags`, raw: String(odds.spread) };
   }
   return {};
 }
@@ -175,7 +178,17 @@ export function updatesFrom(events, weekGames) {
     if (ar) { next.awayRecord = ar; recordsSeen++; }
     if (hr) { next.homeRecord = hr; recordsSeen++; }
 
-    const { favorite, spread } = oddsFor(comp, a, h);
+    const { favorite, spread, from, raw } = oddsFor(comp, a, h);
+    // WHERE THE NUMBER CAME FROM, logged for every game.
+    //
+    // odds[0] is whichever book ESPN happens to list first, and that is
+    // not necessarily the current market - it can be an opening line that
+    // never moves. A spread being well-formed says nothing about it being
+    // right, and without this the run log had no way to tell the two
+    // apart. It is printed even when the value did not change, because
+    // "sixteen lines and none of them moved in two hours" is itself the
+    // signal that the source is static.
+    if (favorite && spread) notes.push(`${game.id}: ${favorite} -${spread}  [${raw}]  from ${from}`);
     // null is the explicit "this is a pick'em" answer and clears the
     // fields; undefined is "nothing usable came back" and leaves them be.
     if (favorite === null) { next.favorite = undefined; next.spread = undefined; }
@@ -246,7 +259,7 @@ async function main() {
     process.exit(1);
   }
 
-  for (const n of notes) console.log(`  note: ${n}`);
+  for (const n of notes) console.log(`  ${n}`);
   const { text, changed } = applyUpdates(source, updates);
 
   // Prove the rewrite moved only what it meant to: same number of game
