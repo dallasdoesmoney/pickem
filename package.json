@@ -34,6 +34,7 @@
     "test:heal": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/pick-heal.test.mjs",
     "test:picksave": "node scripts/pick-save.test.mjs",
     "test:lines": "node scripts/sync-lines.test.mjs",
+    "test:dates": "node scripts/campaign-dates.test.mjs",
     "lines": "node scripts/sync-lines.mjs"
   },
   "dependencies": {

@@ -1,9 +1,12 @@
 // CAMPAIGN: week 2's board is open.
 //
 // One file per blast. It leads with the board being up rather than with
-// a clock, but it is going out ON the Thursday, so every time reference
-// says "tonight" - naming the day would have been right yesterday and
-// reads as days of slack today.
+// a clock, and names the DAY rather than saying "tonight" or "tomorrow".
+// That is not style, it is the only form that survives: this can be sent
+// any time in the day or so before kickoff, and a relative word is wrong
+// for half of that window. It was briefly "tonight" here, written off a
+// UTC clock that had already rolled over while it was still Wednesday
+// evening in Eastern - which is where the audience reads it.
 //
 // TIME-BOUND: dead after Thursday 17 September 2026, 8:15 PM ET, which is
 // when the first pick locks. Do not re-run it later; week 3 is a new
@@ -24,12 +27,12 @@ const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial
 const DISPLAY = "'Bungee','Arial Black','Helvetica Neue',Impact,Arial,sans-serif";
 
 // Written out rather than formatted from a Date: a person deciding
-// whether to send this can check a literal at a glance.
+// whether to send this can check a literal at a glance. The weekday here
+// is checked against the real kickoff, in Eastern, by
+// scripts/campaign-dates.test.mjs.
 const OPENER = "Lions at Bills";
-// "Tonight", because this is going out ON the Thursday. Naming the day
-// would have been right yesterday and reads as days of slack today,
-// which is the opposite of what a first-lock-in-hours email should do.
-const OPENER_AT = "tonight at 8:15 ET";
+export const OPENER_KICKOFF = "2026-09-17T20:15:00-04:00";
+const OPENER_AT = "Thursday at 8:15 PM ET";
 
 const POINTS = [
   [
@@ -38,7 +41,7 @@ const POINTS = [
   ],
   [
     "Each game locks at its own kickoff",
-    "Tonight's pick closes tonight. Everything else stays open - the Sunday games until Sunday, Monday night until Monday night.",
+    "Thursday's pick closes Thursday. Everything else stays open - the Sunday games until Sunday, Monday night until Monday night.",
   ],
   [
     "Set your Lock of the Week",
@@ -125,9 +128,7 @@ export function text({ playUrl, unsubUrl, addr }) {
 
 export const PATH = "/weekly";
 
-// Says what happened AND when it stops. On any other day the first half
-// alone would do - "Make your picks" is the button's job and a subject
-// competing with it spends the reader's attention twice - but this one
-// lands hours before the first lock, and that is the part worth the
-// inbox's one line.
-export const SUBJECT = "Week 2 is open - first pick locks tonight";
+// Says what happened, not what to do. "Make your picks" is the button's
+// job; a subject line competing with it just spends the reader's
+// attention twice.
+export const SUBJECT = "Week 2 is open";

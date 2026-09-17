@@ -139,6 +139,11 @@ export function text({ playUrl, unsubUrl, addr }) {
 
 // The board, not the daily game - every campaign before this one was
 // about /nfl-nameplate, and the sender still defaults there.
+// A LAST CALL, written and sent in one sitting inside the final hours -
+// which is what earns it the relative words the week-opening blasts are
+// not allowed. See scripts/campaign-dates.test.mjs.
+export const SAME_DAY = true;
+
 export const PATH = "/weekly";
 
 // Names the game rather than the deadline. "Your picks lock tonight" is
