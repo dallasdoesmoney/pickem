@@ -44,8 +44,8 @@ export const WEEK_1_GAMES: Game[] = [
 
 export const WEEK_2_GAMES: Game[] = [
   { id: "2026-w2-det-buf", week: 2, away: "DET", home: "BUF", kickoff: "2026-09-17T20:15:00-04:00", network: "Prime Video", favorite: "BUF", spread: 5.5, awayRecord: "1-1", homeRecord: "2-0" },
-  { id: "2026-w2-car-atl", week: 2, away: "CAR", home: "ATL", kickoff: "2026-09-20T13:00:00-04:00", network: "FOX", favorite: "CAR", spread: 2.5, awayRecord: "0-1", homeRecord: "0-1" },
-  { id: "2026-w2-no-bal", week: 2, away: "NO", home: "BAL", kickoff: "2026-09-20T13:00:00-04:00", network: "CBS", favorite: "BAL", spread: 7.5, awayRecord: "0-1", homeRecord: "1-0" },
+  { id: "2026-w2-car-atl", week: 2, away: "CAR", home: "ATL", kickoff: "2026-09-20T13:00:00-04:00", network: "FOX", favorite: "CAR", spread: 3, awayRecord: "0-1", homeRecord: "0-1" },
+  { id: "2026-w2-no-bal", week: 2, away: "NO", home: "BAL", kickoff: "2026-09-20T13:00:00-04:00", network: "CBS", favorite: "BAL", spread: 8.5, awayRecord: "0-1", homeRecord: "1-0" },
   { id: "2026-w2-min-chi", week: 2, away: "MIN", home: "CHI", kickoff: "2026-09-20T13:00:00-04:00", network: "FOX", favorite: "CHI", spread: 4.5, awayRecord: "1-0", homeRecord: "1-0" },
   { id: "2026-w2-cin-hou", week: 2, away: "CIN", home: "HOU", kickoff: "2026-09-20T13:00:00-04:00", network: "CBS", favorite: "HOU", spread: 2.5, awayRecord: "1-0", homeRecord: "0-1" },
   { id: "2026-w2-pit-ne", week: 2, away: "PIT", home: "NE", kickoff: "2026-09-20T13:00:00-04:00", network: "CBS", favorite: "NE", spread: 5.5, awayRecord: "1-0", homeRecord: "0-1" },
@@ -56,7 +56,7 @@ export const WEEK_2_GAMES: Game[] = [
   { id: "2026-w2-lv-lac", week: 2, away: "LV", home: "LAC", kickoff: "2026-09-20T16:05:00-04:00", network: "CBS", favorite: "LAC", spread: 6.5, awayRecord: "1-0", homeRecord: "0-1" },
   { id: "2026-w2-sea-ari", week: 2, away: "SEA", home: "ARI", kickoff: "2026-09-20T16:25:00-04:00", network: "FOX", favorite: "SEA", spread: 3.5, awayRecord: "1-0", homeRecord: "1-0" },
   { id: "2026-w2-was-dal", week: 2, away: "WAS", home: "DAL", kickoff: "2026-09-20T16:25:00-04:00", network: "FOX", favorite: "DAL", spread: 3.5, awayRecord: "0-1", homeRecord: "0-1" },
-  { id: "2026-w2-mia-sf", week: 2, away: "MIA", home: "SF", kickoff: "2026-09-20T16:25:00-04:00", network: "FOX", favorite: "SF", spread: 13.5, awayRecord: "0-1", homeRecord: "1-0" },
+  { id: "2026-w2-mia-sf", week: 2, away: "MIA", home: "SF", kickoff: "2026-09-20T16:25:00-04:00", network: "FOX", favorite: "SF", spread: 12.5, awayRecord: "0-1", homeRecord: "1-0" },
   { id: "2026-w2-ind-kc", week: 2, away: "IND", home: "KC", kickoff: "2026-09-20T20:20:00-04:00", network: "NBC", favorite: "KC", spread: 6.5, awayRecord: "0-1", homeRecord: "1-0" },
   { id: "2026-w2-nyg-lar", week: 2, away: "NYG", home: "LAR", kickoff: "2026-09-21T20:15:00-04:00", network: "ESPN", favorite: "LAR", spread: 7, awayRecord: "1-0", homeRecord: "0-1" },
 ];
