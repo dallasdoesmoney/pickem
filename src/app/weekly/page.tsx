@@ -407,19 +407,25 @@ export default function Home() {
   const now = useNow();
   const { user: authUser } = useAuth();
 
+  // ALWAYS fetch, rather than only for a published week.
+  //
+  // game_results only ever holds games ESPN has called final, and every
+  // pick locked at its own kickoff - which is strictly earlier - so a
+  // result being on screen can no longer help anybody. Waiting for the
+  // publish flag meant Thursday night finished, the pick was frozen, and
+  // the board still showed the week at 0-0. See 0063_score_when_final.
+  //
+  // A week with nothing final yet simply comes back empty, which is the
+  // same thing the old branch did by hand.
   useEffect(() => {
-    if (currentWeekRow?.results_published) {
-      fetchGameResults(activeWeek)
-        .then(setResults)
-        .catch(() => setResults({}));
-      // Not in streamer mode: nothing on this page writes to the
-      // account while a guest has the board.
-      if (authUser && !view.streamerMode) syncLockBonus().catch((err) => console.error("Lock bonus sync failed", err));
-    } else {
-      setResults({});
-    }
+    fetchGameResults(activeWeek)
+      .then(setResults)
+      .catch(() => setResults({}));
+    // Not in streamer mode: nothing on this page writes to the
+    // account while a guest has the board.
+    if (authUser && !view.streamerMode) syncLockBonus().catch((err) => console.error("Lock bonus sync failed", err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWeek, currentWeekRow?.results_published, authUser]);
+  }, [activeWeek, authUser]);
 
   const games = GAMES_BY_WEEK[activeWeek];
   const view = useBoardView();

@@ -33,6 +33,7 @@
     "test:weeklylock": "node scripts/weekly-lock.test.mjs",
     "test:heal": "node --experimental-strip-types --import ./scripts/lib/register-ts.mjs scripts/pick-heal.test.mjs",
     "test:picksave": "node scripts/pick-save.test.mjs",
+    "test:partial": "node scripts/partial-week.test.mjs",
     "test:lines": "node scripts/sync-lines.test.mjs",
     "test:dates": "node scripts/campaign-dates.test.mjs",
     "lines": "node scripts/sync-lines.mjs"
@@ -54,6 +55,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
