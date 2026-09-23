@@ -66,7 +66,7 @@ export const WEEK_3_GAMES: Game[] = [
   { id: "2026-w3-lac-buf", week: 3, away: "LAC", home: "BUF", kickoff: "2026-09-27T13:00:00-04:00", network: "FOX", favorite: "BUF", spread: 7, awayRecord: "0-2", homeRecord: "2-0" },
   { id: "2026-w3-car-cle", week: 3, away: "CAR", home: "CLE", kickoff: "2026-09-27T13:00:00-04:00", network: "FOX", favorite: "CAR", spread: 2.5, awayRecord: "1-1", homeRecord: "1-1" },
   { id: "2026-w3-nyj-det", week: 3, away: "NYJ", home: "DET", kickoff: "2026-09-27T13:00:00-04:00", network: "FOX", favorite: "DET", spread: 6.5, awayRecord: "1-1", homeRecord: "1-1" },
-  { id: "2026-w3-hou-ind", week: 3, away: "HOU", home: "IND", kickoff: "2026-09-27T13:00:00-04:00", network: "CBS", favorite: "HOU", spread: 3, awayRecord: "0-2", homeRecord: "0-2" },
+  { id: "2026-w3-hou-ind", week: 3, away: "HOU", home: "IND", kickoff: "2026-09-27T13:00:00-04:00", network: "CBS", favorite: "HOU", spread: 2.5, awayRecord: "0-2", homeRecord: "0-2" },
   { id: "2026-w3-ne-jax", week: 3, away: "NE", home: "JAX", kickoff: "2026-09-27T13:00:00-04:00", network: "CBS", favorite: "JAX", spread: 3, awayRecord: "1-1", homeRecord: "1-1" },
   { id: "2026-w3-kc-mia", week: 3, away: "KC", home: "MIA", kickoff: "2026-09-27T13:00:00-04:00", network: "CBS", favorite: "KC", spread: 11.5, awayRecord: "2-0", homeRecord: "0-2" },
   { id: "2026-w3-ten-nyg", week: 3, away: "TEN", home: "NYG", kickoff: "2026-09-27T13:00:00-04:00", network: "CBS", favorite: "NYG", spread: 2.5, awayRecord: "0-2", homeRecord: "1-1" },
