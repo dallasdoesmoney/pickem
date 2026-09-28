@@ -76,8 +76,8 @@ export const WEEK_3_GAMES: Game[] = [
   { id: "2026-w3-min-tb", week: 3, away: "MIN", home: "TB", kickoff: "2026-09-27T16:05:00-04:00", network: "FOX", favorite: "MIN", spread: 1.5, awayRecord: "3-0", homeRecord: "0-3" },
   { id: "2026-w3-lv-no", week: 3, away: "LV", home: "NO", kickoff: "2026-09-27T16:25:00-04:00", network: "CBS", favorite: "NO", spread: 3.5, awayRecord: "3-0", homeRecord: "1-2" },
   { id: "2026-w3-bal-dal", week: 3, away: "BAL", home: "DAL", kickoff: "2026-09-27T16:25:00-04:00", network: "CBS", favorite: "BAL", spread: 3.5, awayRecord: "2-1", homeRecord: "1-2" },
-  { id: "2026-w3-lar-den", week: 3, away: "LAR", home: "DEN", kickoff: "2026-09-27T20:20:00-04:00", network: "NBC", favorite: "LAR", spread: 1.5, awayRecord: "1-1", homeRecord: "1-1" },
-  { id: "2026-w3-phi-chi", week: 3, away: "PHI", home: "CHI", kickoff: "2026-09-28T20:15:00-04:00", network: "ESPN", favorite: "PHI", spread: 4.5, awayRecord: "2-0", homeRecord: "1-1" },
+  { id: "2026-w3-lar-den", week: 3, away: "LAR", home: "DEN", kickoff: "2026-09-27T20:20:00-04:00", network: "NBC", favorite: "LAR", spread: 1.5, awayRecord: "1-2", homeRecord: "2-1" },
+  { id: "2026-w3-phi-chi", week: 3, away: "PHI", home: "CHI", kickoff: "2026-09-28T20:15:00-04:00", network: "ESPN", favorite: "PHI", spread: 3.5, awayRecord: "2-0", homeRecord: "1-1" },
 ];
 
 export const WEEK_4_GAMES: Game[] = [
