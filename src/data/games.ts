@@ -87,7 +87,7 @@ export const WEEK_4_GAMES: Game[] = [
   { id: "2026-w4-ne-buf", week: 4, away: "NE", home: "BUF", kickoff: "2026-10-04T13:00:00-04:00", network: "CBS", favorite: "BUF", spread: 6.5, awayRecord: "1-2", homeRecord: "3-0" },
   { id: "2026-w4-nyj-chi", week: 4, away: "NYJ", home: "CHI", kickoff: "2026-10-04T13:00:00-04:00", network: "FOX", favorite: "CHI", spread: 3.5, awayRecord: "1-2", homeRecord: "2-1" },
   { id: "2026-w4-jax-cin", week: 4, away: "JAX", home: "CIN", kickoff: "2026-10-04T13:00:00-04:00", network: "CBS", favorite: "CIN", spread: 2.5, awayRecord: "2-1", homeRecord: "2-1" },
-  { id: "2026-w4-dal-hou", week: 4, away: "DAL", home: "HOU", kickoff: "2026-10-04T13:00:00-04:00", network: "FOX", favorite: "HOU", spread: 2.5, awayRecord: "1-2", homeRecord: "0-3" },
+  { id: "2026-w4-dal-hou", week: 4, away: "DAL", home: "HOU", kickoff: "2026-10-04T13:00:00-04:00", network: "FOX", favorite: "HOU", spread: 3, awayRecord: "1-2", homeRecord: "0-3" },
   { id: "2026-w4-ari-nyg", week: 4, away: "ARI", home: "NYG", kickoff: "2026-10-04T13:00:00-04:00", network: "CBS", favorite: "ARI", spread: 2.5, awayRecord: "1-2", homeRecord: "2-1" },
   { id: "2026-w4-lar-phi", week: 4, away: "LAR", home: "PHI", kickoff: "2026-10-04T13:00:00-04:00", network: "FOX", favorite: "LAR", spread: 3, awayRecord: "1-2", homeRecord: "2-1" },
   { id: "2026-w4-gb-tb", week: 4, away: "GB", home: "TB", kickoff: "2026-10-04T13:00:00-04:00", network: "FOX", favorite: "GB", spread: 3.5, awayRecord: "1-2", homeRecord: "0-3" },
