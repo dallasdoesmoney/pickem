@@ -82,7 +82,7 @@ export const WEEK_3_GAMES: Game[] = [
 
 export const WEEK_4_GAMES: Game[] = [
   { id: "2026-w4-pit-cle", week: 4, away: "PIT", home: "CLE", kickoff: "2026-10-01T20:15:00-04:00", network: "Prime Video", favorite: "PIT", spread: 2.5, awayRecord: "2-2", homeRecord: "3-1" },
-  { id: "2026-w4-ind-was", week: 4, away: "IND", home: "WAS", kickoff: "2026-10-04T09:30:00-04:00", network: "NFL Network", favorite: "IND", spread: 3.5, awayRecord: "1-2", homeRecord: "1-2" },
+  { id: "2026-w4-ind-was", week: 4, away: "IND", home: "WAS", kickoff: "2026-10-04T09:30:00-04:00", network: "NFL Network", favorite: "IND", spread: 4.5, awayRecord: "1-2", homeRecord: "1-2" },
   { id: "2026-w4-ten-bal", week: 4, away: "TEN", home: "BAL", kickoff: "2026-10-04T13:00:00-04:00", network: "CBS", favorite: "BAL", spread: 11.5, awayRecord: "0-3", homeRecord: "2-1" },
   { id: "2026-w4-ne-buf", week: 4, away: "NE", home: "BUF", kickoff: "2026-10-04T13:00:00-04:00", network: "CBS", favorite: "BUF", spread: 7, awayRecord: "1-2", homeRecord: "3-0" },
   { id: "2026-w4-nyj-chi", week: 4, away: "NYJ", home: "CHI", kickoff: "2026-10-04T13:00:00-04:00", network: "FOX", favorite: "CHI", spread: 3.5, awayRecord: "1-2", homeRecord: "2-1" },
