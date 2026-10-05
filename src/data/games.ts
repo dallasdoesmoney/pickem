@@ -95,7 +95,7 @@ export const WEEK_4_GAMES: Game[] = [
   { id: "2026-w4-kc-lv", week: 4, away: "KC", home: "LV", kickoff: "2026-10-04T16:25:00-04:00", network: "CBS", favorite: "KC", spread: 4.5, awayRecord: "4-0", homeRecord: "3-1" },
   { id: "2026-w4-lac-sea", week: 4, away: "LAC", home: "SEA", kickoff: "2026-10-04T16:25:00-04:00", network: "CBS", favorite: "SEA", spread: 7, awayRecord: "0-4", homeRecord: "3-1" },
   { id: "2026-w4-den-sf", week: 4, away: "DEN", home: "SF", kickoff: "2026-10-04T16:25:00-04:00", network: "CBS", favorite: "SF", spread: 3, awayRecord: "2-2", homeRecord: "4-0" },
-  { id: "2026-w4-det-car", week: 4, away: "DET", home: "CAR", kickoff: "2026-10-04T20:20:00-04:00", network: "NBC", favorite: "DET", spread: 4.5, awayRecord: "2-1", homeRecord: "1-2" },
+  { id: "2026-w4-det-car", week: 4, away: "DET", home: "CAR", kickoff: "2026-10-04T20:20:00-04:00", network: "NBC", favorite: "DET", spread: 4.5, awayRecord: "2-2", homeRecord: "2-2" },
   { id: "2026-w4-atl-no", week: 4, away: "ATL", home: "NO", kickoff: "2026-10-05T20:15:00-04:00", network: "ESPN", favorite: "NO", spread: 1.5, awayRecord: "1-2", homeRecord: "1-2" },
 ];
 
