@@ -118,7 +118,7 @@ export const WEEK_5_GAMES: Game[] = [
 ];
 
 export const WEEK_6_GAMES: Game[] = [
-  { id: "2026-w6-sea-den", week: 6, away: "SEA", home: "DEN", kickoff: "2026-10-15T20:15:00-04:00", network: "Prime Video", favorite: "SEA", spread: 2.5, awayRecord: "3-2", homeRecord: "3-2" },
+  { id: "2026-w6-sea-den", week: 6, away: "SEA", home: "DEN", kickoff: "2026-10-15T20:15:00-04:00", network: "Prime Video", favorite: "SEA", spread: 2.5, awayRecord: "3-3", homeRecord: "4-2" },
   { id: "2026-w6-hou-jax", week: 6, away: "HOU", home: "JAX", kickoff: "2026-10-18T09:30:00-04:00", network: "NFL Network", favorite: "JAX", spread: 2.5, awayRecord: "1-4", homeRecord: "4-1" },
   { id: "2026-w6-chi-atl", week: 6, away: "CHI", home: "ATL", kickoff: "2026-10-18T13:00:00-04:00", network: "FOX", favorite: "CHI", spread: 1.5, awayRecord: "3-2", homeRecord: "2-3" },
   { id: "2026-w6-bal-cle", week: 6, away: "BAL", home: "CLE", kickoff: "2026-10-18T13:00:00-04:00", network: "FOX", favorite: "BAL", spread: 3.5, awayRecord: "4-1", homeRecord: "3-2" },
@@ -128,7 +128,7 @@ export const WEEK_6_GAMES: Game[] = [
   { id: "2026-w6-car-phi", week: 6, away: "CAR", home: "PHI", kickoff: "2026-10-18T13:00:00-04:00", network: "CBS", favorite: "CAR", spread: 3.5, awayRecord: "2-2", homeRecord: "2-3" },
   { id: "2026-w6-pit-tb", week: 6, away: "PIT", home: "TB", kickoff: "2026-10-18T13:00:00-04:00", network: "CBS", favorite: "PIT", spread: 2.5, awayRecord: "3-2", homeRecord: "1-4" },
   { id: "2026-w6-ari-lar", week: 6, away: "ARI", home: "LAR", kickoff: "2026-10-18T16:05:00-04:00", network: "FOX", favorite: "LAR", spread: 12.5, awayRecord: "1-4", homeRecord: "2-3" },
-  { id: "2026-w6-lac-kc", week: 6, away: "LAC", home: "KC", kickoff: "2026-10-18T16:25:00-04:00", network: "CBS", favorite: "KC", spread: 8.5, awayRecord: "0-5", homeRecord: "4-0" },
+  { id: "2026-w6-lac-kc", week: 6, away: "LAC", home: "KC", kickoff: "2026-10-18T16:25:00-04:00", network: "CBS", favorite: "KC", spread: 7.5, awayRecord: "0-5", homeRecord: "4-0" },
   { id: "2026-w6-buf-lv", week: 6, away: "BUF", home: "LV", kickoff: "2026-10-18T16:25:00-04:00", network: "CBS", favorite: "BUF", spread: 4.5, awayRecord: "4-1", homeRecord: "3-2" },
   { id: "2026-w6-dal-gb", week: 6, away: "DAL", home: "GB", kickoff: "2026-10-18T20:20:00-04:00", network: "NBC", favorite: "GB", spread: 1.5, awayRecord: "2-3", homeRecord: "3-2" },
   { id: "2026-w6-was-sf", week: 6, away: "WAS", home: "SF", kickoff: "2026-10-19T20:15:00-04:00", network: "ESPN", favorite: "SF", spread: 7.5, awayRecord: "1-3-1", homeRecord: "5-0" },
