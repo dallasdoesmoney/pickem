@@ -127,10 +127,10 @@ export const WEEK_6_GAMES: Game[] = [
   { id: "2026-w6-no-nyg", week: 6, away: "NO", home: "NYG", kickoff: "2026-10-18T13:00:00-04:00", network: "FOX", favorite: "NO", spread: 1.5, awayRecord: "2-4", homeRecord: "3-2-1" },
   { id: "2026-w6-car-phi", week: 6, away: "CAR", home: "PHI", kickoff: "2026-10-18T13:00:00-04:00", network: "CBS", favorite: "CAR", spread: 3, awayRecord: "3-2", homeRecord: "2-4" },
   { id: "2026-w6-pit-tb", week: 6, away: "PIT", home: "TB", kickoff: "2026-10-18T13:00:00-04:00", network: "CBS", favorite: "PIT", spread: 1.5, awayRecord: "4-2", homeRecord: "1-5" },
-  { id: "2026-w6-ari-lar", week: 6, away: "ARI", home: "LAR", kickoff: "2026-10-18T16:05:00-04:00", network: "FOX", favorite: "LAR", spread: 12.5, awayRecord: "1-4", homeRecord: "2-3" },
+  { id: "2026-w6-ari-lar", week: 6, away: "ARI", home: "LAR", kickoff: "2026-10-18T16:05:00-04:00", network: "FOX", favorite: "LAR", spread: 12.5, awayRecord: "2-4", homeRecord: "2-4" },
   { id: "2026-w6-lac-kc", week: 6, away: "LAC", home: "KC", kickoff: "2026-10-18T16:25:00-04:00", network: "CBS", favorite: "KC", spread: 7.5, awayRecord: "0-5", homeRecord: "4-0" },
   { id: "2026-w6-buf-lv", week: 6, away: "BUF", home: "LV", kickoff: "2026-10-18T16:25:00-04:00", network: "CBS", favorite: "BUF", spread: 5.5, awayRecord: "4-1", homeRecord: "3-2" },
-  { id: "2026-w6-dal-gb", week: 6, away: "DAL", home: "GB", kickoff: "2026-10-18T20:20:00-04:00", network: "NBC", favorite: "GB", spread: 1.5, awayRecord: "2-3", homeRecord: "3-2" },
+  { id: "2026-w6-dal-gb", week: 6, away: "DAL", home: "GB", kickoff: "2026-10-18T20:20:00-04:00", network: "NBC", favorite: "DAL", spread: 1.5, awayRecord: "2-3", homeRecord: "3-2" },
   { id: "2026-w6-was-sf", week: 6, away: "WAS", home: "SF", kickoff: "2026-10-19T20:15:00-04:00", network: "ESPN", favorite: "SF", spread: 7.5, awayRecord: "1-3-1", homeRecord: "5-0" },
 ];
 
