@@ -138,7 +138,7 @@ export const WEEK_7_GAMES: Game[] = [
   { id: "2026-w7-ne-chi", week: 7, away: "NE", home: "CHI", kickoff: "2026-10-22T20:15:00-04:00", network: "Prime Video", favorite: "CHI", spread: 3, awayRecord: "4-3", homeRecord: "5-2" },
   { id: "2026-w7-pit-no", week: 7, away: "PIT", home: "NO", kickoff: "2026-10-25T09:30:00-04:00", network: "NFL Network", favorite: "PIT", spread: 3, awayRecord: "4-2", homeRecord: "2-4" },
   { id: "2026-w7-sf-atl", week: 7, away: "SF", home: "ATL", kickoff: "2026-10-25T13:00:00-04:00", network: "FOX", favorite: "SF", spread: 2.5, awayRecord: "6-0", homeRecord: "2-4" },
-  { id: "2026-w7-cin-bal", week: 7, away: "CIN", home: "BAL", kickoff: "2026-10-25T13:00:00-04:00", network: "CBS", favorite: "CIN", spread: 1.5, awayRecord: "3-2", homeRecord: "4-2" },
+  { id: "2026-w7-cin-bal", week: 7, away: "CIN", home: "BAL", kickoff: "2026-10-25T13:00:00-04:00", network: "CBS", favorite: "CIN", spread: 2.5, awayRecord: "3-2", homeRecord: "4-2" },
   { id: "2026-w7-tb-car", week: 7, away: "TB", home: "CAR", kickoff: "2026-10-25T13:00:00-04:00", network: "FOX", favorite: "CAR", spread: 3, awayRecord: "1-5", homeRecord: "3-2" },
   { id: "2026-w7-nyg-hou", week: 7, away: "NYG", home: "HOU", kickoff: "2026-10-25T13:00:00-04:00", network: "FOX", favorite: "HOU", spread: 10, awayRecord: "3-2-1", homeRecord: "2-4" },
   { id: "2026-w7-ind-min", week: 7, away: "IND", home: "MIN", kickoff: "2026-10-25T13:00:00-04:00", network: "CBS", favorite: "MIN", spread: 6.5, awayRecord: "2-4", homeRecord: "5-0" },
