@@ -145,7 +145,7 @@ export const WEEK_7_GAMES: Game[] = [
   { id: "2026-w7-mia-nyj", week: 7, away: "MIA", home: "NYJ", kickoff: "2026-10-25T13:00:00-04:00", network: "CBS", favorite: "NYJ", spread: 4.5, awayRecord: "0-5", homeRecord: "2-4" },
   { id: "2026-w7-cle-ten", week: 7, away: "CLE", home: "TEN", kickoff: "2026-10-25T13:00:00-04:00", network: "CBS", favorite: "CLE", spread: 2.5, awayRecord: "4-2", homeRecord: "1-5" },
   { id: "2026-w7-den-ari", week: 7, away: "DEN", home: "ARI", kickoff: "2026-10-25T16:05:00-04:00", network: "CBS", favorite: "DEN", spread: 4.5, awayRecord: "4-2", homeRecord: "2-4" },
-  { id: "2026-w7-gb-det", week: 7, away: "GB", home: "DET", kickoff: "2026-10-25T16:25:00-04:00", network: "FOX", favorite: "DET", spread: 3, awayRecord: "4-2", homeRecord: "3-2" },
+  { id: "2026-w7-gb-det", week: 7, away: "GB", home: "DET", kickoff: "2026-10-25T16:25:00-04:00", network: "FOX", favorite: "DET", spread: 3.5, awayRecord: "4-2", homeRecord: "3-2" },
   { id: "2026-w7-lar-lv", week: 7, away: "LAR", home: "LV", kickoff: "2026-10-25T16:25:00-04:00", network: "FOX", favorite: "LAR", spread: 3, awayRecord: "2-4", homeRecord: "3-3" },
   { id: "2026-w7-kc-sea", week: 7, away: "KC", home: "SEA", kickoff: "2026-10-25T20:20:00-04:00", network: "NBC", favorite: "SEA", spread: 3, awayRecord: "5-0", homeRecord: "3-3" },
   { id: "2026-w7-dal-phi", week: 7, away: "DAL", home: "PHI", kickoff: "2026-10-26T20:15:00-04:00", network: "ESPN", favorite: "DAL", spread: 4.5, awayRecord: "2-4", homeRecord: "2-4" },
