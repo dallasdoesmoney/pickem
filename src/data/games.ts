@@ -153,8 +153,8 @@ export const WEEK_7_GAMES: Game[] = [
 
 export const WEEK_8_GAMES: Game[] = [
   { id: "2026-w8-car-gb", week: 8, away: "CAR", home: "GB", kickoff: "2026-10-29T20:15:00-04:00", network: "Prime Video", favorite: "GB", spread: 3.5, awayRecord: "3-3", homeRecord: "4-3" },
-  { id: "2026-w8-bal-buf", week: 8, away: "BAL", home: "BUF", kickoff: "2026-11-01T13:00:00-05:00", network: "CBS", favorite: "BUF", spread: 3.5, awayRecord: "4-3", homeRecord: "5-1" },
-  { id: "2026-w8-ten-cin", week: 8, away: "TEN", home: "CIN", kickoff: "2026-11-01T13:00:00-05:00", network: "CBS", favorite: "CIN", spread: 10.5, awayRecord: "1-6", homeRecord: "4-2" },
+  { id: "2026-w8-bal-buf", week: 8, away: "BAL", home: "BUF", kickoff: "2026-11-01T13:00:00-05:00", network: "CBS", favorite: "BUF", spread: 3, awayRecord: "4-3", homeRecord: "5-1" },
+  { id: "2026-w8-ten-cin", week: 8, away: "TEN", home: "CIN", kickoff: "2026-11-01T13:00:00-05:00", network: "CBS", favorite: "CIN", spread: 10, awayRecord: "1-6", homeRecord: "4-2" },
   { id: "2026-w8-ari-dal", week: 8, away: "ARI", home: "DAL", kickoff: "2026-11-01T13:00:00-05:00", network: "FOX", favorite: "DAL", spread: 6.5, awayRecord: "2-5", homeRecord: "3-4" },
   { id: "2026-w8-min-det", week: 8, away: "MIN", home: "DET", kickoff: "2026-11-01T13:00:00-05:00", network: "FOX", favorite: "DET", spread: 3, awayRecord: "6-0", homeRecord: "4-2" },
   { id: "2026-w8-ind-jax", week: 8, away: "IND", home: "JAX", kickoff: "2026-11-01T13:00:00-05:00", network: "CBS", favorite: "JAX", spread: 9.5, awayRecord: "2-5", homeRecord: "4-2" },
