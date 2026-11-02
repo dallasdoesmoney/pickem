@@ -161,10 +161,10 @@ export const WEEK_8_GAMES: Game[] = [
   { id: "2026-w8-lv-nyj", week: 8, away: "LV", home: "NYJ", kickoff: "2026-11-01T13:00:00-05:00", network: "FOX", favorite: "NYJ", spread: 1.5, awayRecord: "4-4", homeRecord: "2-6" },
   { id: "2026-w8-cle-pit", week: 8, away: "CLE", home: "PIT", kickoff: "2026-11-01T13:00:00-05:00", network: "CBS", favorite: "PIT", spread: 3.5, awayRecord: "5-3", homeRecord: "6-2" },
   { id: "2026-w8-atl-tb", week: 8, away: "ATL", home: "TB", kickoff: "2026-11-01T13:00:00-05:00", network: "FOX", favorite: "TB", spread: 2.5, awayRecord: "3-5", homeRecord: "3-5" },
-  { id: "2026-w8-lac-lar", week: 8, away: "LAC", home: "LAR", kickoff: "2026-11-01T16:05:00-05:00", network: "FOX", favorite: "LAR", spread: 6.5, awayRecord: "0-6", homeRecord: "3-4" },
-  { id: "2026-w8-kc-den", week: 8, away: "KC", home: "DEN", kickoff: "2026-11-01T16:25:00-05:00", network: "CBS", favorite: "KC", spread: 1.5, awayRecord: "5-1", homeRecord: "5-2" },
-  { id: "2026-w8-ne-mia", week: 8, away: "NE", home: "MIA", kickoff: "2026-11-01T16:25:00-05:00", network: "CBS", favorite: "NE", spread: 7, awayRecord: "4-3", homeRecord: "1-5" },
-  { id: "2026-w8-phi-was", week: 8, away: "PHI", home: "WAS", kickoff: "2026-11-01T20:20:00-05:00", network: "NBC", favorite: "WAS", spread: 6, awayRecord: "2-5", homeRecord: "1-4-1" },
+  { id: "2026-w8-lac-lar", week: 8, away: "LAC", home: "LAR", kickoff: "2026-11-01T16:05:00-05:00", network: "FOX", favorite: "LAR", spread: 6.5, awayRecord: "0-7", homeRecord: "4-4" },
+  { id: "2026-w8-kc-den", week: 8, away: "KC", home: "DEN", kickoff: "2026-11-01T16:25:00-05:00", network: "CBS", favorite: "KC", spread: 1.5, awayRecord: "5-2", homeRecord: "6-2" },
+  { id: "2026-w8-ne-mia", week: 8, away: "NE", home: "MIA", kickoff: "2026-11-01T16:25:00-05:00", network: "CBS", favorite: "NE", spread: 7, awayRecord: "5-3", homeRecord: "1-6" },
+  { id: "2026-w8-phi-was", week: 8, away: "PHI", home: "WAS", kickoff: "2026-11-01T20:20:00-05:00", network: "NBC", favorite: "WAS", spread: 6, awayRecord: "2-6", homeRecord: "2-4-1" },
   { id: "2026-w8-chi-sea", week: 8, away: "CHI", home: "SEA", kickoff: "2026-11-02T20:15:00-05:00", network: "ESPN", favorite: "SEA", spread: 3, awayRecord: "5-2", homeRecord: "4-3" },
 ];
 
