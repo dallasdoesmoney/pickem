@@ -169,7 +169,7 @@ export const WEEK_8_GAMES: Game[] = [
 ];
 
 export const WEEK_9_GAMES: Game[] = [
-  { id: "2026-w9-jax-bal", week: 9, away: "JAX", home: "BAL", kickoff: "2026-11-05T20:15:00-05:00", network: "Prime Video", favorite: "JAX", spread: 10, awayRecord: "5-2", homeRecord: "4-4" },
+  { id: "2026-w9-jax-bal", week: 9, away: "JAX", home: "BAL", kickoff: "2026-11-05T20:15:00-05:00", network: "Prime Video", favorite: "JAX", spread: 10, awayRecord: "6-2", homeRecord: "4-5" },
   { id: "2026-w9-cin-atl", week: 9, away: "CIN", home: "ATL", kickoff: "2026-11-08T09:30:00-05:00", network: "NFL Network", favorite: "CIN", spread: 3, awayRecord: "5-2", homeRecord: "3-5" },
   { id: "2026-w9-den-car", week: 9, away: "DEN", home: "CAR", kickoff: "2026-11-08T13:00:00-05:00", network: "CBS", favorite: "DEN", spread: 2.5, awayRecord: "6-2", homeRecord: "3-4" },
   { id: "2026-w9-dal-ind", week: 9, away: "DAL", home: "IND", kickoff: "2026-11-08T13:00:00-05:00", network: "FOX", favorite: "DAL", spread: 5.5, awayRecord: "3-5", homeRecord: "2-6" },
