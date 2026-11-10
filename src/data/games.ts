@@ -187,20 +187,20 @@ export const WEEK_9_GAMES: Game[] = [
 ];
 
 export const WEEK_10_GAMES: Game[] = [
-  { id: "2026-w10-was-nyg", week: 10, away: "WAS", home: "NYG", kickoff: "2026-11-12T20:15:00-05:00", network: "Prime Video" },
-  { id: "2026-w10-ne-det", week: 10, away: "NE", home: "DET", kickoff: "2026-11-15T09:30:00-05:00", network: "FOX" },
-  { id: "2026-w10-kc-atl", week: 10, away: "KC", home: "ATL", kickoff: "2026-11-15T13:00:00-05:00", network: "CBS" },
-  { id: "2026-w10-hou-cle", week: 10, away: "HOU", home: "CLE", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX" },
-  { id: "2026-w10-min-gb", week: 10, away: "MIN", home: "GB", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX" },
-  { id: "2026-w10-mia-ind", week: 10, away: "MIA", home: "IND", kickoff: "2026-11-15T13:00:00-05:00", network: "CBS" },
-  { id: "2026-w10-car-no", week: 10, away: "CAR", home: "NO", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX" },
-  { id: "2026-w10-buf-nyj", week: 10, away: "BUF", home: "NYJ", kickoff: "2026-11-15T13:00:00-05:00", network: "CBS" },
-  { id: "2026-w10-jax-ten", week: 10, away: "JAX", home: "TEN", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX" },
-  { id: "2026-w10-lar-ari", week: 10, away: "LAR", home: "ARI", kickoff: "2026-11-15T16:05:00-05:00", network: "CBS" },
-  { id: "2026-w10-sea-lv", week: 10, away: "SEA", home: "LV", kickoff: "2026-11-15T16:05:00-05:00", network: "CBS" },
-  { id: "2026-w10-sf-dal", week: 10, away: "SF", home: "DAL", kickoff: "2026-11-15T16:25:00-05:00", network: "FOX" },
-  { id: "2026-w10-pit-cin", week: 10, away: "PIT", home: "CIN", kickoff: "2026-11-15T20:20:00-05:00", network: "NBC" },
-  { id: "2026-w10-lac-bal", week: 10, away: "LAC", home: "BAL", kickoff: "2026-11-16T20:15:00-05:00", network: "ESPN" },
+  { id: "2026-w10-was-nyg", week: 10, away: "WAS", home: "NYG", kickoff: "2026-11-12T20:15:00-05:00", network: "Prime Video", favorite: "NYG", spread: 2.5, awayRecord: "2-5-1", homeRecord: "5-2-1" },
+  { id: "2026-w10-ne-det", week: 10, away: "NE", home: "DET", kickoff: "2026-11-15T09:30:00-05:00", network: "FOX", favorite: "DET", spread: 2.5, awayRecord: "5-4", homeRecord: "6-2" },
+  { id: "2026-w10-kc-atl", week: 10, away: "KC", home: "ATL", kickoff: "2026-11-15T13:00:00-05:00", network: "CBS", favorite: "KC", spread: 3.5, awayRecord: "6-2", homeRecord: "3-6" },
+  { id: "2026-w10-hou-cle", week: 10, away: "HOU", home: "CLE", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX", favorite: "HOU", spread: 4.5, awayRecord: "3-5", homeRecord: "5-4" },
+  { id: "2026-w10-min-gb", week: 10, away: "MIN", home: "GB", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX", favorite: "GB", spread: 4.5, awayRecord: "6-2", homeRecord: "6-3" },
+  { id: "2026-w10-mia-ind", week: 10, away: "MIA", home: "IND", kickoff: "2026-11-15T13:00:00-05:00", network: "CBS", favorite: "IND", spread: 2.5, awayRecord: "1-7", homeRecord: "2-7" },
+  { id: "2026-w10-car-no", week: 10, away: "CAR", home: "NO", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX", favorite: "NO", spread: 1.5, awayRecord: "3-5", homeRecord: "3-5" },
+  { id: "2026-w10-buf-nyj", week: 10, away: "BUF", home: "NYJ", kickoff: "2026-11-15T13:00:00-05:00", network: "CBS", favorite: "BUF", spread: 8.5, awayRecord: "7-1", homeRecord: "2-7" },
+  { id: "2026-w10-jax-ten", week: 10, away: "JAX", home: "TEN", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX", favorite: "JAX", spread: 10.5, awayRecord: "6-2", homeRecord: "1-7" },
+  { id: "2026-w10-lar-ari", week: 10, away: "LAR", home: "ARI", kickoff: "2026-11-15T16:05:00-05:00", network: "CBS", favorite: "LAR", spread: 9.5, awayRecord: "5-4", homeRecord: "3-6" },
+  { id: "2026-w10-sea-lv", week: 10, away: "SEA", home: "LV", kickoff: "2026-11-15T16:05:00-05:00", network: "CBS", favorite: "SEA", spread: 3.5, awayRecord: "5-4", homeRecord: "4-5" },
+  { id: "2026-w10-sf-dal", week: 10, away: "SF", home: "DAL", kickoff: "2026-11-15T16:25:00-05:00", network: "FOX", favorite: "SF", spread: 3.5, awayRecord: "7-1", homeRecord: "4-5" },
+  { id: "2026-w10-pit-cin", week: 10, away: "PIT", home: "CIN", kickoff: "2026-11-15T20:20:00-05:00", network: "NBC", favorite: "CIN", spread: 3.5, awayRecord: "6-2", homeRecord: "6-2" },
+  { id: "2026-w10-lac-bal", week: 10, away: "LAC", home: "BAL", kickoff: "2026-11-16T20:15:00-05:00", network: "ESPN", favorite: "BAL", spread: 5.5, awayRecord: "0-8", homeRecord: "4-5" },
 ];
 
 export const WEEK_11_GAMES: Game[] = [
