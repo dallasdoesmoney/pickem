@@ -198,7 +198,7 @@ export const WEEK_10_GAMES: Game[] = [
   { id: "2026-w10-jax-ten", week: 10, away: "JAX", home: "TEN", kickoff: "2026-11-15T13:00:00-05:00", network: "FOX", favorite: "JAX", spread: 10.5, awayRecord: "6-2", homeRecord: "1-7" },
   { id: "2026-w10-lar-ari", week: 10, away: "LAR", home: "ARI", kickoff: "2026-11-15T16:05:00-05:00", network: "CBS", favorite: "LAR", spread: 9.5, awayRecord: "5-4", homeRecord: "3-6" },
   { id: "2026-w10-sea-lv", week: 10, away: "SEA", home: "LV", kickoff: "2026-11-15T16:05:00-05:00", network: "CBS", favorite: "SEA", spread: 6.5, awayRecord: "5-4", homeRecord: "4-5" },
-  { id: "2026-w10-sf-dal", week: 10, away: "SF", home: "DAL", kickoff: "2026-11-15T16:25:00-05:00", network: "FOX", favorite: "SF", spread: 4.5, awayRecord: "7-1", homeRecord: "4-5" },
+  { id: "2026-w10-sf-dal", week: 10, away: "SF", home: "DAL", kickoff: "2026-11-15T16:25:00-05:00", network: "FOX", favorite: "SF", spread: 3.5, awayRecord: "7-1", homeRecord: "4-5" },
   { id: "2026-w10-pit-cin", week: 10, away: "PIT", home: "CIN", kickoff: "2026-11-15T20:20:00-05:00", network: "NBC", favorite: "CIN", spread: 3.5, awayRecord: "6-2", homeRecord: "6-2" },
   { id: "2026-w10-lac-bal", week: 10, away: "LAC", home: "BAL", kickoff: "2026-11-16T20:15:00-05:00", network: "ESPN", favorite: "BAL", spread: 4.5, awayRecord: "0-8", homeRecord: "4-5" },
 ];
