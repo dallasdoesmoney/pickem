@@ -213,7 +213,7 @@ export const WEEK_11_GAMES: Game[] = [
   { id: "2026-w11-ari-kc", week: 11, away: "ARI", home: "KC", kickoff: "2026-11-22T13:00:00-05:00", network: "CBS", favorite: "KC", spread: 16.5, awayRecord: "3-7", homeRecord: "7-2" },
   { id: "2026-w11-jax-nyg", week: 11, away: "JAX", home: "NYG", kickoff: "2026-11-22T13:00:00-05:00", network: "CBS", favorite: "JAX", spread: 6, awayRecord: "7-2", homeRecord: "5-3-1" },
   { id: "2026-w11-nyj-lac", week: 11, away: "NYJ", home: "LAC", kickoff: "2026-11-22T16:05:00-05:00", network: "FOX", favorite: "LAC", spread: 3, awayRecord: "2-8", homeRecord: "1-8" },
-  { id: "2026-w11-lv-den", week: 11, away: "LV", home: "DEN", kickoff: "2026-11-22T16:25:00-05:00", network: "CBS", favorite: "DEN", spread: 10, awayRecord: "4-6", homeRecord: "7-2" },
+  { id: "2026-w11-lv-den", week: 11, away: "LV", home: "DEN", kickoff: "2026-11-22T16:25:00-05:00", network: "CBS", favorite: "DEN", spread: 10.5, awayRecord: "4-6", homeRecord: "7-2" },
   { id: "2026-w11-pit-phi", week: 11, away: "PIT", home: "PHI", kickoff: "2026-11-22T16:25:00-05:00", network: "CBS", favorite: "PIT", spread: 3.5, awayRecord: "6-3", homeRecord: "2-7" },
   { id: "2026-w11-min-sf", week: 11, away: "MIN", home: "SF", kickoff: "2026-11-22T20:20:00-05:00", network: "NBC", favorite: "SF", spread: 3, awayRecord: "7-2", homeRecord: "8-1" },
   { id: "2026-w11-cin-was", week: 11, away: "CIN", home: "WAS", kickoff: "2026-11-23T20:15:00-05:00", network: "ESPN", favorite: "CIN", spread: 6, awayRecord: "7-2", homeRecord: "3-5-1" },
