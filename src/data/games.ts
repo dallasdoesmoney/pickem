@@ -215,7 +215,7 @@ export const WEEK_11_GAMES: Game[] = [
   { id: "2026-w11-nyj-lac", week: 11, away: "NYJ", home: "LAC", kickoff: "2026-11-22T16:05:00-05:00", network: "FOX", favorite: "LAC", spread: 3, awayRecord: "3-8", homeRecord: "1-9" },
   { id: "2026-w11-lv-den", week: 11, away: "LV", home: "DEN", kickoff: "2026-11-22T16:25:00-05:00", network: "CBS", favorite: "DEN", spread: 10.5, awayRecord: "4-7", homeRecord: "8-2" },
   { id: "2026-w11-pit-phi", week: 11, away: "PIT", home: "PHI", kickoff: "2026-11-22T16:25:00-05:00", network: "CBS", favorite: "PIT", spread: 3.5, awayRecord: "6-4", homeRecord: "3-7" },
-  { id: "2026-w11-min-sf", week: 11, away: "MIN", home: "SF", kickoff: "2026-11-22T20:20:00-05:00", network: "NBC", favorite: "SF", spread: 3.5, awayRecord: "7-2", homeRecord: "8-1" },
+  { id: "2026-w11-min-sf", week: 11, away: "MIN", home: "SF", kickoff: "2026-11-22T20:20:00-05:00", network: "NBC", favorite: "SF", spread: 3.5, awayRecord: "7-3", homeRecord: "9-1" },
   { id: "2026-w11-cin-was", week: 11, away: "CIN", home: "WAS", kickoff: "2026-11-23T20:15:00-05:00", network: "ESPN", favorite: "CIN", spread: 6, awayRecord: "7-2", homeRecord: "3-5-1" },
 ];
 
