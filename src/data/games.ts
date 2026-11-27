@@ -221,8 +221,8 @@ export const WEEK_11_GAMES: Game[] = [
 
 export const WEEK_12_GAMES: Game[] = [
   { id: "2026-w12-gb-lar", week: 12, away: "GB", home: "LAR", kickoff: "2026-11-25T20:00:00-05:00", network: "Netflix", favorite: "LAR", spread: 2.5, awayRecord: "6-5", homeRecord: "7-4" },
-  { id: "2026-w12-chi-det", week: 12, away: "CHI", home: "DET", kickoff: "2026-11-26T13:00:00-05:00", network: "CBS", favorite: "CHI", spread: 1.5, awayRecord: "8-2", homeRecord: "8-2" },
-  { id: "2026-w12-phi-dal", week: 12, away: "PHI", home: "DAL", kickoff: "2026-11-26T16:30:00-05:00", network: "FOX", favorite: "DAL", spread: 8.5, awayRecord: "3-7", homeRecord: "5-6" },
+  { id: "2026-w12-chi-det", week: 12, away: "CHI", home: "DET", kickoff: "2026-11-26T13:00:00-05:00", network: "CBS", favorite: "CHI", spread: 1.5, awayRecord: "9-2", homeRecord: "8-3" },
+  { id: "2026-w12-phi-dal", week: 12, away: "PHI", home: "DAL", kickoff: "2026-11-26T16:30:00-05:00", network: "FOX", favorite: "DAL", spread: 8.5, awayRecord: "4-7", homeRecord: "5-7" },
   { id: "2026-w12-kc-buf", week: 12, away: "KC", home: "BUF", kickoff: "2026-11-26T20:20:00-05:00", network: "NBC", favorite: "BUF", spread: 3, awayRecord: "8-2", homeRecord: "9-1" },
   { id: "2026-w12-den-pit", week: 12, away: "DEN", home: "PIT", kickoff: "2026-11-27T15:00:00-05:00", network: "Prime Video", favorite: "DEN", spread: 4.5, awayRecord: "8-2", homeRecord: "6-4" },
   { id: "2026-w12-no-cin", week: 12, away: "NO", home: "CIN", kickoff: "2026-11-29T13:00:00-05:00", network: "CBS", favorite: "CIN", spread: 10, awayRecord: "3-7", homeRecord: "7-3" },
@@ -234,7 +234,7 @@ export const WEEK_12_GAMES: Game[] = [
   { id: "2026-w12-ten-jax", week: 12, away: "TEN", home: "JAX", kickoff: "2026-11-29T16:05:00-05:00", network: "CBS", favorite: "JAX", spread: 14.5, awayRecord: "1-9", homeRecord: "7-3" },
   { id: "2026-w12-was-ari", week: 12, away: "WAS", home: "ARI", kickoff: "2026-11-29T16:25:00-05:00", network: "FOX", favorite: "WAS", spread: 6.5, awayRecord: "4-5-1", homeRecord: "3-8" },
   { id: "2026-w12-sea-sf", week: 12, away: "SEA", home: "SF", kickoff: "2026-11-29T16:25:00-05:00", network: "FOX", favorite: "SF", spread: 3, awayRecord: "6-4", homeRecord: "9-1" },
-  { id: "2026-w12-ne-lac", week: 12, away: "NE", home: "LAC", kickoff: "2026-11-29T20:20:00-05:00", network: "NBC", favorite: "NE", spread: 1.5, awayRecord: "5-5", homeRecord: "1-9" },
+  { id: "2026-w12-ne-lac", week: 12, away: "NE", home: "LAC", kickoff: "2026-11-29T20:20:00-05:00", network: "NBC", favorite: "NE", spread: 2.5, awayRecord: "5-5", homeRecord: "1-9" },
   { id: "2026-w12-car-tb", week: 12, away: "CAR", home: "TB", kickoff: "2026-11-30T20:15:00-05:00", network: "ESPN", favorite: "TB", spread: 3, awayRecord: "5-5", homeRecord: "3-7" },
 ];
 
